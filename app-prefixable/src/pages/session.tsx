@@ -151,7 +151,7 @@ export function Session() {
   );
 
   const [input, setInput] = createSignal("");
-  const [dragHeight, setDragHeight] = createSignal(0); // 0 = no manual drag, positive = user-set minimum
+  const [dragHeight, setDragHeight] = createSignal(0);
   const [optimisticMessage, setOptimisticMessage] =
     createSignal<DisplayMessage | null>(null);
   const [loading, setLoading] = createSignal(false);
@@ -2042,10 +2042,24 @@ export function Session() {
                       }
                       return;
                     }
-                    // Enter to submit (without shift), Shift+Enter for newline
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
-                      sendMessage(new Event("submit") as any);
+                      if (device.isTouchDevice()) {
+                        const textarea = e.target as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const text = input();
+                        const newText = text.slice(0, start) + "\n" + text.slice(end);
+                        setInput(newText);
+                        setTimeout(() => {
+                          textarea.style.height = "auto";
+                          textarea.style.height = Math.min(textarea.scrollHeight, parseInt(getComputedStyle(textarea).maxHeight || "200")) + "px";
+                          textarea.selectionStart = textarea.selectionEnd = start + 1;
+                          textarea.focus();
+                        }, 0);
+                      } else {
+                        sendMessage(new Event("submit") as any);
+                      }
                     }
                   }}
                   placeholder={inputBlocked() ? "Respond to the prompt above to continue..." : "Type a message... (Tab to switch agent, / for commands)"}

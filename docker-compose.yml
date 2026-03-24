@@ -1,0 +1,101 @@
+# =============================================================================
+# OpenCode Web UI - Docker Compose
+# =============================================================================
+# A prefix-aware Web UI for OpenCode that works behind reverse proxies.
+#
+# Usage:
+#   docker-compose build opencode-ui
+#   docker compose up              # Basic (no reverse proxy)
+#   docker compose -f docker-compose.yml up nginx        # With nginx
+#   docker compose -f docker-compose.yml up traefik      # With Traefik
+#
+# Prerequisites:
+#   - OpenCode API server must be running on your host:
+#     opencode serve --port 4096
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # OpenCode UI Server
+  # ---------------------------------------------------------------------------
+  opencode-ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: opencode-ui
+    environment:
+      - PORT=8080
+      - API_URL=http://host.docker.internal:4096
+      - BASE_PATH=/
+      - OPENCODE_WORKSPACE_ROOT=/home/sgallat
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8080:8080"
+    volumes:
+      - /home/sgallat:/home/sgallat
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Optional: nginx Reverse Proxy
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: opencode-nginx
+    profiles:
+      - nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./examples/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      opencode-ui:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Optional: Traefik Reverse Proxy
+  # ---------------------------------------------------------------------------
+  traefik:
+    image: traefik:v3.0
+    container_name: opencode-traefik
+    profiles:
+      - traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8081:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      opencode-ui:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+
+# Development override - uses local app-prefixable for hot reload
+x-dev-ui:
+  &dev-ui
+  build:
+    context: ./app-prefixable
+    dockerfile: ../docker/Dockerfile.dev
+  environment:
+    - PORT=3000
+    - API_URL=http://host.docker.internal:4096
+    - BASE_PATH=/
+    - DEV=true
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  ports:
+    - "3000:3000"
+  volumes:
+    - ./app-prefixable/src:/app/src
+    - ./app-prefixable/public:/app/public

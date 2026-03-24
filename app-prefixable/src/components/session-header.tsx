@@ -203,11 +203,11 @@ export function SessionHeader(props: SessionHeaderProps) {
           <FileCode class="w-4 h-4" />
         </button>
 
-        {/* Info panel toggle */}
+        {/* Info panel toggle - hidden on mobile */}
         <button
           data-hint-target
           onClick={layout.info.toggle}
-          class="p-1.5 rounded-md transition-colors"
+          class="p-1.5 rounded-md transition-colors hidden sm:flex"
           style={{
             color: layout.info.opened() ? "var(--text-interactive-base)" : "var(--icon-base)",
             background: layout.info.opened() ? "var(--surface-inset)" : "transparent",

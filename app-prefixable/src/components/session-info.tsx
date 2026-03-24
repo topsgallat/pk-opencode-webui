@@ -13,6 +13,7 @@ interface SessionInfoProps {
   onAbort: () => void
   onAgentClick: () => void
   onModelClick: () => void
+  hasAttachments?: () => boolean
 }
 
 export function SessionInfo(props: SessionInfoProps) {
@@ -152,7 +153,7 @@ export function SessionInfo(props: SessionInfoProps) {
 
     function handleClick(e: MouseEvent) {
       if (popoverRef && !popoverRef.contains(e.target as Node) &&
-          triggerRef && !triggerRef.contains(e.target as Node)) {
+        triggerRef && !triggerRef.contains(e.target as Node)) {
         setShowTokenPopover(false)
       }
     }
@@ -191,9 +192,9 @@ export function SessionInfo(props: SessionInfoProps) {
   const fmt = (n: number) => n.toLocaleString()
 
   return (
-    <div class="flex items-center px-4 py-1.5 text-xs" style={{ color: "var(--text-weak)" }}>
-      {/* Left group - info text, truncatable */}
-      <div class="flex flex-1 items-center gap-3 min-w-0 overflow-hidden whitespace-nowrap [&_button:focus-visible]:outline-offset-[-2px] [&_a:focus-visible]:outline-offset-[-2px]">
+    <div class="flex flex-wrap items-center px-2 sm:px-4 py-1.5 text-xs gap-y-2" style={{ color: "var(--text-weak)" }}>
+      {/* Left group - info text, wraps on mobile */}
+      <div class="flex flex-1 flex-wrap items-center gap-3 min-w-0 [&_button:focus-visible]:outline-offset-[-2px] [&_a:focus-visible]:outline-offset-[-2px] pr-2">
         {/* Agent */}
         <Show when={providers.selectedAgent}>
           <button
@@ -361,13 +362,22 @@ export function SessionInfo(props: SessionInfoProps) {
         <Show
           when={props.processing()}
           fallback={
-            <Show when={props.input().trim() && !props.loading()}>
-              <span class="flex items-center gap-1 opacity-50" title="Press Enter to send">
-                <span class="font-mono text-[10px] px-1 py-0.5 rounded" style={{ background: "var(--surface-inset)" }}>
-                  Enter
-                </span>
-                <CornerDownLeft class="w-3 h-3" />
-              </span>
+            <Show when={(props.input().trim() || props.hasAttachments?.()) && !props.loading()}>
+              <button
+                type="submit"
+                class="flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg"
+                style={{
+                  background: "var(--interactive-base)",
+                  color: "white"
+                }}
+                title="Click or press Enter to send"
+                aria-label="Send message"
+              >
+                <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
+                  SEND
+                </div>
+                <CornerDownLeft class="w-4 h-4" />
+              </button>
             </Show>
           }
         >

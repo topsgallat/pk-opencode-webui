@@ -4,10 +4,11 @@ import { MessageTurn } from "./message-turn"
 // Note: Markdown and MessageParts are used in the FlatMessageList component below
 import { Markdown } from "./markdown"
 import { MessageParts } from "./tool-part"
-import { ChevronUp } from "lucide-solid"
+import { ChevronUp, RefreshCw, Clock } from "lucide-solid"
 import { errorText } from "../types/message"
 import type { DisplayMessage, Turn } from "../types/message"
 import { extractTextContent } from "../utils/message"
+import type { SessionStatus } from "../sdk/client"
 
 // Number of turns to render initially and on each "load more"
 const TURNS_PER_BATCH = 10
@@ -74,6 +75,7 @@ export function MessageTimeline(props: {
   messages: DisplayMessage[]
   processing: boolean
   loadingHistory: boolean
+  sessionStatus?: SessionStatus
   onScroll?: (nearBottom: boolean) => void
 }) {
   let containerRef: HTMLDivElement | undefined
@@ -281,18 +283,7 @@ export function MessageTimeline(props: {
         {/* Processing indicator - shown when processing but last turn has content */}
         <Show when={props.processing && lastTurn() && lastTurn()!.assistantMessages.length > 0}>
           <div class="mt-4">
-            <div
-              class="rounded-lg p-4"
-              style={{
-                background: "var(--background-base)",
-                border: "1px solid var(--border-base)",
-              }}
-            >
-              <div class="flex items-center gap-2" style={{ color: "var(--text-weak)" }}>
-                <Spinner class="w-4 h-4" />
-                <span>Thinking...</span>
-              </div>
-            </div>
+            <ProcessingIndicator sessionStatus={props.sessionStatus} />
           </div>
         </Show>
 
@@ -328,18 +319,7 @@ export function MessageTimeline(props: {
         {/* Processing indicator when no turns yet */}
         <Show when={props.processing && (!lastTurn() || lastTurn()!.assistantMessages.length === 0)}>
           <div class="mt-4">
-            <div
-              class="rounded-lg p-4"
-              style={{
-                background: "var(--background-base)",
-                border: "1px solid var(--border-base)",
-              }}
-            >
-              <div class="flex items-center gap-2" style={{ color: "var(--text-weak)" }}>
-                <Spinner class="w-4 h-4" />
-                <span>Thinking...</span>
-              </div>
-            </div>
+            <ProcessingIndicator sessionStatus={props.sessionStatus} />
           </div>
         </Show>
       </Show>
@@ -351,7 +331,12 @@ export function MessageTimeline(props: {
 }
 
 // Flat message list display (alternative simpler view)
-export function FlatMessageList(props: { messages: DisplayMessage[]; processing: boolean; loadingHistory: boolean }) {
+export function FlatMessageList(props: {
+  messages: DisplayMessage[]
+  processing: boolean
+  loadingHistory: boolean
+  sessionStatus?: SessionStatus
+}) {
   let containerRef: HTMLDivElement | undefined
   let endRef: HTMLDivElement | undefined
   const [userScrolledUp, setUserScrolledUp] = createSignal(false)
@@ -474,24 +459,72 @@ export function FlatMessageList(props: { messages: DisplayMessage[]; processing:
         </For>
 
         <Show when={props.processing}>
-          <div class="w-full">
-            <div
-              class="rounded-lg p-4"
-              style={{
-                background: "var(--background-base)",
-                border: "1px solid var(--border-base)",
-              }}
-            >
-              <div class="flex items-center gap-2" style={{ color: "var(--text-weak)" }}>
-                <Spinner class="w-4 h-4" />
-                <span>Thinking...</span>
-              </div>
-            </div>
+          <div class="mt-4">
+            <ProcessingIndicator sessionStatus={props.sessionStatus} />
           </div>
         </Show>
       </Show>
 
       <div ref={endRef} />
+    </div>
+  )
+}
+
+function ProcessingIndicator(props: { sessionStatus?: SessionStatus }) {
+  const [timeLeft, setTimeLeft] = createSignal<number>(0)
+
+  // Use a reactive calculation for time left
+  const calculateRemaining = () => {
+    const s = props.sessionStatus
+    if (s?.type === "retry" && s.next) {
+      return Math.max(0, Math.round((s.next - Date.now()) / 1000))
+    }
+    return 0
+  }
+
+  createEffect(() => {
+    // Re-run effect when sessionStatus type changes to retry or next changes
+    const s = props.sessionStatus
+    if (s?.type === "retry" && s.next) {
+      setTimeLeft(calculateRemaining())
+      const timer = setInterval(() => {
+        setTimeLeft(calculateRemaining())
+      }, 1000)
+      onCleanup(() => clearInterval(timer))
+    }
+  })
+
+  return (
+    <div
+      class="rounded-lg p-3 sm:p-4 transition-all"
+      style={{
+        background: props.sessionStatus?.type === "retry" ? "var(--status-warning-dim)" : "var(--background-base)",
+        border: props.sessionStatus?.type === "retry" ? "1px solid var(--status-warning-border)" : "1px solid var(--border-base)",
+      }}
+    >
+      <Show
+        when={props.sessionStatus?.type === "retry"}
+        fallback={
+          <div class="flex items-center gap-2" style={{ color: "var(--text-weak)" }}>
+            <Spinner class="w-4 h-4" />
+            <span class="text-sm font-medium">Thinking...</span>
+          </div>
+        }
+      >
+        <div class="flex flex-col gap-2">
+          <div class="flex items-center gap-2" style={{ color: "var(--status-warning-text)" }}>
+            <RefreshCw class="w-3.5 h-3.5 animate-spin-slow" />
+            <span class="text-sm font-semibold">Retrying soon</span>
+            <div class="flex items-center gap-1 ml-auto text-xs px-2 py-0.5 rounded bg-black/10" style={{ color: "var(--status-warning-text)" }}>
+              <Clock class="w-3 h-3" />
+              <span class="font-mono">{timeLeft()}s</span>
+            </div>
+          </div>
+          <div class="text-xs leading-relaxed opacity-90 font-medium" style={{ color: "var(--status-warning-text)" }}>
+            {props.sessionStatus?.type === "retry" ? props.sessionStatus.message : "Waiting to retry..."}
+          </div>
+        </div>
+      </Show>
     </div>
   )
 }

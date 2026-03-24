@@ -11,6 +11,7 @@ import {
   untrack,
 } from "solid-js";
 import { useParams, useNavigate } from "@solidjs/router";
+import { generateUUID } from "../utils/uuid";
 import { Button } from "../components/ui/button";
 import { Spinner } from "../components/ui/spinner";
 import { useSDK } from "../context/sdk";
@@ -33,15 +34,17 @@ import { PermissionPrompt } from "../components/permission-prompt";
 import { SessionInfo } from "../components/session-info";
 import { SessionSidebar } from "../components/session-sidebar";
 import { ReviewPanel } from "../components/review-panel";
+import { Terminal } from "../components/terminal";
 import { SessionHeader } from "../components/session-header";
 import { ResizeHandle } from "../components/resize-handle";
 import { base64Encode, base64Decode } from "../utils/path";
 import type { Part, QuestionRequest, TextPart } from "../sdk/client";
 import type { DisplayMessage } from "../types/message";
-import { Plus, Settings, Paperclip, Upload, Bookmark, BookOpen } from "lucide-solid";
+import { Plus, Settings, Paperclip, Upload, Bookmark, BookOpen, X as XIcon, SquareTerminal } from "lucide-solid";
 import { Portal } from "solid-js/web";
 import { ContextItems, type FileContext } from "../components/context-items";
 import { FilePickerDialog } from "../components/file-picker-dialog";
+import { useDevice } from "../context/device";
 import {
   ImageAttachments,
   type ImageAttachment,
@@ -97,10 +100,12 @@ export function Session() {
   const savedPrompts = useSavedPrompts();
   const terminal = useTerminal();
   const appConfig = useConfig();
+  const device = useDevice();
 
   // Unified toast system — only one toast visible at a time
+  const [toastTitle, setToastTitle] = createSignal<string | null>(null);
   const [toastMessage, setToastMessage] = createSignal<string | null>(null);
-  const [toastVariant, setToastVariant] = createSignal<"default" | "hint">("default");
+  const [toastVariant, setToastVariant] = createSignal<"default" | "hint" | "warning" | "error" | "success">("default");
   const toastMsgTimer: { id: ReturnType<typeof setTimeout> | null } = { id: null };
   onCleanup(() => { if (toastMsgTimer.id !== null) clearTimeout(toastMsgTimer.id); });
 
@@ -108,10 +113,12 @@ export function Session() {
     if (toastMsgTimer.id !== null) clearTimeout(toastMsgTimer.id);
     toastMsgTimer.id = null;
     setToastMessage(null);
+    setToastTitle(null);
   }
 
-  function showToast(msg: string, duration = 2500, variant: "default" | "hint" = "default") {
+  function showToast(msg: string, duration = 2500, variant: any = "default", title: string | null = null) {
     if (toastMsgTimer.id !== null) clearTimeout(toastMsgTimer.id);
+    setToastTitle(title);
     setToastMessage(msg);
     setToastVariant(variant);
     toastMsgTimer.id = setTimeout(() => hideToast(), duration);
@@ -126,7 +133,7 @@ export function Session() {
         const cfg = res.data as { instructions?: string[] } | undefined;
         setInstructionsActive((cfg?.instructions ?? []).length > 0);
       })
-      .catch(() => {});
+      .catch(() => { });
   });
 
   // Helper to get the current directory slug
@@ -1079,6 +1086,26 @@ export function Session() {
           }
         }
 
+        // Handle global TUI events
+        if (event.type === "tui.toast.show") {
+          const props = event.properties as {
+            title?: string;
+            message: string;
+            variant: "info" | "success" | "warning" | "error";
+            duration?: number;
+          };
+          // Increase default duration for non-info toasts to 8s
+          const duration = props.duration ?? (props.variant === "info" ? 4000 : 8000);
+          showToast(props.message, duration, props.variant, props.title ?? null);
+        }
+
+        if (event.type === "tui.session.select") {
+          const props = event.properties as { sessionID: string };
+          if (props.sessionID !== sessionId()) {
+            navigate(`/${dirSlug()}/session/${props.sessionID}`);
+          }
+        }
+
         // Handle session updates
         if (event.type === "session.updated") {
           refetchSession();
@@ -1171,7 +1198,7 @@ export function Session() {
     reader.onload = () => {
       const dataUrl = reader.result as string;
       const attachment: ImageAttachment = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         name: file.name,
         mime: file.type,
         dataUrl,
@@ -1313,11 +1340,11 @@ export function Session() {
 
     // Optimistic update - show user message immediately while waiting for server
     const userMessage: DisplayMessage = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       role: "user",
       parts: [
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           sessionID: sessionId() || "",
           messageID: "",
           type: "text",
@@ -1739,6 +1766,7 @@ export function Session() {
               pendingPermissions().length === 0
             }
             loadingHistory={loadingHistory()}
+            sessionStatus={sessionId() ? events.status[sessionId()!] : undefined}
           />
 
           {/* Question Prompt - rendered outside timeline for proper focus.
@@ -2017,8 +2045,7 @@ export function Session() {
                     // Enter to submit (without shift), Shift+Enter for newline
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
-                      const form = e.currentTarget.closest("form");
-                      if (form) form.requestSubmit();
+                      sendMessage(new Event("submit") as any);
                     }
                   }}
                   placeholder={inputBlocked() ? "Respond to the prompt above to continue..." : "Type a message... (Tab to switch agent, / for commands)"}
@@ -2032,21 +2059,43 @@ export function Session() {
                   }}
                 />
 
-                {/* Bottom bar: attach buttons + session info */}
-                <div class="flex items-center px-2 py-1">
-                  {/* Attach buttons */}
-                  <div class="flex items-center gap-1 shrink-0">
-                    {/* Save as prompt button */}
-                    <Show when={input().trim()}>
+                {/* Bottom bar: attach buttons row + session info row */}
+                <div class="flex flex-col">
+                  {/* Attach buttons row */}
+                  <div class="flex items-center justify-between px-2 pt-1 pb-0">
+                    <div class="flex items-center gap-1">
+                      {/* Save as prompt button */}
+                      <Show when={input().trim()}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const text = input().trim();
+                            if (!text) return;
+                            setSavePromptTitle(text.slice(0, 30));
+                            setSavePromptBody(text);
+                            setShowSavePrompt(true);
+                          }}
+                          class="p-1.5 rounded transition-colors"
+                          style={{ color: "var(--text-weak)" }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background =
+                              "var(--surface-inset)";
+                            e.currentTarget.style.color = "var(--text-strong)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "transparent";
+                            e.currentTarget.style.color = "var(--text-weak)";
+                          }}
+                          title="Save as prompt"
+                          aria-label="Save as prompt"
+                        >
+                          <Bookmark class="w-4 h-4" />
+                        </button>
+                      </Show>
+                      {/* Upload from device button */}
                       <button
                         type="button"
-                        onClick={() => {
-                          const text = input().trim();
-                          if (!text) return;
-                          setSavePromptTitle(text.slice(0, 30));
-                          setSavePromptBody(text);
-                          setShowSavePrompt(true);
-                        }}
+                        onClick={() => fileInputRef?.click()}
                         class="p-1.5 rounded transition-colors"
                         style={{ color: "var(--text-weak)" }}
                         onMouseEnter={(e) => {
@@ -2058,56 +2107,36 @@ export function Session() {
                           e.currentTarget.style.background = "transparent";
                           e.currentTarget.style.color = "var(--text-weak)";
                         }}
-                        title="Save as prompt"
-                        aria-label="Save as prompt"
+                        title="Upload image or PDF"
+                        aria-label="Upload image or PDF"
                       >
-                        <Bookmark class="w-4 h-4" />
+                        <Upload class="w-4 h-4" />
                       </button>
-                    </Show>
-                    {/* Upload from device button */}
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef?.click()}
-                      class="p-1.5 rounded transition-colors"
-                      style={{ color: "var(--text-weak)" }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background =
-                          "var(--surface-inset)";
-                        e.currentTarget.style.color = "var(--text-strong)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "transparent";
-                        e.currentTarget.style.color = "var(--text-weak)";
-                      }}
-                      title="Upload image or PDF"
-                      aria-label="Upload image or PDF"
-                    >
-                      <Upload class="w-4 h-4" />
-                    </button>
-                    {/* Attach file from project button */}
-                    <button
-                      type="button"
-                      onClick={() => setShowFilePicker(true)}
-                      class="p-1.5 rounded transition-colors"
-                      style={{ color: "var(--text-weak)" }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background =
-                          "var(--surface-inset)";
-                        e.currentTarget.style.color = "var(--text-strong)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "transparent";
-                        e.currentTarget.style.color = "var(--text-weak)";
-                      }}
-                      title="Attach file from project"
-                      aria-label="Attach file from project"
-                    >
-                      <Paperclip class="w-4 h-4" />
-                    </button>
+                      {/* Attach file from project button */}
+                      <button
+                        type="button"
+                        onClick={() => setShowFilePicker(true)}
+                        class="p-1.5 rounded transition-colors"
+                        style={{ color: "var(--text-weak)" }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background =
+                            "var(--surface-inset)";
+                          e.currentTarget.style.color = "var(--text-strong)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "transparent";
+                          e.currentTarget.style.color = "var(--text-weak)";
+                        }}
+                        title="Attach file from project"
+                        aria-label="Attach file from project"
+                      >
+                        <Paperclip class="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Session info: Agent, Model, Token usage */}
-                  <div class="flex-1 min-w-0">
+                  {/* Session info row: Agent, Model, Token usage — always full width */}
+                  <div class="w-full">
                     <SessionInfo
                       input={input}
                       loading={loading}
@@ -2115,6 +2144,7 @@ export function Session() {
                       onAbort={handleAbort}
                       onAgentClick={() => setShowAgentPicker(true)}
                       onModelClick={() => setShowModelPicker(true)}
+                      hasAttachments={() => fileContext().length > 0 || imageAttachments().length > 0}
                     />
                   </div>
                 </div>
@@ -2279,19 +2309,44 @@ export function Session() {
         {/* Unified toast — only one visible at a time */}
         <Show when={toastMessage()}>
           <div
-            class="fixed bottom-20 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-lg shadow-lg text-sm font-medium"
-            style={toastVariant() === "hint"
-              ? {
-                  background: "var(--surface-inset)",
-                  color: "var(--text-strong)",
-                  border: "1px solid var(--border-base)",
-                }
-              : {
-                  background: "var(--interactive-base)",
-                  color: "white",
-                }}
+            class="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] px-4 py-2.5 rounded-lg shadow-xl text-sm transition-all border animate-in fade-in slide-in-from-bottom-2 duration-300 flex items-start gap-3"
+            style={{
+              "min-width": "280px",
+              "max-width": "90vw",
+              background: toastVariant() === "error" ? "var(--status-critical-dim)" :
+                toastVariant() === "warning" ? "var(--status-warning-dim)" :
+                  toastVariant() === "success" ? "rgba(22, 163, 74, 0.1)" :
+                    toastVariant() === "hint" ? "var(--surface-inset)" :
+                      "var(--interactive-base)",
+              color: toastVariant() === "error" ? "var(--status-critical-text)" :
+                toastVariant() === "warning" ? "var(--status-warning-text)" :
+                  toastVariant() === "success" ? "var(--icon-success-base)" :
+                    toastVariant() === "hint" ? "var(--text-strong)" :
+                      "white",
+              "border-color": toastVariant() === "error" ? "var(--status-critical-border)" :
+                toastVariant() === "warning" ? "var(--status-warning-border)" :
+                  toastVariant() === "success" ? "rgba(22, 163, 74, 0.2)" :
+                    toastVariant() === "hint" ? "var(--border-base)" :
+                      "var(--interactive-hover)",
+            }}
           >
-            {toastMessage()}
+            <div class="flex-1 flex flex-col gap-0.5 min-w-0">
+              <Show when={toastTitle()}>
+                <div class="font-bold text-xs uppercase tracking-wide opacity-80">{toastTitle()}</div>
+              </Show>
+              <div class="font-medium break-words">{toastMessage()}</div>
+            </div>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                hideToast();
+              }}
+              class="shrink-0 p-1 -mr-1 rounded-md opacity-60 hover:opacity-100 transition-opacity"
+              aria-label="Close notification"
+            >
+              <XIcon class="w-3.5 h-3.5" />
+            </button>
           </div>
         </Show>
       </div>
@@ -2307,33 +2362,40 @@ export function Session() {
           <ChatView />
         </div>
 
-        {/* Review Panel - collapsible with resize handle */}
+        {/* Review Panel */}
         <Show when={layout.review.opened()}>
-          <aside class="flex shrink-0" aria-label="Review panel">
-            <ResizeHandle
-              direction="horizontal"
-              edge="start"
-              size={layout.review.width()}
-              min={200}
-              // Computed from viewport width at render time; clamped to never fall below min
-              max={Math.max(200, typeof window !== "undefined" ? Math.round(window.innerWidth * 0.8) : 800)}
-              onResize={layout.review.resize}
-              onCollapse={layout.review.close}
-              collapseThreshold={100}
-            />
-            <div
-              data-panel="review"
-              tabIndex={-1}
-              class="shrink-0 overflow-hidden focus-visible:outline-2 focus-visible:outline-[var(--interactive-base)] focus-visible:outline-offset-[-2px]"
-              style={{ width: `${layout.review.width()}px` }}
-            >
-              <ReviewPanel sessionId={sessionId()!} />
-            </div>
-          </aside>
+          <Show when={device.isMobile()} fallback={
+            <aside class="flex shrink-0" aria-label="Review panel">
+              <ResizeHandle
+                direction="horizontal"
+                edge="start"
+                size={layout.review.width()}
+                min={200}
+                max={Math.max(200, typeof window !== "undefined" ? Math.round(window.innerWidth * 0.8) : 800)}
+                onResize={layout.review.resize}
+                onCollapse={layout.review.close}
+                collapseThreshold={100}
+              />
+              <div
+                data-panel="review"
+                tabIndex={-1}
+                class="shrink-0 overflow-hidden focus-visible:outline-2 focus-visible:outline-[var(--interactive-base)] focus-visible:outline-offset-[-2px]"
+                style={{ width: `${layout.review.width()}px` }}
+              >
+                <ReviewPanel sessionId={sessionId()!} />
+              </div>
+            </aside>
+          }>
+            <Portal>
+              <div class="mobile-overlay" style={{ "z-index": 60 }}>
+                <ReviewPanel sessionId={sessionId()!} />
+              </div>
+            </Portal>
+          </Show>
         </Show>
 
-        {/* Info Panel (Session Sidebar) - collapsible with resize handle */}
-        <Show when={layout.info.opened()}>
+        {/* Info Panel (Session Sidebar) - hidden on mobile since it's unneeded or handled elsewhere */}
+        <Show when={layout.info.opened() && !device.isMobile()}>
           <aside class="flex shrink-0" aria-label="Session info">
             <ResizeHandle
               direction="horizontal"
@@ -2354,6 +2416,106 @@ export function Session() {
           </aside>
         </Show>
       </div>
+
+      {/* Mobile Terminal Overlay */}
+      <Show when={device.isMobile() && (terminal.opened() || terminal.creating() || !!terminal.error())}>
+        <Portal>
+          <div
+            class="mobile-overlay flex flex-col"
+            style={{ "z-index": 70, background: "var(--background-base)" }}
+          >
+            {/* Header */}
+            <div
+              class="flex items-center justify-between px-4 h-12 shrink-0"
+              style={{
+                background: "var(--background-stronger)",
+                "border-bottom": "1px solid var(--border-base)",
+              }}
+            >
+              <div class="flex items-center gap-2">
+                <SquareTerminal class="w-4 h-4" style={{ color: "var(--icon-base)" }} />
+                <span class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>Terminal</span>
+              </div>
+              <button
+                onClick={() => terminal.toggle(directory)}
+                class="p-1.5 rounded-md transition-colors"
+                style={{ color: "var(--icon-base)" }}
+                aria-label="Close terminal"
+              >
+                <XIcon class="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Creating indicator */}
+            <Show when={terminal.creating() && !terminal.error()}>
+              <div class="p-4 flex items-center gap-3" style={{ color: "var(--text-weak)" }}>
+                <span class="text-sm">Creating terminal session...</span>
+              </div>
+            </Show>
+
+            {/* Error display */}
+            <Show when={terminal.error()}>
+              <div class="p-4 text-sm" style={{ color: "var(--text-critical-base)" }}>
+                {terminal.error()}
+              </div>
+            </Show>
+
+            {/* Terminal sessions */}
+            <Show when={terminal.sessions().length > 0 && !terminal.error()}>
+              {/* Tab bar */}
+              <div
+                class="flex items-center gap-2 px-3 py-1.5 shrink-0"
+                style={{ "border-bottom": "1px solid var(--border-base)" }}
+              >
+                <For each={terminal.sessions()}>
+                  {(session) => (
+                    <div
+                      onClick={() => terminal.setActive(session.id)}
+                      class="flex items-center gap-1.5 px-2 py-1 text-xs rounded cursor-pointer"
+                      style={{
+                        background: terminal.active() === session.id ? "var(--surface-inset)" : "transparent",
+                        color: terminal.active() === session.id ? "var(--text-strong)" : "var(--text-weak)",
+                      }}
+                    >
+                      <SquareTerminal class="w-3 h-3" />
+                      {session.title}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); terminal.close(session.id); }}
+                        class="ml-1 p-0.5 rounded"
+                        style={{ color: "var(--icon-weak)" }}
+                      >
+                        <XIcon class="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </For>
+                <button
+                  onClick={() => terminal.create(directory)}
+                  class="p-1 rounded"
+                  style={{ color: "var(--icon-weak)" }}
+                  title="New Terminal"
+                >
+                  <Plus class="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Terminal content */}
+              <div class="flex-1 overflow-hidden">
+                <For each={terminal.sessions()}>
+                  {(session) => (
+                    <div
+                      class="size-full"
+                      style={{ display: terminal.active() === session.id ? "block" : "none" }}
+                    >
+                      <Terminal ptyId={session.id} />
+                    </div>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </div>
+        </Portal>
+      </Show>
     </Show>
   );
 }

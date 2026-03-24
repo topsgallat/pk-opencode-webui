@@ -231,17 +231,88 @@ export function SyncProvider(props: ParentProps) {
 
       // Update parts in existing messages only - don't synthesize messages from parts
       setStore("message", part.sessionID, (msgs: MessageWithParts[]) => {
-        if (!msgs || msgs.length === 0) return msgs
+        // Find existing message
+        const msgIdx = (msgs || []).findIndex((m) => m.info.id === part.messageID)
 
-        const msgIdx = msgs.findIndex((m) => m.info.id === part.messageID)
-        if (msgIdx === -1) return msgs
+        if (msgIdx === -1) {
+          // If message doesn't exist yet, synthesize a placeholder assistant message
+          const synthesized: MessageWithParts = {
+            info: {
+              id: part.messageID,
+              sessionID: part.sessionID,
+              role: "assistant", // Parts updated from SSE are almost always assistant messages
+              time: { created: Date.now() },
+            } as any,
+            parts: [part]
+          };
+          return [...(msgs || []), synthesized].sort((a, b) => cmp(a.info.id, b.info.id));
+        }
 
         // Update existing message parts
         return msgs.map((m, i) => {
           if (i !== msgIdx) return m
           const partIdx = m.parts.findIndex((p) => p.id === part.id)
-          const newParts = partIdx === -1 ? [...m.parts, part] : m.parts.map((p, pi) => (pi === partIdx ? part : p))
+          const newParts = partIdx === -1 ? sortParts([...m.parts, part]) : m.parts.map((p, pi) => (pi === partIdx ? part : p))
           return { ...m, parts: newParts }
+        })
+      })
+    }
+
+    if (event.type === "message.part.delta") {
+      const { sessionID, messageID, partID, field, delta } = props as {
+        sessionID: string
+        messageID: string
+        partID: string
+        field: string
+        delta: string
+      }
+      if (!sessionID || !messageID || !partID) return
+
+      // Update part in store
+      setStore("part", messageID, (existing: Part[] | undefined) => {
+        if (!existing) return [];
+        return existing.map((p) => {
+          if (p.id !== partID) return p
+          const current = (p as any)[field] ?? ""
+          return { ...p, [field]: current + delta }
+        })
+      })
+
+      // Update part in message list
+      setStore("message", sessionID, (msgs: MessageWithParts[]) => {
+        if (!msgs) return msgs
+        return msgs.map((m) => {
+          if (m.info.id !== messageID) return m
+          return {
+            ...m,
+            parts: m.parts.map((p) => {
+              if (p.id !== partID) return p
+              const current = (p as any)[field] ?? ""
+              return { ...p, [field]: current + delta }
+            }),
+          }
+        })
+      })
+    }
+
+    if (event.type === "message.part.removed") {
+      const { sessionID, messageID, partID } = props as {
+        sessionID: string
+        messageID: string
+        partID: string
+      }
+      if (!sessionID || !messageID || !partID) return
+
+      setStore("part", messageID, (existing: Part[] | undefined) => {
+        if (!existing) return [];
+        return existing.filter((p) => p.id !== partID)
+      })
+
+      setStore("message", sessionID, (msgs: MessageWithParts[]) => {
+        if (!msgs) return msgs
+        return msgs.map((m) => {
+          if (m.info.id !== messageID) return m
+          return { ...m, parts: m.parts.filter((p) => p.id !== partID) }
         })
       })
     }

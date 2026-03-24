@@ -9,11 +9,12 @@
  */
 
 @layer base {
+
   /* Override browser default focus outline (orange/yellow) with brand color */
   *:focus {
     outline-color: var(--interactive-base);
   }
-  
+
   *:focus-visible {
     outline: 2px solid var(--interactive-base);
     outline-offset: 2px;
@@ -63,6 +64,13 @@
     --diff-removed-text: #c026d3;
     --diff-added-bg: rgba(99, 102, 241, 0.12);
     --diff-added-text: #6366f1;
+    /* Status colors */
+    --status-warning-dim: #fffbeb;
+    --status-warning-text: #92400e;
+    --status-warning-border: #fde68a;
+    --status-critical-dim: #fef2f2;
+    --status-critical-text: #991b1b;
+    --status-critical-border: #fecaca;
   }
 
   .dark {
@@ -103,6 +111,13 @@
     --diff-removed-text: #d946ef;
     --diff-added-bg: rgba(99, 102, 241, 0.18);
     --diff-added-text: #818cf8;
+    /* Status colors */
+    --status-warning-dim: #451a03;
+    --status-warning-text: #fcd34d;
+    --status-warning-border: #92400e;
+    --status-critical-dim: #450a0a;
+    --status-critical-text: #fca5a5;
+    --status-critical-border: #991b1b;
   }
 }
 
@@ -500,5 +515,137 @@
 
   .xterm .composition-view {
     display: none !important;
+  }
+}
+
+/* ============================================
+   MOBILE RESPONSIVE STYLES
+   ============================================ */
+
+/* Dynamic viewport height for mobile browsers */
+.mobile-viewport {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Mobile bottom tab bar */
+.mobile-tab-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: var(--background-stronger);
+  border-top: 1px solid var(--border-base);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.mobile-tab-bar button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 12px;
+  min-width: 64px;
+  min-height: 48px;
+  border: none;
+  background: transparent;
+  color: var(--text-weak);
+  font-size: 10px;
+  transition: color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-tab-bar button.active {
+  color: var(--text-interactive-base);
+}
+
+/* Mobile overlay panel */
+.mobile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--background-base);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mobile-overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-base);
+  background: var(--background-stronger);
+  min-height: 48px;
+  flex-shrink: 0;
+}
+
+/* Mobile session item */
+.mobile-session-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-base);
+  min-height: 56px;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
+  cursor: pointer;
+}
+
+.mobile-session-item:active {
+  background: var(--surface-inset);
+}
+
+@media (max-width: 767px) {
+
+  /* Prevent iOS zoom on input focus */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  /* Ensure touch targets are large enough */
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Hide desktop-only elements */
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* Full-width messages on mobile */
+  .pk-chat-message-user {
+    margin-left: 0;
+  }
+
+  .pk-chat-message-assistant {
+    margin-right: 0;
+  }
+}
+
+@media (min-width: 768px) {
+
+  /* Hide mobile-only elements */
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+.animate-spin-slow {
+  animation: pk-spin 3s linear infinite;
+}
+
+@keyframes pk-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
   }
 }

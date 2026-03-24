@@ -78,6 +78,8 @@ import { readNotifyMap, cleanupNotifyState, NOTIFY_STORAGE_KEY } from "../utils/
 import { readSoundSettings, playSound, primeAudioContext, SOUND_STORAGE_KEY } from "../utils/sound";
 import { dispatchStorageEvent } from "../utils/storage";
 import { sessionHasQuestion, buildChildMap, rootAncestorId } from "../utils/session-tree-request";
+import { useDevice } from "../context/device";
+import { MobileLayout } from "./mobile-layout";
 
 // Storage keys
 const PROJECTS_STORAGE_KEY = "opencode.projects";
@@ -245,6 +247,7 @@ export function Layout(props: ParentProps) {
   const command = useCommand();
   const location = useLocation();
   const navigate = useNavigate();
+  const device = useDevice();
 
   const [sessions, setSessions] = createSignal<Session[]>([]);
   const [loading, setLoading] = createSignal(true);
@@ -587,7 +590,7 @@ export function Layout(props: ParentProps) {
             class={`absolute right-0 top-0 bottom-0 items-center rounded-r-md ${menuOpenId() === session.id ? "flex" : focusedId() === session.id ? "hidden" : "hidden group-hover:flex group-focus-within:flex"}`}
             style={{ "pointer-events": "none" }}
           >
-             <div
+            <div
               class="w-6 h-full"
               style={{
                 background: `linear-gradient(to right, transparent, var(${isActive(session.id) ? "--surface-inset" : "--background-stronger"}))`,
@@ -612,12 +615,12 @@ export function Layout(props: ParentProps) {
                 class="p-1 rounded transition-colors"
                 style={{ color: "var(--icon-weak)" }}
                 onMouseEnter={(e) =>
-                  (e.currentTarget.style.color =
-                    "var(--icon-base)")
+                (e.currentTarget.style.color =
+                  "var(--icon-base)")
                 }
                 onMouseLeave={(e) =>
-                  (e.currentTarget.style.color =
-                    "var(--icon-weak)")
+                (e.currentTarget.style.color =
+                  "var(--icon-weak)")
                 }
                 title="More options"
                 aria-label="More session options"
@@ -902,7 +905,7 @@ export function Layout(props: ParentProps) {
     const isSearchNav = searchQuery().trim() && (isSearchInput
       ? (e.key === "ArrowDown" || e.key === "Enter")
       : (e.key === "ArrowDown" || e.key === "ArrowUp" ||
-         e.key === "Home" || e.key === "End" || e.key === "Enter"));
+        e.key === "Home" || e.key === "End" || e.key === "Enter"));
     if ((tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable) && !isSearchNav) return;
 
     // When search is active, provide keyboard navigation for search results
@@ -1989,969 +1992,973 @@ export function Layout(props: ParentProps) {
   }
 
   return (
-    <div
-      class="flex h-screen"
-      style={{ background: "var(--background-stronger)" }}
-    >
+    <>
       {/* Project Dialog */}
       <ProjectDialog
         open={projectDialogOpen()}
         onClose={() => setProjectDialogOpen(false)}
         onSelect={handleProjectSelect}
       />
-
-      {/* Left: Project Icons Strip (always visible) */}
-      <div
-        class="w-16 shrink-0 flex flex-col items-center"
-        style={{
-          background: "var(--background-base)",
-          "border-right": "1px solid var(--border-base)",
-        }}
-      >
-        {/* OpenCode Logo - navigates to home */}
-        <button
-          onClick={navigateToHome}
-          class="w-full h-12 flex items-center justify-center transition-opacity hover:opacity-80"
-          style={{ "border-bottom": "1px solid var(--border-base)" }}
-          title="Home"
-        >
-          <OpenCodeLogo class="w-7 h-8 rounded" />
-        </button>
-
-        {/* Project icons */}
-        <div class="flex-1 flex flex-col items-center gap-2 overflow-y-auto w-full px-2 py-3">
-          <For each={projects()}>
-            {(project) => (
-              <div
-                data-hint-target
-                onClick={() => navigateToProject(project.worktree)}
-                class="group relative cursor-pointer"
-                title={project.name || getFilename(project.worktree)}
-              >
-                <ProjectAvatar
-                  project={project}
-                  size="large"
-                  selected={project.worktree === directory}
-                  badge={project.worktree !== directory ? globalEvents.badge(project.worktree) : undefined}
-                />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeProject(project.worktree);
-                    if (
-                      project.worktree === directory &&
-                      projects().length > 1
-                    ) {
-                      const next = projects().find(
-                        (p) => p.worktree !== project.worktree,
-                      );
-                      if (next) navigateToProject(next.worktree);
-                    }
-                  }}
-                  class="absolute -top-1 -right-1 w-4 h-4 rounded-full hidden group-hover:flex items-center justify-center"
-                  style={{
-                    background: "var(--surface-strong)",
-                    color: "var(--text-base)",
-                  }}
-                >
-                  <X class="w-3 h-3" />
-                </button>
-              </div>
-            )}
-          </For>
-
-          {/* Add project button */}
-          <button
-            data-hint-target
-            onClick={() => setProjectDialogOpen(true)}
-            class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
-            style={{
-              border: "2px dashed var(--border-base)",
-              color: "var(--icon-weak)",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.borderColor = "var(--border-strong)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.borderColor = "var(--border-base)")
-            }
-            title="Open Project"
-          >
-            <Plus class="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Bottom icons */}
+      <Show when={!device.isMobile()} fallback={<MobileLayout onOpenProject={() => setProjectDialogOpen(true)}>{props.children}</MobileLayout>}>
         <div
-          class="flex flex-col items-center gap-2 py-3"
-          style={{ "border-top": "1px solid var(--border-base)" }}
-        >
-          <button
-            data-hint-target
-            onClick={() => terminal.toggle(directory)}
-            class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
-            style={{
-              color: terminal.opened()
-                ? "var(--text-interactive-base)"
-                : "var(--icon-base)",
-              background: terminal.opened()
-                ? "var(--surface-inset)"
-                : "transparent",
-            }}
-            title="Terminal (Ctrl+`)"
-          >
-            <SquareTerminal class="w-5 h-5" />
-          </button>
-          <button
-            data-hint-target
-            onClick={() => navigate(`/${dirSlug()}/settings`)}
-            class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
-            style={{
-              color: isSettingsActive()
-                ? "var(--text-interactive-base)"
-                : "var(--icon-base)",
-              background: isSettingsActive()
-                ? "var(--surface-inset)"
-                : "transparent",
-            }}
-            title="Settings"
-          >
-            <Settings class="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Sessions Panel (collapsible) */}
-      <nav
-        data-panel="sidebar"
-        tabIndex={-1}
-        aria-label="Session list"
-        onFocus={handleSidebarFocus}
-        onBlur={(e) => {
-          // Clear focus indicator when focus leaves the sidebar entirely
-          // relatedTarget is null when focus moves to browser chrome or is lost
-          if (!e.relatedTarget || !e.currentTarget.contains(e.relatedTarget as Node)) {
-            setFocusedId(null);
-            if (menuOpenId()) {
-              setMenuOpenId(null);
-              setMenuFocusIndex(-1);
-            }
-          }
-        }}
-        onKeyDown={handleSessionListKeyDown}
-        class={`shrink-0 flex flex-col focus-visible:outline-2 focus-visible:outline-[var(--interactive-base)] focus-visible:outline-offset-[-2px] ${sidebarDragging() ? "" : "transition-all duration-200"}`}
-        style={{
-          width: showSidebar() ? `${layout.sidebar.width()}px` : "0px",
-          overflow: "hidden",
-          background: "var(--background-stronger)",
-          "border-right": showSidebar()
-            ? "1px solid var(--border-base)"
-            : "none",
-        }}
-      >
-        <div class="h-full flex flex-col" style={{ "min-width": `${layout.sidebar.width()}px` }}>
-          {/* Project Header with collapse toggle */}
+          class="flex h-screen w-full"
+          style={{ background: "var(--background-stronger)" }}
+        >        {/* Left: Project Icons Strip (always visible) */}
           <div
-            class="px-3 h-12 flex items-center gap-2"
-            style={{ "border-bottom": "1px solid var(--border-base)" }}
+            class="w-16 shrink-0 flex flex-col items-center"
+            style={{
+              background: "var(--background-base)",
+              "border-right": "1px solid var(--border-base)",
+            }}
           >
-            <Show when={currentProject()}>
-              {(project) => <ProjectAvatar project={project()} size="small" />}
-            </Show>
-            <div class="min-w-0 flex-1">
-              <div
-                class="text-sm font-medium truncate"
-                style={{ color: "var(--text-strong)" }}
-              >
-                {projectName()}
-              </div>
-              <div
-                class="text-xs truncate"
-                style={{ color: "var(--text-weak)" }}
-              >
-                {directory?.replace(/^\/home\/[^/]+/, "~") || ""}
-              </div>
-            </div>
+            {/* OpenCode Logo - navigates to home */}
             <button
-              onClick={toggleSidebar}
-              class="p-1 rounded transition-colors shrink-0"
-              style={{ color: "var(--icon-base)" }}
-              title="Collapse Sidebar (Ctrl+B)"
+              onClick={navigateToHome}
+              class="w-full h-12 flex items-center justify-center transition-opacity hover:opacity-80"
+              style={{ "border-bottom": "1px solid var(--border-base)" }}
+              title="Home"
             >
-              <ChevronLeft class="w-4 h-4" />
+              <OpenCodeLogo class="w-7 h-8 rounded" />
             </button>
-          </div>
 
-          {/* New Session Button (split button with saved prompts dropdown) */}
-          <div class="px-3 py-2 relative">
-            <div class="flex w-full">
-              <Button
-                data-hint-target
-                onClick={createNewSession}
-                variant="ghost"
-                class={`flex-1 justify-start ${savedPrompts.prompts().length > 0 ? "rounded-r-none" : ""}`}
-                size="sm"
-              >
-                <Plus class="w-4 h-4" />
-                <span>New Session</span>
-              </Button>
-              <Show when={savedPrompts.prompts().length > 0}>
-                <button
-                  on:click={(e) => {
-                    e.stopPropagation();
-                    setPromptDropdownIndex(0);
-                    setPromptDropdownOpen(!promptDropdownOpen());
-                  }}
-                  class="inline-flex items-center px-1.5 rounded-r-xl border-2 border-l-0 border-transparent bg-transparent text-[var(--text-base)] hover:bg-[var(--surface-inset)] hover:text-[var(--text-interactive-base)] transition-all"
-                  title="New session from saved prompt"
-                  aria-haspopup="listbox"
-                  aria-expanded={promptDropdownOpen()}
-                >
-                  <ChevronDown class="w-3.5 h-3.5" />
-                </button>
-              </Show>
-            </div>
-            <Show when={promptDropdownOpen()}>
-              <PromptDropdown
-                prompts={savedPrompts.prompts()}
-                activeIndex={promptDropdownIndex()}
-                onSelect={(text) => createSessionWithPrompt(text)}
-                onClose={() => setPromptDropdownOpen(false)}
-                onIndexChange={(i) => setPromptDropdownIndex(i)}
-              />
-            </Show>
-          </div>
+            {/* Project icons */}
+            <div class="flex-1 flex flex-col items-center gap-2 overflow-y-auto w-full px-2 py-3">
+              <For each={projects()}>
+                {(project) => (
+                  <div
+                    data-hint-target
+                    onClick={() => navigateToProject(project.worktree)}
+                    class="group relative cursor-pointer"
+                    title={project.name || getFilename(project.worktree)}
+                  >
+                    <ProjectAvatar
+                      project={project}
+                      size="large"
+                      selected={project.worktree === directory}
+                      badge={project.worktree !== directory ? globalEvents.badge(project.worktree) : undefined}
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeProject(project.worktree);
+                        if (
+                          project.worktree === directory &&
+                          projects().length > 1
+                        ) {
+                          const next = projects().find(
+                            (p) => p.worktree !== project.worktree,
+                          );
+                          if (next) navigateToProject(next.worktree);
+                        }
+                      }}
+                      class="absolute -top-1 -right-1 w-4 h-4 rounded-full hidden group-hover:flex items-center justify-center"
+                      style={{
+                        background: "var(--surface-strong)",
+                        color: "var(--text-base)",
+                      }}
+                    >
+                      <X class="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </For>
 
-          {/* Session Search */}
-          <div class="px-3 pb-2">
-            <div
-              class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-sm"
-              style={{
-                background: "var(--surface-inset)",
-                border: "1px solid var(--border-base)",
-              }}
-            >
-              <Show
-                when={!searching()}
-                fallback={
-                  <Loader2 class="w-3.5 h-3.5 shrink-0 animate-spin" style={{ color: "var(--icon-weak)" }} />
-                }
-              >
-                <Search class="w-3.5 h-3.5 shrink-0" style={{ color: "var(--icon-weak)" }} />
-              </Show>
-              <input
-                ref={el => searchInputRef = el}
-                type="text"
-                placeholder="Search sessions..."
-                aria-label="Search sessions"
-                value={searchQuery()}
-                onInput={(e) => handleSearchInput(e.currentTarget.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    clearSearch();
-                  }
-                }}
-                class="flex-1 min-w-0 bg-transparent outline-none text-sm"
-                style={{ color: "var(--text-base)" }}
-              />
+              {/* Add project button */}
               <button
-                onClick={() => {
-                  clearSearch();
-                  searchInputRef?.focus();
-                }}
-                class="p-0.5 rounded transition-colors shrink-0"
+                data-hint-target
+                onClick={() => setProjectDialogOpen(true)}
+                class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
                 style={{
+                  border: "2px dashed var(--border-base)",
                   color: "var(--icon-weak)",
-                  opacity: searchQuery().trim() ? 1 : 0,
-                  "pointer-events": searchQuery().trim() ? "auto" : "none",
                 }}
-                disabled={!searchQuery().trim()}
-                tabIndex={searchQuery().trim() ? 0 : -1}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--icon-base)")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--icon-weak)")}
-                aria-label="Clear search"
-                title="Clear search"
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.borderColor = "var(--border-strong)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.borderColor = "var(--border-base)")
+                }
+                title="Open Project"
               >
-                <X class="w-3.5 h-3.5" />
+                <Plus class="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Bottom icons */}
+            <div
+              class="flex flex-col items-center gap-2 py-3"
+              style={{ "border-top": "1px solid var(--border-base)" }}
+            >
+              <button
+                data-hint-target
+                onClick={() => terminal.toggle(directory)}
+                class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                style={{
+                  color: terminal.opened()
+                    ? "var(--text-interactive-base)"
+                    : "var(--icon-base)",
+                  background: terminal.opened()
+                    ? "var(--surface-inset)"
+                    : "transparent",
+                }}
+                title="Terminal (Ctrl+`)"
+              >
+                <SquareTerminal class="w-5 h-5" />
+              </button>
+              <button
+                data-hint-target
+                onClick={() => navigate(`/${dirSlug()}/settings`)}
+                class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                style={{
+                  color: isSettingsActive()
+                    ? "var(--text-interactive-base)"
+                    : "var(--icon-base)",
+                  background: isSettingsActive()
+                    ? "var(--surface-inset)"
+                    : "transparent",
+                }}
+                title="Settings"
+              >
+                <Settings class="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          {/* Sessions List */}
-          <div
-            class="flex-1 overflow-y-auto px-2"
-            role="listbox"
-            aria-label="Sessions"
-            aria-activedescendant={focusedId() ? `session-${focusedId()}` : undefined}
-            tabIndex={0}
+          {/* Sessions Panel (collapsible) */}
+          <nav
+            data-panel="sidebar"
+            tabIndex={-1}
+            aria-label="Session list"
+            onFocus={handleSidebarFocus}
+            onBlur={(e) => {
+              // Clear focus indicator when focus leaves the sidebar entirely
+              // relatedTarget is null when focus moves to browser chrome or is lost
+              if (!e.relatedTarget || !e.currentTarget.contains(e.relatedTarget as Node)) {
+                setFocusedId(null);
+                if (menuOpenId()) {
+                  setMenuOpenId(null);
+                  setMenuFocusIndex(-1);
+                }
+              }
+            }}
+            onKeyDown={handleSessionListKeyDown}
+            class={`shrink-0 flex flex-col focus-visible:outline-2 focus-visible:outline-[var(--interactive-base)] focus-visible:outline-offset-[-2px] ${sidebarDragging() ? "" : "transition-all duration-200"}`}
+            style={{
+              width: showSidebar() ? `${layout.sidebar.width()}px` : "0px",
+              overflow: "hidden",
+              background: "var(--background-stronger)",
+              "border-right": showSidebar()
+                ? "1px solid var(--border-base)"
+                : "none",
+            }}
           >
-            <Show when={loading() && !searchQuery().trim()}>
+            <div class="h-full flex flex-col" style={{ "min-width": `${layout.sidebar.width()}px` }}>
+              {/* Project Header with collapse toggle */}
               <div
-                class="flex flex-col items-center justify-center py-8 gap-2"
-                style={{ color: "var(--text-weak)" }}
+                class="px-3 h-12 flex items-center gap-2"
+                style={{ "border-bottom": "1px solid var(--border-base)" }}
               >
-                <Spinner
-                  class="w-5 h-5"
-                  style={{ color: "var(--text-interactive-base)" }}
-                />
-                <span class="text-sm">Loading sessions...</span>
-              </div>
-            </Show>
-
-            {/* Search Results */}
-            <Show when={searchQuery().trim()}>
-              <Show
-                when={!searching() && searchResults().length === 0}
-                fallback={
-                  <div class="space-y-0.5">
-                    <For each={searchResults()}>
-                      {(session, idx) => {
-                        const focused = () => searchFocusIdx() === idx();
-                        return (
-                          <A
-                            href={`/${dirSlug()}/session/${session.id}`}
-                            onClick={() => clearSearch(session.id)}
-                            role="option"
-                            id={`session-${session.id}`}
-                            aria-selected={isActive(session.id)}
-                            tabIndex={-1}
-                            class="flex items-center gap-2 px-2.5 py-2 rounded-md text-sm transition-colors"
-                            style={{
-                              color: isActive(session.id) || focused()
-                                ? "var(--text-interactive-base)"
-                                : session.time?.archived
-                                  ? "var(--text-weak)"
-                                  : "var(--text-base)",
-                              background: isActive(session.id) || focused()
-                                ? "var(--surface-inset)"
-                                : "transparent",
-                              opacity: session.time?.archived && !isActive(session.id) ? 0.7 : 1,
-                              outline: focused() ? "2px solid var(--border-focus, var(--interactive-base))" : "none",
-                              "outline-offset": "-2px",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isActive(session.id) && !focused()) e.currentTarget.style.background = "var(--surface-inset)";
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isActive(session.id) && !focused()) e.currentTarget.style.background = "transparent";
-                            }}
-                          >
-                            <span class="shrink-0" style={{ color: "var(--icon-weak)" }}>
-                              <Show
-                                when={session.time?.archived}
-                                fallback={<MessageCircle class="w-4 h-4" />}
-                              >
-                                <Archive class="w-4 h-4" />
-                              </Show>
-                            </span>
-                            <span class="min-w-0 flex-1 truncate">
-                              {session.title || "Untitled"}
-                            </span>
-                          </A>
-                        );
-                      }}
-                    </For>
-                  </div>
-                }
-              >
-                <div
-                  class="py-6 text-center"
-                  style={{ color: "var(--text-weak)" }}
-                >
-                  <p class="text-sm">No results</p>
-                  <p class="text-xs mt-1">Try a different search term</p>
-                </div>
-              </Show>
-            </Show>
-
-            {/* Normal Session List */}
-            <Show when={!loading() && !searchQuery().trim()}>
-              <Show
-                when={
-                  projectSessions().length > 0 || archivedSessions().length > 0
-                }
-                fallback={
+                <Show when={currentProject()}>
+                  {(project) => <ProjectAvatar project={project()} size="small" />}
+                </Show>
+                <div class="min-w-0 flex-1">
                   <div
-                    class="py-6 text-center"
+                    class="text-sm font-medium truncate"
+                    style={{ color: "var(--text-strong)" }}
+                  >
+                    {projectName()}
+                  </div>
+                  <div
+                    class="text-xs truncate"
                     style={{ color: "var(--text-weak)" }}
                   >
-                    <p class="text-sm">No sessions yet</p>
-                    <p class="text-xs mt-1">Click "New Session" to start</p>
+                    {directory?.replace(/^\/home\/[^/]+/, "~") || ""}
                   </div>
-                }
+                </div>
+                <button
+                  onClick={toggleSidebar}
+                  class="p-1 rounded transition-colors shrink-0"
+                  style={{ color: "var(--icon-base)" }}
+                  title="Collapse Sidebar (Ctrl+B)"
+                >
+                  <ChevronLeft class="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* New Session Button (split button with saved prompts dropdown) */}
+              <div class="px-3 py-2 relative">
+                <div class="flex w-full">
+                  <Button
+                    data-hint-target
+                    onClick={createNewSession}
+                    variant="ghost"
+                    class={`flex-1 justify-start ${savedPrompts.prompts().length > 0 ? "rounded-r-none" : ""}`}
+                    size="sm"
+                  >
+                    <Plus class="w-4 h-4" />
+                    <span>New Session</span>
+                  </Button>
+                  <Show when={savedPrompts.prompts().length > 0}>
+                    <button
+                      on:click={(e) => {
+                        e.stopPropagation();
+                        setPromptDropdownIndex(0);
+                        setPromptDropdownOpen(!promptDropdownOpen());
+                      }}
+                      class="inline-flex items-center px-1.5 rounded-r-xl border-2 border-l-0 border-transparent bg-transparent text-[var(--text-base)] hover:bg-[var(--surface-inset)] hover:text-[var(--text-interactive-base)] transition-all"
+                      title="New session from saved prompt"
+                      aria-haspopup="listbox"
+                      aria-expanded={promptDropdownOpen()}
+                    >
+                      <ChevronDown class="w-3.5 h-3.5" />
+                    </button>
+                  </Show>
+                </div>
+                <Show when={promptDropdownOpen()}>
+                  <PromptDropdown
+                    prompts={savedPrompts.prompts()}
+                    activeIndex={promptDropdownIndex()}
+                    onSelect={(text) => createSessionWithPrompt(text)}
+                    onClose={() => setPromptDropdownOpen(false)}
+                    onIndexChange={(i) => setPromptDropdownIndex(i)}
+                  />
+                </Show>
+              </div>
+
+              {/* Session Search */}
+              <div class="px-3 pb-2">
+                <div
+                  class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-sm"
+                  style={{
+                    background: "var(--surface-inset)",
+                    border: "1px solid var(--border-base)",
+                  }}
+                >
+                  <Show
+                    when={!searching()}
+                    fallback={
+                      <Loader2 class="w-3.5 h-3.5 shrink-0 animate-spin" style={{ color: "var(--icon-weak)" }} />
+                    }
+                  >
+                    <Search class="w-3.5 h-3.5 shrink-0" style={{ color: "var(--icon-weak)" }} />
+                  </Show>
+                  <input
+                    ref={el => searchInputRef = el}
+                    type="text"
+                    placeholder="Search sessions..."
+                    aria-label="Search sessions"
+                    value={searchQuery()}
+                    onInput={(e) => handleSearchInput(e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        clearSearch();
+                      }
+                    }}
+                    class="flex-1 min-w-0 bg-transparent outline-none text-sm"
+                    style={{ color: "var(--text-base)" }}
+                  />
+                  <button
+                    onClick={() => {
+                      clearSearch();
+                      searchInputRef?.focus();
+                    }}
+                    class="p-0.5 rounded transition-colors shrink-0"
+                    style={{
+                      color: "var(--icon-weak)",
+                      opacity: searchQuery().trim() ? 1 : 0,
+                      "pointer-events": searchQuery().trim() ? "auto" : "none",
+                    }}
+                    disabled={!searchQuery().trim()}
+                    tabIndex={searchQuery().trim() ? 0 : -1}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--icon-base)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--icon-weak)")}
+                    aria-label="Clear search"
+                    title="Clear search"
+                  >
+                    <X class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Sessions List */}
+              <div
+                class="flex-1 overflow-y-auto px-2"
+                role="listbox"
+                aria-label="Sessions"
+                aria-activedescendant={focusedId() ? `session-${focusedId()}` : undefined}
+                tabIndex={0}
               >
-                {/* Pinned Sessions (drag-and-drop reorderable) */}
-                <Show when={pinnedSessions().length > 0}>
-                  <div class="pb-2">
-                    <h3
-                      role="presentation"
-                      class="px-2.5 pt-2 pb-1 font-semibold uppercase text-[0.65rem] tracking-[0.06em]"
-                      style={{ color: "var(--text-weak)" }}
-                    >
-                      Pinned
-                    </h3>
-                    <DragDropProvider
-                      onDragStart={handlePinDragStart}
-                      onDragEnd={handlePinDragEnd}
-                      collisionDetector={closestCenter}
-                    >
-                      <DragDropSensors />
-                      {/* Constrains drag to vertical axis only (zeroes out X transform) */}
-                      <ConstrainDragXAxis />
-                      <div class="space-y-0.5">
-                        <SortableProvider ids={pinnedSessions().map((s) => s.id)}>
-                          <For each={pinnedSessions()}>
-                            {(session) => (
-                              <SortablePinnedSession
-                                session={session}
-                                render={(s) => renderSessionItem(s, true)}
-                              />
-                            )}
-                          </For>
-                        </SortableProvider>
-                      </div>
-                      <DragOverlay>
-                        <Show when={pinDragId()}>
-                          {(id) => {
-                            const dragged = () => pinnedSessions().find((s) => s.id === id());
-                            return (
-                              <div
-                                class="flex items-center gap-2 rounded-md px-2.5 py-2 text-sm"
-                                style={{
-                                  background: "var(--surface-inset)",
-                                  color: "var(--text-interactive-base)",
-                                  "box-shadow": "0 4px 12px rgba(0,0,0,0.15)",
-                                  "min-width": "120px",
-                                }}
-                              >
-                                <GripVertical class="w-3 h-3 shrink-0" style={{ color: "var(--icon-weak)" }} />
-                                <Pin class="w-4 h-4 shrink-0" style={{ color: "var(--icon-weak)" }} />
-                                <span class="truncate">{dragged()?.title || "Untitled"}</span>
-                              </div>
-                            );
-                          }}
-                        </Show>
-                      </DragOverlay>
-                    </DragDropProvider>
+                <Show when={loading() && !searchQuery().trim()}>
+                  <div
+                    class="flex flex-col items-center justify-center py-8 gap-2"
+                    style={{ color: "var(--text-weak)" }}
+                  >
+                    <Spinner
+                      class="w-5 h-5"
+                      style={{ color: "var(--text-interactive-base)" }}
+                    />
+                    <span class="text-sm">Loading sessions...</span>
                   </div>
                 </Show>
 
-                {/* Active Sessions — grouped by date */}
-                <For each={groupedSessions()}>
-                  {(group) => (
-                    <div class="pb-2">
-                      <h3
-                        role="presentation"
-                        class="px-2.5 pt-2 pb-1 font-semibold uppercase text-[0.65rem] tracking-[0.06em]"
-                        style={{ color: "var(--text-weak)" }}
-                      >
-                        {group.label}
-                      </h3>
+                {/* Search Results */}
+                <Show when={searchQuery().trim()}>
+                  <Show
+                    when={!searching() && searchResults().length === 0}
+                    fallback={
                       <div class="space-y-0.5">
-                        <For each={group.sessions}>
-                          {(session) => renderSessionItem(session, false)}
+                        <For each={searchResults()}>
+                          {(session, idx) => {
+                            const focused = () => searchFocusIdx() === idx();
+                            return (
+                              <A
+                                href={`/${dirSlug()}/session/${session.id}`}
+                                onClick={() => clearSearch(session.id)}
+                                role="option"
+                                id={`session-${session.id}`}
+                                aria-selected={isActive(session.id)}
+                                tabIndex={-1}
+                                class="flex items-center gap-2 px-2.5 py-2 rounded-md text-sm transition-colors"
+                                style={{
+                                  color: isActive(session.id) || focused()
+                                    ? "var(--text-interactive-base)"
+                                    : session.time?.archived
+                                      ? "var(--text-weak)"
+                                      : "var(--text-base)",
+                                  background: isActive(session.id) || focused()
+                                    ? "var(--surface-inset)"
+                                    : "transparent",
+                                  opacity: session.time?.archived && !isActive(session.id) ? 0.7 : 1,
+                                  outline: focused() ? "2px solid var(--border-focus, var(--interactive-base))" : "none",
+                                  "outline-offset": "-2px",
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isActive(session.id) && !focused()) e.currentTarget.style.background = "var(--surface-inset)";
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isActive(session.id) && !focused()) e.currentTarget.style.background = "transparent";
+                                }}
+                              >
+                                <span class="shrink-0" style={{ color: "var(--icon-weak)" }}>
+                                  <Show
+                                    when={session.time?.archived}
+                                    fallback={<MessageCircle class="w-4 h-4" />}
+                                  >
+                                    <Archive class="w-4 h-4" />
+                                  </Show>
+                                </span>
+                                <span class="min-w-0 flex-1 truncate">
+                                  {session.title || "Untitled"}
+                                </span>
+                              </A>
+                            );
+                          }}
                         </For>
                       </div>
-                    </div>
-                  )}
-                </For>
-
-                {/* Archived Sessions Toggle */}
-                <Show when={archivedSessions().length > 0}>
-                  <div class="pt-2 pb-1">
-                    <button
-                      onClick={toggleShowArchived}
-                      class="flex items-center gap-2 px-2.5 py-1.5 w-full text-xs rounded-md transition-colors"
+                    }
+                  >
+                    <div
+                      class="py-6 text-center"
                       style={{ color: "var(--text-weak)" }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.background =
-                          "var(--surface-inset)")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.background = "transparent")
-                      }
                     >
-                      <Archive class="w-3.5 h-3.5" />
-                      <span>
-                        {showArchived() ? "Hide" : "Show"} archived (
-                        {archivedSessions().length})
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Archived Sessions List */}
-                  <Show when={showArchived()}>
-                    <div class="space-y-0.5 pb-2">
-                      <For each={archivedSessions()}>
-                        {(session) => (
-                           <div class="group relative">
-                            <A
-                              href={`/${dirSlug()}/session/${session.id}`}
-                              class="flex items-center gap-2 px-2.5 py-2 rounded-md text-sm transition-colors"
-                              style={{
-                                color: isActive(session.id)
-                                  ? "var(--text-interactive-base)"
-                                  : "var(--text-weak)",
-                                background: isActive(session.id)
-                                  ? "var(--surface-inset)"
-                                  : "transparent",
-                                opacity: isActive(session.id) ? 1 : 0.7,
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isActive(session.id)) {
-                                  e.currentTarget.style.background =
-                                    "var(--surface-inset)";
-                                  e.currentTarget.style.opacity = "1";
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isActive(session.id)) {
-                                  e.currentTarget.style.background =
-                                    "transparent";
-                                  e.currentTarget.style.opacity = "0.7";
-                                }
-                              }}
-                            >
-                              <span
-                                class="shrink-0"
-                                style={{ color: "var(--icon-weak)" }}
-                              >
-                                <Archive class="w-4 h-4" />
-                              </span>
-                              <span class="min-w-0 flex-1 truncate">
-                                {session.title || "Untitled"}
-                              </span>
-                            </A>
-                            <div
-                              class={`absolute right-0 top-0 bottom-0 items-center rounded-r-md ${menuOpenId() === session.id ? "flex" : "hidden group-hover:flex group-focus-within:flex"}`}
-                              style={{ "pointer-events": "none" }}
-                            >
-                              <div
-                                class="w-6 h-full"
-                                style={{
-                                  background: `linear-gradient(to right, transparent, var(${isActive(session.id) ? "--surface-inset" : "--background-stronger"}))`,
-                                }}
-                              />
-                              <div
-                                class="flex items-center pr-1.5 relative"
-                                style={{
-                                  "pointer-events": "auto",
-                                  background: isActive(session.id) ? "var(--surface-inset)" : "var(--background-stronger)",
-                                }}
-                                data-sidebar-menu
-                              >
-                                <button
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    const opening = menuOpenId() !== session.id;
-                                    setMenuOpenId(opening ? session.id : null);
-                                    setMenuFocusIndex(opening ? 0 : -1);
-                                  }}
-                                  class="p-1 rounded transition-colors"
-                                  style={{ color: "var(--icon-weak)" }}
-                                  onMouseEnter={(e) =>
-                                    (e.currentTarget.style.color =
-                                      "var(--icon-base)")
-                                  }
-                                  onMouseLeave={(e) =>
-                                    (e.currentTarget.style.color =
-                                      "var(--icon-weak)")
-                                  }
-                                  title="More options"
-                                  aria-label="More session options"
-                                  aria-haspopup="true"
-                                  aria-expanded={menuOpenId() === session.id}
-                                >
-                                  <MoreHorizontal class="w-3.5 h-3.5" />
-                                </button>
-
-                                {/* Dropdown menu for archived sessions */}
-                                <Show when={menuOpenId() === session.id}>
-                                  <div
-                                    class="absolute right-0 top-full mt-1 w-44 rounded-md shadow-lg z-30 py-1"
-                                    style={{
-                                      background: "var(--background-base)",
-                                      border: "1px solid var(--border-base)",
-                                    }}
-                                    data-sidebar-menu-dropdown
-                                    role="menu"
-                                  >
-                                    {/* Restore */}
-                                    <button
-                                      data-menu-item
-                                      role="menuitem"
-                                      class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left transition-colors"
-                                      style={{
-                                        color: "var(--text-base)",
-                                        background: menuFocusIndex() === 0 ? "var(--surface-inset)" : "transparent",
-                                      }}
-                                      onMouseEnter={() => setMenuFocusIndex(0)}
-                                      onFocus={() => setMenuFocusIndex(0)}
-                                      onMouseLeave={(e) => { if (menuFocusIndex() !== 0) e.currentTarget.style.background = "transparent" }}
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setMenuOpenId(null);
-                                        restoreSession(session);
-                                      }}
-                                    >
-                                      <ArchiveRestore class="w-3.5 h-3.5 shrink-0" style={{ color: "var(--icon-weak)" }} />
-                                      Restore
-                                    </button>
-
-                                    {/* Separator */}
-                                    <div class="my-1" role="separator" style={{ "border-top": "1px solid var(--border-base)" }} />
-
-                                    {/* Delete */}
-                                    <button
-                                      data-menu-item
-                                      role="menuitem"
-                                      class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left transition-colors"
-                                      style={{
-                                        color: "var(--text-critical-base)",
-                                        background: menuFocusIndex() === 1 ? "var(--surface-inset)" : "transparent",
-                                      }}
-                                      onMouseEnter={() => setMenuFocusIndex(1)}
-                                      onFocus={() => setMenuFocusIndex(1)}
-                                      onMouseLeave={(e) => { if (menuFocusIndex() !== 1) e.currentTarget.style.background = "transparent" }}
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setMenuOpenId(null);
-                                        setDeleteError(null);
-                                        setConfirmDeleteSession(session);
-                                      }}
-                                    >
-                                      <Trash2 class="w-3.5 h-3.5 shrink-0" />
-                                      Delete
-                                    </button>
-                                  </div>
-                                </Show>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </For>
+                      <p class="text-sm">No results</p>
+                      <p class="text-xs mt-1">Try a different search term</p>
                     </div>
                   </Show>
                 </Show>
-              </Show>
-            </Show>
-          </div>
 
-          {/* Provider Status */}
-          <div
-            class="p-3"
-            style={{ "border-top": "1px solid var(--border-base)" }}
-          >
-            <div
-              class="flex items-center gap-2 text-xs"
-              style={{ color: "var(--text-weak)" }}
-            >
-              <Show
-                when={providers.connected.length > 0}
-                fallback={
-                  <>
-                    <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                    <span>No providers</span>
-                  </>
-                }
-              >
-                <span class="w-1.5 h-1.5 bg-green-500 rounded-full" />
-                <span>{providers.connected.length} provider(s)</span>
-              </Show>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Sidebar resize handle */}
-      <Show when={showSidebar()}>
-        <ResizeHandle
-          direction="horizontal"
-          edge="end"
-          size={layout.sidebar.width()}
-          min={SIDEBAR_MIN_WIDTH}
-          max={SIDEBAR_MAX_WIDTH}
-          onResize={(width) => {
-            setSidebarDragging(true);
-            layout.sidebar.resize(width);
-          }}
-          onDragEnd={() => {
-            setSidebarDragging(false);
-          }}
-          onCollapse={toggleSidebar}
-          collapseThreshold={100}
-        />
-      </Show>
-
-      {/* Expand button when manually collapsed (not on settings or small screens) */}
-      <Show
-        when={
-          !sidebarExpanded() &&
-          !location.pathname.endsWith("/settings") &&
-          windowWidth() >= COLLAPSE_BREAKPOINT
-        }
-      >
-        <button
-          onClick={toggleSidebar}
-          class="absolute left-16 top-1/2 -translate-y-1/2 z-10 p-1 rounded-r-md transition-colors"
-          style={{
-            background: "var(--background-base)",
-            border: "1px solid var(--border-base)",
-            "border-left": "none",
-            color: "var(--icon-base)",
-          }}
-          title="Expand Sidebar (Ctrl+B)"
-        >
-          <ChevronRight class="w-4 h-4" />
-        </button>
-      </Show>
-
-      {/* Main Content + Terminal */}
-      <div class="flex-1 flex flex-col overflow-hidden">
-        <main
-          class="flex-1 flex flex-col overflow-hidden"
-          style={{ background: "var(--background-stronger)" }}
-        >
-          {props.children}
-        </main>
-
-        {/* Terminal Panel */}
-        <Show
-          when={
-            terminal.sessions().length > 0 ||
-            terminal.error() ||
-            terminal.creating()
-          }
-        >
-          <div
-            data-panel="terminal"
-            tabIndex={-1}
-            class="flex flex-col relative"
-            style={{
-              height:
-                terminal.opened() || terminal.error() || terminal.creating()
-                  ? `${terminal.height()}px`
-                  : "0px",
-              overflow: "hidden",
-              "border-top":
-                terminal.opened() || terminal.error() || terminal.creating()
-                  ? "1px solid var(--border-base)"
-                  : "none",
-              background: "var(--background-base)",
-              transition: terminal.opened() ? "none" : "height 0.15s ease-out",
-            }}
-          >
-            {/* Resize handle */}
-            <Show when={terminal.opened()}>
-              <div
-                class="absolute top-0 left-0 right-0 h-1 cursor-ns-resize z-10 group"
-                style={{ background: "transparent" }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  const startY = e.clientY;
-                  const startHeight = terminal.height();
-
-                  function onMouseMove(e: MouseEvent) {
-                    const delta = startY - e.clientY;
-                    const maxHeight = window.innerHeight - 100;
-                    const newHeight = Math.max(
-                      100,
-                      Math.min(maxHeight, startHeight + delta),
-                    );
-                    terminal.setHeight(newHeight);
-                  }
-
-                  function onMouseUp() {
-                    document.removeEventListener("mousemove", onMouseMove);
-                    document.removeEventListener("mouseup", onMouseUp);
-                  }
-
-                  document.addEventListener("mousemove", onMouseMove);
-                  document.addEventListener("mouseup", onMouseUp);
-                }}
-              >
-                <div
-                  class="mx-auto mt-0.5 w-12 h-1 rounded-full transition-colors group-hover:bg-[var(--surface-strong)]"
-                  style={{ background: "var(--border-base)" }}
-                />
-              </div>
-            </Show>
-            {/* Error display */}
-            <Show when={terminal.error()}>
-              <div
-                class="p-4 flex items-start gap-3"
-                style={{
-                  background: "var(--surface-critical-subtle)",
-                  color: "var(--text-critical-base)",
-                }}
-              >
-                <AlertTriangle class="w-5 h-5 shrink-0 mt-0.5" />
-                <div class="flex-1">
-                  <div class="font-medium text-sm">Terminal Error</div>
-                  <div
-                    class="text-sm mt-1"
-                    style={{ color: "var(--text-base)" }}
-                  >
-                    {terminal.error()}
-                  </div>
-                  <div
-                    class="text-xs mt-2"
-                    style={{ color: "var(--text-weak)" }}
-                  >
-                    This may happen if the PTY system is not available in this
-                    environment. Check the server logs for more details.
-                  </div>
-                </div>
-                <button
-                  onClick={() => terminal.clearError()}
-                  class="p-1 rounded hover:bg-white/10"
-                  style={{ color: "var(--icon-base)" }}
-                >
-                  <X class="w-4 h-4" />
-                </button>
-              </div>
-            </Show>
-
-            {/* Creating indicator */}
-            <Show when={terminal.creating() && !terminal.error()}>
-              <div
-                class="p-4 flex items-center gap-3"
-                style={{ color: "var(--text-weak)" }}
-              >
-                <Spinner class="w-5 h-5" />
-                <span class="text-sm">Creating terminal session...</span>
-              </div>
-            </Show>
-
-            {/* Terminal tabs and content */}
-            <Show when={terminal.sessions().length > 0 && !terminal.error()}>
-              <div
-                class="flex items-center justify-between px-3 py-1.5 shrink-0"
-                style={{ "border-bottom": "1px solid var(--border-base)" }}
-              >
-                <div class="flex items-center gap-2">
-                  <For each={terminal.sessions()}>
-                    {(session) => (
+                {/* Normal Session List */}
+                <Show when={!loading() && !searchQuery().trim()}>
+                  <Show
+                    when={
+                      projectSessions().length > 0 || archivedSessions().length > 0
+                    }
+                    fallback={
                       <div
-                        onClick={() => terminal.setActive(session.id)}
-                        class="flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors cursor-pointer"
-                        style={{
-                          background:
-                            terminal.active() === session.id
-                              ? "var(--surface-inset)"
-                              : "transparent",
-                          color:
-                            terminal.active() === session.id
-                              ? "var(--text-strong)"
-                              : "var(--text-weak)",
-                        }}
+                        class="py-6 text-center"
+                        style={{ color: "var(--text-weak)" }}
                       >
-                        <SquareTerminal class="w-3 h-3" />
-                        {session.title}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            terminal.close(session.id);
-                          }}
-                          class="ml-1 p-0.5 rounded hover:bg-white/10"
-                          style={{ color: "var(--icon-weak)" }}
+                        <p class="text-sm">No sessions yet</p>
+                        <p class="text-xs mt-1">Click "New Session" to start</p>
+                      </div>
+                    }
+                  >
+                    {/* Pinned Sessions (drag-and-drop reorderable) */}
+                    <Show when={pinnedSessions().length > 0}>
+                      <div class="pb-2">
+                        <h3
+                          role="presentation"
+                          class="px-2.5 pt-2 pb-1 font-semibold uppercase text-[0.65rem] tracking-[0.06em]"
+                          style={{ color: "var(--text-weak)" }}
                         >
-                          <X class="w-3 h-3" />
+                          Pinned
+                        </h3>
+                        <DragDropProvider
+                          onDragStart={handlePinDragStart}
+                          onDragEnd={handlePinDragEnd}
+                          collisionDetector={closestCenter}
+                        >
+                          <DragDropSensors />
+                          {/* Constrains drag to vertical axis only (zeroes out X transform) */}
+                          <ConstrainDragXAxis />
+                          <div class="space-y-0.5">
+                            <SortableProvider ids={pinnedSessions().map((s) => s.id)}>
+                              <For each={pinnedSessions()}>
+                                {(session) => (
+                                  <SortablePinnedSession
+                                    session={session}
+                                    render={(s) => renderSessionItem(s, true)}
+                                  />
+                                )}
+                              </For>
+                            </SortableProvider>
+                          </div>
+                          <DragOverlay>
+                            <Show when={pinDragId()}>
+                              {(id) => {
+                                const dragged = () => pinnedSessions().find((s) => s.id === id());
+                                return (
+                                  <div
+                                    class="flex items-center gap-2 rounded-md px-2.5 py-2 text-sm"
+                                    style={{
+                                      background: "var(--surface-inset)",
+                                      color: "var(--text-interactive-base)",
+                                      "box-shadow": "0 4px 12px rgba(0,0,0,0.15)",
+                                      "min-width": "120px",
+                                    }}
+                                  >
+                                    <GripVertical class="w-3 h-3 shrink-0" style={{ color: "var(--icon-weak)" }} />
+                                    <Pin class="w-4 h-4 shrink-0" style={{ color: "var(--icon-weak)" }} />
+                                    <span class="truncate">{dragged()?.title || "Untitled"}</span>
+                                  </div>
+                                );
+                              }}
+                            </Show>
+                          </DragOverlay>
+                        </DragDropProvider>
+                      </div>
+                    </Show>
+
+                    {/* Active Sessions — grouped by date */}
+                    <For each={groupedSessions()}>
+                      {(group) => (
+                        <div class="pb-2">
+                          <h3
+                            role="presentation"
+                            class="px-2.5 pt-2 pb-1 font-semibold uppercase text-[0.65rem] tracking-[0.06em]"
+                            style={{ color: "var(--text-weak)" }}
+                          >
+                            {group.label}
+                          </h3>
+                          <div class="space-y-0.5">
+                            <For each={group.sessions}>
+                              {(session) => renderSessionItem(session, false)}
+                            </For>
+                          </div>
+                        </div>
+                      )}
+                    </For>
+
+                    {/* Archived Sessions Toggle */}
+                    <Show when={archivedSessions().length > 0}>
+                      <div class="pt-2 pb-1">
+                        <button
+                          onClick={toggleShowArchived}
+                          class="flex items-center gap-2 px-2.5 py-1.5 w-full text-xs rounded-md transition-colors"
+                          style={{ color: "var(--text-weak)" }}
+                          onMouseEnter={(e) =>
+                          (e.currentTarget.style.background =
+                            "var(--surface-inset)")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.background = "transparent")
+                          }
+                        >
+                          <Archive class="w-3.5 h-3.5" />
+                          <span>
+                            {showArchived() ? "Hide" : "Show"} archived (
+                            {archivedSessions().length})
+                          </span>
                         </button>
                       </div>
-                    )}
-                  </For>
-                  <button
-                    onClick={() => terminal.create(directory)}
-                    class="p-1 rounded transition-colors"
-                    style={{ color: "var(--icon-weak)" }}
-                    title="New Terminal"
-                  >
-                    <Plus class="w-4 h-4" />
-                  </button>
-                </div>
 
-                <button
-                  onClick={() => terminal.toggle(directory)}
-                  class="p-1 rounded transition-colors"
-                  style={{ color: "var(--icon-weak)" }}
-                  title="Close Terminal"
-                >
-                  <ChevronDown class="w-4 h-4" />
-                </button>
+                      {/* Archived Sessions List */}
+                      <Show when={showArchived()}>
+                        <div class="space-y-0.5 pb-2">
+                          <For each={archivedSessions()}>
+                            {(session) => (
+                              <div class="group relative">
+                                <A
+                                  href={`/${dirSlug()}/session/${session.id}`}
+                                  class="flex items-center gap-2 px-2.5 py-2 rounded-md text-sm transition-colors"
+                                  style={{
+                                    color: isActive(session.id)
+                                      ? "var(--text-interactive-base)"
+                                      : "var(--text-weak)",
+                                    background: isActive(session.id)
+                                      ? "var(--surface-inset)"
+                                      : "transparent",
+                                    opacity: isActive(session.id) ? 1 : 0.7,
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!isActive(session.id)) {
+                                      e.currentTarget.style.background =
+                                        "var(--surface-inset)";
+                                      e.currentTarget.style.opacity = "1";
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!isActive(session.id)) {
+                                      e.currentTarget.style.background =
+                                        "transparent";
+                                      e.currentTarget.style.opacity = "0.7";
+                                    }
+                                  }}
+                                >
+                                  <span
+                                    class="shrink-0"
+                                    style={{ color: "var(--icon-weak)" }}
+                                  >
+                                    <Archive class="w-4 h-4" />
+                                  </span>
+                                  <span class="min-w-0 flex-1 truncate">
+                                    {session.title || "Untitled"}
+                                  </span>
+                                </A>
+                                <div
+                                  class={`absolute right-0 top-0 bottom-0 items-center rounded-r-md ${menuOpenId() === session.id ? "flex" : "hidden group-hover:flex group-focus-within:flex"}`}
+                                  style={{ "pointer-events": "none" }}
+                                >
+                                  <div
+                                    class="w-6 h-full"
+                                    style={{
+                                      background: `linear-gradient(to right, transparent, var(${isActive(session.id) ? "--surface-inset" : "--background-stronger"}))`,
+                                    }}
+                                  />
+                                  <div
+                                    class="flex items-center pr-1.5 relative"
+                                    style={{
+                                      "pointer-events": "auto",
+                                      background: isActive(session.id) ? "var(--surface-inset)" : "var(--background-stronger)",
+                                    }}
+                                    data-sidebar-menu
+                                  >
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        const opening = menuOpenId() !== session.id;
+                                        setMenuOpenId(opening ? session.id : null);
+                                        setMenuFocusIndex(opening ? 0 : -1);
+                                      }}
+                                      class="p-1 rounded transition-colors"
+                                      style={{ color: "var(--icon-weak)" }}
+                                      onMouseEnter={(e) =>
+                                      (e.currentTarget.style.color =
+                                        "var(--icon-base)")
+                                      }
+                                      onMouseLeave={(e) =>
+                                      (e.currentTarget.style.color =
+                                        "var(--icon-weak)")
+                                      }
+                                      title="More options"
+                                      aria-label="More session options"
+                                      aria-haspopup="true"
+                                      aria-expanded={menuOpenId() === session.id}
+                                    >
+                                      <MoreHorizontal class="w-3.5 h-3.5" />
+                                    </button>
+
+                                    {/* Dropdown menu for archived sessions */}
+                                    <Show when={menuOpenId() === session.id}>
+                                      <div
+                                        class="absolute right-0 top-full mt-1 w-44 rounded-md shadow-lg z-30 py-1"
+                                        style={{
+                                          background: "var(--background-base)",
+                                          border: "1px solid var(--border-base)",
+                                        }}
+                                        data-sidebar-menu-dropdown
+                                        role="menu"
+                                      >
+                                        {/* Restore */}
+                                        <button
+                                          data-menu-item
+                                          role="menuitem"
+                                          class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left transition-colors"
+                                          style={{
+                                            color: "var(--text-base)",
+                                            background: menuFocusIndex() === 0 ? "var(--surface-inset)" : "transparent",
+                                          }}
+                                          onMouseEnter={() => setMenuFocusIndex(0)}
+                                          onFocus={() => setMenuFocusIndex(0)}
+                                          onMouseLeave={(e) => { if (menuFocusIndex() !== 0) e.currentTarget.style.background = "transparent" }}
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setMenuOpenId(null);
+                                            restoreSession(session);
+                                          }}
+                                        >
+                                          <ArchiveRestore class="w-3.5 h-3.5 shrink-0" style={{ color: "var(--icon-weak)" }} />
+                                          Restore
+                                        </button>
+
+                                        {/* Separator */}
+                                        <div class="my-1" role="separator" style={{ "border-top": "1px solid var(--border-base)" }} />
+
+                                        {/* Delete */}
+                                        <button
+                                          data-menu-item
+                                          role="menuitem"
+                                          class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left transition-colors"
+                                          style={{
+                                            color: "var(--text-critical-base)",
+                                            background: menuFocusIndex() === 1 ? "var(--surface-inset)" : "transparent",
+                                          }}
+                                          onMouseEnter={() => setMenuFocusIndex(1)}
+                                          onFocus={() => setMenuFocusIndex(1)}
+                                          onMouseLeave={(e) => { if (menuFocusIndex() !== 1) e.currentTarget.style.background = "transparent" }}
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setMenuOpenId(null);
+                                            setDeleteError(null);
+                                            setConfirmDeleteSession(session);
+                                          }}
+                                        >
+                                          <Trash2 class="w-3.5 h-3.5 shrink-0" />
+                                          Delete
+                                        </button>
+                                      </div>
+                                    </Show>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </For>
+                        </div>
+                      </Show>
+                    </Show>
+                  </Show>
+                </Show>
               </div>
 
-              <div class="flex-1 overflow-hidden">
-                <For each={terminal.sessions()}>
-                  {(session) => (
+              {/* Provider Status */}
+              <div
+                class="p-3"
+                style={{ "border-top": "1px solid var(--border-base)" }}
+              >
+                <div
+                  class="flex items-center gap-2 text-xs"
+                  style={{ color: "var(--text-weak)" }}
+                >
+                  <Show
+                    when={providers.connected.length > 0}
+                    fallback={
+                      <>
+                        <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
+                        <span>No providers</span>
+                      </>
+                    }
+                  >
+                    <span class="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                    <span>{providers.connected.length} provider(s)</span>
+                  </Show>
+                </div>
+              </div>
+            </div>
+          </nav>
+
+          {/* Sidebar resize handle */}
+          <Show when={showSidebar()}>
+            <ResizeHandle
+              direction="horizontal"
+              edge="end"
+              size={layout.sidebar.width()}
+              min={SIDEBAR_MIN_WIDTH}
+              max={SIDEBAR_MAX_WIDTH}
+              onResize={(width) => {
+                setSidebarDragging(true);
+                layout.sidebar.resize(width);
+              }}
+              onDragEnd={() => {
+                setSidebarDragging(false);
+              }}
+              onCollapse={toggleSidebar}
+              collapseThreshold={100}
+            />
+          </Show>
+
+          {/* Expand button when manually collapsed (not on settings or small screens) */}
+          <Show
+            when={
+              !sidebarExpanded() &&
+              !location.pathname.endsWith("/settings") &&
+              windowWidth() >= COLLAPSE_BREAKPOINT
+            }
+          >
+            <button
+              onClick={toggleSidebar}
+              class="absolute left-16 top-1/2 -translate-y-1/2 z-10 p-1 rounded-r-md transition-colors"
+              style={{
+                background: "var(--background-base)",
+                border: "1px solid var(--border-base)",
+                "border-left": "none",
+                color: "var(--icon-base)",
+              }}
+              title="Expand Sidebar (Ctrl+B)"
+            >
+              <ChevronRight class="w-4 h-4" />
+            </button>
+          </Show>
+
+          {/* Main Content + Terminal */}
+          <div class="flex-1 flex flex-col overflow-hidden">
+            <main
+              class="flex-1 flex flex-col overflow-hidden"
+              style={{ background: "var(--background-stronger)" }}
+            >
+              {props.children}
+            </main>
+
+            {/* Terminal Panel */}
+            <Show
+              when={
+                terminal.sessions().length > 0 ||
+                terminal.error() ||
+                terminal.creating()
+              }
+            >
+              <div
+                data-panel="terminal"
+                tabIndex={-1}
+                class="flex flex-col relative"
+                style={{
+                  height:
+                    terminal.opened() || terminal.error() || terminal.creating()
+                      ? `${terminal.height()}px`
+                      : "0px",
+                  overflow: "hidden",
+                  "border-top":
+                    terminal.opened() || terminal.error() || terminal.creating()
+                      ? "1px solid var(--border-base)"
+                      : "none",
+                  background: "var(--background-base)",
+                  transition: terminal.opened() ? "none" : "height 0.15s ease-out",
+                }}
+              >
+                {/* Resize handle */}
+                <Show when={terminal.opened()}>
+                  <div
+                    class="absolute top-0 left-0 right-0 h-1 cursor-ns-resize z-10 group"
+                    style={{ background: "transparent" }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const startY = e.clientY;
+                      const startHeight = terminal.height();
+
+                      function onMouseMove(e: MouseEvent) {
+                        const delta = startY - e.clientY;
+                        const maxHeight = window.innerHeight - 100;
+                        const newHeight = Math.max(
+                          100,
+                          Math.min(maxHeight, startHeight + delta),
+                        );
+                        terminal.setHeight(newHeight);
+                      }
+
+                      function onMouseUp() {
+                        document.removeEventListener("mousemove", onMouseMove);
+                        document.removeEventListener("mouseup", onMouseUp);
+                      }
+
+                      document.addEventListener("mousemove", onMouseMove);
+                      document.addEventListener("mouseup", onMouseUp);
+                    }}
+                  >
                     <div
-                      class="size-full"
-                      style={{
-                        display:
-                          terminal.active() === session.id ? "block" : "none",
-                      }}
-                    >
-                      <Terminal ptyId={session.id} />
+                      class="mx-auto mt-0.5 w-12 h-1 rounded-full transition-colors group-hover:bg-[var(--surface-strong)]"
+                      style={{ background: "var(--border-base)" }}
+                    />
+                  </div>
+                </Show>
+                {/* Error display */}
+                <Show when={terminal.error()}>
+                  <div
+                    class="p-4 flex items-start gap-3"
+                    style={{
+                      background: "var(--surface-critical-subtle)",
+                      color: "var(--text-critical-base)",
+                    }}
+                  >
+                    <AlertTriangle class="w-5 h-5 shrink-0 mt-0.5" />
+                    <div class="flex-1">
+                      <div class="font-medium text-sm">Terminal Error</div>
+                      <div
+                        class="text-sm mt-1"
+                        style={{ color: "var(--text-base)" }}
+                      >
+                        {terminal.error()}
+                      </div>
+                      <div
+                        class="text-xs mt-2"
+                        style={{ color: "var(--text-weak)" }}
+                      >
+                        This may happen if the PTY system is not available in this
+                        environment. Check the server logs for more details.
+                      </div>
                     </div>
-                  )}
-                </For>
+                    <button
+                      onClick={() => terminal.clearError()}
+                      class="p-1 rounded hover:bg-white/10"
+                      style={{ color: "var(--icon-base)" }}
+                    >
+                      <X class="w-4 h-4" />
+                    </button>
+                  </div>
+                </Show>
+
+                {/* Creating indicator */}
+                <Show when={terminal.creating() && !terminal.error()}>
+                  <div
+                    class="p-4 flex items-center gap-3"
+                    style={{ color: "var(--text-weak)" }}
+                  >
+                    <Spinner class="w-5 h-5" />
+                    <span class="text-sm">Creating terminal session...</span>
+                  </div>
+                </Show>
+
+                {/* Terminal tabs and content */}
+                <Show when={terminal.sessions().length > 0 && !terminal.error()}>
+                  <div
+                    class="flex items-center justify-between px-3 py-1.5 shrink-0"
+                    style={{ "border-bottom": "1px solid var(--border-base)" }}
+                  >
+                    <div class="flex items-center gap-2">
+                      <For each={terminal.sessions()}>
+                        {(session) => (
+                          <div
+                            onClick={() => terminal.setActive(session.id)}
+                            class="flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors cursor-pointer"
+                            style={{
+                              background:
+                                terminal.active() === session.id
+                                  ? "var(--surface-inset)"
+                                  : "transparent",
+                              color:
+                                terminal.active() === session.id
+                                  ? "var(--text-strong)"
+                                  : "var(--text-weak)",
+                            }}
+                          >
+                            <SquareTerminal class="w-3 h-3" />
+                            {session.title}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                terminal.close(session.id);
+                              }}
+                              class="ml-1 p-0.5 rounded hover:bg-white/10"
+                              style={{ color: "var(--icon-weak)" }}
+                            >
+                              <X class="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </For>
+                      <button
+                        onClick={() => terminal.create(directory)}
+                        class="p-1 rounded transition-colors"
+                        style={{ color: "var(--icon-weak)" }}
+                        title="New Terminal"
+                      >
+                        <Plus class="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => terminal.toggle(directory)}
+                      class="p-1 rounded transition-colors"
+                      style={{ color: "var(--icon-weak)" }}
+                      title="Close Terminal"
+                    >
+                      <ChevronDown class="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div class="flex-1 overflow-hidden">
+                    <For each={terminal.sessions()}>
+                      {(session) => (
+                        <div
+                          class="size-full"
+                          style={{
+                            display:
+                              terminal.active() === session.id ? "block" : "none",
+                          }}
+                        >
+                          <Terminal ptyId={session.id} />
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </Show>
               </div>
             </Show>
           </div>
-        </Show>
-      </div>
 
-      {/* Delete confirmation dialog for sidebar sessions */}
-      <ConfirmDialog
-        open={!!confirmDeleteSession()}
-        title="Delete session?"
-        message={`This will permanently delete "${confirmDeleteSession()?.title || "this session"}". This cannot be undone.`}
-        confirmLabel={deleting() ? "Deleting..." : "Delete"}
-        confirmDisabled={deleting()}
-        cancelDisabled={deleting()}
-        cancelLabel="Cancel"
-        variant="danger"
-        error={deleteError() ?? undefined}
-        onConfirm={() => {
-          const session = confirmDeleteSession();
-          if (session) deleteAndNavigate(session);
-        }}
-        onCancel={() => {
-          if (deleting()) return;
-          setDeleteError(null);
-          setConfirmDeleteSession(null);
-        }}
-      />
+          {/* Delete confirmation dialog for sidebar sessions */}
+          <ConfirmDialog
+            open={!!confirmDeleteSession()}
+            title="Delete session?"
+            message={`This will permanently delete "${confirmDeleteSession()?.title || "this session"}". This cannot be undone.`}
+            confirmLabel={deleting() ? "Deleting..." : "Delete"}
+            confirmDisabled={deleting()}
+            cancelDisabled={deleting()}
+            cancelLabel="Cancel"
+            variant="danger"
+            error={deleteError() ?? undefined}
+            onConfirm={() => {
+              const session = confirmDeleteSession();
+              if (session) deleteAndNavigate(session);
+            }}
+            onCancel={() => {
+              if (deleting()) return;
+              setDeleteError(null);
+              setConfirmDeleteSession(null);
+            }}
+          />
 
-      {/* Archive confirmation dialog for busy sessions (Cmd+W) */}
-      <ConfirmDialog
-        open={!!confirmArchiveSession()}
-        title="Archive busy session?"
-        message={`"${confirmArchiveSession()?.title || "This session"}" is currently running. Archive it anyway?`}
-        confirmLabel="Archive"
-        cancelLabel="Cancel"
-        variant="warning"
-        onConfirm={() => {
-          const session = confirmArchiveSession();
-          setConfirmArchiveSession(null);
-          if (session) archiveAndNavigate(session);
-        }}
-        onCancel={() => setConfirmArchiveSession(null)}
-      />
+          {/* Archive confirmation dialog for busy sessions (Cmd+W) */}
+          <ConfirmDialog
+            open={!!confirmArchiveSession()}
+            title="Archive busy session?"
+            message={`"${confirmArchiveSession()?.title || "This session"}" is currently running. Archive it anyway?`}
+            confirmLabel="Archive"
+            cancelLabel="Cancel"
+            variant="warning"
+            onConfirm={() => {
+              const session = confirmArchiveSession();
+              setConfirmArchiveSession(null);
+              if (session) archiveAndNavigate(session);
+            }}
+            onCancel={() => setConfirmArchiveSession(null)}
+          />
 
-      {/* Keyboard shortcut reference overlay */}
-      <ShortcutReference />
+          {/* Keyboard shortcut reference overlay */}
+          <ShortcutReference />
 
-      {/* Command palette overlay */}
-      <CommandPalette />
+          {/* Command palette overlay */}
+          <CommandPalette />
 
-      {/* Vimium-style hint mode overlay */}
-      <HintMode />
-    </div>
+          {/* Vimium-style hint mode overlay */}
+          <HintMode />
+        </div>
+      </Show>
+    </>
   );
 }
+
+

@@ -1,0 +1,8 @@
+{
+  "permission": {
+    "webfetch": "allow",
+    "external_directory": "allow",
+    "compress": "allow",
+    "task": "allow"
+  }
+}

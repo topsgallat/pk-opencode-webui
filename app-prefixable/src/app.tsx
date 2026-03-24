@@ -2,6 +2,7 @@ import { Router, Route, Navigate, useParams } from "@solidjs/router"
 import { createSignal, onMount, onCleanup } from "solid-js"
 import { BasePathProvider, useBasePath } from "./context/base-path"
 import { BrandingProvider } from "./context/branding"
+import { DeviceProvider } from "./context/device"
 import { ThemeProvider } from "./context/theme"
 import { CommandProvider } from "./context/command"
 import { RecentProjectsProvider } from "./context/recent-projects"
@@ -134,19 +135,21 @@ export function App() {
 
   return (
     <BasePathProvider>
-      <ThemeProvider>
-        <BrandingProvider>
-          <RecentProjectsProvider>
-            <SavedPromptsProvider directory={activeDirectory}>
-              <GlobalEventsProvider projects={projects} activeDirectory={activeDirectory}>
-                <CommandProvider>
-                  <AppRoutes />
-                </CommandProvider>
-              </GlobalEventsProvider>
-            </SavedPromptsProvider>
-          </RecentProjectsProvider>
-        </BrandingProvider>
-      </ThemeProvider>
+      <DeviceProvider>
+        <ThemeProvider>
+          <BrandingProvider>
+            <RecentProjectsProvider>
+              <SavedPromptsProvider directory={activeDirectory}>
+                <GlobalEventsProvider projects={projects} activeDirectory={activeDirectory}>
+                  <CommandProvider>
+                    <AppRoutes />
+                  </CommandProvider>
+                </GlobalEventsProvider>
+              </SavedPromptsProvider>
+            </RecentProjectsProvider>
+          </BrandingProvider>
+        </ThemeProvider>
+      </DeviceProvider>
     </BasePathProvider>
   )
 }

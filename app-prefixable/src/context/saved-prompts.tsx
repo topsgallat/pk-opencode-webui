@@ -1,5 +1,6 @@
 import { createContext, useContext, createSignal, createEffect, on, type ParentProps, type Accessor } from "solid-js"
 import { deriveDirectoryFromPathname } from "../utils/path"
+import { generateUUID } from "../utils/uuid"
 
 interface SavedPrompt {
   id: string
@@ -122,7 +123,7 @@ export function SavedPromptsProvider(props: ParentProps & { directory?: Accessor
   function add(title: string, text: string) {
     setPrompts((prev) => {
       const prompt: SavedPrompt = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         title,
         text,
         createdAt: Date.now(),

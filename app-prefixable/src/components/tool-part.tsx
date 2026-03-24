@@ -1,15 +1,17 @@
 import { createSignal, createEffect, createMemo, Show, For, createRoot } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import type { Part, ToolPart as SDKToolPart, ToolState } from "../sdk/client";
-import { ChevronDown, ExternalLink, Users } from "lucide-solid";
+import type { Part, ToolPart as SDKToolPart, ToolState, ReasoningPart as SDKReasoningPart } from "../sdk/client";
+import { ChevronDown, ExternalLink, Users, Sparkles, Brain } from "lucide-solid";
 import { ContentDiff } from "./diff/content-diff";
 import { useSync } from "../context/sync";
 import { useParams, useNavigate } from "@solidjs/router";
 import { base64Encode } from "../utils/path";
 import { useSDK } from "../context/sdk";
+import { Markdown } from "./markdown";
 
-// Use the SDK's ToolPart type
+// Use the SDK's types
 type ToolPart = SDKToolPart;
+type ReasoningPart = SDKReasoningPart;
 
 // Limit how many tool part expansion states we keep to avoid unbounded growth.
 const MAX_EXPANDED_STATES = 1000;
@@ -24,13 +26,13 @@ const expandedStore = createRoot(() => {
     get: (id: string) => states[id] ?? false,
     set: (id: string, value: boolean) => {
       const isNewKey = !(id in states);
-      
+
       // Only update if value actually changes
       if (!isNewKey && states[id] === value) return;
-      
+
       setStates(produce(state => {
         state[id] = value;
-        
+
         if (isNewKey) {
           expandedKeys.push(id);
           // Evict oldest entry if over limit
@@ -435,6 +437,56 @@ function TaskToolDisplay(props: { part: ToolPart }) {
   );
 }
 
+// Reasoning part display (AI Thinking)
+function ReasoningPartDisplay(props: { part: ReasoningPart }) {
+  const expanded = () => expandedStore.get(props.part.id);
+
+  // Auto-expand when content starts arriving
+  createEffect(() => {
+    if (props.part.text.length > 0 && !expandedStore.get(props.part.id)) {
+      expandedStore.set(props.part.id, true);
+    }
+  });
+
+  return (
+    <div
+      class="rounded-md overflow-hidden bg-[var(--background-base)] border border-[var(--border-base)] mb-2"
+    >
+      <button
+        onClick={() => expandedStore.toggle(props.part.id)}
+        class="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--surface-inset)]"
+        style={{
+          background: expanded() ? "var(--surface-inset)" : "transparent",
+        }}
+      >
+        <Sparkles class="w-3.5 h-3.5" style={{ color: "var(--text-interactive-base)" }} />
+        <span class="text-xs font-medium uppercase tracking-wider opacity-70 flex-1" style={{ color: "var(--text-strong)" }}>
+          Thought process
+        </span>
+        <ChevronDown
+          class="w-3.5 h-3.5 transition-transform"
+          style={{
+            color: "var(--icon-weak)",
+            transform: expanded() ? "rotate(180deg)" : "rotate(0deg)",
+          }}
+        />
+      </button>
+
+      <Show when={expanded()}>
+        <div
+          class="px-4 py-3 text-sm border-t border-[var(--border-base)] italic"
+          style={{
+            background: "var(--background-stronger)",
+            color: "var(--text-base)",
+          }}
+        >
+          <Markdown content={props.part.text} class="thinking-content opacity-80" />
+        </div>
+      </Show>
+    </div>
+  );
+}
+
 export function ToolPartDisplay(props: { part: ToolPart }) {
   // Use special rendering for task tool
   if (props.part.tool === "task") {
@@ -458,7 +510,7 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
 
   // Track if we've already auto-expanded this tool part
   const autoExpandedKey = `auto-${props.part.id}`;
-  
+
   // Auto-expand edit tools when diff becomes available (only once)
   createEffect(() => {
     if (hasDiff() && !expandedStore.get(autoExpandedKey)) {
@@ -615,14 +667,18 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
 
 // Render tool parts from a message
 export function MessageParts(props: { parts: Part[] }) {
-  // Filter to only tool parts
-  const toolParts = () => props.parts.filter(isToolPart);
+  // Separate parts by type but keep order
+  const filteredParts = () => props.parts.filter(p => p.type === "tool" || p.type === "reasoning");
 
   return (
-    <Show when={toolParts().length > 0}>
+    <Show when={filteredParts().length > 0}>
       <div class="space-y-2 mt-3">
-        <For each={toolParts()}>
-          {(part) => <ToolPartDisplay part={part} />}
+        <For each={filteredParts()}>
+          {(part) => {
+            if (part.type === "reasoning") return <ReasoningPartDisplay part={part as ReasoningPart} />;
+            if (part.type === "tool") return <ToolPartDisplay part={part as ToolPart} />;
+            return null;
+          }}
         </For>
       </div>
     </Show>

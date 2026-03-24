@@ -13,6 +13,7 @@ import { Check, Copy, Plug, GitBranch, Server, ExternalLink, Key, Search, X, Tra
 import { SOUND_OPTIONS, readSoundSettings, writeSoundSettings, playSound, primeAudioContext, SOUND_STORAGE_KEY, type SoundSettings } from "../utils/sound"
 import { useSavedPrompts } from "../context/saved-prompts"
 import { useTheme } from "../context/theme"
+import { useDevice } from "../context/device"
 import { writeFile } from "../utils/extended-api"
 import type { Config, PermissionActionConfig } from "../sdk/client"
 
@@ -21,6 +22,7 @@ export function Settings() {
   const mcp = useMCP()
   const { client, global, url, directory } = useSDK()
   const theme = useTheme()
+  const device = useDevice()
   const [selectedProvider, setSelectedProvider] = createSignal<string | null>(null)
   const [apiKey, setApiKey] = createSignal("")
   const [connecting, setConnecting] = createSignal(false)
@@ -235,7 +237,7 @@ export function Settings() {
       })
 
       console.log("[runPtyCommand] Final output:", output)
-      await global.pty.remove({ ptyID: ptyId }).catch(() => {})
+      await global.pty.remove({ ptyID: ptyId }).catch(() => { })
       return output
     } catch (e) {
       console.error("[runPtyCommand] Error:", e)
@@ -653,71 +655,103 @@ Add your project-specific instructions here.
   })
 
   return (
-    <div class="h-full flex" style={{ background: "var(--background-stronger)" }}>
-      {/* Tabs sidebar */}
-      <div
-        class="w-56 shrink-0 flex flex-col py-3 px-2"
-        style={{
-          background: "var(--background-base)",
-          "border-right": "1px solid var(--border-base)",
-        }}
-      >
-        <div class="text-xs font-medium uppercase tracking-wide px-3 py-2" style={{ color: "var(--text-weak)" }}>
-          Settings
-        </div>
-        {/* Project indicator */}
-        <Show when={directory}>
-          <div
-            class="mx-2 mb-2 px-2 py-1.5 rounded-md text-xs truncate"
-            style={{
-              background: "var(--surface-inset)",
-              color: "var(--text-weak)",
-              border: "1px solid var(--border-base)",
-            }}
-            title={directory}
-          >
-            <span style={{ color: "var(--text-base)" }}>{directory!.replace(/[\\/]+$/, "").split(/[\\/]/).pop()}</span>
+    <div class="h-full flex flex-col md:flex-row" style={{ background: "var(--background-stronger)" }}>
+      {/* Tabs sidebar - Hidden on mobile, dropdown used instead */}
+      <Show when={!device.isMobile()}>
+        <div
+          class="w-56 shrink-0 flex flex-col py-3 px-2"
+          style={{
+            background: "var(--background-base)",
+            "border-right": "1px solid var(--border-base)",
+          }}
+        >
+          <div class="text-xs font-medium uppercase tracking-wide px-3 py-2" style={{ color: "var(--text-weak)" }}>
+            Settings
           </div>
-        </Show>
-        <div class="space-y-0.5">
-          <For each={tabs()}>
-            {(tab) => (
-              <button
-                onClick={() => onTabChange(tab.id)}
-                class="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors text-left"
-                style={{
-                  color: activeTab() === tab.id ? "var(--text-interactive-base)" : "var(--text-base)",
-                  background: activeTab() === tab.id ? "var(--surface-inset)" : "transparent",
-                }}
-                onMouseEnter={(e) => {
-                  if (activeTab() !== tab.id) e.currentTarget.style.background = "var(--surface-inset)"
-                }}
-                onMouseLeave={(e) => {
-                  if (activeTab() !== tab.id) e.currentTarget.style.background = "transparent"
-                }}
-              >
-                {tab.icon()}
-                <span class="flex-1 truncate">{tab.label}</span>
-                <Show when={tab.scope}>
-                  <span
-                    class="text-[10px] px-1 py-0.5 rounded shrink-0"
-                    style={{
-                      background: "var(--surface-inset)",
-                      color: "var(--text-weak)",
-                    }}
-                  >
-                    {tab.scope}
-                  </span>
-                </Show>
-              </button>
-            )}
-          </For>
+          {/* Project indicator */}
+          <Show when={directory}>
+            <div
+              class="mx-2 mb-2 px-2 py-1.5 rounded-md text-xs truncate"
+              style={{
+                background: "var(--surface-inset)",
+                color: "var(--text-weak)",
+                border: "1px solid var(--border-base)",
+              }}
+              title={directory}
+            >
+              <span style={{ color: "var(--text-base)" }}>{directory!.replace(/[\\/]+$/, "").split(/[\\/]/).pop()}</span>
+            </div>
+          </Show>
+          <div class="space-y-0.5">
+            <For each={tabs()}>
+              {(tab) => (
+                <button
+                  onClick={() => onTabChange(tab.id)}
+                  class="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors text-left"
+                  style={{
+                    color: activeTab() === tab.id ? "var(--text-interactive-base)" : "var(--text-base)",
+                    background: activeTab() === tab.id ? "var(--surface-inset)" : "transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeTab() !== tab.id) e.currentTarget.style.background = "var(--surface-inset)"
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeTab() !== tab.id) e.currentTarget.style.background = "transparent"
+                  }}
+                >
+                  {tab.icon()}
+                  <span class="flex-1 truncate">{tab.label}</span>
+                  <Show when={tab.scope}>
+                    <span
+                      class="text-[10px] px-1 py-0.5 rounded shrink-0"
+                      style={{
+                        background: "var(--surface-inset)",
+                        color: "var(--text-weak)",
+                      }}
+                    >
+                      {tab.scope}
+                    </span>
+                  </Show>
+                </button>
+              )}
+            </For>
+          </div>
         </div>
-      </div>
+      </Show>
 
       {/* Content */}
-      <div class="flex-1 overflow-y-auto">
-        <div class="max-w-2xl p-6 space-y-6">
+      <div class="flex-1 overflow-y-auto relative">
+        <div class="max-w-2xl p-4 md:p-6 space-y-6">
+          {/* Mobile Tab Selector */}
+          <Show when={device.isMobile()}>
+            <div class="mb-4">
+              <label class="block text-xs font-medium uppercase tracking-wide mb-2" style={{ color: "var(--text-weak)" }}>
+                Settings Menu
+              </label>
+              <div class="relative">
+                <select
+                  class="w-full appearance-none px-3 py-2.5 rounded-lg text-sm font-medium border focus:outline-none"
+                  style={{
+                    background: "var(--background-base)",
+                    "border-color": "var(--border-base)",
+                    color: "var(--text-strong)",
+                  }}
+                  value={activeTab()}
+                  onChange={(e) => onTabChange(e.currentTarget.value)}
+                >
+                  <For each={tabs()}>
+                    {(tab) => (
+                      <option value={tab.id}>
+                        {tab.label} {tab.scope ? `(${tab.scope})` : ""}
+                      </option>
+                    )}
+                  </For>
+                </select>
+                <ChevronDown class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "var(--text-weak)" }} />
+              </div>
+            </div>
+          </Show>
+
           {/* Project header banner */}
           <Show when={directory}>
             <div
@@ -1820,202 +1854,202 @@ Add your project-specific instructions here.
               </Show>
 
               <Show when={directory}>
-              <Show when={instructionError()}>
-                <div
-                  class="p-3 rounded-md text-sm"
-                  style={{
-                    background: "var(--surface-inset)",
-                    border: "1px solid var(--border-base)",
-                    "border-left": "3px solid var(--interactive-critical)",
-                    color: "var(--interactive-critical)",
-                  }}
-                >
-                  {instructionError()}
-                </div>
-              </Show>
-
-              <Show when={instructionLoading()}>
-                <div class="flex items-center gap-2" style={{ color: "var(--text-weak)" }}>
-                  <Spinner class="w-4 h-4" />
-                  <span class="text-sm">Loading instructions...</span>
-                </div>
-              </Show>
-
-              {/* No instructions configured */}
-              <Show when={!instructionLoading() && instructionPaths().length === 0}>
-                <section
-                  class="rounded-lg overflow-hidden"
-                  style={{
-                    background: "var(--background-base)",
-                    border: "1px solid var(--border-base)",
-                  }}
-                >
-                  <div class="p-6 text-center space-y-4">
-                    <BookOpen class="w-10 h-10 mx-auto" style={{ color: "var(--text-weak)", opacity: "0.5" }} />
-                    <div>
-                      <p class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-                        No project instructions configured
-                      </p>
-                      <p class="text-sm mt-1" style={{ color: "var(--text-weak)" }}>
-                        Project instructions are defined in <code class="text-xs px-1 py-0.5 rounded" style={{ background: "var(--surface-inset)" }}>opencode.json</code> and included in every session automatically.
-                      </p>
-                    </div>
-                    <Button
-                      onClick={createInstructionsFile}
-                      variant="primary"
-                      size="sm"
-                      disabled={instructionCreating()}
-                    >
-                      <Show when={instructionCreating()} fallback={
-                        <>
-                          <Plus class="w-4 h-4" />
-                          Create Instructions File
-                        </>
-                      }>
-                        <Spinner class="w-4 h-4" />
-                        Creating...
-                      </Show>
-                    </Button>
+                <Show when={instructionError()}>
+                  <div
+                    class="p-3 rounded-md text-sm"
+                    style={{
+                      background: "var(--surface-inset)",
+                      border: "1px solid var(--border-base)",
+                      "border-left": "3px solid var(--interactive-critical)",
+                      color: "var(--interactive-critical)",
+                    }}
+                  >
+                    {instructionError()}
                   </div>
-                </section>
+                </Show>
 
-                <section
-                  class="rounded-lg p-4"
-                  style={{
-                    background: "var(--surface-inset)",
-                    border: "1px solid var(--border-base)",
-                  }}
-                >
-                  <h3 class="text-sm font-medium mb-2" style={{ color: "var(--text-strong)" }}>
-                    How instructions work
-                  </h3>
-                  <div class="text-xs space-y-2" style={{ color: "var(--text-weak)" }}>
-                    <p>
-                      Add an <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>instructions</code> field to your project's <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code>:
-                    </p>
-                    <pre
-                      class="p-3 rounded-md overflow-x-auto"
-                      style={{ background: "var(--background-base)", color: "var(--text-base)" }}
-                    >{`{
+                <Show when={instructionLoading()}>
+                  <div class="flex items-center gap-2" style={{ color: "var(--text-weak)" }}>
+                    <Spinner class="w-4 h-4" />
+                    <span class="text-sm">Loading instructions...</span>
+                  </div>
+                </Show>
+
+                {/* No instructions configured */}
+                <Show when={!instructionLoading() && instructionPaths().length === 0}>
+                  <section
+                    class="rounded-lg overflow-hidden"
+                    style={{
+                      background: "var(--background-base)",
+                      border: "1px solid var(--border-base)",
+                    }}
+                  >
+                    <div class="p-6 text-center space-y-4">
+                      <BookOpen class="w-10 h-10 mx-auto" style={{ color: "var(--text-weak)", opacity: "0.5" }} />
+                      <div>
+                        <p class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                          No project instructions configured
+                        </p>
+                        <p class="text-sm mt-1" style={{ color: "var(--text-weak)" }}>
+                          Project instructions are defined in <code class="text-xs px-1 py-0.5 rounded" style={{ background: "var(--surface-inset)" }}>opencode.json</code> and included in every session automatically.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={createInstructionsFile}
+                        variant="primary"
+                        size="sm"
+                        disabled={instructionCreating()}
+                      >
+                        <Show when={instructionCreating()} fallback={
+                          <>
+                            <Plus class="w-4 h-4" />
+                            Create Instructions File
+                          </>
+                        }>
+                          <Spinner class="w-4 h-4" />
+                          Creating...
+                        </Show>
+                      </Button>
+                    </div>
+                  </section>
+
+                  <section
+                    class="rounded-lg p-4"
+                    style={{
+                      background: "var(--surface-inset)",
+                      border: "1px solid var(--border-base)",
+                    }}
+                  >
+                    <h3 class="text-sm font-medium mb-2" style={{ color: "var(--text-strong)" }}>
+                      How instructions work
+                    </h3>
+                    <div class="text-xs space-y-2" style={{ color: "var(--text-weak)" }}>
+                      <p>
+                        Add an <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>instructions</code> field to your project's <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code>:
+                      </p>
+                      <pre
+                        class="p-3 rounded-md overflow-x-auto"
+                        style={{ background: "var(--background-base)", color: "var(--text-base)" }}
+                      >{`{
   "instructions": ["AGENTS.md", ".opencode/instructions/*.md"]
 }`}</pre>
-                    <p>
-                      Each file path is resolved relative to the project root. The content is injected into the system prompt for every new session.
-                    </p>
-                  </div>
-                </section>
-              </Show>
+                      <p>
+                        Each file path is resolved relative to the project root. The content is injected into the system prompt for every new session.
+                      </p>
+                    </div>
+                  </section>
+                </Show>
 
-              {/* Instructions configured */}
-              <Show when={!instructionLoading() && instructionPaths().length > 0}>
-                <For each={instructionPaths()}>
-                  {(path) => {
-                    const info = () => instructionContents()[path]
-                    const edited = () => instructionEdits()[path]
-                    const currentContent = () => edited() ?? info()?.content ?? ""
-                    const isDirty = () => edited() !== undefined
-                    const isSaving = () => instructionSaving() === path
-                    const wasSaved = () => instructionSaved() === path
+                {/* Instructions configured */}
+                <Show when={!instructionLoading() && instructionPaths().length > 0}>
+                  <For each={instructionPaths()}>
+                    {(path) => {
+                      const info = () => instructionContents()[path]
+                      const edited = () => instructionEdits()[path]
+                      const currentContent = () => edited() ?? info()?.content ?? ""
+                      const isDirty = () => edited() !== undefined
+                      const isSaving = () => instructionSaving() === path
+                      const wasSaved = () => instructionSaved() === path
 
-                    return (
-                      <section
-                        class="rounded-lg overflow-hidden"
-                        style={{
-                          background: "var(--background-base)",
-                          border: "1px solid var(--border-base)",
-                        }}
-                      >
-                        <div
-                          class="px-4 py-3 flex items-center justify-between"
-                          style={{ "border-bottom": "1px solid var(--border-base)" }}
+                      return (
+                        <section
+                          class="rounded-lg overflow-hidden"
+                          style={{
+                            background: "var(--background-base)",
+                            border: "1px solid var(--border-base)",
+                          }}
                         >
-                          <div class="flex items-center gap-2">
-                            <BookOpen class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
-                            <span class="text-sm font-medium font-mono" style={{ color: "var(--text-strong)" }}>
-                              {path}
-                            </span>
-                            <Show when={info()?.exists === false}>
-                              <span
-                                class="text-xs px-1.5 py-0.5 rounded"
-                                style={{
-                                  background: "var(--surface-inset)",
-                                  color: "var(--icon-warning-base)",
-                                }}
-                              >
-                                Missing
+                          <div
+                            class="px-4 py-3 flex items-center justify-between"
+                            style={{ "border-bottom": "1px solid var(--border-base)" }}
+                          >
+                            <div class="flex items-center gap-2">
+                              <BookOpen class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
+                              <span class="text-sm font-medium font-mono" style={{ color: "var(--text-strong)" }}>
+                                {path}
                               </span>
-                            </Show>
-                            <Show when={info()?.exists}>
-                              <span
-                                class="text-xs px-1.5 py-0.5 rounded"
-                                style={{
-                                  background: "var(--surface-inset)",
-                                  color: "var(--icon-success-base)",
-                                }}
-                              >
-                                Active
-                              </span>
-                            </Show>
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <Show when={wasSaved()}>
-                              <span class="text-xs flex items-center gap-1" style={{ color: "var(--icon-success-base)" }}>
-                                <Check class="w-3 h-3" /> Saved
-                              </span>
-                            </Show>
-                            <Button
-                              onClick={() => saveInstruction(path)}
-                              variant="primary"
-                              size="sm"
-                              disabled={!isDirty() || isSaving()}
-                            >
-                              <Show when={isSaving()} fallback={
-                                <>
-                                  <Save class="w-3.5 h-3.5" />
-                                  Save
-                                </>
-                              }>
-                                <Spinner class="w-3.5 h-3.5" />
-                                Saving...
+                              <Show when={info()?.exists === false}>
+                                <span
+                                  class="text-xs px-1.5 py-0.5 rounded"
+                                  style={{
+                                    background: "var(--surface-inset)",
+                                    color: "var(--icon-warning-base)",
+                                  }}
+                                >
+                                  Missing
+                                </span>
                               </Show>
-                            </Button>
+                              <Show when={info()?.exists}>
+                                <span
+                                  class="text-xs px-1.5 py-0.5 rounded"
+                                  style={{
+                                    background: "var(--surface-inset)",
+                                    color: "var(--icon-success-base)",
+                                  }}
+                                >
+                                  Active
+                                </span>
+                              </Show>
+                            </div>
+                            <div class="flex items-center gap-2">
+                              <Show when={wasSaved()}>
+                                <span class="text-xs flex items-center gap-1" style={{ color: "var(--icon-success-base)" }}>
+                                  <Check class="w-3 h-3" /> Saved
+                                </span>
+                              </Show>
+                              <Button
+                                onClick={() => saveInstruction(path)}
+                                variant="primary"
+                                size="sm"
+                                disabled={!isDirty() || isSaving()}
+                              >
+                                <Show when={isSaving()} fallback={
+                                  <>
+                                    <Save class="w-3.5 h-3.5" />
+                                    Save
+                                  </>
+                                }>
+                                  <Spinner class="w-3.5 h-3.5" />
+                                  Saving...
+                                </Show>
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                        <div class="p-4">
-                          <textarea
-                            value={currentContent()}
-                            onInput={(e) => {
-                              const val = e.currentTarget.value
-                              setInstructionEdits((prev) => ({ ...prev, [path]: val }))
-                            }}
-                            rows={12}
-                            class="w-full px-3 py-2 rounded-md text-sm font-mono resize-y"
-                            style={{
-                              background: "var(--surface-inset)",
-                              border: "1px solid var(--border-base)",
-                              color: "var(--text-base)",
-                              "min-height": "160px",
-                            }}
-                            placeholder={info()?.exists === false ? "This file does not exist yet. Type content and save to create it." : "Enter instructions..."}
-                          />
-                        </div>
-                      </section>
-                    )
-                  }}
-                </For>
+                          <div class="p-4">
+                            <textarea
+                              value={currentContent()}
+                              onInput={(e) => {
+                                const val = e.currentTarget.value
+                                setInstructionEdits((prev) => ({ ...prev, [path]: val }))
+                              }}
+                              rows={12}
+                              class="w-full px-3 py-2 rounded-md text-sm font-mono resize-y"
+                              style={{
+                                background: "var(--surface-inset)",
+                                border: "1px solid var(--border-base)",
+                                color: "var(--text-base)",
+                                "min-height": "160px",
+                              }}
+                              placeholder={info()?.exists === false ? "This file does not exist yet. Type content and save to create it." : "Enter instructions..."}
+                            />
+                          </div>
+                        </section>
+                      )
+                    }}
+                  </For>
 
-                <section
-                  class="rounded-lg p-4"
-                  style={{
-                    background: "var(--surface-inset)",
-                    border: "1px solid var(--border-base)",
-                  }}
-                >
-                  <p class="text-xs" style={{ color: "var(--text-weak)" }}>
-                    Instruction files are defined in your project's <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code>. Changes take effect on the next session.
-                  </p>
-                </section>
-              </Show>
+                  <section
+                    class="rounded-lg p-4"
+                    style={{
+                      background: "var(--surface-inset)",
+                      border: "1px solid var(--border-base)",
+                    }}
+                  >
+                    <p class="text-xs" style={{ color: "var(--text-weak)" }}>
+                      Instruction files are defined in your project's <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code>. Changes take effect on the next session.
+                    </p>
+                  </section>
+                </Show>
               </Show>
             </div>
           </Show>

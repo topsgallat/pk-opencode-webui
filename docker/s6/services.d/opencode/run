@@ -1,0 +1,3 @@
+#!/command/with-contenv sh
+
+exec bun run /opt/opencode-ui/serve-ui.ts

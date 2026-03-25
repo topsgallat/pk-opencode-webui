@@ -7,6 +7,10 @@
  * 3. Proxies WebSocket connections for PTY terminal sessions
  * 4. Injects NB_PREFIX into index.html at runtime
  * 5. Provides extended API endpoints (/api/ext/*)
+ *
+ * Operation Modes (OPERATION_MODE env var):
+ *   solo     (default): Starts OpenCode API server on port 4096, then starts UI
+ *   ui-only: Only starts the UI server; expects external API at API_URL
  */
 
 import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
@@ -14,6 +18,61 @@ import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
 const BASE_PATH = process.env.NB_PREFIX || process.env.BASE_PATH || "/"
 const PORT = parseInt(process.env.PORT || "8080", 10)
 const API_URL = process.env.API_URL || "http://127.0.0.1:4096"
+const OPERATION_MODE = process.env.OPERATION_MODE || "solo"
+
+if (OPERATION_MODE === "solo") {
+  const homeDir = process.env.HOME || "/root"
+
+  if (homeDir !== "/root") {
+    await Bun.spawn(["mkdir", "-p", "/root/.cache", "/root/.config"]).exited
+
+    const dirs = [
+      { mounted: `${homeDir}/.cache/opencode`, container: "/root/.cache/opencode" },
+      { mounted: `${homeDir}/.config/opencode`, container: "/root/.config/opencode" },
+    ]
+
+    for (const dir of dirs) {
+      await Bun.spawn(["rm", "-rf", dir.mounted]).exited
+      await Bun.spawn(["mkdir", "-p", dir.container]).exited
+      await Bun.spawn(["ln", "-sfn", dir.container, dir.mounted]).exited
+    }
+
+    console.log(`[solo] Using container config at /root/.cache/opencode and /root/.config/opencode`)
+  }
+
+  console.log(`[solo] Starting OpenCode API server on port 4096...`)
+
+  const apiProc = Bun.spawn(["opencode", "serve", "--port", "4096", "--hostname", "127.0.0.1"], {
+    stdout: "inherit",
+    stderr: "inherit",
+    env: { ...process.env },
+  })
+
+  const apiReady = await (async () => {
+    for (let i = 0; i < 30; i++) {
+      try {
+        const res = await fetch("http://127.0.0.1:4096/health")
+        if (res.ok) return true
+      } catch (_) { void _ }
+      await Bun.sleep(1000)
+    }
+    return false
+  })()
+
+  if (!apiReady) {
+    console.error("[solo] ERROR: OpenCode API server failed to start within 30 seconds")
+    apiProc.kill()
+    process.exit(1)
+  }
+
+  console.log(`[solo] OpenCode API server is ready`)
+
+  process.on("exit", () => apiProc.kill())
+  process.on("SIGINT", () => { apiProc.kill(); process.exit(0) })
+  process.on("SIGTERM", () => { apiProc.kill(); process.exit(0) })
+} else {
+  console.log(`[ui-only] Skipping API server startup; expecting external API at ${API_URL}`)
+}
 const WS_API_URL = API_URL.replace(/^http/, "ws")
 const DIST_DIR = process.env.DIST_DIR || "/opt/opencode-ui/dist"
 const BRANDING_NAME = process.env.BRANDING_NAME || ""

@@ -17,40 +17,63 @@ import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
 
 const BASE_PATH = process.env.NB_PREFIX || process.env.BASE_PATH || "/"
 const PORT = parseInt(process.env.PORT || "8080", 10)
-const API_URL = process.env.API_URL || "http://127.0.0.1:4096"
+const API_PORT = parseInt(process.env.OPENCODE_API_PORT || process.env.API_PORT || "4096", 10)
+const API_URL = process.env.API_URL || `http://127.0.0.1:${API_PORT}`
 const OPERATION_MODE = process.env.OPERATION_MODE || "solo"
+
+// Auth header for proxy (set in solo mode)
+let proxyAuthHeader: string | undefined
 
 if (OPERATION_MODE === "solo") {
   const homeDir = process.env.HOME || "/root"
+  const opencodeServerEnv = {
+    ...process.env,
+    OPENCODE_SERVER_PASSWORD: process.env.OPENCODE_SERVER_PASSWORD || "opencode-local",
+  }
+  const dirs = [
+    `${homeDir}/.cache/opencode`,
+    `${homeDir}/.config/opencode`,
+  ]
 
-  if (homeDir !== "/root") {
-    await Bun.spawn(["mkdir", "-p", "/root/.cache", "/root/.config"]).exited
-
-    const dirs = [
-      { mounted: `${homeDir}/.cache/opencode`, container: "/root/.cache/opencode" },
-      { mounted: `${homeDir}/.config/opencode`, container: "/root/.config/opencode" },
-    ]
-
-    for (const dir of dirs) {
-      await Bun.spawn(["mkdir", "-p", dir.container]).exited
-      console.log(`[solo] Created container directory (if missing): ${dir.container}`)
-    }
-
-    console.log(`[solo] Using container directories: /root/.cache/opencode and /root/.config/opencode (host-mounted directories left untouched)`)
+  for (const dir of dirs) {
+    await Bun.spawn(["mkdir", "-p", dir]).exited
+    console.log(`[solo] Created container directory (if missing): ${dir}`)
   }
 
-  console.log(`[solo] Starting OpenCode API server on port 4096...`)
+  console.log(`[solo] Using container directories: ${dirs.join(" and ")} (host-mounted directories left untouched)`)
 
-  const apiProc = Bun.spawn(["opencode", "serve", "--port", "4096", "--hostname", "127.0.0.1"], {
+  console.log(`[solo] Refreshing OpenCode models cache...`)
+  const modelsRefresh = Bun.spawn(["opencode", "models", "--refresh"], {
     stdout: "inherit",
     stderr: "inherit",
-    env: { ...process.env },
+    env: opencodeServerEnv,
   })
 
+  const modelsRefreshed = await modelsRefresh.exited
+  if (modelsRefreshed !== 0) {
+    console.error(`[solo] ERROR: Failed to refresh OpenCode models cache (exit ${modelsRefreshed})`)
+    process.exit(1)
+  }
+
+  console.log(`[solo] Starting OpenCode API server on port ${API_PORT}...`)
+
+  const apiProc = Bun.spawn(["opencode", "serve", "--port", `${API_PORT}`, "--hostname", "127.0.0.1"], {
+    stdout: "inherit",
+    stderr: "inherit",
+    env: opencodeServerEnv,
+  })
+
+  const serverPassword = opencodeServerEnv.OPENCODE_SERVER_PASSWORD
+  proxyAuthHeader = serverPassword
+    ? `Basic ${Buffer.from(`opencode:${serverPassword}`).toString("base64")}`
+    : undefined
+
   const apiReady = await (async () => {
+    const headers: Record<string, string> = {}
+    if (proxyAuthHeader) headers["Authorization"] = proxyAuthHeader
     for (let i = 0; i < 30; i++) {
       try {
-        const res = await fetch("http://127.0.0.1:4096/health")
+        const res = await fetch(`http://127.0.0.1:${API_PORT}/health`, { headers })
         if (res.ok) return true
       } catch (_) { void _ }
       await Bun.sleep(1000)
@@ -197,6 +220,11 @@ const server = Bun.serve<{ path: string; search: string }>({
     if (isApiPath(path)) {
       const target = new URL(path + url.search, API_URL)
       const headers = new Headers(req.headers)
+
+      // Add auth header for API proxy in solo mode
+      if (proxyAuthHeader) {
+        headers.set("Authorization", proxyAuthHeader)
+      }
 
       // SSE requests need special handling
       if (path.startsWith("/event")) {

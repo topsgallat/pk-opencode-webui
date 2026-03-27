@@ -169,7 +169,7 @@ docker restart opencode
 | Variable                    | Default                 | Description                                              |
 |-----------------------------|-------------------------|----------------------------------------------------------|
 | `OPERATION_MODE`           | `solo`                  | `solo`: API + UI together; `ui-only`: UI server only   |
-| `HOME`                     | `/home/sgallat`         | Home directory (set to mounted path for projects)       |
+| `HOME`                     | `/home/user`            | Home directory (set to mounted path for projects)       |
 | `PORT`                     | `8080`                  | Port the UI server listens on                           |
 | `API_URL`                  | `http://127.0.0.1:4096` | OpenCode API server URL (used in `ui-only` mode)       |
 | `BASE_PATH`                | `/`                     | URL prefix for reverse proxy support                    |

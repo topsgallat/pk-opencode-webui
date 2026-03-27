@@ -1,5 +1,24 @@
 #!/command/with-contenv sh
 
+# === Security: forbidden path & root checks ===
+forbidden_path() {
+  case "$1" in
+    "/home/sgallat"*|"/Users/"*|"/root"|"/mnt/"*|"/media/"*|"/etc/"*|"/var/"*|"/tmp/host"*|"/Volumes/"*|"C:\\Users\\"*|"C:\\Windows\\"*|"D:\\"*|"E:\\"*|"F:\\"*|*sgallat*|*users*|*Documents\ and\ Settings*)
+      return 0;;
+    *)
+      return 1;;
+  esac
+}
+if [ "$(id -u)" = "0" ]; then
+  echo "ERROR: Refusing to run as root. Please use a non-root container user."; exit 1
+fi
+for p in "$HOME" "$HOME_TMP"; do
+  if [ -n "$p" ] && forbidden_path "$p"; then
+    echo "ERROR: Detected forbidden host/user/system path in shell var: $p -- must be container-local only."; exit 1
+  fi
+done
+# === End security checks ===
+
 # This script sets up the OpenCode home directory and config paths
 # It ensures that OpenCode configuration is stored in the persistent /home/jovyan volume
 

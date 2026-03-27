@@ -14,44 +14,118 @@
  */
 
 import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
+import path from "path"
 
 const BASE_PATH = process.env.NB_PREFIX || process.env.BASE_PATH || "/"
 const PORT = parseInt(process.env.PORT || "8080", 10)
-const API_URL = process.env.API_URL || "http://127.0.0.1:4096"
+const API_PORT = parseInt(process.env.OPENCODE_API_PORT || process.env.API_PORT || "4096", 10)
+const API_URL = process.env.API_URL || `http://127.0.0.1:${API_PORT}`
 const OPERATION_MODE = process.env.OPERATION_MODE || "solo"
 
+function isForbiddenHostPath(p: string): boolean {
+  const norm = path.resolve(p.replace(/\\/g, '/'))
+  const forbiddenPatterns = [
+    /^\/home\//,
+    /^\/Users\//,
+    /^\/root(\/|$)/,
+    /^\/mnt\//,
+    /^\/media\//,
+    /^\/etc\//,
+    /^\/var\//,
+    /^\/tmp\/\.?/,
+    /^\/run\//,
+    /^\/opt\//,
+    /^\/host_mnt\//,
+    /^\/workspace\//,
+    /^\/docker\//,
+    /^\/srv\//,
+    /^\/data\//,
+    /^\/Volumes\//,
+    /^C:\\Users\\/,
+    /^C:\\Windows\\/,
+    /^D:\\/,
+    /^E:\\/,
+    /^F:\\/
+  ]
+  for (const pat of forbiddenPatterns) {
+    if (pat.test(norm)) return true
+  }
+  if (norm.includes('/sgallat') || norm.includes('/users/') || norm.toLowerCase().includes('documents and settings')) return true
+  return false
+}
+
+// Auth header for proxy (set in solo mode)
+let proxyAuthHeader: string | undefined
+
 if (OPERATION_MODE === "solo") {
-  const homeDir = process.env.HOME || "/root"
-
-  if (homeDir !== "/root") {
-    await Bun.spawn(["mkdir", "-p", "/root/.cache", "/root/.config"]).exited
-
-    const dirs = [
-      { mounted: `${homeDir}/.cache/opencode`, container: "/root/.cache/opencode" },
-      { mounted: `${homeDir}/.config/opencode`, container: "/root/.config/opencode" },
-    ]
-
-    for (const dir of dirs) {
-      await Bun.spawn(["rm", "-rf", dir.mounted]).exited
-      await Bun.spawn(["mkdir", "-p", dir.container]).exited
-      await Bun.spawn(["ln", "-sfn", dir.container, dir.mounted]).exited
-    }
-
-    console.log(`[solo] Using container config at /root/.cache/opencode and /root/.config/opencode`)
+  const homeDir = process.env.HOME
+  const xdgCache = process.env.XDG_CACHE_HOME
+  // Root/host path & non-root checks
+  if (!homeDir) {
+    console.error("[solo] ERROR: HOME environment variable is not set. Cannot proceed without a home directory for container-local cache and config.")
+    process.exit(1)
   }
 
-  console.log(`[solo] Starting OpenCode API server on port 4096...`)
+  if (isForbiddenHostPath(homeDir)) {
+    console.error(`[solo] ERROR: HOME env points to forbidden host location (${homeDir}); must be a container-local path (e.g. /container-user). Aborting.`)
+    process.exit(1)
+  }
+  if (process.getuid && process.getuid() === 0) {
+    console.error("[solo] ERROR: Refusing to run as root. Please use a non-root container user.")
+    process.exit(1)
+  }
+  if (xdgCache && isForbiddenHostPath(xdgCache)) {
+    console.error(`[solo] ERROR: XDG_CACHE_HOME points to forbidden host location (${xdgCache}); must be container-local (e.g. /container-user/.cache). Aborting.`)
+    process.exit(1)
+  }
+  const opencodeServerEnv = {
+    ...process.env,
+    OPENCODE_SERVER_PASSWORD: process.env.OPENCODE_SERVER_PASSWORD || "opencode-local",
+  }
+  const dirs = [
+    `${homeDir}/.cache/opencode`,
+    `${homeDir}/.config/opencode`,
+  ]
 
-  const apiProc = Bun.spawn(["opencode", "serve", "--port", "4096", "--hostname", "127.0.0.1"], {
+  for (const dir of dirs) {
+    await Bun.spawn(["mkdir", "-p", dir]).exited
+    console.log(`[solo] Created container directory (if missing): ${dir}`)
+  }
+
+  console.log(`[solo] Using container directories: ${dirs.join(" and ")} (host-mounted directories left untouched)`)
+
+  console.log(`[solo] Refreshing OpenCode models cache...`)
+  const modelsRefresh = Bun.spawn(["opencode", "models", "--refresh"], {
     stdout: "inherit",
     stderr: "inherit",
-    env: { ...process.env },
+    env: opencodeServerEnv,
   })
 
+  const modelsRefreshed = await modelsRefresh.exited
+  if (modelsRefreshed !== 0) {
+    console.error(`[solo] ERROR: Failed to refresh OpenCode models cache (exit ${modelsRefreshed})`)
+    process.exit(1)
+  }
+
+  console.log(`[solo] Starting OpenCode API server on port ${API_PORT}...`)
+
+  const apiProc = Bun.spawn(["opencode", "serve", "--port", `${API_PORT}`, "--hostname", "127.0.0.1"], {
+    stdout: "inherit",
+    stderr: "inherit",
+    env: opencodeServerEnv,
+  })
+
+  const serverPassword = opencodeServerEnv.OPENCODE_SERVER_PASSWORD
+  proxyAuthHeader = serverPassword
+    ? `Basic ${Buffer.from(`opencode:${serverPassword}`).toString("base64")}`
+    : undefined
+
   const apiReady = await (async () => {
+    const headers: Record<string, string> = {}
+    if (proxyAuthHeader) headers["Authorization"] = proxyAuthHeader
     for (let i = 0; i < 30; i++) {
       try {
-        const res = await fetch("http://127.0.0.1:4096/health")
+        const res = await fetch(`http://127.0.0.1:${API_PORT}/health`, { headers })
         if (res.ok) return true
       } catch (_) { void _ }
       await Bun.sleep(1000)
@@ -78,6 +152,7 @@ const DIST_DIR = process.env.DIST_DIR || "/opt/opencode-ui/dist"
 const BRANDING_NAME = process.env.BRANDING_NAME || ""
 const BRANDING_URL = process.env.BRANDING_URL || ""
 const BRANDING_ICON = process.env.BRANDING_ICON || ""
+const serverStartTime = Date.now()
 
 console.log(`OpenCode UI Server starting...`)
 console.log(`  BASE_PATH: ${BASE_PATH}`)
@@ -198,6 +273,11 @@ const server = Bun.serve<{ path: string; search: string }>({
       const target = new URL(path + url.search, API_URL)
       const headers = new Headers(req.headers)
 
+      // Add auth header for API proxy in solo mode
+      if (proxyAuthHeader) {
+        headers.set("Authorization", proxyAuthHeader)
+      }
+
       // SSE requests need special handling
       if (path.startsWith("/event")) {
         console.log("[Proxy] SSE request to:", target.toString())
@@ -253,105 +333,29 @@ const server = Bun.serve<{ path: string; search: string }>({
       return new Response(file, {
         headers: {
           "Content-Type": contentType,
-          // Cache static assets
-          ...(ext !== "html" && {
-            "Cache-Control": "public, max-age=31536000, immutable",
-          }),
         },
       })
     }
 
-    // SPA fallback - serve index.html with injected base path
-    const indexPath = `${DIST_DIR}/index.html`
-    const indexFile = Bun.file(indexPath)
-
-    if (!(await indexFile.exists())) {
-      console.error("index.html not found at:", indexPath)
-      return new Response("Not Found", { status: 404 })
+    // Fallback: serve index.html for SPA routing
+    if (path === "/" || !path.includes(".")) {
+      const indexFile = Bun.file(`${DIST_DIR}/index.html`)
+      if (await indexFile.exists()) {
+        let html = await indexFile.text()
+        // Inject NB_PREFIX at runtime
+        html = html.replace(/__NB_PREFIX__/g, validatedBasePath)
+        if (BRANDING_NAME) html = html.replace(/__BRANDING_NAME__/g, BRANDING_NAME)
+        if (BRANDING_URL) html = html.replace(/__BRANDING_URL__/g, BRANDING_URL)
+        if (BRANDING_ICON) html = html.replace(/__BRANDING_ICON__/g, BRANDING_ICON)
+        return new Response(html, {
+          headers: {
+            "Content-Type": "text/html",
+          },
+        })
+      }
     }
 
-    const indexHtml = await indexFile.text()
-    // Use JSON.stringify for safe encoding to prevent XSS
-    const config = JSON.stringify({
-      basePath: basePathWithTrailing,
-      branding: { name: BRANDING_NAME, url: BRANDING_URL, icon: BRANDING_ICON },
-    })
-    // HTML-escape basePath for safe insertion into the <base href> attribute
-    const escapedBasePath = basePathWithTrailing.replace(/[&<>"']/g, (ch) => {
-      const map: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }
-      return map[ch] ?? ch
-    })
-    const injected = indexHtml.replace('<base href="/" />', `<base href="${escapedBasePath}" />`).replace(
-      "window.__OPENCODE__ = window.__OPENCODE__ || {}",
-      // Don't set serverUrl - let the browser use window.location.origin
-      // API requests will be proxied through this server
-      `window.__OPENCODE__ = ${config}`,
-    )
-
-    return new Response(injected, {
-      headers: {
-        "Content-Type": "text/html",
-        "Cache-Control": "no-cache",
-      },
-    })
-  },
-
-  // WebSocket handler for PTY proxy
-  websocket: {
-    open(ws) {
-      const { path, search } = ws.data
-      const targetUrl = `${WS_API_URL}${path}${search}`
-      console.log("[Proxy] Opening backend WebSocket to:", targetUrl)
-
-      const backend = new WebSocket(targetUrl)
-
-      backend.addEventListener("open", () => {
-        console.log("[Proxy] Backend WebSocket connected")
-      })
-
-      backend.addEventListener("message", (event) => {
-        // Forward backend messages to client
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(event.data)
-        }
-      })
-
-      backend.addEventListener("close", (event) => {
-        console.log("[Proxy] Backend WebSocket closed:", event.code, event.reason)
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.close(event.code, event.reason)
-        }
-      })
-
-      backend.addEventListener("error", (error) => {
-        console.error("[Proxy] Backend WebSocket error:", error)
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.close(1011, "Backend connection error")
-        }
-      })
-
-      backendConnections.set(ws, backend)
-    },
-
-    message(ws, message) {
-      // Forward client messages to backend
-      lastActivity = Date.now()
-      const backend = backendConnections.get(ws)
-      if (backend?.readyState === WebSocket.OPEN) {
-        backend.send(message)
-      }
-    },
-
-    close(ws, code, reason) {
-      console.log("[Proxy] Client WebSocket closed:", code, reason)
-      const backend = backendConnections.get(ws)
-      if (backend?.readyState === WebSocket.OPEN) {
-        backend.close(code, reason)
-      }
-      backendConnections.delete(ws)
-    },
+    // Not found
+    return new Response("Not Found", { status: 404 })
   },
 })
-
-console.log(`\nOpenCode UI Server running at http://0.0.0.0:${PORT}${basePathWithTrailing}`)
-console.log(`Proxying API requests to ${API_URL}`)

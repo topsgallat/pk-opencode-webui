@@ -17,33 +17,267 @@ import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
 
 const BASE_PATH = process.env.NB_PREFIX || process.env.BASE_PATH || "/"
 const PORT = parseInt(process.env.PORT || "8080", 10)
-const API_URL = process.env.API_URL || "http://127.0.0.1:4096"
+const API_PORT = parseInt(process.env.OPENCODE_API_PORT || process.env.API_PORT || "4096", 10)
+const API_URL = process.env.API_URL || `http://127.0.0.1:${API_PORT}`
 const OPERATION_MODE = process.env.OPERATION_MODE || "solo"
+
+// Auth header for proxy (set in solo mode)
+let proxyAuthHeader: string | undefined
 
 if (OPERATION_MODE === "solo") {
   const homeDir = process.env.HOME || "/root"
+  const opencodeServerEnv = {
+    ...process.env,
+    OPENCODE_SERVER_PASSWORD: process.env.OPENCODE_SERVER_PASSWORD || "opencode-local",
+  }
+  const dirs = [
+    `${homeDir}/.cache/opencode`,
+    `${homeDir}/.config/opencode`,
+  ]
 
-  if (homeDir !== "/root") {
-    await Bun.spawn(["mkdir", "-p", "/root/.cache", "/root/.config"]).exited
+  for (const dir of dirs) {
+    await Bun.spawn(["mkdir", "-p", dir]).exited
+    console.log(`[solo] Created container directory (if missing): ${dir}`)
+  }
 
-    const dirs = [
-      { mounted: `${homeDir}/.cache/opencode`, container: "/root/.cache/opencode" },
-      { mounted: `${homeDir}/.config/opencode`, container: "/root/.config/opencode" },
-    ]
+  console.log(`[solo] Using container directories: ${dirs.join(" and ")} (host-mounted directories left untouched)`)
 
-    for (const dir of dirs) {
-      await Bun.spawn(["mkdir", "-p", dir.container]).exited
-      console.log(`[solo] Created container directory (if missing): ${dir.container}`)
+  console.log(`[solo] Refreshing OpenCode models cache...`)
+  const modelsRefresh = Bun.spawn(["opencode", "models", "--refresh"], {
+    stdout: "inherit",
+    stderr: "inherit",
+    env: opencodeServerEnv,
+  })
+
+  const modelsRefreshed = await modelsRefresh.exited
+  if (modelsRefreshed !== 0) {
+    console.error(`[solo] ERROR: Failed to refresh OpenCode models cache (exit ${modelsRefreshed})`)
+    process.exit(1)
+  }
+
+  console.log(`[solo] Starting OpenCode API server on port ${API_PORT}...`)
+
+  const apiProc = Bun.spawn(["opencode", "serve", "--port", `${API_PORT}`, "--hostname", "127.0.0.1"], {
+    stdout: "inherit",
+    stderr: "inherit",
+    env: opencodeServerEnv,
+  })
+
+  const serverPassword = opencodeServerEnv.OPENCODE_SERVER_PASSWORD
+  proxyAuthHeader = serverPassword
+    ? `Basic ${Buffer.from(`opencode:${serverPassword}`).toString("base64")}`
+    : undefined
+
+  const apiReady = await (async () => {
+    const headers: Record<string, string> = {}
+    if (proxyAuthHeader) headers["Authorization"] = proxyAuthHeader
+    for (let i = 0; i < 30; i++) {
+      try {
+        const res = await fetch(`http://127.0.0.1:${API_PORT}/health`, { headers })
+        if (res.ok) return true
+      } catch (_) { void _ }
+      await Bun.sleep(1000)
+    }
+    return false
+  })()
+
+  if (!apiReady) {
+    console.error("[solo] ERROR: OpenCode API server failed to start within 30 seconds")
+    apiProc.kill()
+    process.exit(1)
+  }
+
+  console.log(`[solo] OpenCode API server is ready`)
+
+  process.on("exit", () => apiProc.kill())
+  process.on("SIGINT", () => { apiProc.kill(); process.exit(0) })
+  process.on("SIGTERM", () => { apiProc.kill(); process.exit(0) })
+} else {
+  console.log(`[ui-only] Skipping API server startup; expecting external API at ${API_URL}`)
+}
+const WS_API_URL = API_URL.replace(/^http/, "ws")
+const DIST_DIR = process.env.DIST_DIR || "/opt/opencode-ui/dist"
+const BRANDING_NAME = process.env.BRANDING_NAME || ""
+const BRANDING_URL = process.env.BRANDING_URL || ""
+const BRANDING_ICON = process.env.BRANDING_ICON || ""
+const serverStartTime = Date.now()
+
+console.log(`OpenCode UI Server starting...`)
+console.log(`  BASE_PATH: ${BASE_PATH}`)
+console.log(`  API_URL: ${API_URL}`)
+console.log(`  WS_API_URL: ${WS_API_URL}`)
+console.log(`  PORT: ${PORT}`)
+console.log(`  DIST_DIR: ${DIST_DIR}`)
+if (BRANDING_NAME) console.log(`  BRANDING: ${BRANDING_NAME}`)
+
+// Normalize and validate base path (must be a valid path-only prefix)
+function validateBasePath(path: string): string {
+  // Must start with /, must not contain protocol or double slashes at start
+  if (!path.startsWith("/") || path.includes("://") || path.startsWith("//")) {
+    console.warn(`[WARN] Invalid BASE_PATH "${path}", falling back to "/"`)
+    return "/"
+  }
+  // Remove HTML-sensitive characters and collapse multiple slashes
+  const sanitized = path.replace(/[<>"'&]/g, "").replace(/\/+/g, "/")
+  return sanitized || "/"
+}
+const validatedBasePath = validateBasePath(BASE_PATH)
+const basePathWithoutTrailing = validatedBasePath.endsWith("/") ? validatedBasePath.slice(0, -1) : validatedBasePath
+const basePathWithTrailing = validatedBasePath.endsWith("/") ? validatedBasePath : validatedBasePath + "/"
+
+// MIME types for static files
+const mimeTypes: Record<string, string> = {
+  js: "application/javascript",
+  mjs: "application/javascript",
+  css: "text/css",
+  html: "text/html",
+  json: "application/json",
+  svg: "image/svg+xml",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  ico: "image/x-icon",
+  woff: "font/woff",
+  woff2: "font/woff2",
+  ttf: "font/ttf",
+  eot: "application/vnd.ms-fontobject",
+  map: "application/json",
+}
+
+// Check if this is a PTY WebSocket connection request
+function isPtyWebSocket(path: string): boolean {
+  return /^\/pty\/[^/]+\/connect/.test(path)
+}
+
+// Track last non-polling activity for Kubeflow idle culling
+let lastActivity = Date.now()
+
+// Store for backend WebSocket connections (keyed by client WebSocket)
+const backendConnections = new WeakMap<object, WebSocket>()
+
+const server = Bun.serve<{ path: string; search: string }>({
+  port: PORT,
+  hostname: "0.0.0.0",
+  idleTimeout: 0, // Disable timeout for SSE connections
+
+  async fetch(req, server) {
+    const url = new URL(req.url)
+    let path = url.pathname
+
+    // Strip base path prefix if present
+    if (basePathWithoutTrailing && path.startsWith(basePathWithoutTrailing)) {
+      path = path.slice(basePathWithoutTrailing.length) || "/"
+    }
+    if (!path.startsWith("/")) {
+      path = "/" + path
     }
 
-    console.log(`[solo] Using container directories: /root/.cache/opencode and /root/.config/opencode (host-mounted directories left untouched)`)
-const serverStartTime = Date.now()
-          ...(ext !== "html" && {
-            "Cache-Control": "public, max-age=0, must-revalidate",
-    const cacheBuster = `?v=${serverStartTime}`
-    let injected = indexHtml
-      .replace('<base href="/" />', `<base href="${escapedBasePath}" />`)
-      .replace("window.__OPENCODE__ = window.__OPENCODE__ || {}", `window.__OPENCODE__ = ${config}`)
-    injected = injected
-      .replace('src="./entry.js"', `src="./entry.js${cacheBuster}"`)
-      .replace('href="./entry.css"', `href="./entry.css${cacheBuster}"`)
+    // Kubeflow idle culling: /api/kernels must never update activity timestamp
+    if (path === "/api/kernels") {
+      if (req.method !== "GET") {
+        return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET" } })
+      }
+      const idle = Date.now() - lastActivity >= 60_000
+      const kernel = {
+        id: "opencode-activity",
+        name: "opencode",
+        last_activity: new Date(lastActivity).toISOString(),
+        execution_state: idle ? "idle" : "busy",
+        connections: 0,
+      }
+      return new Response(JSON.stringify([kernel]), {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+      })
+    }
+
+    // Update activity timestamp for all non-polling requests
+    lastActivity = Date.now()
+
+    // Handle WebSocket upgrade for PTY connections
+    if (isPtyWebSocket(path)) {
+      const upgradeHeader = req.headers.get("Upgrade")
+      if (upgradeHeader?.toLowerCase() === "websocket") {
+        console.log("[Proxy] WebSocket upgrade for PTY:", path)
+        const success = server.upgrade(req, {
+          data: { path, search: url.search },
+        })
+        if (success) {
+          return undefined // Bun handles the response
+        }
+        return new Response("WebSocket upgrade failed", { status: 500 })
+      }
+    }
+
+    // Extended API endpoints (handled locally, not proxied)
+    const extResponse = await handleExtendedEndpoint(path, req.method, url, req)
+    if (extResponse) return extResponse
+
+    // Check if this is an API request (after stripping prefix)
+    if (isApiPath(path)) {
+      const target = new URL(path + url.search, API_URL)
+      const headers = new Headers(req.headers)
+
+      // Add auth header for API proxy in solo mode
+      if (proxyAuthHeader) {
+        headers.set("Authorization", proxyAuthHeader)
+      }
+
+      // SSE requests need special handling
+      if (path.startsWith("/event")) {
+        console.log("[Proxy] SSE request to:", target.toString())
+        try {
+          const response = await fetch(target.toString(), {
+            method: req.method,
+            headers,
+          })
+
+          if (!response.ok) {
+            console.error("[Proxy] SSE error:", response.status, response.statusText)
+            return new Response(response.body, { status: response.status })
+          }
+
+          return new Response(response.body, {
+            status: response.status,
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+              "X-Accel-Buffering": "no",
+            },
+          })
+        } catch (e) {
+          console.error("[Proxy] SSE connection error:", e)
+          return new Response("SSE proxy error", { status: 502 })
+        }
+      }
+
+      // Regular API requests
+      console.log("[Proxy] API:", req.method, path)
+      try {
+        return await fetch(target.toString(), {
+          method: req.method,
+          headers,
+          body: req.body,
+        })
+      } catch (e) {
+        console.error("[Proxy] API error:", e)
+        return new Response("API proxy error", { status: 502 })
+      }
+    }
+
+    // Frontend routes - path is already stripped above
+    // Try to serve static file
+    const filePath = `${DIST_DIR}${path}`
+    const file = Bun.file(filePath)
+
+    if (await file.exists()) {
+      const ext = path.split(".").pop()?.toLowerCase() || ""
+      const contentType = mimeTypes[ext] || "application/octet-stream"
+
+      return new Response(file, {
+        headers: {
+          "Content-Type": contentType,

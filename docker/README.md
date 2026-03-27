@@ -166,29 +166,41 @@ docker restart opencode
 
 ### Environment Variables
 
-| Variable         | Default                 | Description                                          |
-|------------------|-------------------------|------------------------------------------------------|
-| `OPERATION_MODE` | `solo`                  | `solo`: API + UI together; `ui-only`: UI server only |
-| `HOME`           | `/root`                 | Home directory (set to mounted path for projects)      |
-| `PORT`           | `8080`                  | Port the UI server listens on                        |
-| `API_URL`        | `http://127.0.0.1:4096` | OpenCode API server URL (used in `ui-only` mode)     |
-| `BASE_PATH`      | `/`                     | URL prefix for reverse proxy support                 |
-| `BRANDING_NAME`  | (empty)                 | Optional branding name shown in UI                   |
-| `BRANDING_URL`   | (empty)                 | Optional URL for branding link                       |
+| Variable                    | Default                 | Description                                              |
+|-----------------------------|-------------------------|----------------------------------------------------------|
+| `OPERATION_MODE`           | `solo`                  | `solo`: API + UI together; `ui-only`: UI server only   |
+| `HOME`                     | `/home/sgallat`         | Home directory (set to mounted path for projects)       |
+| `PORT`                     | `8080`                  | Port the UI server listens on                           |
+| `API_URL`                  | `http://127.0.0.1:4096` | OpenCode API server URL (used in `ui-only` mode)       |
+| `BASE_PATH`                | `/`                     | URL prefix for reverse proxy support                    |
+| `OPENCODE_SERVER_PASSWORD` | `opencode-local`        | Password for API server (optional, auto-generated)     |
+| `OPENCODE_API_PORT`        | `4096`                  | Port for the embedded API server (solo mode only)      |
+| `XDG_CACHE_HOME`           | (auto)                  | Cache directory (isolated from host)                    |
+| `BRANDING_NAME`            | (empty)                 | Optional branding name shown in UI                     |
+| `BRANDING_URL`             | (empty)                 | Optional URL for branding link                          |
 
-## Kubeflow Image (`kubeflow/Dockerfile`)
+### Solo Mode Features
 
-A full-featured image for Kubeflow Notebooks that includes:
-- OpenCode CLI pre-installed
-- s6-overlay process supervisor
-- Kubeflow-compatible user (jovyan, UID 1000)
-- Automatic home directory setup for PVCs
+The solo mode now includes several improvements:
 
-See [kubeflow/README.md](kubeflow/README.md) for details.
+1. **Isolated cache** — Container uses its own `.cache/opencode` and `.config/opencode` directories, separate from host to avoid conflicts.
 
-### Build
+2. **Non-root execution** — Container runs as UID/GID 1000 by default, improving security.
+
+3. **Pre-warmed models** — The models cache is refreshed at startup to avoid "Provider Cache Missing" warnings.
+
+4. **Built-in authentication** — API server requires Basic Auth by default. The proxy automatically forwards credentials.
+
+To customize the server password:
+
+```yaml
+environment:
+  - OPENCODE_SERVER_PASSWORD=your-secure-password
+```
+
+Or set it before running:
 
 ```bash
-# From repo root
-docker build -f docker/kubeflow/Dockerfile -t opencode-web-kubeflow .
+export OPENCODE_SERVER_PASSWORD=your-secure-password
+docker compose up -d
 ```

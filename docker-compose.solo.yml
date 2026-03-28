@@ -10,8 +10,8 @@ services:
     environment:
       - OPERATION_MODE=solo
       - BASE_PATH=/
-      - HOME=/home/sgallat
-      - XDG_CACHE_HOME=/root/.cache
-    volumes:
-      - /home/sgallat:/home/sgallat
+      - HOME=/tmp/opencode-home
+      - XDG_CACHE_HOME=/tmp/opencode-home/.cache
+    # Run container as non-root for verification (simulate typical non-root image user)
+    user: "1000:1000"
     restart: unless-stopped

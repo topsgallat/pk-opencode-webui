@@ -2,6 +2,8 @@ import { createContext, useContext, batch, type ParentProps } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import type { FileNode } from "../sdk/client"
 import { useSDK } from "./sdk"
+import { useBasePath } from "./base-path"
+import { readFile } from "../utils/extended-api"
 
 type DirState = {
   expanded: boolean
@@ -42,6 +44,7 @@ interface FileContextValue {
   }
   load: (path: string, options?: { force?: boolean }) => Promise<void>
   get: (path: string) => FileState | undefined
+  setContent: (path: string, content: string) => void
 }
 
 const FileContext = createContext<FileContextValue>()
@@ -52,7 +55,8 @@ function basename(path: string) {
 }
 
 export function FileProvider(props: ParentProps) {
-  const { client } = useSDK()
+  const { client, directory } = useSDK()
+  const { serverUrl } = useBasePath()
 
   const [store, setStore] = createStore<FileStore>({
     dirs: {},
@@ -141,6 +145,10 @@ export function FileProvider(props: ParentProps) {
     // Initialize file state
     setStore("files", path, { path, name: basename(path), loading: true, loaded: false })
 
+    
+    const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
+    const existingContent = store.files[path]?.content?.content
+
     const promise = client.file
       .read({ path })
       .then((res) => {
@@ -152,6 +160,7 @@ export function FileProvider(props: ParentProps) {
             produce((f) => {
               f.loaded = true
               f.loading = false
+              f.error = undefined
               f.content = data
                 ? {
                     content: data.content,
@@ -164,8 +173,43 @@ export function FileProvider(props: ParentProps) {
           )
         })
       })
-      .catch((e) => {
-        console.error("[File] Failed to load file:", path, e)
+      .catch(async (e) => {
+        console.error("[File] Upstream API failed for:", path, e)
+        
+        // Fallback 1: try extended API
+        const extContent = await readFile(serverUrl, fullPath)
+        if (extContent !== null) {
+          batch(() => {
+            setStore("files", path, produce((f) => {
+              f.loaded = true
+              f.loading = false
+              f.error = undefined
+              f.content = {
+                content: extContent,
+                encoding: "utf-8",
+              }
+            }))
+          })
+          return
+        }
+
+        // Fallback 2: restore previously set content
+        if (existingContent !== undefined) {
+          batch(() => {
+            setStore("files", path, produce((f) => {
+              f.loaded = true
+              f.loading = false
+              f.error = undefined
+              f.content = {
+                content: existingContent,
+                encoding: "utf-8",
+              }
+            }))
+          })
+          return
+        }
+
+        // Final: show error
         setStore(
           "files",
           path,
@@ -178,6 +222,7 @@ export function FileProvider(props: ParentProps) {
       .finally(() => {
         fileInflight.delete(path)
       })
+
 
     fileInflight.set(path, promise)
     return promise
@@ -194,6 +239,15 @@ export function FileProvider(props: ParentProps) {
     },
     load: loadFile,
     get: (path: string) => store.files[path],
+    setContent: (path: string, content: string) => {
+      setStore("files", path, produce(f => {
+        f.loaded = true
+        f.loading = false
+        f.error = undefined
+        if (!f.content) f.content = { content, encoding: "utf-8" }
+        else f.content.content = content
+      }))
+    },
   }
 
   return <FileContext.Provider value={value}>{props.children}</FileContext.Provider>

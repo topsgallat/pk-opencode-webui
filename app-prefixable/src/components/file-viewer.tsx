@@ -1,20 +1,22 @@
-import { createMemo, createEffect, Show, Match, Switch } from "solid-js"
+import { createSignal, createEffect, Show, Match, Switch, createMemo } from "solid-js"
 import { useFile } from "../context/file"
+import { useSDK } from "../context/sdk"
+import { useBasePath } from "../context/base-path"
 import { ContentCode } from "./diff/content-code"
 import { Spinner } from "./ui/spinner"
-import { FileCode } from "lucide-solid"
+import { FileCode, Pencil } from "lucide-solid"
+import { writeFile } from "../utils/extended-api"
+import { EditorDialog } from "./editor-dialog"
 
 interface FileViewerProps {
   path: string
 }
 
 function getLanguage(path: string) {
-  // Extract basename first to handle files like "dir/Dockerfile"
   const idx = path.lastIndexOf("/")
   const filename = idx === -1 ? path : path.slice(idx + 1)
   const lower = filename.toLowerCase()
 
-  // Handle extensionless files
   if (lower === "dockerfile") return "dockerfile"
   if (lower === "makefile") return "makefile"
 
@@ -87,39 +89,77 @@ function getLanguage(path: string) {
 
 export function FileViewer(props: FileViewerProps) {
   const file = useFile()
+  const sdk = useSDK()
+  const basePath = useBasePath()
 
-  // Load file when path changes
+  const [isEditing, setIsEditing] = createSignal(false)
+  const [saveError, setSaveError] = createSignal<string | null>(null)
+
+  // Bug #7: Explicit signals for file content reactivity
+  const [fileLoading, setFileLoading] = createSignal(false)
+  const [fileLoaded, setFileLoaded] = createSignal(false)
+  const [fileError, setFileError] = createSignal<string | undefined>(undefined)
+  const [fileContent, setFileContent] = createSignal("")
+  const [isBinary, setIsBinary] = createSignal(false)
+  const [imageUrl, setImageUrl] = createSignal<string | undefined>(undefined)
+  const [isImage, setIsImage] = createSignal(false)
+
+  const lang = createMemo(() => getLanguage(props.path))
+  const SAFE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"])
+
   createEffect(() => {
-    if (props.path) {
-      void file.load(props.path)
+    const path = props.path
+    if (!path) return
+
+    const s = file.get(path)
+    const loading = !!s?.loading
+    const loaded = !!s?.loaded
+    const error = s?.error
+    const content = s?.content?.content ?? ""
+    const isBin = s?.content?.type === "binary"
+    const mime = s?.content?.mimeType
+    const img = s?.content?.encoding === "base64" && mime && SAFE_IMAGE_TYPES.has(mime)
+
+    setFileLoading(loading)
+    setFileLoaded(loaded)
+    setFileError(error)
+    setFileContent(content)
+    setIsBinary(isBin)
+    setIsImage(!!img)
+    if (img) {
+      setImageUrl(`data:${mime};base64,${s?.content?.content}`)
+    } else {
+      setImageUrl(undefined)
+    }
+
+    if (!loaded && !loading) {
+      void file.load(path)
     }
   })
 
-  const state = createMemo(() => file.get(props.path))
-  const content = createMemo(() => state()?.content?.content ?? "")
-  const lang = createMemo(() => getLanguage(props.path))
+  // Bug #8: Save Path
+  async function handleSave(newContent: string) {
+    const fullPath = sdk.directory && !props.path.startsWith("/")
+      ? `${sdk.directory}/${props.path}`
+      : props.path
 
-  // Safe image formats - block SVG to prevent XSS
-  const SAFE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"])
-
-  const isImage = createMemo(() => {
-    const s = state()
-    const mime = s?.content?.mimeType
-    return s?.content?.encoding === "base64" && mime && SAFE_IMAGE_TYPES.has(mime)
-  })
-
-  const imageUrl = createMemo(() => {
-    if (!isImage()) return undefined
-    const s = state()
-    return `data:${s?.content?.mimeType};base64,${s?.content?.content}`
-  })
-
-  const isBinary = createMemo(() => state()?.content?.type === "binary")
+    setSaveError(null)
+    const success = await writeFile(basePath.serverUrl, fullPath, newContent)
+    if (success) {
+      // Force reload content locally so it updates
+      file.setContent(props.path, newContent)
+      setIsEditing(false)
+    } else {
+      setSaveError("Failed to save file.")
+      // In a real app, maybe show a toast
+      console.error("Save failed for", fullPath)
+    }
+  }
 
   return (
-    <div class="flex-1 overflow-auto min-h-0">
+    <div class="flex-1 overflow-auto min-h-0 relative">
       <Switch>
-        <Match when={state()?.loading}>
+        <Match when={fileLoading()}>
           <div class="flex items-center justify-center gap-2 p-8">
             <Spinner class="w-4 h-4" />
             <span class="text-xs" style={{ color: "var(--text-weak)" }}>
@@ -127,7 +167,7 @@ export function FileViewer(props: FileViewerProps) {
             </span>
           </div>
         </Match>
-        <Match when={state()?.error}>
+        <Match when={fileError()}>
           {(err) => (
             <div class="flex flex-col items-center justify-center h-full text-center px-4">
               <FileCode class="w-8 h-8 mb-2" style={{ color: "var(--icon-critical-base)", opacity: 0.5 }} />
@@ -137,12 +177,12 @@ export function FileViewer(props: FileViewerProps) {
             </div>
           )}
         </Match>
-        <Match when={state()?.loaded && isImage()}>
+        <Match when={fileLoaded() && isImage()}>
           <div class="p-4 flex justify-center">
             <img src={imageUrl()} alt={props.path} class="max-w-full max-h-[60vh]" />
           </div>
         </Match>
-        <Match when={state()?.loaded && isBinary()}>
+        <Match when={fileLoaded() && isBinary()}>
           <div class="flex flex-col items-center justify-center h-full text-center px-4">
             <FileCode class="w-8 h-8 mb-2" style={{ color: "var(--icon-weak)", opacity: 0.3 }} />
             <div class="text-xs" style={{ color: "var(--text-weak)" }}>
@@ -150,24 +190,32 @@ export function FileViewer(props: FileViewerProps) {
             </div>
           </div>
         </Match>
-        <Match when={state()?.loaded}>
+        <Match when={fileLoaded()}>
           <div class="p-2">
-            <div class="rounded overflow-hidden" style={{ border: "1px solid var(--border-base)" }}>
+            <div class="rounded overflow-hidden flex flex-col" style={{ border: "1px solid var(--border-base)" }}>
               <div
-                class="px-3 py-1.5 text-xs truncate"
+                class="px-3 py-1.5 text-xs flex justify-between items-center shrink-0"
                 style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}
               >
-                {props.path}
+                <div class="truncate">{props.path}</div>
+                <button
+                  class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded"
+                  onClick={() => setIsEditing(true)}
+                  title="Edit File"
+                  style={{ color: "var(--text-base)" }}
+                >
+                  <Pencil class="w-3.5 h-3.5" />
+                </button>
               </div>
-              <div class="overflow-x-auto">
-                <Show when={content()} fallback={<div class="p-4 text-xs" style={{ color: "var(--text-weak)" }}>Empty file</div>}>
-                  <ContentCode code={content()} lang={lang()} />
+              <div class="overflow-x-auto min-h-0">
+                <Show when={fileContent()} fallback={<div class="p-4 text-xs" style={{ color: "var(--text-weak)" }}>Empty file</div>}>
+                  <ContentCode code={fileContent()} lang={lang()} />
                 </Show>
               </div>
             </div>
           </div>
         </Match>
-        <Match when={!state()}>
+        <Match when={!props.path}>
           <div class="flex flex-col items-center justify-center h-full text-center px-4">
             <FileCode class="w-8 h-8 mb-2" style={{ color: "var(--icon-weak)", opacity: 0.3 }} />
             <span class="text-xs" style={{ color: "var(--text-weak)" }}>
@@ -176,6 +224,15 @@ export function FileViewer(props: FileViewerProps) {
           </div>
         </Match>
       </Switch>
+
+      <EditorDialog
+        open={isEditing()}
+        path={props.path}
+        content={fileContent()}
+        language={lang()}
+        onClose={() => setIsEditing(false)}
+        onSave={handleSave}
+      />
     </div>
   )
 }

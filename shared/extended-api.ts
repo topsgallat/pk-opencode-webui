@@ -313,5 +313,31 @@ export async function handleExtendedEndpoint(
   }
 
   // Not an extended endpoint
+    // GET /api/ext/file - Read file content
+  if (path === "/api/ext/file" && method === "GET") {
+    const filePath = url.searchParams.get("path")
+    if (!filePath) {
+      return Response.json({ error: "path parameter is required" }, { status: 400 })
+    }
+
+    const allowedRoot = getAllowedRoot()
+    const validatedPath = validatePath(filePath, allowedRoot)
+    if (!validatedPath) {
+      console.warn("[ExtAPI] file read: path outside allowed root:", filePath)
+      return Response.json({ error: "path must be within allowed directory" }, { status: 403 })
+    }
+
+    console.log("[ExtAPI] file read:", validatedPath)
+
+    try {
+      const content = await fs.promises.readFile(validatedPath, "utf-8")
+      return Response.json({ content })
+    } catch (e) {
+      console.error("[ExtAPI] file read error:", e)
+      return Response.json({ error: String(e) }, { status: 500 })
+    }
+  }
+
+  // Not an extended endpoint
   return undefined
 }

@@ -361,6 +361,7 @@ const server = Bun.serve<{ path: string; search: string }>({
       return new Response(file, {
         headers: {
           "Content-Type": contentType,
+          "Cache-Control": "public, max-age=0, must-revalidate",
         },
       })
     }
@@ -370,6 +371,9 @@ const server = Bun.serve<{ path: string; search: string }>({
       const indexFile = Bun.file(`${DIST_DIR}/index.html`)
       if (await indexFile.exists()) {
         let html = await indexFile.text()
+        const cacheBuster = `?v=${serverStartTime}`
+        html = html.replace('src="./entry.js"', `src="./entry.js${cacheBuster}"`)
+        html = html.replace('href="./entry.css"', `href="./entry.css${cacheBuster}"`)
         // Inject NB_PREFIX at runtime
         html = html.replace(/__NB_PREFIX__/g, validatedBasePath)
         if (BRANDING_NAME) html = html.replace(/__BRANDING_NAME__/g, BRANDING_NAME)

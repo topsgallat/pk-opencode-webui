@@ -61,3 +61,19 @@ export async function writeFile(serverUrl: string, path: string, content: string
   }
   return true
 }
+
+/**
+ * Read file content via extended API
+ */
+export async function readFile(serverUrl: string, path: string): Promise<string | null> {
+  try {
+    const params = new URLSearchParams({ path })
+    const res = await fetch(`${serverUrl}/api/ext/file?${params}`)
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.content
+  } catch (e) {
+    console.error("[extended-api] readFile failed:", e)
+    return null
+  }
+}

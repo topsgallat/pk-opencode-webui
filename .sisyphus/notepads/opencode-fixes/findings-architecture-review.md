@@ -33,3 +33,4 @@
 **Security note**: The opencode state directory contains sensitive tokens/credentials. The container runs as uid/gid 1000:1000 matching the host user, so no permission escalation occurs.
 
 **Validation**: `docker compose config --quiet` returned no errors.
+\n- Implemented full add/delete file/folder feature in Extended API and SolidJS Context, using portal dialogs and right-click context menu, avoiding else statements and trying to minimize try/catch blocks where possible.

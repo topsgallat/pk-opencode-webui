@@ -1,0 +1,23 @@
+services:
+  opencode-ui-only:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: opencode-web-ui-only:latest
+    container_name: opencode-ui-only
+    ports:
+      - "8080:8080"
+    environment:
+      - OPERATION_MODE=ui-only
+      - BASE_PATH=/
+      - HOME=/home/sgallat
+      - XDG_CACHE_HOME=/home/sgallat/.cache
+      - OPENCODE_WORKSPACE_ROOT=/home/sgallat
+      - API_URL=http://host.docker.internal:4096
+    volumes:
+      - /home/sgallat:/home/sgallat
+      - /home/sgallat/.local/share/opencode:/home/sgallat/.local/share/opencode
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    user: "1000:1000"
+    restart: unless-stopped

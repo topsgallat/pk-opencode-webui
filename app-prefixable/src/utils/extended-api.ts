@@ -77,3 +77,42 @@ export async function readFile(serverUrl: string, path: string): Promise<string 
     return null
   }
 }
+
+/**
+ * Delete a file via extended API
+ */
+export async function deleteFile(serverUrl: string, path: string): Promise<boolean> {
+  const params = new URLSearchParams({ path })
+  const res = await fetch(`${serverUrl}/api/ext/file?${params}`, {
+    method: "DELETE",
+  }).catch(() => null)
+  
+  if (!res?.ok) {
+    console.error("[extended-api] deleteFile failed:", res?.status)
+    return false
+  }
+  return true
+}
+
+/**
+ * Delete a directory via extended API
+ */
+export async function deleteDir(serverUrl: string, path: string): Promise<boolean> {
+  const params = new URLSearchParams({ path })
+  const res = await fetch(`${serverUrl}/api/ext/dir?${params}`, {
+    method: "DELETE",
+  }).catch(() => null)
+  
+  if (!res?.ok) {
+    console.error("[extended-api] deleteDir failed:", res?.status)
+    return false
+  }
+  return true
+}
+
+/**
+ * Create an empty file
+ */
+export async function createFile(serverUrl: string, path: string): Promise<boolean> {
+  return writeFile(serverUrl, path, "")
+}

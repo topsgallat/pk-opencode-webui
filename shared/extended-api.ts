@@ -313,7 +313,57 @@ export async function handleExtendedEndpoint(
   }
 
   // Not an extended endpoint
-    // GET /api/ext/file - Read file content
+  // DELETE /api/ext/file - Delete a file
+  if (path === "/api/ext/file" && method === "DELETE") {
+    const filePath = url.searchParams.get("path")
+    if (!filePath) {
+      return Response.json({ error: "path parameter is required" }, { status: 400 })
+    }
+
+    const allowedRoot = getAllowedRoot()
+    const validatedPath = validatePath(filePath, allowedRoot)
+    if (!validatedPath) {
+      console.warn("[ExtAPI] file delete: path outside allowed root:", filePath)
+      return Response.json({ error: "path must be within allowed directory" }, { status: 403 })
+    }
+
+    console.log("[ExtAPI] file delete:", validatedPath)
+
+    try {
+      await fs.promises.unlink(validatedPath)
+      return Response.json({ success: true })
+    } catch (e) {
+      console.error("[ExtAPI] file delete error:", e)
+      return Response.json({ error: String(e) }, { status: 500 })
+    }
+  }
+
+  // DELETE /api/ext/dir - Delete a directory
+  if (path === "/api/ext/dir" && method === "DELETE") {
+    const dirPath = url.searchParams.get("path")
+    if (!dirPath) {
+      return Response.json({ error: "path parameter is required" }, { status: 400 })
+    }
+
+    const allowedRoot = getAllowedRoot()
+    const validatedPath = validatePath(dirPath, allowedRoot)
+    if (!validatedPath) {
+      console.warn("[ExtAPI] dir delete: path outside allowed root:", dirPath)
+      return Response.json({ error: "path must be within allowed directory" }, { status: 403 })
+    }
+
+    console.log("[ExtAPI] dir delete:", validatedPath)
+
+    try {
+      await fs.promises.rm(validatedPath, { recursive: true, force: true })
+      return Response.json({ success: true })
+    } catch (e) {
+      console.error("[ExtAPI] dir delete error:", e)
+      return Response.json({ error: String(e) }, { status: 500 })
+    }
+  }
+
+  // GET /api/ext/file - Read file content
   if (path === "/api/ext/file" && method === "GET") {
     const filePath = url.searchParams.get("path")
     if (!filePath) {

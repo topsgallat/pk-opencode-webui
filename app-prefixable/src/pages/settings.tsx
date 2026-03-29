@@ -165,7 +165,7 @@ export function Settings() {
   })
 
   async function runPtyCommand(command: string, timeout = 5000): Promise<string> {
-    console.log("[runPtyCommand] Starting with command:", command)
+    if (import.meta.env.DEV) console.debug("[runPtyCommand] Starting with command:", command)
     try {
       // Create PTY that directly runs the command via sh -c
       // Add a sleep at the end to give us time to connect and read the output
@@ -184,7 +184,7 @@ export function Settings() {
         cwd: "/tmp",
       })
 
-      console.log("[runPtyCommand] PTY create response:", ptyRes)
+      if (import.meta.env.DEV) console.debug("[runPtyCommand] PTY create response:", ptyRes)
 
       if (!ptyRes.data?.id) {
         console.error("[runPtyCommand] Failed to create PTY:", ptyRes)
@@ -193,30 +193,30 @@ export function Settings() {
 
       const ptyId = ptyRes.data.id
       const wsUrl = url.replace(/^http/, "ws") + `/pty/${ptyId}/connect`
-      console.log("[runPtyCommand] Connecting to:", wsUrl)
+      if (import.meta.env.DEV) console.debug("[runPtyCommand] Connecting to:", wsUrl)
 
       const output = await new Promise<string>((resolve) => {
         let data = ""
         const ws = new WebSocket(wsUrl)
 
-        const timeoutId = setTimeout(() => {
-          console.log("[runPtyCommand] Timeout reached. Data collected:", data)
+          const timeoutId = setTimeout(() => {
+          if (import.meta.env.DEV) console.debug("[runPtyCommand] Timeout reached. Data collected:", data)
           ws.close()
           resolve(data)
         }, timeout)
 
         ws.addEventListener("open", () => {
-          console.log("[runPtyCommand] WebSocket connected")
+          if (import.meta.env.DEV) console.debug("[runPtyCommand] WebSocket connected")
         })
 
         ws.addEventListener("message", async (event) => {
           const text = event.data instanceof Blob ? await event.data.text() : String(event.data)
-          console.log("[runPtyCommand] Received message:", text)
+          if (import.meta.env.DEV) console.debug("[runPtyCommand] Received message:", text)
           data += text
 
           // Check if we got the completion marker
           if (data.includes(marker)) {
-            console.log("[runPtyCommand] Marker found, closing")
+            if (import.meta.env.DEV) console.debug("[runPtyCommand] Marker found, closing")
             clearTimeout(timeoutId)
             ws.close()
             resolve(data)
@@ -224,7 +224,7 @@ export function Settings() {
         })
 
         ws.addEventListener("close", () => {
-          console.log("[runPtyCommand] WebSocket closed, total output length:", data.length)
+          if (import.meta.env.DEV) console.debug("[runPtyCommand] WebSocket closed, total output length:", data.length)
           clearTimeout(timeoutId)
           resolve(data)
         })
@@ -236,7 +236,7 @@ export function Settings() {
         })
       })
 
-      console.log("[runPtyCommand] Final output:", output)
+      if (import.meta.env.DEV) console.debug("[runPtyCommand] Final output:", output)
       await global.pty.remove({ ptyID: ptyId }).catch(() => { })
       return output
     } catch (e) {
@@ -258,7 +258,7 @@ export function Settings() {
   async function loadSshKey() {
     setSshKeyLoading(true)
     setSshKeyError(null)
-    console.log("[loadSshKey] Starting")
+    if (import.meta.env.DEV) console.debug("[loadSshKey] Starting")
     try {
       // List all .pub files in ~/.ssh/
       const lsOutput = await runPtyCommand(`ls -1 ~/.ssh/*.pub 2>/dev/null`)
@@ -270,7 +270,7 @@ export function Settings() {
         .map((line) => line.trim())
         .filter((line) => line.endsWith(".pub") && !line.includes("*"))
 
-      console.log("[loadSshKey] Found .pub files:", pubFiles)
+      if (import.meta.env.DEV) console.debug("[loadSshKey] Found .pub files:", pubFiles)
 
       const foundKeys: SshKey[] = []
 
@@ -285,17 +285,17 @@ export function Settings() {
           })
           ?.trim()
 
-        if (keyContent) {
+          if (keyContent) {
           // Extract just the filename without path and .pub extension
           const keyName =
             pubFile
               .split("/")
               .pop()
               ?.replace(/\.pub$/, "") || pubFile
-          console.log("[loadSshKey] Found key:", keyName)
-          foundKeys.push({ name: keyName, content: keyContent })
+            if (import.meta.env.DEV) console.debug("[loadSshKey] Found key:", keyName)
+            foundKeys.push({ name: keyName, content: keyContent })
+          }
         }
-      }
 
       // Sort keys: standard names first, then alphabetically
       const standardOrder = ["id_ed25519", "id_ecdsa", "id_rsa", "id_dsa"]
@@ -308,7 +308,7 @@ export function Settings() {
         return a.name.localeCompare(b.name)
       })
 
-      console.log("[loadSshKey] Total keys found:", foundKeys.length)
+      if (import.meta.env.DEV) console.debug("[loadSshKey] Total keys found:", foundKeys.length)
       setSshKeys(foundKeys)
     } catch (e) {
       console.error("[loadSshKey] Failed to load SSH keys:", e)
@@ -513,10 +513,10 @@ Add your project-specific instructions here.
 
         // Start the callback immediately - it will poll until user authorizes
         // This call blocks until authorization succeeds or fails
-        console.log("[OAuth] Starting auto callback for", providerID, "with code:", code)
+        if (import.meta.env.DEV) console.debug("[OAuth] Starting auto callback for", providerID, "with code:", code)
         setConnecting(true)
         const ok = await providers.completeOAuth(providerID, methodIndex)
-        console.log("[OAuth] Callback result:", ok)
+        if (import.meta.env.DEV) console.debug("[OAuth] Callback result:", ok)
         setConnecting(false)
 
         if (ok) {

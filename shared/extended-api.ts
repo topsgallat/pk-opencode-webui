@@ -30,9 +30,9 @@ function validatePath(inputPath: string, allowedRoot: string): string | null {
     return resolved
   }
 
-  // Check that resolved path is within allowed root (prevents ../ traversal)
-  // Must either equal the root exactly, or start with root + separator
-  if (resolved !== normalizedRoot && !resolved.startsWith(normalizedRoot + nodePath.sep)) {
+  // Check that resolved path is strictly within allowed root (prevents ../ traversal)
+  // Must start with root + separator (root itself is not a valid target)
+  if (!resolved.startsWith(normalizedRoot + nodePath.sep)) {
     return null
   }
 

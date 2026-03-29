@@ -37,8 +37,8 @@ function isForbiddenHostPath(p: string): boolean {
   // startup checks do not falsely block valid container HOME/XDG_CACHE_HOME.
   // Keep this list minimal and explicit.
   const allowedPatterns = [
-    /^\/home\/opencode(\/|$)/,
-    /^\/tmp\/\.cache(\/|$)/,
+    /^\/home\/[^/]+(\/|$)/,
+    /^\/tmp\//,
   ]
   for (const pat of allowedPatterns) {
     if (pat.test(norm)) return false
@@ -47,10 +47,9 @@ function isForbiddenHostPath(p: string): boolean {
   // Forbidden patterns: explicit host/user/system locations or host mount
   // points. These are strong indicators the env var points to a host path.
   const forbiddenPatterns = [
-    /^\/home\/sgallat(\/|$)/, // explicit developer home (blocked)
-    /^\/Users\//,             // macOS user homes
-    /^\/root(\/|$)/,          // host root
-    /^\/mnt\//,               // typical host mount
+    /^\/Users\//,
+    /^\/root(\/|$)/,
+    /^\/mnt\//,
     /^\/media\//,
     /^\/etc\//,
     /^\/var\//,
@@ -70,7 +69,7 @@ function isForbiddenHostPath(p: string): boolean {
   }
 
   const lower = norm.toLowerCase()
-  if (lower.includes('/sgallat') || lower.includes('documents and settings')) return true
+  if (lower.includes('documents and settings')) return true
 
   return false
 }

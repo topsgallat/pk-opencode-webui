@@ -66,8 +66,10 @@ RUN case $(uname -m) in \
     curl -L "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" | tar -xJvf - -C / && \
     curl -L "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${ARCH}.tar.xz" | tar -xJvf - -C /
 
-# Create app directory
-RUN mkdir -p /opt/opencode-ui /run
+# Create non-root user and app directory
+RUN addgroup -S opencode && adduser -S -G opencode -u 1000 opencode && \
+    mkdir -p /opt/opencode-ui /run /home/opencode && \
+    chown -R opencode:opencode /opt/opencode-ui /run /home/opencode
 
 # Copy built UI from builder stage
 COPY --from=builder /app/app-prefixable/dist /opt/opencode-ui/dist
@@ -91,7 +93,10 @@ ENV LD_PRELOAD=/lib/libgcompat.so.0
 ENV PORT=8080 \
     API_URL=http://127.0.0.1:4096 \
     BASE_PATH=/ \
-    OPERATION_MODE=solo
+    OPERATION_MODE=solo \
+    HOME=/home/opencode
+
+USER opencode
 
 WORKDIR /opt/opencode-ui
 

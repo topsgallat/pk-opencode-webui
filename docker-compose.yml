@@ -27,13 +27,13 @@ services:
       - PORT=8080
       - API_URL=http://host.docker.internal:4096
       - BASE_PATH=/
-      - OPENCODE_WORKSPACE_ROOT=/home/sgallat
+      - OPENCODE_WORKSPACE_ROOT=${HOME}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
     volumes:
-      - /home/sgallat:/home/sgallat
+      - ${HOME}:${HOME}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]

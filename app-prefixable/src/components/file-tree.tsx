@@ -166,14 +166,21 @@ export function FileTree(props: FileTreeProps) {
     const { mode, parentPath } = dialogState()
     const fullPath = parentPath ? `${parentPath}/${name}` : name
     
-    if (mode === "file") {
-      await file.createFile(fullPath)
+    try {
+      if (mode === "file") {
+        await file.createFile(fullPath)
+      }
+      if (mode === "folder") {
+        await file.createDir(fullPath)
+      }
+      setDialogState({ open: false, mode: "file", parentPath: "" })
+    } catch (err) {
+      try {
+        const message = err instanceof Error ? err.message : String(err)
+        alert(`Create failed: ${message}`)
+    } catch (e) {
     }
-    if (mode === "folder") {
-      await file.createDir(fullPath)
     }
-    
-    setDialogState({ open: false, mode: "file", parentPath: "" })
   }
 
   const handleDelete = async (node: FileNode | { type: "directory"; path: string; name: string }) => {
@@ -191,12 +198,13 @@ export function FileTree(props: FileTreeProps) {
       <Show when={level() === 0}>
         <div class="flex items-center justify-between px-2 py-1 mb-1 border-b border-white/5 dark:border-black/5" style={{ "border-color": "var(--border-base)" }}>
           <span class="text-xs font-semibold" style={{ color: "var(--text-weak)" }}>FILES</span>
-          <div class="flex gap-1">
+            <div class="flex gap-1">
             <button
               type="button"
               class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
               onClick={(e) => { e.stopPropagation(); setDialogState({ open: true, mode: "file", parentPath: "" }) }}
               title="New File"
+              aria-label="New File"
             >
               <FilePlus class="w-3.5 h-3.5" style={{ color: "var(--icon-weak)" }} />
             </button>
@@ -205,6 +213,7 @@ export function FileTree(props: FileTreeProps) {
               class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
               onClick={(e) => { e.stopPropagation(); setDialogState({ open: true, mode: "folder", parentPath: "" }) }}
               title="New Folder"
+              aria-label="New Folder"
             >
               <FolderPlus class="w-3.5 h-3.5" style={{ color: "var(--icon-weak)" }} />
             </button>

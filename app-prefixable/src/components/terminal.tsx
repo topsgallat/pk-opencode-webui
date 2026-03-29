@@ -1,4 +1,4 @@
-import { onMount, onCleanup, createSignal, createEffect, createMemo } from "solid-js"
+import { onMount, onCleanup, createSignal, createEffect, createMemo, Show } from "solid-js"
 import { Terminal as XTerm } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
 import "@xterm/xterm/css/xterm.css"
@@ -106,6 +106,7 @@ export function Terminal(props: TerminalProps) {
 
   const [status, setStatus] = createSignal<"connecting" | "connected" | "error" | "disconnected">("connecting")
   const [error, setError] = createSignal<string | null>(null)
+  const [showBanner, setShowBanner] = createSignal(false)
 
   const resolvedScheme = () => {
     const scheme = terminalScheme()
@@ -167,6 +168,7 @@ export function Terminal(props: TerminalProps) {
       console.error("[Terminal] WebSocket error:", e)
       setStatus("error")
       setError("WebSocket connection error")
+      setShowBanner(true)
       writeStatus("WebSocket error - check browser console for details", "error")
     })
 
@@ -312,6 +314,38 @@ export function Terminal(props: TerminalProps) {
 
   return (
     <div class="size-full flex flex-col" style={{ "min-height": "100px" }}>
+      <Show when={showBanner()}>
+        <div role="alert" class="bg-red-600 text-white px-3 py-2 flex items-center justify-between">
+          <div class="text-sm">Terminal connection error. Some features may be unavailable.</div>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="underline text-sm"
+              onClick={() => {
+                setShowBanner(false)
+                setError(null)
+              }}
+            >
+              Dismiss
+            </button>
+            <button
+              type="button"
+              class="bg-white text-red-600 px-2 py-1 rounded text-sm"
+              onClick={() => {
+                setShowBanner(false)
+                setError(null)
+                setStatus("connecting")
+                try {
+                  ws?.close()
+                } catch {}
+                connect()
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </Show>
       {/* Theme toggle */}
       <div
         class="flex items-center justify-end px-2 py-0.5 shrink-0"

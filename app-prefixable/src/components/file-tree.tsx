@@ -1,5 +1,6 @@
 import { createEffect, createMemo, For, Match, Show, Switch, untrack, createSignal, onCleanup } from "solid-js"
 import { Portal } from "solid-js/web"
+import { ConfirmDialog } from "./confirm-dialog"
 import type { FileNode } from "../sdk/client"
 import { useFile } from "../context/file"
 import { ChevronDown, ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Trash2, Edit2 } from "lucide-solid"
@@ -21,6 +22,8 @@ function kindColor(kind: Kind) {
 
 const [contextMenu, setContextMenu] = createSignal<{ x: number; y: number; node: FileNode | { type: "directory"; path: string; name: string } } | null>(null)
 const [dialogState, setDialogState] = createSignal<{ open: boolean; mode: "file" | "folder"; parentPath: string }>({ open: false, mode: "file", parentPath: "" })
+const [deleteTarget, setDeleteTarget] = createSignal<{ type: "directory" | "file"; path: string; name: string } | FileNode | null>(null)
+const [confirmOpen, setConfirmOpen] = createSignal(false)
 
 if (typeof window !== "undefined") {
   window.addEventListener("click", () => setContextMenu(null))
@@ -228,12 +231,13 @@ export function FileTree(props: FileTreeProps) {
 
           return (
             <Switch>
-              <Match when={node.type === "directory"}>
-                <div>
-                  <button
-                    type="button"
+                <Match when={node.type === "directory"}>
+                 <div>
+                   <button
+                     type="button"
                     onClick={() => (expanded() ? file.tree.collapse(node.path) : file.tree.expand(node.path))}
-                    onContextMenu={(e) => handleContextMenu(e, node)}
+                    aria-expanded={expanded()}
+                     onContextMenu={(e) => handleContextMenu(e, node)}
                     class="w-full min-h-[44px] flex items-center gap-1.5 rounded px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
                     style={{ "padding-left": `${Math.max(0, 6 + level() * 12)}px` }}
                   >
@@ -306,9 +310,9 @@ export function FileTree(props: FileTreeProps) {
         }}
       </For>
       <Show when={level() === 0}>
-        <Show when={contextMenu()}>
-          {(menu) => (
-            <Portal>
+                <Show when={contextMenu()}>
+                  {(menu) => (
+                    <Portal>
               <div
                 class="fixed z-[200] min-w-[160px] py-1 rounded shadow-lg flex flex-col"
                 style={{
@@ -368,12 +372,9 @@ export function FileTree(props: FileTreeProps) {
                     class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-red-500/10 text-red-500 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation()
-                      
-                      if (window.confirm(`Are you sure you want to delete this ${menu().node.type === "directory" ? "folder" : "file"}?`)) {
-                        void handleDelete(menu().node)
-                      } else {
-                        setContextMenu(null)
-                      }
+                      setDeleteTarget(menu().node as any)
+                      setConfirmOpen(true)
+                      setContextMenu(null)
                     }}
                   >
                     <Trash2 class="w-3.5 h-3.5" />
@@ -390,6 +391,34 @@ export function FileTree(props: FileTreeProps) {
           parentPath={dialogState().parentPath}
           onConfirm={handleCreate}
           onClose={() => setDialogState({ ...dialogState(), open: false })}
+        />
+        <ConfirmDialog
+          open={confirmOpen()}
+          title="Confirm Delete"
+          message={(() => {
+            const dt = deleteTarget()
+            if (!dt) return "Are you sure you want to delete this item?"
+            const t = (dt as any).type ?? (dt as FileNode).type
+            return `Are you sure you want to delete this ${t === "directory" ? "folder" : "file"}?`
+          })()}
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={() => {
+            const target = deleteTarget()
+            if (target) {
+              void (async () => {
+                await handleDelete(target as any)
+                setDeleteTarget(null)
+                setConfirmOpen(false)
+              })()
+            } else {
+              setConfirmOpen(false)
+            }
+          }}
+          onCancel={() => {
+            setDeleteTarget(null)
+            setConfirmOpen(false)
+          }}
         />
       </Show>
     </div>

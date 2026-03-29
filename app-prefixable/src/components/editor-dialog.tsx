@@ -1,4 +1,4 @@
-import { createSignal, createEffect, createComputed, Show } from "solid-js"
+import { createSignal, createEffect, createComputed, Show, onCleanup } from "solid-js"
 import { Portal } from "solid-js/web"
 import { MonacoEditor } from "./monaco-editor"
 import { Save, X } from "lucide-solid"
@@ -15,6 +15,49 @@ interface EditorDialogProps {
 export function EditorDialog(props: EditorDialogProps) {
   const [editContent, setEditContent] = createSignal("")
   const [editorKey, setEditorKey] = createSignal(0)
+  let dialogRef: HTMLDivElement | undefined
+
+  createEffect(() => {
+    if (!props.open) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        props.onClose()
+      } else if (e.key === "Tab" && dialogRef) {
+        const focusable = dialogRef.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+        if (!focusable.length) return
+        
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            last.focus()
+            e.preventDefault()
+          }
+        } else {
+          if (document.activeElement === last) {
+            first.focus()
+            e.preventDefault()
+          }
+        }
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    onCleanup(() => document.removeEventListener("keydown", handleKeyDown))
+
+    setTimeout(() => {
+      if (dialogRef) {
+        const focusable = dialogRef.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+        if (focusable.length) focusable[0].focus()
+      }
+    }, 10)
+  })
 
   // Bug #5: EditorDialog Send Content to Monaco Timing Issue Workaround
   createComputed(() => {
@@ -32,9 +75,12 @@ export function EditorDialog(props: EditorDialogProps) {
         <div
           class="fixed inset-0 z-[100] flex items-center justify-center"
           style={{ background: "rgba(0,0,0,0.5)" }}
-          role="presentation"
         >
           <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="editor-dialog-title"
             class="w-full max-w-6xl rounded-lg shadow-xl overflow-hidden flex flex-col h-[90vh] sm:h-[calc(100vh-40px)]"
             style={{
               background: "var(--background-base)",
@@ -42,16 +88,17 @@ export function EditorDialog(props: EditorDialogProps) {
             }}
           >
             <div class="px-4 py-3 flex justify-between items-center" style={{ "border-bottom": "1px solid var(--border-base)" }}>
-              <div class="text-sm font-medium flex items-center gap-2" style={{ color: "var(--text-strong)" }}>
+              <div id="editor-dialog-title" class="text-sm font-medium flex items-center gap-2" style={{ color: "var(--text-strong)" }}>
                 Editing: <span class="text-xs font-mono px-2 py-1 rounded" style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}>{props.path}</span>
               </div>
               <div class="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={props.onClose}
-                  class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-md"
+                  class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-md min-h-[44px] min-w-[44px] flex items-center justify-center"
                   style={{ color: "var(--text-base)" }}
                   title="Close"
+                  aria-label="Close dialog"
                 >
                   <X class="w-4 h-4" />
                 </button>
@@ -73,7 +120,7 @@ export function EditorDialog(props: EditorDialogProps) {
               <button
                 type="button"
                 onClick={props.onClose}
-                class="px-4 py-2 text-sm font-medium rounded-md transition-colors"
+                class="px-4 py-2 min-h-[44px] text-sm font-medium rounded-md transition-colors"
                 style={{
                   background: "var(--surface-inset)",
                   color: "var(--text-base)",
@@ -84,7 +131,7 @@ export function EditorDialog(props: EditorDialogProps) {
               <button
                 type="button"
                 onClick={() => props.onSave(editContent())}
-                class="px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2"
+                class="px-4 py-2 min-h-[44px] text-sm font-medium rounded-md transition-colors flex items-center gap-2"
                 style={{
                   background: "var(--interactive-base)",
                   color: "white",

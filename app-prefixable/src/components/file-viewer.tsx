@@ -199,7 +199,7 @@ export function FileViewer(props: FileViewerProps) {
               >
                 <div class="truncate">{props.path}</div>
                 <button
-                  class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded"
+                  class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
                   onClick={() => setIsEditing(true)}
                   title="Edit File"
                   style={{ color: "var(--text-base)" }}
@@ -224,6 +224,21 @@ export function FileViewer(props: FileViewerProps) {
           </div>
         </Match>
       </Switch>
+
+      <Show when={saveError()}>
+        {(err) => (
+          <div class="absolute bottom-4 right-4 bg-red-500 text-white px-4 py-2 rounded shadow-lg text-sm z-50 flex items-center gap-2" role="alert">
+            <span>{err()}</span>
+            <button 
+              onClick={() => setSaveError(null)} 
+              class="p-1 hover:bg-white/20 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label="Dismiss error"
+            >
+              &times;
+            </button>
+          </div>
+        )}
+      </Show>
 
       <EditorDialog
         open={isEditing()}

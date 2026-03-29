@@ -107,7 +107,7 @@ export function MonacoEditor(props: MonacoEditorProps) {
       </Show>
       
       {/* Monaco managed container - completely clean from SolidJS reactivity */}
-      <div ref={monacoContainerRef} class="w-full h-full" />
+      <div ref={monacoContainerRef} class="w-full h-full" aria-label="Code Editor" role="region" />
     </div>
   )
 }

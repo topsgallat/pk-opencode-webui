@@ -194,7 +194,7 @@ export function FileTree(props: FileTreeProps) {
           <div class="flex gap-1">
             <button
               type="button"
-              class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors"
+              class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
               onClick={(e) => { e.stopPropagation(); setDialogState({ open: true, mode: "file", parentPath: "" }) }}
               title="New File"
             >
@@ -202,7 +202,7 @@ export function FileTree(props: FileTreeProps) {
             </button>
             <button
               type="button"
-              class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors"
+              class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
               onClick={(e) => { e.stopPropagation(); setDialogState({ open: true, mode: "folder", parentPath: "" }) }}
               title="New Folder"
             >
@@ -225,7 +225,7 @@ export function FileTree(props: FileTreeProps) {
                     type="button"
                     onClick={() => (expanded() ? file.tree.collapse(node.path) : file.tree.expand(node.path))}
                     onContextMenu={(e) => handleContextMenu(e, node)}
-                    class="w-full h-6 flex items-center gap-1.5 rounded px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                    class="w-full min-h-[44px] flex items-center gap-1.5 rounded px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
                     style={{ "padding-left": `${Math.max(0, 6 + level() * 12)}px` }}
                   >
                     <span class="w-4 h-4 flex items-center justify-center" style={{ color: "var(--icon-weak)" }}>
@@ -270,7 +270,7 @@ export function FileTree(props: FileTreeProps) {
                   type="button"
                   onClick={() => props.onFileClick?.(node)}
                   onContextMenu={(e) => handleContextMenu(e, node)}
-                  class="w-full h-6 flex items-center gap-1.5 rounded px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                  class="w-full min-h-[44px] flex items-center gap-1.5 rounded px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
                   classList={{ "bg-black/5 dark:bg-white/5": node.path === props.active }}
                   style={{ "padding-left": `${Math.max(0, 6 + level() * 12 + 16)}px` }}
                 >
@@ -311,7 +311,7 @@ export function FileTree(props: FileTreeProps) {
               >
                 <Show when={menu().node.type === "directory"}>
                   <button
-                    class="w-full px-3 py-1.5 text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation()
                       setContextMenu(null)
@@ -322,7 +322,7 @@ export function FileTree(props: FileTreeProps) {
                     New File
                   </button>
                   <button
-                    class="w-full px-3 py-1.5 text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation()
                       setContextMenu(null)
@@ -339,7 +339,7 @@ export function FileTree(props: FileTreeProps) {
 
                 <Show when={menu().node.type === "file"}>
                   <button
-                    class="w-full px-3 py-1.5 text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation()
                       setContextMenu(null)
@@ -354,10 +354,15 @@ export function FileTree(props: FileTreeProps) {
 
                 <Show when={menu().node.path !== ""}>
                   <button
-                    class="w-full px-3 py-1.5 text-xs text-left flex items-center gap-2 hover:bg-red-500/10 text-red-500 transition-colors"
+                    class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-red-500/10 text-red-500 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation()
-                      void handleDelete(menu().node)
+                      
+                      if (window.confirm(`Are you sure you want to delete this ${menu().node.type === "directory" ? "folder" : "file"}?`)) {
+                        void handleDelete(menu().node)
+                      } else {
+                        setContextMenu(null)
+                      }
                     }}
                   >
                     <Trash2 class="w-3.5 h-3.5" />

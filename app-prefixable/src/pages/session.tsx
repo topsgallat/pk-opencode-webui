@@ -336,7 +336,7 @@ export function Session() {
   // preventing drafts from leaking across projects when id stays undefined.
   createEffect(on(() => draftKey(params.dir, params.id), (key, prevKey) => {
     const id = params.id;
-    console.log("[Session] URL param changed:", key);
+    // DEBUG: URL param changed - removed console.log for production
 
     // Save draft from the previous session before switching.
     // Read signals via untrack() so they aren't tracked dependencies.
@@ -388,14 +388,7 @@ export function Session() {
           if (statuses[id]) {
             const isBusy =
               statuses[id].type === "busy" || statuses[id].type === "retry";
-            console.log(
-              "[Session] Initial status for",
-              id,
-              ":",
-              statuses[id].type,
-              "isBusy:",
-              isBusy,
-            );
+            // DEBUG: initial status logged during development - removed for production
             if (isBusy) wasProcessing.value = true;
             setProcessing(isBusy);
           }
@@ -544,11 +537,11 @@ export function Session() {
         description: "Create a new chat session",
         slash: "new",
         onSelect: async () => {
-          console.log("[Command] New session - creating...");
+          // Command: New session (debug logs removed)
           try {
             const res = await client.session.create({});
             if (res.data) {
-              console.log("[Command] Created session:", res.data.id);
+                // Created session: res.data.id
               navigate(`/${dirSlug()}/session/${res.data.id}`);
             }
           } catch (err) {
@@ -562,7 +555,7 @@ export function Session() {
         description: "Open settings page",
         slash: "settings",
         onSelect: () => {
-          console.log("[Command] Settings");
+           // Command: Settings opened
           navigate(`/${dirSlug()}/settings`);
         },
       },
@@ -572,7 +565,7 @@ export function Session() {
         description: "Add an AI provider",
         slash: "connect",
         onSelect: () => {
-          console.log("[Command] Connect");
+          // Command: Connect provider selected
           navigate(`/${dirSlug()}/settings`);
         },
       },
@@ -600,7 +593,7 @@ export function Session() {
         description: "Manage MCP server connections",
         slash: "mcp",
         onSelect: () => {
-          console.log("[Command] MCP dialog");
+          // Command: MCP dialog opened
           setShowMCPDialog(true);
         },
       },
@@ -2680,4 +2673,3 @@ function SavePromptDialog(props: {
     </Portal>
   );
 }
-

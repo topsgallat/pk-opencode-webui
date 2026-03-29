@@ -97,6 +97,12 @@ Build a **prompt library** -- save, edit, reorder, and quickly insert frequently
 
 For trusted projects, enable **auto-accept** to automatically approve file edit and write permissions without confirmation dialogs. Toggled per-directory, persisted in localStorage, with a visual indicator in the session header.
 
+### New Features
+
+- New File/Edit: Create and edit files directly from the UI with inline editor support and in-place diffs for review.
+- Fullscreen Editor: Expand the inline editor to fullscreen for focused editing sessions, with keyboard shortcuts and theme support.
+- Mobile UI: Responsive layout improvements and touch-friendly controls for sessions and command palette, ensuring usability on phones and tablets.
+
 ### Settings
 
 A full settings page with tabs for:

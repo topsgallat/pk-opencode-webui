@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Add CHANGELOG.md and require changelog entries in PRs (#165)
 - Add drag-to-resize handle for chat input textarea (#170)
 - Add timestamp display and expandable details panel to message turns (#176)
+ - New File/Edit: create and edit files inline with diffs (#201)
+ - Fullscreen Editor: expand editor to fullscreen with keyboard shortcuts (#202)
+ - Mobile UI: responsive layout and touch-friendly controls (#203)
 
 ### Fixed
 - Fix saved prompts written to wrong localStorage key during navigation (#187)
@@ -22,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Preserve per-session draft input text, file context, and image attachments across session switches (#173)
 - Clear chat input text when switching sessions (#167)
 - Remove 600px max-height cap on terminal panel drag resize, use viewport-based limit instead (#169)
+ - Fix: remove noisy debug logging in session UI that affected performance (#204)
+ - Fixes for bugs #1-#9 (detailed in PR notes) (#205)
 
 ## [0.8.2] - 2026-03-11
 

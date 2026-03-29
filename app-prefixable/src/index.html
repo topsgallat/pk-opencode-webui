@@ -53,6 +53,9 @@
     <script>
       // Runtime configuration injection point
       window.__OPENCODE__ = window.__OPENCODE__ || {}
+      // Branding config will be injected by the server as a JSON object
+      // Server replacement token: __BRANDING_CONFIG__ -> JSON
+      window.__OPENCODE__.branding = __BRANDING_CONFIG__
       // Server can inject: window.__OPENCODE__.basePath = "/my-prefix/";
       // Server can inject: window.__OPENCODE__.serverUrl = "http://localhost:4096";
     </script>

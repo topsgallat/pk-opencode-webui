@@ -833,14 +833,12 @@ export function Session() {
 
   // Handle slash command selection
   function selectSlashCommand(cmd: Command) {
-    console.log("[Session] Selecting command:", cmd.id);
     setInput("");
     setShowSlashPopover(false);
     setSlashQuery("");
 
     // Use setTimeout to ensure state updates before command runs
     setTimeout(() => {
-      console.log("[Session] Executing command:", cmd.id);
       cmd.onSelect();
     }, 0);
   }
@@ -1019,7 +1017,6 @@ export function Session() {
 
   // Start processing state - SSE events will handle updates and completion
   function startProcessing() {
-    console.log("[Session] Starting processing, relying on SSE events");
     wasProcessing.value = true;
     setProcessing(true);
   }
@@ -1048,9 +1045,6 @@ export function Session() {
             part.type === "text" &&
             part.text?.trim() === pendingText.trim()
           ) {
-            console.log(
-              "[Session] User message echoed from server, clearing optimistic message",
-            );
             setPendingUserMessageText(null);
             setOptimisticMessage(null);
           }
@@ -1063,7 +1057,6 @@ export function Session() {
             status: { type: string };
           };
           if (props.sessionID === id && props.status.type === "idle") {
-            console.log("[Session] Status idle");
             // Only clear optimistic message if no pending text or it was already matched
             if (!pendingUserMessageText()) {
               setOptimisticMessage(null);
@@ -1145,7 +1138,6 @@ export function Session() {
     if (!id) return;
 
     try {
-      console.log("[Session] Aborting session:", id);
       await client.session.abort({ sessionID: id, directory });
       setProcessing(false);
       // Only dismiss the question if it belongs to this session — aborting is
@@ -1351,9 +1343,7 @@ export function Session() {
       let id = sessionId();
 
       if (!id) {
-        console.log("[Session] Creating new session...");
         const createRes = await client.session.create({});
-        console.log("[Session] Create response:", createRes);
         if (!createRes.data) throw new Error("Failed to create session");
 
         id = createRes.data.id;
@@ -1400,7 +1390,6 @@ export function Session() {
       }
 
       // Send message with agent and model
-      console.log("[Session] Sending message to session:", id);
       const promptPayload: {
         sessionID: string;
         parts: typeof parts;
@@ -1417,7 +1406,6 @@ export function Session() {
       }
 
       const promptRes = await client.session.promptAsync(promptPayload);
-      console.log("[Session] Prompt response:", promptRes);
 
       // Start processing - SSE events will handle updates and completion
       startProcessing();
@@ -1595,24 +1583,17 @@ export function Session() {
           <div class="flex flex-col gap-3 w-full max-w-xs">
             <Button
               onClick={async () => {
-                console.log(
-                  "[Welcome] New Session clicked, directory:",
-                  directory,
-                  "dirSlug:",
-                  dirSlug(),
-                );
+                // New Session clicked
                 if (!directory) {
                   console.error("[Welcome] No directory available");
                   return;
                 }
                 try {
-                  console.log("[Welcome] Creating session...");
                   const res = await client.session.create({});
-                  console.log("[Welcome] Create response:", res);
                   if (res.data) {
                     const url = `/${dirSlug()}/session/${res.data.id}`;
-                    console.log("[Welcome] Navigating to:", url);
                     navigate(url);
+                    
                   }
                 } catch (e) {
                   console.error("[Welcome] Failed to create session:", e);

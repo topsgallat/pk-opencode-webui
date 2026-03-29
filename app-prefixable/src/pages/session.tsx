@@ -980,7 +980,7 @@ export function Session() {
           }
         }
       } catch (err) {
-        console.warn("[Session] localStorage error:", err);
+        console.error("[Session] localStorage error:", err);
       }
       return;
     }
@@ -993,7 +993,7 @@ export function Session() {
         if (stored === id) window.localStorage.removeItem(key);
       }
     } catch (err) {
-      console.warn("[Session] localStorage error:", err);
+      console.error("[Session] localStorage error:", err);
     }
     navigate(`/${dirSlug()}/session`, { replace: true });
   });
@@ -1011,7 +1011,7 @@ export function Session() {
         window.localStorage.setItem(`opencode.lastSession.${dir}`, id);
       }
     } catch (err) {
-      console.warn("[Session] Failed to persist last session:", err);
+      console.error("[Session] Failed to persist last session:", err);
     }
   });
 

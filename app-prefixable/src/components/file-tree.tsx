@@ -326,6 +326,7 @@ export function FileTree(props: FileTreeProps) {
                       setContextMenu(null)
                       setDialogState({ open: true, mode: "file", parentPath: menu().node.path })
                     }}
+                    aria-label="New File"
                   >
                     <FilePlus class="w-3.5 h-3.5" />
                     New File
@@ -337,6 +338,7 @@ export function FileTree(props: FileTreeProps) {
                       setContextMenu(null)
                       setDialogState({ open: true, mode: "folder", parentPath: menu().node.path })
                     }}
+                    aria-label="New Folder"
                   >
                     <FolderPlus class="w-3.5 h-3.5" />
                     New Folder

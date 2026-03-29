@@ -202,6 +202,7 @@ export function FileViewer(props: FileViewerProps) {
                   class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
                   onClick={() => setIsEditing(true)}
                   title="Edit File"
+                  aria-label="Edit File"
                   style={{ color: "var(--text-base)" }}
                 >
                   <Pencil class="w-3.5 h-3.5" />

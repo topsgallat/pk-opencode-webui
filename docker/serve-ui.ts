@@ -376,9 +376,13 @@ const server = Bun.serve<{ target: string }>({
         html = html.replace('href="./entry.css"', `href="./entry.css${cacheBuster}"`)
         // Inject NB_PREFIX at runtime
         html = html.replace(/__NB_PREFIX__/g, validatedBasePath)
-        if (BRANDING_NAME) html = html.replace(/__BRANDING_NAME__/g, BRANDING_NAME)
-        if (BRANDING_URL) html = html.replace(/__BRANDING_URL__/g, BRANDING_URL)
-        if (BRANDING_ICON) html = html.replace(/__BRANDING_ICON__/g, BRANDING_ICON)
+        // Inject branding config as a JSON object to avoid HTML/JS injection
+        const brandingConfig = {
+          name: BRANDING_NAME || "",
+          url: BRANDING_URL || "",
+          icon: BRANDING_ICON || "",
+        }
+        html = html.replace(/__BRANDING_CONFIG__/g, JSON.stringify(brandingConfig))
         return new Response(html, {
           headers: {
             "Content-Type": "text/html",

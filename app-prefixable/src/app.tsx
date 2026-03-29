@@ -1,4 +1,4 @@
-import { Router, Route, Navigate, useParams } from "@solidjs/router"
+import { Router, Route, useNavigate, useParams } from "@solidjs/router"
 import { createSignal, onMount, onCleanup } from "solid-js"
 import { BasePathProvider, useBasePath } from "./context/base-path"
 import { BrandingProvider } from "./context/branding"
@@ -33,15 +33,19 @@ function getLastSessionHref(encodedDir: string): string {
 
 function DirectoryIndex() {
   const params = useParams<{ dir: string }>()
-  return <Navigate href={getLastSessionHref(params.dir)} replace />
+  const navigate = useNavigate()
+  onMount(() => navigate(getLastSessionHref(params.dir), { replace: true }))
+  return null
 }
 
 function SessionIndex() {
   const params = useParams<{ dir: string }>()
+  const navigate = useNavigate()
   const href = getLastSessionHref(params.dir)
   if (href === "session") return <Session />
   const id = href.replace(/^session\//, "")
-  return <Navigate href={id} replace />
+  onMount(() => navigate(id, { replace: true }))
+  return null
 }
 
 function AppRoutes() {

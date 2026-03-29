@@ -45,12 +45,14 @@ export function ThemeProvider(props: ParentProps) {
 
   if (query) {
     const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches)
-    if ("addEventListener" in query) {
-      query.addEventListener("change", handler)
-      onCleanup(() => query.removeEventListener("change", handler))
-    } else if ("addListener" in query) {
-      query.addListener(handler)
-      onCleanup(() => query.removeListener(handler))
+    // Narrow to EventTarget-compatible for addEventListener
+    if (typeof (query as MediaQueryList).addEventListener === "function") {
+      ;(query as MediaQueryList).addEventListener("change", handler)
+      onCleanup(() => (query as MediaQueryList).removeEventListener("change", handler))
+    } else if (typeof (query as any).addListener === "function") {
+      // Legacy API - narrow and call
+      ;(query as any).addListener(handler)
+      onCleanup(() => (query as any).removeListener(handler))
     }
   }
 

@@ -233,6 +233,32 @@ const mimeTypes: Record<string, string> = {
   map: "application/json",
 }
 
+const COMPRESSIBLE = new Set([
+  "application/javascript",
+  "text/css",
+  "text/html",
+  "application/json",
+  "image/svg+xml",
+  "text/plain",
+])
+
+async function maybeGzip(req: Request, body: Uint8Array | string, contentType: string, extraHeaders: Record<string, string>): Promise<Response> {
+  const acceptEncoding = req.headers.get("Accept-Encoding") || ""
+  if (zlib && acceptEncoding.includes("gzip") && COMPRESSIBLE.has(contentType.split(";")[0].trim())) {
+    const input = typeof body === "string" ? Buffer.from(body, "utf8") : body
+    const compressed = zlib.gzipSync(input)
+    return new Response(compressed, {
+      headers: {
+        ...extraHeaders,
+        "Content-Encoding": "gzip",
+        "Content-Length": String(compressed.byteLength),
+        "Vary": "Accept-Encoding",
+      },
+    })
+  }
+  return new Response(body, { headers: extraHeaders })
+}
+
 // Check if this is a PTY WebSocket connection request
 function isPtyWebSocket(path: string): boolean {
   return /^\/pty\/[^/]+\/connect/.test(path)
@@ -359,15 +385,12 @@ const server = Bun.serve<{ target: string }>({
         // This prevents Bun from re-compressing streamed responses and allows
         // us to explicitly set Content-Length after optional decompression.
         const raw = Buffer.from(await response.arrayBuffer())
-        let bodyToReturn: any = raw
+        let bodyToReturn: Buffer | Uint8Array = raw
 
-        // Determine if upstream sent a compressed body we should decompress
         const encoding = (response.headers.get("content-encoding") || "").toLowerCase()
 
         try {
           if (encoding) {
-            // GZIP: only attempt gunzip when gzip magic bytes present to avoid
-            // noisy Z_DATA_ERROR logs when headers are incorrect or body is not gzipped.
             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
               if (!zlib) throw new Error("zlib not available for gzip decompression")
               if (raw.length >= 2 && raw[0] === 0x1f && raw[1] === 0x8b) {
@@ -400,28 +423,23 @@ const server = Bun.serve<{ target: string }>({
                 bodyToReturn = raw
               }
             } else {
-              // Unknown encoding — keep original bytes
               bodyToReturn = raw
             }
           }
         } catch (decompErr) {
-          // Avoid noisy stack traces for decompression mismatches. Log concise warning
           console.warn('[Proxy] decompression error, returning raw bytes for:', path)
           bodyToReturn = raw
         }
 
-        // Copy upstream headers but strip compression/transfer/length headers
         const responseHeaders = new Headers(response.headers)
         responseHeaders.delete("content-encoding")
         responseHeaders.delete("transfer-encoding")
         responseHeaders.delete("content-length")
 
-        // Ensure explicit Content-Length for the materialized body
         try {
           const length = (bodyToReturn && (bodyToReturn.byteLength ?? bodyToReturn.length)) || 0
           responseHeaders.set("Content-Length", String(length))
         } catch (e) {
-          // If computing length fails, log and continue without setting it
           console.warn("[Proxy] could not determine response byte length:", e)
         }
 
@@ -444,10 +462,26 @@ const server = Bun.serve<{ target: string }>({
       const ext = path.split(".").pop()?.toLowerCase() || ""
       const contentType = mimeTypes[ext] || "application/octet-stream"
 
+      // esbuild generates content-hashed chunk filenames (e.g. chunk-ABC123.js, abap-JFJQJ6PR.js).
+      // These are safe to cache indefinitely. Entry points are cache-busted via ?v=
+      // query param by the server, so they get no-cache.
+      const isHashedAsset = /-[a-zA-Z0-9]{6,}\.(js|css|woff2?|ttf|eot)$/.test(path)
+      const cacheControl = isHashedAsset
+        ? "public, max-age=31536000, immutable"
+        : "no-cache"
+
+      if (COMPRESSIBLE.has(contentType.split(";")[0].trim())) {
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        return maybeGzip(req, bytes, contentType, {
+          "Content-Type": contentType,
+          "Cache-Control": cacheControl,
+        })
+      }
+
       return new Response(file, {
         headers: {
           "Content-Type": contentType,
-          "Cache-Control": "public, max-age=0, must-revalidate",
+          "Cache-Control": cacheControl,
         },
       })
     }
@@ -469,10 +503,9 @@ const server = Bun.serve<{ target: string }>({
           icon: BRANDING_ICON || "",
         }
         html = html.replace(/__BRANDING_CONFIG__/g, JSON.stringify(brandingConfig))
-        return new Response(html, {
-          headers: {
-            "Content-Type": "text/html",
-          },
+        return maybeGzip(req, html, "text/html", {
+          "Content-Type": "text/html",
+          "Cache-Control": "no-cache",
         })
       }
     }

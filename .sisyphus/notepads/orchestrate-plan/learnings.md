@@ -14,4 +14,3 @@ Keep app-level UX fixes minimal and focused on preventing main-thread blocking.
   Deltas are queued per messageID:partID and flushed once per animation frame using requestAnimationFrame.
   This reduces per-delta setStore calls by applying concatenated updates in a single SolidJS batch,
   preserving ordering and final part content while lowering main-thread work.
- - Fix: allow listing the configured workspace root in validatePath so requests for the root don't 403

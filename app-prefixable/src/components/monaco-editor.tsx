@@ -107,9 +107,9 @@ export function MonacoEditor(props: MonacoEditorProps) {
       // disposal.
       try { window.removeEventListener("unhandledrejection", _unhandled) } catch {}
       try {
-        // Allow a short delay for in-flight Monaco promises to settle
-        // before disposing to reduce 'Canceled' unhandled rejections.
-        try { setTimeout(() => { try { editor?.dispose() } catch {} }, 50) } catch {}
+        Promise.resolve().then(() => {
+          try { editor?.dispose() } catch {}
+        })
       } catch {}
     })
   })

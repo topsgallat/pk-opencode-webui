@@ -30,8 +30,14 @@ function validatePath(inputPath: string, allowedRoot: string): string | null {
     return resolved
   }
 
-  // Check that resolved path is strictly within allowed root (prevents ../ traversal)
-  // Must start with root + separator (root itself is not a valid target)
+  // Check that resolved path is within allowed root (prevents ../ traversal).
+  // Allow the allowed root itself as a valid target so callers can list the
+  // configured workspace root directory (e.g. OPENCODE_WORKSPACE_ROOT or HOME).
+  if (resolved === normalizedRoot) {
+    return resolved
+  }
+
+  // Otherwise require resolved path to be inside the root (root + separator)
   if (!resolved.startsWith(normalizedRoot + nodePath.sep)) {
     return null
   }
@@ -56,7 +62,7 @@ function isValidServerName(name: string): boolean {
  * Get the allowed root directory for filesystem operations.
  * Defaults to HOME directory.
  */
-function getAllowedRoot(): string {
+export function getAllowedRoot(): string {
   return process.env.OPENCODE_WORKSPACE_ROOT || process.env.HOME || os.homedir()
 }
 

@@ -22,7 +22,7 @@
 
 
 import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
-import path from "path"
+import nodePath from "path"
 // Decompression for proxied responses
 let zlib: any
 try {
@@ -40,7 +40,7 @@ const API_URL = process.env.API_URL || `http://127.0.0.1:${API_PORT}`
 const OPERATION_MODE = process.env.OPERATION_MODE || "solo"
 
 function isForbiddenHostPath(p: string): boolean {
-  const norm = path.resolve(p.replace(/\\/g, '/'))
+  const norm = nodePath.resolve(p.replace(/\\/g, '/'))
 
   // Allow-list: explicitly permit common container-local paths so the
   // startup checks do not falsely block valid container HOME/XDG_CACHE_HOME.
@@ -388,6 +388,7 @@ const server = Bun.serve<{ target: string }>({
         let bodyToReturn: Buffer | Uint8Array = raw
 
         const encoding = (response.headers.get("content-encoding") || "").toLowerCase()
+        let responseEncoding = ""
 
         try {
           if (encoding) {
@@ -408,6 +409,7 @@ const server = Bun.serve<{ target: string }>({
               } catch (inflateErr) {
                 console.warn('[Proxy] deflate decompression failed, returning raw bytes for:', path)
                 bodyToReturn = raw
+                responseEncoding = encoding
               }
             } else if (encoding.includes("br")) {
               if (zlib && typeof zlib.brotliDecompressSync === "function") {
@@ -417,10 +419,12 @@ const server = Bun.serve<{ target: string }>({
                 } catch (brErr) {
                   console.warn('[Proxy] Brotli decompression failed, returning raw bytes for:', path)
                   bodyToReturn = raw
+                  responseEncoding = encoding
                 }
               } else {
                 console.warn(`[Proxy] Brotli (br) encoded response received but Brotli decompression is unavailable. Returning original compressed body for: ${path}`)
                 bodyToReturn = raw
+                responseEncoding = encoding
               }
             } else {
               bodyToReturn = raw
@@ -435,6 +439,9 @@ const server = Bun.serve<{ target: string }>({
         responseHeaders.delete("content-encoding")
         responseHeaders.delete("transfer-encoding")
         responseHeaders.delete("content-length")
+        if (responseEncoding) {
+          responseHeaders.set("content-encoding", responseEncoding)
+        }
 
         try {
           const length = (bodyToReturn && (bodyToReturn.byteLength ?? bodyToReturn.length)) || 0
@@ -454,8 +461,11 @@ const server = Bun.serve<{ target: string }>({
     }
 
     // Frontend routes - path is already stripped above
-    // Try to serve static file
-    const filePath = `${DIST_DIR}${path}`
+    // Try to serve static file — guard against path traversal
+    const filePath = nodePath.resolve(DIST_DIR, "." + path)
+    if (!filePath.startsWith(DIST_DIR + "/") && filePath !== DIST_DIR) {
+      return new Response("Forbidden", { status: 403 })
+    }
     const file = Bun.file(filePath)
 
     if (await file.exists()) {

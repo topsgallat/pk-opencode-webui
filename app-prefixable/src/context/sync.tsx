@@ -82,6 +82,92 @@ export function SyncProvider(props: ParentProps) {
   })
 
   const inflight = new Map<string, Promise<void>>()
+  // Queue for micro-batching incoming part delta events to avoid many
+  // synchronous setStore calls which block the main thread during heavy streams.
+  // Keyed by `${messageID}:${partID}` and accumulates per-field string deltas
+  // preserving arrival order by a monotonic counter.
+  const deltaQueue = new Map<
+    string,
+    { sessionID: string; messageID: string; partID: string; fields: Record<string, string>; order: number }
+  >()
+  let rafHandle: number | null = null
+  let seqCounter = 0
+
+  function scheduleFlush() {
+    // Prefer requestAnimationFrame to batch updates into a single paint tick.
+    if (rafHandle != null) return
+    rafHandle = requestAnimationFrame(() => {
+      rafHandle = null
+      flushDeltaQueue()
+    })
+  }
+
+  function flushDeltaQueue() {
+    if (deltaQueue.size === 0) return
+    // Capture queued entries and clear the queue immediately so new events
+    // can be collected while we apply the batched update.
+    const entries = Array.from(deltaQueue.values()).sort((a, b) => a.order - b.order)
+    deltaQueue.clear()
+
+    // Apply updates in a single SolidJS batch to minimise reactivity churn.
+    batch(() => {
+      // 1) Update the per-message "part" store (keyed by messageID)
+      const byMessage = new Map<string, typeof entries>()
+      for (const e of entries) {
+        const arr = byMessage.get(e.messageID) ?? []
+        arr.push(e)
+        byMessage.set(e.messageID, arr)
+      }
+
+      for (const [messageID, list] of byMessage.entries()) {
+        const existingParts = store.part[messageID] ?? []
+        if (existingParts.length === 0) continue
+        let changed = false
+        const next = existingParts.map((p) => {
+          const matched = list.find((le) => le.partID === p.id)
+          if (!matched) return p
+          const updated: any = { ...p }
+          for (const [f, v] of Object.entries(matched.fields)) {
+            const cur = (updated as any)[f] ?? ""
+            ;(updated as any)[f] = cur + v
+          }
+          changed = true
+          return updated as Part
+        })
+        if (changed) setStore("part", messageID, next)
+      }
+
+      // 2) Update the per-session "message" store so MessageWithParts reflect
+      // the concatenated part changes (one setStore per session).
+      const bySession = new Map<string, typeof entries>()
+      for (const e of entries) {
+        const arr = bySession.get(e.sessionID) ?? []
+        arr.push(e)
+        bySession.set(e.sessionID, arr)
+      }
+
+      for (const [sessionID, list] of bySession.entries()) {
+        const msgs = store.message[sessionID] ?? []
+        if (!msgs || msgs.length === 0) continue
+        const nextMsgs = msgs.map((m) => {
+          const updatesForMsg = list.filter((u) => u.messageID === m.info.id)
+          if (updatesForMsg.length === 0) return m
+          const newParts = m.parts.map((p) => {
+            const upd = updatesForMsg.find((u) => u.partID === p.id)
+            if (!upd) return p
+            const updated: any = { ...p }
+            for (const [f, v] of Object.entries(upd.fields)) {
+              const cur = (updated as any)[f] ?? ""
+              ;(updated as any)[f] = cur + v
+            }
+            return updated as Part
+          })
+          return { ...m, parts: newParts }
+        })
+        setStore("message", sessionID, nextMsgs)
+      }
+    })
+  }
 
   // Connect to SSE endpoint
   let eventSource: EventSource | null = null
@@ -268,31 +354,24 @@ export function SyncProvider(props: ParentProps) {
       }
       if (!sessionID || !messageID || !partID) return
 
-      // Update part in store
-      setStore("part", messageID, (existing: Part[] | undefined) => {
-        if (!existing) return [];
-        return existing.map((p) => {
-          if (p.id !== partID) return p
-          const current = (p as any)[field] ?? ""
-          return { ...p, [field]: current + delta }
+      // Micro-batch deltas: accumulate per-part per-field deltas in an
+      // in-memory queue and schedule a single flush per animation frame.
+      const key = `${messageID}:${partID}`
+      const existing = deltaQueue.get(key)
+      if (existing) {
+        // Preserve ordering by appending to the existing field value
+        existing.fields[field] = (existing.fields[field] ?? "") + delta
+      } else {
+        deltaQueue.set(key, {
+          sessionID,
+          messageID,
+          partID,
+          fields: { [field]: delta },
+          order: seqCounter++,
         })
-      })
+      }
 
-      // Update part in message list
-      setStore("message", sessionID, (msgs: MessageWithParts[]) => {
-        if (!msgs) return msgs
-        return msgs.map((m) => {
-          if (m.info.id !== messageID) return m
-          return {
-            ...m,
-            parts: m.parts.map((p) => {
-              if (p.id !== partID) return p
-              const current = (p as any)[field] ?? ""
-              return { ...p, [field]: current + delta }
-            }),
-          }
-        })
-      })
+      scheduleFlush()
     }
 
     if (event.type === "message.part.removed") {

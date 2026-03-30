@@ -14,6 +14,23 @@ if (!root) {
 root.innerHTML = ""
 
 try {
+  if (typeof window !== "undefined") {
+    const key = "__pk_oc_monaco_cancel_handler"
+    if (!(window as any)[key]) {
+      const h = (ev: PromiseRejectionEvent) => {
+        try {
+          const r: any = ev.reason
+          const msg = typeof r === "string" ? r : r?.message
+          if (msg === "Canceled") {
+            try { console.debug("Suppressed canceled rejection", r) } catch {}
+            ev.preventDefault()
+          }
+        } catch {}
+      }
+      window.addEventListener("unhandledrejection", h)
+      ;(window as any)[key] = h
+    }
+  }
   console.log("[OpenCode] Rendering...")
   render(() => <App />, root)
   console.log("[OpenCode] Rendered successfully")

@@ -3,6 +3,36 @@ import loader from "@monaco-editor/loader"
 import type * as monacoType from "monaco-editor"
 import { useTheme } from "../context/theme"
 
+// Install a global handler to suppress known Monaco 'Canceled' promise
+// rejections that occur when the editor or its workers are torn down.
+// This handler is safe to keep permanently and only ignores the exact
+// 'Canceled' reason to avoid noisy console output during normal use.
+if (typeof window !== "undefined") {
+  try {
+    const globalKey = "__pk_oc_monaco_cancel_handler"
+    // @ts-ignore global marker
+    if (!(window as any)[globalKey]) {
+      const g = (ev: PromiseRejectionEvent) => {
+        try {
+          const r: any = ev.reason
+          const msg = typeof r === "string" ? r : r?.message
+          if (msg === "Canceled") {
+            // Log a lightweight debug entry so we can trace where this
+            // cancellation originates during runtime without polluting
+            // the console for end users. The debug log will include a
+            // stack snapshot to help locate the source in production
+            // bundles.
+            try { console.debug("Monaco canceled rejection detected:", r, new Error().stack) } catch {}
+            ev.preventDefault()
+          }
+        } catch {}
+      }
+      window.addEventListener("unhandledrejection", g)
+      ;(window as any)[globalKey] = g
+    }
+  } catch {}
+}
+
 export interface MonacoEditorProps {
   value: string
   language?: string
@@ -21,6 +51,19 @@ export function MonacoEditor(props: MonacoEditorProps) {
 
   onMount(() => {
     let isCanceled = false
+    // During the editor lifetime ignore known 'Canceled' promise rejections
+    // coming from Monaco/worker disposal to avoid noisy console logs.
+    const _unhandled = (ev: PromiseRejectionEvent) => {
+      try {
+        const r: any = ev.reason
+        const msg = typeof r === "string" ? r : r?.message || r?.name || String(r)
+        if (typeof msg === "string" && msg.indexOf("Canceled") !== -1) {
+          ev.preventDefault()
+          return
+        }
+      } catch {}
+    }
+    window.addEventListener("unhandledrejection", _unhandled)
 
     loader.init().then((monaco) => {
       if (isCanceled) return
@@ -40,22 +83,34 @@ export function MonacoEditor(props: MonacoEditorProps) {
       })
 
       if (editor) { editor.onDidChangeModelContent(() => {
-        const val = editor?.getValue()
-        if (val !== undefined && props.onChange) {
-          props.onChange(val)
+        try {
+          const val = editor?.getValue()
+          if (val !== undefined && props.onChange) {
+            props.onChange(val)
+          }
+        } catch (e) {
+          // ignore synchronous errors if editor was disposed concurrently
         }
       }) }
 
       setReady(true)
     }).catch(err => {
-      if (!isCanceled) setError(String(err))
+      // Ignore cancellation during unmount
+      if (!isCanceled && err?.message !== "Canceled") setError(String(err))
     })
 
     onCleanup(() => {
       isCanceled = true
-      if (editor) {
-        editor.dispose()
-      }
+      // remove handler and dispose editor asynchronously so that any
+      // in-flight microtasks or promise chains can settle first. This
+      // reduces races where Monaco rejects promises during synchronous
+      // disposal.
+      try { window.removeEventListener("unhandledrejection", _unhandled) } catch {}
+      try {
+        Promise.resolve().then(() => {
+          try { editor?.dispose() } catch {}
+        })
+      } catch {}
     })
   })
 
@@ -63,7 +118,9 @@ export function MonacoEditor(props: MonacoEditorProps) {
   createEffect(() => {
     props.editorKey; // track
     if (editor) {
-      editor.setValue(props.value)
+      try {
+        editor.setValue(props.value)
+      } catch (e) { /* ignore if disposed concurrently */ }
     }
   })
 
@@ -72,14 +129,20 @@ export function MonacoEditor(props: MonacoEditorProps) {
     const isDark = resolved() === "dark"
     loader.init().then((monaco) => {
       monaco.editor.setTheme(isDark ? "vs-dark" : "vs")
+    }).catch(e => {
+      if (e?.message !== "Canceled") console.warn("Monaco theme init error", e)
     })
   })
 
   // React to prop.value changes if they come from outside
   createEffect(() => {
     const val = props.value
-    if (editor && val !== editor.getValue()) {
-      editor.setValue(val)
+    if (editor) {
+      try {
+        if (val !== editor.getValue()) {
+          editor.setValue(val)
+        }
+      } catch (e) { /* ignore if disposed concurrently */ }
     }
   })
 
@@ -88,10 +151,14 @@ export function MonacoEditor(props: MonacoEditorProps) {
     const lang = props.language
     if (editor && lang) {
       loader.init().then((monaco) => {
-        const model = editor!.getModel()
-        if (model) {
-          monaco.editor.setModelLanguage(model, lang)
-        }
+        try {
+          const model = editor!.getModel()
+          if (model) {
+            monaco.editor.setModelLanguage(model, lang)
+          }
+        } catch (e) { /* ignore if disposed concurrently */ }
+      }).catch(e => {
+        if (e?.message !== "Canceled") console.warn("Monaco language init error", e)
       })
     }
   })

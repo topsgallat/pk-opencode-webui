@@ -25,3 +25,6 @@ Key files referenced:
 2026-03-30 22:07: UI proxy decompresses upstream compressed responses (gzip/deflate/br when available) for proxied API responses to avoid ERR_CONTENT_DECODING_FAILED
 2026-03-30T22:10: implemented materialize-and-decompress for proxied API responses; set explicit Content-Length header to prevent Bun auto-recompression
 2026-03-30T15:20:50Z: curl check against http://localhost:8080/session showed no upstream Content-Encoding (identity/no header); no code changes applied
+2026-03-30T15:28:53Z - Observed Content-Encoding header absent on /session,/provider,/path,/mcp; SSE /event uses chunked Transfer-Encoding and Content-Type: text/event-stream. Proxy logs show decompression errors when trying to gunzip upstream responses.
+2026-03-30T15:32:28Z - Check: /session,/provider,/path,/mcp responses show no Content-Encoding header; /event is chunked SSE. Proxy logs show repeated decompression (gunzip) failures (Z_DATA_ERROR).
+2026-03-30T22:20:00Z - Implemented gzip-magic check: proxy now verifies first two bytes (0x1f,0x8b) before gunzip; deflate/br attempts guarded to avoid noisy Z_DATA_ERROR logs.

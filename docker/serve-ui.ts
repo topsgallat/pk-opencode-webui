@@ -366,18 +366,35 @@ const server = Bun.serve<{ target: string }>({
 
         try {
           if (encoding) {
+            // GZIP: only attempt gunzip when gzip magic bytes present to avoid
+            // noisy Z_DATA_ERROR logs when headers are incorrect or body is not gzipped.
             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
               if (!zlib) throw new Error("zlib not available for gzip decompression")
-              bodyToReturn = zlib.gunzipSync(raw)
-              console.log(`[Proxy] decompressed response for: ${path} (${encoding})`)
+              if (raw.length >= 2 && raw[0] === 0x1f && raw[1] === 0x8b) {
+                bodyToReturn = zlib.gunzipSync(raw)
+                console.log(`[Proxy] decompressed response for: ${path} (${encoding})`)
+              } else {
+                console.warn('[Proxy] claimed gzip but body lacks gzip magic, skipping gunzip for:', path)
+                bodyToReturn = raw
+              }
             } else if (encoding.includes("deflate")) {
               if (!zlib) throw new Error("zlib not available for deflate decompression")
-              bodyToReturn = zlib.inflateSync(raw)
-              console.log(`[Proxy] decompressed response for: ${path} (${encoding})`)
+              try {
+                bodyToReturn = zlib.inflateSync(raw)
+                console.log(`[Proxy] decompressed response for: ${path} (${encoding})`)
+              } catch (inflateErr) {
+                console.warn('[Proxy] deflate decompression failed, returning raw bytes for:', path)
+                bodyToReturn = raw
+              }
             } else if (encoding.includes("br")) {
               if (zlib && typeof zlib.brotliDecompressSync === "function") {
-                bodyToReturn = zlib.brotliDecompressSync(raw)
-                console.log(`[Proxy] decompressed response for: ${path} (br)`)
+                try {
+                  bodyToReturn = zlib.brotliDecompressSync(raw)
+                  console.log(`[Proxy] decompressed response for: ${path} (br)`)
+                } catch (brErr) {
+                  console.warn('[Proxy] Brotli decompression failed, returning raw bytes for:', path)
+                  bodyToReturn = raw
+                }
               } else {
                 console.warn(`[Proxy] Brotli (br) encoded response received but Brotli decompression is unavailable. Returning original compressed body for: ${path}`)
                 bodyToReturn = raw
@@ -388,8 +405,8 @@ const server = Bun.serve<{ target: string }>({
             }
           }
         } catch (decompErr) {
-          console.error("[Proxy] decompression error:", decompErr)
-          // Fall back to the raw bytes we already read
+          // Avoid noisy stack traces for decompression mismatches. Log concise warning
+          console.warn('[Proxy] decompression error, returning raw bytes for:', path)
           bodyToReturn = raw
         }
 

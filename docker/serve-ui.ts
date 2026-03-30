@@ -306,6 +306,8 @@ const server = Bun.serve<{ target: string }>({
         headers.set("Authorization", proxyAuthHeader)
       }
 
+      headers.delete("Accept-Encoding")
+
       // SSE requests need special handling
       if (path.startsWith("/event")) {
         console.log("[Proxy] SSE request to:", target.toString())
@@ -338,10 +340,21 @@ const server = Bun.serve<{ target: string }>({
       // Regular API requests
       console.log("[Proxy] API:", req.method, path)
       try {
-        return await fetch(target.toString(), {
+        const response = await fetch(target.toString(), {
           method: req.method,
           headers,
           body: req.body,
+        })
+
+        // Copy upstream headers but strip compression/transfer headers
+        const responseHeaders = new Headers(response.headers)
+        responseHeaders.delete("content-encoding")
+        responseHeaders.delete("transfer-encoding")
+        responseHeaders.delete("content-length")
+
+        return new Response(response.body, {
+          status: response.status,
+          headers: responseHeaders,
         })
       } catch (e) {
         console.error("[Proxy] API error:", e)

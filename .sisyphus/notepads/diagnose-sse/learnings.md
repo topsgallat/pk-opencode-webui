@@ -21,4 +21,4 @@ Key files referenced:
 - shared/extended-api.ts — implementation of /api/ext/list-dirs
 - app-prefixable/src/utils/extended-api.ts — frontend listDirs() wrapper that calls the UI server
 - app-prefixable/dev.ts and docker/serve-ui.ts — dev/prod UI servers that proxy /event and handle extended endpoints
-
+ - 2026-03-30: UI proxy now strips upstream Content-Encoding, Transfer-Encoding, and Content-Length headers for regular proxied API responses to avoid ERR_CONTENT_DECODING_FAILED in browsers.

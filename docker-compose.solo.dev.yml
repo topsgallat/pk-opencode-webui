@@ -1,0 +1,20 @@
+services:
+  opencode-solo:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: opencode-web-solo:latest
+    container_name: opencode-solo-test
+    ports:
+      - "8081:8080"
+    environment:
+      - OPERATION_MODE=solo
+      - BASE_PATH=/
+      - HOME=/home/sgallat
+      - XDG_CACHE_HOME=/home/sgallat/opencode-home/.cache
+    # Run container as non-root for verification (simulate typical non-root image user)
+    volumes:
+      - /home/sgallat:/home/sgallat
+      - /home/sgallat/.local/share/opencode:/home/sgallat/.local/share/opencode
+    user: "1000:1000"
+    restart: unless-stopped

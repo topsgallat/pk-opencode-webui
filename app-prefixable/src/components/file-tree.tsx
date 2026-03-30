@@ -327,8 +327,9 @@ export function FileTree(props: FileTreeProps) {
                     class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation()
+                      const m = menu()
                       setContextMenu(null)
-                      setDialogState({ open: true, mode: "file", parentPath: menu().node.path })
+                      setDialogState({ open: true, mode: "file", parentPath: m.node.path })
                     }}
                     aria-label="New File"
                   >
@@ -339,8 +340,9 @@ export function FileTree(props: FileTreeProps) {
                     class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation()
+                      const m = menu()
                       setContextMenu(null)
-                      setDialogState({ open: true, mode: "folder", parentPath: menu().node.path })
+                      setDialogState({ open: true, mode: "folder", parentPath: m.node.path })
                     }}
                     aria-label="New Folder"
                   >
@@ -357,8 +359,9 @@ export function FileTree(props: FileTreeProps) {
                     class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation()
+                      const m = menu()
                       setContextMenu(null)
-                      props.onFileClick?.(menu().node as FileNode)
+                      props.onFileClick?.(m.node as FileNode)
                     }}
                   >
                     <Edit2 class="w-3.5 h-3.5" />

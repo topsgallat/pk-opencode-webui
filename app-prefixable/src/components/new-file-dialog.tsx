@@ -19,7 +19,11 @@ export function NewFileDialog(props: NewFileDialogProps) {
     if (props.open) {
       setName("")
       // focus slightly later so modal can render
-      setTimeout(() => inputRef?.focus(), 10)
+      const tid = setTimeout(() => {
+        if (!props.open) return
+        inputRef?.focus()
+      }, 10)
+      onCleanup(() => clearTimeout(tid))
     }
   })
 

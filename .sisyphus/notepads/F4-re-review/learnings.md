@@ -1,0 +1,3 @@
+- Verified session.tsx has no console.log or console.warn (only debug comments and console.error)
+- settings.tsx uses console.debug guarded by import.meta.env.DEV (ok)
+- layout.tsx contains console.error/console.debug but no console.log; TypeScript diagnostics not available via LSP tool in this environment; build passed successfully

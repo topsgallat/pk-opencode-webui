@@ -3204,7 +3204,13 @@ function PromptDialog(props: {
             </button>
             <button
               type="button"
-              onClick={props.onSave}
+              onClick={async () => {
+                try {
+                  await props.onSave();
+                } catch (err) {
+                  console.error("Settings: save failed", err);
+                }
+              }}
               disabled={!props.title().trim() || !props.text().trim()}
               class="px-4 py-2 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
               style={{

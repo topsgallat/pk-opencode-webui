@@ -2511,7 +2511,7 @@ export function Session() {
 function SavePromptDialog(props: {
   title: () => string
   setTitle: (v: string) => void
-  onSave: () => void
+  onSave: () => void | Promise<void>
   onClose: () => void
 }) {
   const [container, setContainer] = createSignal<HTMLDivElement>();
@@ -2607,12 +2607,16 @@ function SavePromptDialog(props: {
                   border: "1px solid var(--border-base)",
                   color: "var(--text-base)",
                 }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    props.onSave();
-                  }
-                }}
+                onKeyDown={async (e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      try {
+                        await props.onSave();
+                      } catch (err) {
+                        console.error("SavePromptDialog: save failed", err);
+                      }
+                    }
+                  }}
               />
             </div>
             <p class="text-xs" style={{ color: "var(--text-weak)" }}>
@@ -2639,7 +2643,13 @@ function SavePromptDialog(props: {
             <button
               type="button"
               disabled={!props.title().trim()}
-              onClick={props.onSave}
+              onClick={async () => {
+                  try {
+                    await props.onSave();
+                  } catch (err) {
+                    console.error("SavePromptDialog: save failed", err);
+                  }
+                }}
               class="px-4 py-2 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
               style={{
                 background: "var(--interactive-base)",

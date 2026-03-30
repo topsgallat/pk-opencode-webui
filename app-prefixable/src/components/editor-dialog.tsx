@@ -7,7 +7,7 @@ interface EditorDialogProps {
   open: boolean
   path: string
   content: string
-  onSave: (content: string) => void
+  onSave: (content: string) => void | Promise<void>
   onClose: () => void
   language?: string
 }
@@ -130,7 +130,13 @@ export function EditorDialog(props: EditorDialogProps) {
               </button>
               <button
                 type="button"
-                onClick={() => props.onSave(editContent())}
+                onClick={async () => {
+                  try {
+                    await props.onSave(editContent())
+                  } catch (err) {
+                    console.error("EditorDialog: save failed", err)
+                  }
+                }}
                 class="px-4 py-2 min-h-[44px] text-sm font-medium rounded-md transition-colors flex items-center gap-2"
                 style={{
                   background: "var(--interactive-base)",

@@ -24,3 +24,4 @@ Key files referenced:
  - 2026-03-30: UI proxy now strips upstream Content-Encoding, Transfer-Encoding, and Content-Length headers for regular proxied API responses to avoid ERR_CONTENT_DECODING_FAILED in browsers.
 2026-03-30 22:07: UI proxy decompresses upstream compressed responses (gzip/deflate/br when available) for proxied API responses to avoid ERR_CONTENT_DECODING_FAILED
 2026-03-30T22:10: implemented materialize-and-decompress for proxied API responses; set explicit Content-Length header to prevent Bun auto-recompression
+2026-03-30T15:20:50Z: curl check against http://localhost:8080/session showed no upstream Content-Encoding (identity/no header); no code changes applied

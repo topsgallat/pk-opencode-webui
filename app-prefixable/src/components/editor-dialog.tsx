@@ -134,8 +134,9 @@ export function EditorDialog(props: EditorDialogProps) {
                   try {
                     await props.onSave(editContent())
                   } catch (err) {
-                    console.error("EditorDialog: save failed", err)
+                    console.error('EditorDialog save failed (caught):', err)
                   }
+                  props.onClose()
                 }}
                 class="px-4 py-2 min-h-[44px] text-sm font-medium rounded-md transition-colors flex items-center gap-2"
                 style={{

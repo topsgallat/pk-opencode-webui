@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-03-30T17:16:10.320Z",
+  "baseUrl": "http://localhost:8080",
+  "consoleErrors": [],
+  "sse": {
+    "connected": true,
+    "eventsCount": 1,
+    "lastEvent": "{\"type\":\"server.connected\",\"properties\":{}}"
+  },
+  "apiResponses": {
+    "mcp": {
+      "status": 200,
+      "headers": {
+        "content-length": "217",
+        "content-type": "application/json",
+        "date": "Mon, 30 Mar 2026 17:15:59 GMT, Mon, 30 Mar 2026 17:15:58 GMT",
+        "vary": "Origin"
+      }
+    },
+    "session": {
+      "status": 200,
+      "headers": {
+        "content-length": "51299",
+        "content-type": "application/json",
+        "date": "Mon, 30 Mar 2026 17:15:59 GMT, Mon, 30 Mar 2026 17:15:58 GMT",
+        "vary": "Origin"
+      }
+    },
+    "path": {
+      "status": 200,
+      "headers": {
+        "content-length": "155",
+        "content-type": "application/json",
+        "date": "Mon, 30 Mar 2026 17:15:59 GMT, Mon, 30 Mar 2026 17:15:58 GMT",
+        "vary": "Origin"
+      }
+    },
+    "provider": {
+      "status": 200,
+      "headers": {
+        "content-length": "2921700",
+        "content-type": "application/json",
+        "date": "Mon, 30 Mar 2026 17:15:59 GMT, Mon, 30 Mar 2026 17:15:58 GMT",
+        "vary": "Origin"
+      }
+    }
+  },
+  "verdict": "pass",
+  "inheritedWisdom": [
+    "The proxy now strips Accept-Encoding from proxied requests and materializes upstream response bodies, then strips content-encoding/transfer-encoding and sets Content-Length.",
+    "A gzip-magic guard was added: only attempt gunzip when first two bytes are 0x1f,0x8b.",
+    "Curl checks show Content-Encoding is no longer present for many JSON endpoints, but browser-level verification is still pending."
+  ]
+}

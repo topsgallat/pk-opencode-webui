@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-03-31T00:16:00Z",
+  "baseUrl": "http://localhost:8080",
+  "testRun": "tests/playwright/sse-verification.spec.ts",
+  "testStatus": "passed",
+  "duration_seconds": 11.5,
+  "consoleErrors": [],
+  "sse": {
+    "connected": true,
+    "eventsCount": 1,
+    "lastEvent": "{\"type\":\"server.connected\",\"properties\":{}}"
+  },
+  "apiResponses": {
+    "session": { "status": 200, "contentLength": "51299", "contentEncoding": "none" },
+    "provider": { "status": 200, "contentLength": "2921700", "contentEncoding": "none" },
+    "path": { "status": 200, "contentLength": "155", "contentEncoding": "none" },
+    "mcp": { "status": 200, "contentLength": "217", "contentEncoding": "none" }
+  },
+  "verdict": "pass",
+  "notes": "All proxied API endpoints returned 200 with correct Content-Length and no Content-Encoding. SSE connected and received server.connected event. No ERR_CONTENT_DECODING_FAILED observed."
+}

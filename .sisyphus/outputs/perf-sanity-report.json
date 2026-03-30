@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-03-31T00:20:00Z",
+  "baseUrl": "http://localhost:8080",
+  "testType": "performance-sanity",
+  "requests": {
+    "total": 30,
+    "errors": 0,
+    "avg_ms": 68.5,
+    "max_ms": 364.9
+  },
+  "endpoints": {
+    "session": { "requests": 10, "avg_ms": 20.3, "max_ms": 31.0, "errors": 0 },
+    "provider": { "requests": 10, "avg_ms": 178.7, "max_ms": 364.9, "errors": 0 },
+    "mcp": { "requests": 10, "avg_ms": 23.1, "max_ms": 37.7, "errors": 0 }
+  },
+  "decoding_errors_found": false,
+  "verdict": "PASS",
+  "notes": "All proxied API endpoints respond with 200 and reasonable latency. No decoding errors observed. /provider is slower due to larger response size (~2.9MB)."
+}

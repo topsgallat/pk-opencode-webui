@@ -355,54 +355,58 @@ const server = Bun.serve<{ target: string }>({
           body: req.body,
         })
 
+        // Always materialize upstream response bytes for non-SSE API requests.
+        // This prevents Bun from re-compressing streamed responses and allows
+        // us to explicitly set Content-Length after optional decompression.
+        const raw = Buffer.from(await response.arrayBuffer())
+        let bodyToReturn: any = raw
+
         // Determine if upstream sent a compressed body we should decompress
         const encoding = (response.headers.get("content-encoding") || "").toLowerCase()
 
-        let bodyToReturn: any = response.body
         try {
           if (encoding) {
-            // Read full body as ArrayBuffer then decompress according to encoding
-            const raw = await response.arrayBuffer()
-            const buf = Buffer.from(raw)
-
             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
               if (!zlib) throw new Error("zlib not available for gzip decompression")
-              bodyToReturn = zlib.gunzipSync(buf)
+              bodyToReturn = zlib.gunzipSync(raw)
               console.log(`[Proxy] decompressed response for: ${path} (${encoding})`)
             } else if (encoding.includes("deflate")) {
               if (!zlib) throw new Error("zlib not available for deflate decompression")
-              bodyToReturn = zlib.inflateSync(buf)
+              bodyToReturn = zlib.inflateSync(raw)
               console.log(`[Proxy] decompressed response for: ${path} (${encoding})`)
             } else if (encoding.includes("br")) {
               if (zlib && typeof zlib.brotliDecompressSync === "function") {
-                bodyToReturn = zlib.brotliDecompressSync(buf)
+                bodyToReturn = zlib.brotliDecompressSync(raw)
                 console.log(`[Proxy] decompressed response for: ${path} (br)`)
               } else {
                 console.warn(`[Proxy] Brotli (br) encoded response received but Brotli decompression is unavailable. Returning original compressed body for: ${path}`)
-                bodyToReturn = buf
+                bodyToReturn = raw
               }
             } else {
-              // Unknown encoding — leave body as-is (raw bytes)
-              bodyToReturn = buf
+              // Unknown encoding — keep original bytes
+              bodyToReturn = raw
             }
           }
         } catch (decompErr) {
           console.error("[Proxy] decompression error:", decompErr)
-          // If decompression failed, fall back to original response bytes when possible
-          try {
-            const fallbackRaw = await response.arrayBuffer()
-            bodyToReturn = Buffer.from(fallbackRaw)
-          } catch (_err) {
-            // If we cannot read body, fall back to streaming body (may be drained)
-            bodyToReturn = response.body
-          }
+          // Fall back to the raw bytes we already read
+          bodyToReturn = raw
         }
 
-        // Copy upstream headers but strip compression/transfer headers
+        // Copy upstream headers but strip compression/transfer/length headers
         const responseHeaders = new Headers(response.headers)
         responseHeaders.delete("content-encoding")
         responseHeaders.delete("transfer-encoding")
         responseHeaders.delete("content-length")
+
+        // Ensure explicit Content-Length for the materialized body
+        try {
+          const length = (bodyToReturn && (bodyToReturn.byteLength ?? bodyToReturn.length)) || 0
+          responseHeaders.set("Content-Length", String(length))
+        } catch (e) {
+          // If computing length fails, log and continue without setting it
+          console.warn("[Proxy] could not determine response byte length:", e)
+        }
 
         return new Response(bodyToReturn, {
           status: response.status,

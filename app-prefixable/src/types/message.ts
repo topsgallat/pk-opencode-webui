@@ -16,6 +16,7 @@ export interface DisplayMessage {
   tokens?: AssistantMessage["tokens"]
   modelID?: string
   providerID?: string
+  agent?: string
 }
 
 export interface Turn {

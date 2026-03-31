@@ -459,20 +459,21 @@ export function Session() {
   const syncMessages = createMemo(() => {
     const id = sessionId();
     if (!id) return [];
-    return sync.messages(id).map((msg) => {
-      const info = msg.info;
-      if (info.role === "assistant") {
-        return {
-          id: info.id,
-          role: info.role,
-          parts: msg.parts,
-          error: info.error,
-          time: { created: info.time.created, completed: info.time.completed },
-          modelID: info.modelID,
-          providerID: info.providerID,
-          tokens: info.tokens,
-        };
-      }
+      return sync.messages(id).map((msg) => {
+        const info = msg.info;
+        if (info.role === "assistant") {
+          return {
+            id: info.id,
+            role: info.role,
+            parts: msg.parts,
+            error: info.error,
+            time: { created: info.time.created, completed: info.time.completed },
+            modelID: info.modelID,
+            providerID: info.providerID,
+            agent: info.agent,
+            tokens: info.tokens,
+          };
+        }
       return {
         id: info.id,
         role: info.role,

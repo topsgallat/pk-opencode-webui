@@ -158,6 +158,22 @@ function TurnDetails(props: { turn: Turn }) {
   )
 }
 
+const getAgentColors = (agent?: string) => {
+  const base = { bg: "var(--surface-brand-muted)", fg: "var(--text-interactive-base)" }
+  if (!agent) return base
+
+  const colors = [
+    base,
+    { bg: "var(--status-success-dim)", fg: "var(--status-success-text)" },
+    { bg: "var(--status-warning-dim)", fg: "var(--status-warning-text)" },
+    { bg: "var(--status-danger-dim)", fg: "var(--status-danger-text)" },
+    { bg: "var(--surface-inset)", fg: "var(--text-strong)" },
+  ]
+
+  const hash = Array.from(agent).reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0)
+  return colors[Math.abs(hash) % colors.length]
+}
+
 export function MessageTurn(props: {
   turn: Turn
   now: Accessor<number>
@@ -495,9 +511,11 @@ export function MessageTurn(props: {
 
           {/* Assistant messages */}
           <For each={props.turn.assistantMessages}>
-            {(message) => {
+            {(message, index) => {
               const text = extractTextContent(message.parts).trim()
               const tools = hasTools(message)
+              const isLast = () => index() === props.turn.assistantMessages.length - 1
+              const colors = () => getAgentColors(message.agent)
 
               return (
                 <div class="flex gap-3">
@@ -508,9 +526,35 @@ export function MessageTurn(props: {
                     <Bot class="w-3 h-3" style={{ color: "var(--text-strong)" }} />
                   </div>
                   <div class="flex-1 min-w-0">
-                    <div class="text-xs font-medium mb-1" style={{ color: "var(--text-weak)" }}>
-                      ASSISTANT
-                    </div>
+                    <Show
+                      when={isLast() && message.agent}
+                      fallback={
+                        <div class="text-xs font-medium mb-1" style={{ color: "var(--text-weak)" }}>
+                          ASSISTANT
+                        </div>
+                      }
+                    >
+                      <div class="flex items-center gap-1.5 flex-wrap text-xs font-medium mb-1">
+                        <span
+                          style={{
+                            background: colors().bg,
+                            color: colors().fg,
+                            "border-radius": "9999px",
+                            padding: "1px 8px",
+                            "font-size": "0.7rem",
+                            "font-weight": 600,
+                          }}
+                        >
+                          {message.agent}
+                        </span>
+                        <Show when={message.providerID || message.modelID}>
+                          <span style={{ color: "var(--text-weak)" }}>·</span>
+                          <span style={{ color: "var(--text-weak)" }}>
+                            {[message.providerID, message.modelID].filter(Boolean).join(" / ")}
+                          </span>
+                        </Show>
+                      </div>
+                    </Show>
                     {/* Error display */}
                     <Show when={message.error}>
                       {(err) => (

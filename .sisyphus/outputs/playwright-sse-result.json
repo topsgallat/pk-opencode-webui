@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-30T17:16:10.320Z",
+  "timestamp": "2026-03-30T18:15:15.396Z",
   "baseUrl": "http://localhost:8080",
   "consoleErrors": [],
   "sse": {
@@ -8,21 +8,21 @@
     "lastEvent": "{\"type\":\"server.connected\",\"properties\":{}}"
   },
   "apiResponses": {
-    "mcp": {
-      "status": 200,
-      "headers": {
-        "content-length": "217",
-        "content-type": "application/json",
-        "date": "Mon, 30 Mar 2026 17:15:59 GMT, Mon, 30 Mar 2026 17:15:58 GMT",
-        "vary": "Origin"
-      }
-    },
     "session": {
       "status": 200,
       "headers": {
         "content-length": "51299",
         "content-type": "application/json",
-        "date": "Mon, 30 Mar 2026 17:15:59 GMT, Mon, 30 Mar 2026 17:15:58 GMT",
+        "date": "Mon, 30 Mar 2026 18:15:04 GMT, Mon, 30 Mar 2026 18:15:04 GMT",
+        "vary": "Origin"
+      }
+    },
+    "mcp": {
+      "status": 200,
+      "headers": {
+        "content-length": "217",
+        "content-type": "application/json",
+        "date": "Mon, 30 Mar 2026 18:15:04 GMT, Mon, 30 Mar 2026 18:15:04 GMT",
         "vary": "Origin"
       }
     },
@@ -31,7 +31,7 @@
       "headers": {
         "content-length": "155",
         "content-type": "application/json",
-        "date": "Mon, 30 Mar 2026 17:15:59 GMT, Mon, 30 Mar 2026 17:15:58 GMT",
+        "date": "Mon, 30 Mar 2026 18:15:04 GMT, Mon, 30 Mar 2026 18:15:04 GMT",
         "vary": "Origin"
       }
     },
@@ -40,7 +40,7 @@
       "headers": {
         "content-length": "2921700",
         "content-type": "application/json",
-        "date": "Mon, 30 Mar 2026 17:15:59 GMT, Mon, 30 Mar 2026 17:15:58 GMT",
+        "date": "Mon, 30 Mar 2026 18:15:04 GMT, Mon, 30 Mar 2026 18:15:04 GMT",
         "vary": "Origin"
       }
     }

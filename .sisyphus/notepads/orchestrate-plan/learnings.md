@@ -13,3 +13,5 @@ Static file serving builds filePath by concatenation; use path.resolve and prefi
 
 Verification note: Playwright verification completed successfully on 2026-03-30 — the SSE/API decoding test passed and no ERR_CONTENT_DECODING_FAILED was observed. Smoke curl checks confirm Content-Length is set for /provider, entry.js is served gzipped when requested, and hashed chunks return immutable cache headers.
 Healthcheck switched from wget to curl -fsS -o /dev/null for ui-only compose
+- Browser smoke check on http://localhost:8080 passed: Root element (#app-root) rendered successfully without uncaught exceptions; screenshot captured to /tmp/opencode-smoke.png.
+2026-03-31 14:57:02 - Moved ConfigProvider inside EventProvider in app-prefixable/src/pages/directory-layout.tsx so useEvents() runs with EventContext available.

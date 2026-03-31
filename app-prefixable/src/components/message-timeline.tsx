@@ -140,11 +140,26 @@ export function MessageTimeline(props: {
     })
   }
 
+  // Track the previous last turn to collapse it when superseded
+  const [prevLastId, setPrevLastId] = createSignal<string | undefined>(undefined)
+
   // Expand a turn by default when it's the last one
   // Use functional update to avoid tracking expanded() which would cause infinite recursion
   createEffect(() => {
     const last = lastTurn()
     if (!last) return
+    
+    const prev = untrack(() => prevLastId())
+    if (prev && prev !== last.id) {
+      // Previous last turn has been superseded — collapse it
+      setExpanded((e) => {
+        const next = { ...e }
+        delete next[prev]
+        return next
+      })
+    }
+    setPrevLastId(last.id)
+    
     setExpanded((prev) => {
       if (prev[last.id] !== undefined) return prev // Return same ref = no update
       return { ...prev, [last.id]: true }

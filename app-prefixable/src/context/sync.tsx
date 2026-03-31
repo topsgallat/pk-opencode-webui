@@ -404,7 +404,13 @@ export function SyncProvider(props: ParentProps) {
       setStore("message", msg.info.sessionID, (existing: MessageWithParts[]) => {
         if (!existing || existing.length === 0) return [msg]
         const match = binarySearch(existing, msg.info.id, (m) => m.info.id)
-        if (match.found) return existing
+        if (match.found) {
+          // Update info on the existing synthesized placeholder with the real message info,
+          // but preserve existing parts (which may have more recent streaming content)
+          const next = [...existing]
+          next[match.index] = { ...existing[match.index], info: msg.info }
+          return next
+        }
         const next = [...existing]
         next.splice(match.index, 0, msg)
         return next

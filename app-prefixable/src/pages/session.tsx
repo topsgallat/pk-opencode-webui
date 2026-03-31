@@ -1152,6 +1152,7 @@ export function Session() {
 
   // Focus input on mount
   onMount(() => {
+    if (("ontouchstart" in window)) return;
     inputRef?.focus();
   });
 
@@ -1711,7 +1712,7 @@ export function Session() {
     let wasBlocked = false;
     createEffect(() => {
       const blocked = inputBlocked();
-      if (wasBlocked && !blocked) {
+      if (wasBlocked && !blocked && !("ontouchstart" in window)) {
         requestAnimationFrame(() => inputRef?.focus());
       }
       wasBlocked = blocked;

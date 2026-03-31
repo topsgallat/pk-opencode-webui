@@ -816,7 +816,7 @@ export function Layout(props: ParentProps) {
 
   const projectSessions = createMemo(() =>
     sessions()
-      .filter((s) => s.directory === directory && !s.time?.archived && !s.parentID)
+      .filter((s) => s.directory === directory && !s.time?.archived)
       .sort((a, b) => (b.time?.updated || 0) - (a.time?.updated || 0)),
   );
 
@@ -2960,5 +2960,4 @@ export function Layout(props: ParentProps) {
     </>
   );
 }
-
 

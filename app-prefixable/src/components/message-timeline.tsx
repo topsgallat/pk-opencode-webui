@@ -193,15 +193,6 @@ export function MessageTimeline(props: {
     }
   }
 
-  // Auto-scroll when messages change (if not scrolled up)
-  createEffect(() => {
-    // Track last message (including its parts) so streaming updates re-run this effect
-    const msgs = props.messages
-    const last = msgs[msgs.length - 1]
-    if (last) void last.parts
-    scrollToBottom()
-  })
-
   // Scroll to bottom on mount
   onMount(() => {
     setTimeout(() => scrollToBottom(true), 100)
@@ -240,7 +231,7 @@ export function MessageTimeline(props: {
       ref={containerRef}
       onScroll={handleScroll}
       class="flex-1 overflow-y-auto p-6"
-      style={{ background: "var(--background-stronger)" }}
+      style={{ background: "var(--background-stronger)", "overflow-anchor": "none" }}
     >
       {/* Loading history indicator */}
       <Show when={props.loadingHistory}>
@@ -339,8 +330,7 @@ export function MessageTimeline(props: {
         </Show>
       </Show>
 
-      {/* Scroll anchor */}
-      <div ref={endRef} />
+      <div ref={endRef} style={{ "overflow-anchor": "auto", height: "1px" }} />
     </div>
   )
 }
@@ -373,14 +363,6 @@ export function FlatMessageList(props: {
     }
   }
 
-  createEffect(() => {
-    // Track last message (including its parts) so streaming updates re-run this effect
-    const msgs = props.messages
-    const last = msgs[msgs.length - 1]
-    if (last) void last.parts
-    scrollToBottom()
-  })
-
   onMount(() => {
     setTimeout(() => scrollToBottom(true), 100)
   })
@@ -392,7 +374,7 @@ export function FlatMessageList(props: {
       ref={containerRef}
       onScroll={handleScroll}
       class="flex-1 overflow-y-auto p-6 space-y-4"
-      style={{ background: "var(--background-stronger)" }}
+      style={{ background: "var(--background-stronger)", "overflow-anchor": "none" }}
     >
       <Show when={props.loadingHistory}>
         <div class="flex flex-col items-center justify-center h-full text-center">
@@ -483,7 +465,7 @@ export function FlatMessageList(props: {
         </Show>
       </Show>
 
-      <div ref={endRef} />
+      <div ref={endRef} style={{ "overflow-anchor": "auto", height: "1px" }} />
     </div>
   )
 }

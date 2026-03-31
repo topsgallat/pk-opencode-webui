@@ -1,7 +1,7 @@
 import { createContext, useContext, createSignal, onMount, onCleanup, type ParentProps } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import { useSDK } from "./sdk"
-import { useEvents } from "./events"
+import { EventContext } from "./events"
 import type { Config, PermissionConfig, PermissionActionConfig, PermissionRuleConfig } from "../sdk/client"
 
 interface ConfigContextValue {
@@ -25,7 +25,7 @@ const ConfigContext = createContext<ConfigContextValue>()
 
 export function ConfigProvider(props: ParentProps) {
   const sdk = useSDK()
-  const events = useEvents()
+  const events = useContext(EventContext)
   const [project, setProject] = createStore<Config>({})
   const [global, setGlobal] = createStore<Config>({})
   const [loading, setLoading] = createSignal(true)
@@ -117,7 +117,7 @@ export function ConfigProvider(props: ParentProps) {
   // Refresh config when server reconnects (e.g. after config file changes).
   // Skip if we just did an API update — our response already has the latest data
   // and re-fetching risks returning stale data from a restarting server.
-  const unsub = events.subscribe((event) => {
+  const unsub = events?.subscribe((event) => {
     if (event.type === "server.connected") {
       if (Date.now() - lastUpdateAt < 5000) return
       if (refreshTimer !== undefined) clearTimeout(refreshTimer)
@@ -129,7 +129,7 @@ export function ConfigProvider(props: ParentProps) {
   })
 
   onCleanup(() => {
-    unsub()
+    unsub?.()
     if (refreshTimer !== undefined) clearTimeout(refreshTimer)
   })
 

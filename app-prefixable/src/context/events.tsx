@@ -3,6 +3,7 @@ import { createStore, produce } from "solid-js/store"
 import type { Event, SessionStatus, QuestionRequest } from "../sdk/client"
 import { useBasePath } from "./base-path"
 import { useSDK } from "./sdk"
+import { SyncContext, type SyncEvent } from "./sync"
 
 type EventHandler = (event: Event) => void
 
@@ -13,23 +14,64 @@ interface EventContextValue {
   dismissQuestion: (sessionID: string, requestID: string) => void
 }
 
-const EventContext = createContext<EventContextValue>()
+export const EventContext = createContext<EventContextValue>()
 
 export function EventProvider(props: ParentProps) {
   const { prefix } = useBasePath()
   const { client, directory } = useSDK()
+  const sync = useContext(SyncContext)
   const handlers = new Set<EventHandler>()
   const [status, setStatus] = createStore<Record<string, SessionStatus>>({})
   const [pendingQuestions, setPendingQuestions] = createStore<Record<string, QuestionRequest | undefined>>({})
 
-  // Connect to SSE endpoint
+  const sseAskedQuestions = new Set<string>()
+  const sseClearedRequests = new Set<string>()
+  const sseSeenStatuses = new Set<string>()
+
+  function handleRawEvent(event: Event | SyncEvent) {
+    const e = event as Event
+    if (!e || !e.type) return
+    console.log("[Events] Received:", e.type, e.properties)
+
+    if (e.type === "session.status") {
+      const p = e.properties
+      if (p?.sessionID && p?.status) {
+        sseSeenStatuses.add(p.sessionID as string)
+        setStatus(p.sessionID as string, p.status as SessionStatus)
+      }
+    }
+
+    if (e.type === "question.asked") {
+      const q = e.properties as QuestionRequest
+      if (q?.sessionID) {
+        sseAskedQuestions.add(q.sessionID)
+        setPendingQuestions(q.sessionID, q)
+      }
+    }
+    if (e.type === "question.replied" || e.type === "question.rejected") {
+      const q = e.properties as { sessionID?: string; requestID?: string }
+      if (q?.sessionID) {
+        if (q.requestID) sseClearedRequests.add(q.requestID)
+        setPendingQuestions(produce((map) => {
+          if (!q.requestID || map[q.sessionID!]?.id === q.requestID) delete map[q.sessionID!]
+        }))
+      }
+    }
+
+    for (const handler of handlers) {
+      handler(e)
+    }
+  }
+
   let eventSource: EventSource | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
   function connect() {
-    if (eventSource) return
+    if (eventSource) {
+      eventSource.close()
+      eventSource = null
+    }
 
-    // Use prefixed path with directory parameter so events are scoped to the correct instance
     const dirParam = directory ? `?directory=${encodeURIComponent(directory)}` : ""
     const eventUrl = prefix(`/event${dirParam}`)
     eventSource = new EventSource(eventUrl)
@@ -42,47 +84,12 @@ export function EventProvider(props: ParentProps) {
     eventSource.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data)
-        // Handle both formats: direct event or wrapped in payload
         const event = (data?.payload ?? data) as Event
         if (!event || !event.type) {
           console.warn("[Events] Received event without type:", data)
           return
         }
-        console.log("[Events] Received:", event.type, event.properties)
-
-        // Update session status
-        if (event.type === "session.status") {
-          const props = event.properties
-          if (props?.sessionID && props?.status) {
-            sseSeenStatuses.add(props.sessionID as string)
-            setStatus(props.sessionID, props.status)
-          }
-        }
-
-        // Track pending questions
-        if (event.type === "question.asked") {
-          const q = event.properties as QuestionRequest
-          if (q?.sessionID) {
-            sseAskedQuestions.add(q.sessionID)
-            setPendingQuestions(q.sessionID, q)
-          }
-        }
-        if (event.type === "question.replied" || event.type === "question.rejected") {
-          const q = event.properties as { sessionID?: string; requestID?: string }
-          if (q?.sessionID) {
-            if (q.requestID) sseClearedRequests.add(q.requestID)
-            // Only clear if the stored question matches this request to avoid
-            // accidentally removing a newer question for the same session.
-            setPendingQuestions(produce((map) => {
-              if (!q.requestID || map[q.sessionID!]?.id === q.requestID) delete map[q.sessionID!]
-            }))
-          }
-        }
-
-        // Notify all handlers
-        for (const handler of handlers) {
-          handler(event)
-        }
+        handleRawEvent(event)
       } catch (err) {
         console.error("[Events] Parse error:", err)
       }
@@ -93,7 +100,6 @@ export function EventProvider(props: ParentProps) {
       eventSource?.close()
       eventSource = null
 
-      // Reconnect after delay
       if (!reconnectTimer) {
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null
@@ -103,27 +109,23 @@ export function EventProvider(props: ParentProps) {
     }
   }
 
-  // Connect SSE and seed initial state concurrently. SSE is connected first so
-  // no events are missed during the HTTP flight. The HTTP seed only applies
-  // entries for sessions that haven't already been touched by a live SSE event,
-  // preventing stale HTTP snapshots from overwriting newer SSE updates.
-  //
-  // sseAskedQuestions: sessions that received a question.asked via SSE (skip HTTP seed)
-  // sseClearedRequests: specific requestIDs cleared via SSE (skip that question in HTTP seed)
-  // sseSeenStatuses: sessions with a status update via SSE (skip HTTP seed)
-  const sseAskedQuestions = new Set<string>()
-  const sseClearedRequests = new Set<string>()
-  const sseSeenStatuses = new Set<string>()
-
   onMount(() => {
-    connect()
+    if (sync) {
+      const unsub = sync.registerExternalListener(handleRawEvent)
+      onCleanup(unsub)
+    } else {
+      connect()
+      onCleanup(() => {
+        eventSource?.close()
+        if (reconnectTimer) clearTimeout(reconnectTimer)
+      })
+    }
+
     if (!directory) return
     client.question.list({ directory })
       .then((res) => {
         const questions = Array.isArray(res.data) ? res.data : []
         for (const q of questions) {
-          // Skip if SSE already delivered a question.asked for this session
-          // or if this specific request was already cleared via SSE
           if (sseAskedQuestions.has(q.sessionID)) continue
           if (sseClearedRequests.has(q.id)) continue
           setPendingQuestions(q.sessionID, q)
@@ -140,20 +142,11 @@ export function EventProvider(props: ParentProps) {
       .catch((err) => console.error("[Events] Failed to load statuses:", err))
   })
 
-  onCleanup(() => {
-    eventSource?.close()
-    if (reconnectTimer) clearTimeout(reconnectTimer)
-  })
-
   function subscribe(handler: EventHandler) {
     handlers.add(handler)
     return () => handlers.delete(handler)
   }
 
-  /** Optimistically remove a pending question so the UI unblocks immediately
-   *  without waiting for the SSE confirmation event. Only deletes when the
-   *  currently stored request matches the given requestID to avoid clearing a
-   *  newer question that arrived in the meantime. */
   function dismissQuestion(sessionID: string, requestID: string) {
     setPendingQuestions(produce((map) => {
       if (map[sessionID]?.id === requestID) delete map[sessionID]

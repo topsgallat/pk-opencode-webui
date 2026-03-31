@@ -1,0 +1,11 @@
+=== REQUEST: /mcp ===
+-- HEADERS --
+HTTP/1.1 200 OK
+Content-Type: application/json
+Vary: Origin
+Date: Mon, 30 Mar 2026 15:27:55 GMT
+Date: Mon, 30 Mar 2026 15:27:55 GMT
+Content-Length: 217
+
+-- BODY (first 2000 bytes) --
+{"websearch":{"status":"connected"},"context7":{"status":"connected"},"grep_app":{"status":"connected"},"hindsight":{"status":"connected"},"browser-use":{"status":"failed","error":"Operation timed out after 30000ms"}}

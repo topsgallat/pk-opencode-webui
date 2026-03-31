@@ -1,0 +1,11 @@
+=== REQUEST: /path ===
+-- HEADERS --
+HTTP/1.1 200 OK
+Content-Type: application/json
+Vary: Origin
+Date: Mon, 30 Mar 2026 15:27:55 GMT
+Date: Mon, 30 Mar 2026 15:27:55 GMT
+Content-Length: 155
+
+-- BODY (first 2000 bytes) --
+{"home":"/home/sgallat","state":"/home/sgallat/.local/state/opencode","config":"/home/sgallat/.config/opencode","worktree":"/","directory":"/home/sgallat"}

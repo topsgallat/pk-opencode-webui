@@ -1,0 +1,6 @@
+endpoint | Content-Encoding present? | Content-Length present? | Notes
+/session | no | yes (51299) | JSON list
+/provider | no | yes (2925951) | Large JSON
+/path | no | yes (155) | Small JSON
+/mcp | no | yes (217) | status JSON
+/event | n/a (SSE) | Transfer-Encoding: chunked | text/event-stream; streaming

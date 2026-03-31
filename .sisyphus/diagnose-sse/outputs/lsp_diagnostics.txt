@@ -1,0 +1,1 @@
+lsp_diagnostics: Files scanned: 50; Files with errors: 0; Total diagnostics: 68 (external hints shown)

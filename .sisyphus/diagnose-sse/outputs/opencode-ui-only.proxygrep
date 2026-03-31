@@ -1,0 +1,28 @@
+[Proxy] SSE request to: http://host.docker.internal:4096/event
+[Proxy] API: GET /global/config
+[Proxy] API: GET /mcp
+[Proxy] API: GET /session
+[Proxy] SSE request to: http://host.docker.internal:4096/event?directory=%2Fhome%2Fsgallat
+[Proxy] API: GET /session
+[Proxy] API: GET /session
+[Proxy] SSE request to: http://host.docker.internal:4096/event?directory=%2Fhome%2Fsgallat%2Fpk-opencode-webui
+[Proxy] SSE request to: http://host.docker.internal:4096/event?directory=%2Fhome%2Fsgallat%2Ftest2
+[Proxy] API: GET /session
+[Proxy] API: GET /session
+[Proxy] API: GET /session
+[Proxy] API: GET /permission
+[Proxy] API: GET /question
+[Proxy] API: GET /session/status
+[Proxy] API: GET /permission
+[Proxy] API: GET /question
+[Proxy] API: GET /session/status
+[Proxy] API: GET /permission
+[Proxy] API: GET /question
+[Proxy] API: GET /session/status
+[Proxy] API: GET /session
+[Proxy] API: GET /session
+[Proxy] API: GET /provider
+[Proxy] API: GET /path
+[Proxy] API: GET /mcp
+[Proxy] SSE request to: http://host.docker.internal:4096/event
+[Proxy] SSE request to: http://host.docker.internal:4096/event

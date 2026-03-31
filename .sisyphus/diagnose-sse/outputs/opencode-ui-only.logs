@@ -1,0 +1,200 @@
+
+      at zlibOnError (node:zlib:104:51)
+      at writeSync (native:1:1)
+      at processChunkSync (node:zlib:207:25)
+      at zlibBufferSync (node:zlib:99:32)
+      at /opt/opencode-ui/serve-ui.ts:371:35
+      at processTicksAndRejections (native:7:39)
+
+[Proxy] API: GET /question
+[Proxy] API: GET /session/status
+[Proxy] decompression error: 366 | 
+367 |         try {
+368 |           if (encoding) {
+369 |             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
+370 |               if (!zlib) throw new Error("zlib not available for gzip decompression")
+371 |               bodyToReturn = zlib.gunzipSync(raw)
+      ^
+error: incorrect header check
+ errno: -3
+  code: "Z_DATA_ERROR"
+
+      at zlibOnError (node:zlib:104:51)
+      at writeSync (native:1:1)
+      at processChunkSync (node:zlib:207:25)
+      at zlibBufferSync (node:zlib:99:32)
+      at /opt/opencode-ui/serve-ui.ts:371:35
+      at processTicksAndRejections (native:7:39)
+
+[Proxy] decompression error: 366 | 
+367 |         try {
+368 |           if (encoding) {
+369 |             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
+370 |               if (!zlib) throw new Error("zlib not available for gzip decompression")
+371 |               bodyToReturn = zlib.gunzipSync(raw)
+      ^
+error: incorrect header check
+ errno: -3
+  code: "Z_DATA_ERROR"
+
+      at zlibOnError (node:zlib:104:51)
+      at writeSync (native:1:1)
+      at processChunkSync (node:zlib:207:25)
+      at zlibBufferSync (node:zlib:99:32)
+      at /opt/opencode-ui/serve-ui.ts:371:35
+      at processTicksAndRejections (native:7:39)
+
+[Proxy] API: GET /permission
+[Proxy] API: GET /question
+[Proxy] decompression error: 366 | 
+367 |         try {
+368 |           if (encoding) {
+369 |             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
+370 |               if (!zlib) throw new Error("zlib not available for gzip decompression")
+371 |               bodyToReturn = zlib.gunzipSync(raw)
+      ^
+error: incorrect header check
+ errno: -3
+  code: "Z_DATA_ERROR"
+
+      at zlibOnError (node:zlib:104:51)
+      at writeSync (native:1:1)
+      at processChunkSync (node:zlib:207:25)
+      at zlibBufferSync (node:zlib:99:32)
+      at /opt/opencode-ui/serve-ui.ts:371:35
+      at processTicksAndRejections (native:7:39)
+
+[Proxy] decompression error: 366 | 
+367 |         try {
+368 |           if (encoding) {
+369 |             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
+370 |               if (!zlib) throw new Error("zlib not available for gzip decompression")
+371 |               bodyToReturn = zlib.gunzipSync(raw)
+      ^
+error: incorrect header check
+ errno: -3
+  code: "Z_DATA_ERROR"
+
+      at zlibOnError (node:zlib:104:51)
+      at writeSync (native:1:1)
+      at processChunkSync (node:zlib:207:25)
+      at zlibBufferSync (node:zlib:99:32)
+      at /opt/opencode-ui/serve-ui.ts:371:35
+      at processTicksAndRejections (native:7:39)
+
+[Proxy] API: GET /session/status
+[Proxy] decompression error: 366 | 
+367 |         try {
+368 |           if (encoding) {
+369 |             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
+370 |               if (!zlib) throw new Error("zlib not available for gzip decompression")
+371 |               bodyToReturn = zlib.gunzipSync(raw)
+      ^
+error: incorrect header check
+ errno: -3
+  code: "Z_DATA_ERROR"
+
+      at zlibOnError (node:zlib:104:51)
+      at writeSync (native:1:1)
+      at processChunkSync (node:zlib:207:25)
+      at zlibBufferSync (node:zlib:99:32)
+      at /opt/opencode-ui/serve-ui.ts:371:35
+      at processTicksAndRejections (native:7:39)
+
+[Proxy] API: GET /session
+[Proxy] decompression error: 366 | 
+367 |         try {
+368 |           if (encoding) {
+369 |             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
+370 |               if (!zlib) throw new Error("zlib not available for gzip decompression")
+371 |               bodyToReturn = zlib.gunzipSync(raw)
+      ^
+error: incorrect header check
+ errno: -3
+  code: "Z_DATA_ERROR"
+
+      at zlibOnError (node:zlib:104:51)
+      at writeSync (native:1:1)
+      at processChunkSync (node:zlib:207:25)
+      at zlibBufferSync (node:zlib:99:32)
+      at /opt/opencode-ui/serve-ui.ts:371:35
+      at processTicksAndRejections (native:7:39)
+
+[Proxy] API: GET /session
+[Proxy] decompression error: 366 | 
+367 |         try {
+368 |           if (encoding) {
+369 |             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
+370 |               if (!zlib) throw new Error("zlib not available for gzip decompression")
+371 |               bodyToReturn = zlib.gunzipSync(raw)
+      ^
+error: incorrect header check
+ errno: -3
+  code: "Z_DATA_ERROR"
+
+      at zlibOnError (node:zlib:104:51)
+      at writeSync (native:1:1)
+      at processChunkSync (node:zlib:207:25)
+      at zlibBufferSync (node:zlib:99:32)
+      at /opt/opencode-ui/serve-ui.ts:371:35
+      at processTicksAndRejections (native:7:39)
+
+[Proxy] API: GET /provider
+[Proxy] decompression error: 366 | 
+367 |         try {
+368 |           if (encoding) {
+369 |             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
+370 |               if (!zlib) throw new Error("zlib not available for gzip decompression")
+371 |               bodyToReturn = zlib.gunzipSync(raw)
+      ^
+error: incorrect header check
+ errno: -3
+  code: "Z_DATA_ERROR"
+
+      at zlibOnError (node:zlib:104:51)
+      at writeSync (native:1:1)
+      at processChunkSync (node:zlib:207:25)
+      at zlibBufferSync (node:zlib:99:32)
+      at /opt/opencode-ui/serve-ui.ts:371:35
+      at processTicksAndRejections (native:7:39)
+
+[Proxy] API: GET /path
+[Proxy] decompression error: 366 | 
+367 |         try {
+368 |           if (encoding) {
+369 |             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
+370 |               if (!zlib) throw new Error("zlib not available for gzip decompression")
+371 |               bodyToReturn = zlib.gunzipSync(raw)
+      ^
+error: incorrect header check
+ errno: -3
+  code: "Z_DATA_ERROR"
+
+      at zlibOnError (node:zlib:104:51)
+      at writeSync (native:1:1)
+      at processChunkSync (node:zlib:207:25)
+      at zlibBufferSync (node:zlib:99:32)
+      at /opt/opencode-ui/serve-ui.ts:371:35
+      at processTicksAndRejections (native:7:39)
+
+[Proxy] API: GET /mcp
+[Proxy] decompression error: 366 | 
+367 |         try {
+368 |           if (encoding) {
+369 |             if (encoding.includes("gzip") || encoding.includes("x-gzip")) {
+370 |               if (!zlib) throw new Error("zlib not available for gzip decompression")
+371 |               bodyToReturn = zlib.gunzipSync(raw)
+      ^
+error: incorrect header check
+ errno: -3
+  code: "Z_DATA_ERROR"
+
+      at zlibOnError (node:zlib:104:51)
+      at writeSync (native:1:1)
+      at processChunkSync (node:zlib:207:25)
+      at zlibBufferSync (node:zlib:99:32)
+      at /opt/opencode-ui/serve-ui.ts:371:35
+      at processTicksAndRejections (native:7:39)
+
+[Proxy] SSE request to: http://host.docker.internal:4096/event
+[Proxy] SSE request to: http://host.docker.internal:4096/event

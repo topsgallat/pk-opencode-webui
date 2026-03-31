@@ -1,0 +1,11 @@
+=== REQUEST: /session ===
+-- HEADERS --
+HTTP/1.1 200 OK
+Content-Type: application/json
+Vary: Origin
+Date: Mon, 30 Mar 2026 15:27:55 GMT
+Date: Mon, 30 Mar 2026 15:27:55 GMT
+Content-Length: 51299
+
+-- BODY (first 2000 bytes) --
+[{"id":"ses_2e718fb18ffeiy6NTWZkCcdzJu","slug":"quiet-mountain","projectID":"global","directory":"/home/sgallat","title":"Config Plugin,MCP","version":"1.2.27","summary":{"additions":0,"deletions":0,"files":0},"time":{"created":1774239286503,"updated":1774869913166}},{"id":"ses_2c2cea6e2ffer3pPN3OLkqqtyd","slug":"kind-star","projectID":"global","directory":"/home/sgallat","title":"Hindsight MCP recall for all-config bank","version":"1.3.0","summary":{"additions":0,"deletions":0,"files":0},"time":{"created":1774848137502,"updated":1774868676000}},{"id":"ses_2c1a20eb6ffew7tv3kMk2tV2uh","slug":"gentle-nebula","projectID":"global","directory":"/home/sgallat","title":"New session - 2026-03-30T10:50:37.257Z","version":"1.3.0","time":{"created":1774867837257,"updated":1774867837257}},{"id":"ses_2c1a20f1bffenpYREIjvHJ54sm","slug":"tidy-meadow","projectID":"global","directory":"/home/sgallat","title":"New session - 2026-03-30T10:50:37.157Z","version":"1.3.0","time":{"created":1774867837157,"updated":1774867837157}},{"id":"ses_2c1a21298ffeHA0oBJve0IeDDk","slug":"kind-island","projectID":"global","directory":"/home/sgallat","title":"New session - 2026-03-30T10:50:36.264Z","version":"1.3.0","time":{"created":1774867836264,"updated":1774867836264}},{"id":"ses_2c368002affeFTo755iHEM0Ewj","slug":"neon-moon","projectID":"global","directory":"/home/sgallat/test2","title":"Greeting: Hi conversation","version":"1.3.0","summary":{"additions":0,"deletions":0,"files":0},"time":{"created":1774838087637,"updated":1774859388714}},{"id":"ses_2c2461559ffeyJvK39RDHWNRhs","slug":"eager-moon","projectID":"global","directory":"/home/sgallat","parentID":"ses_2e718fb18ffeiy6NTWZkCcdzJu","title":"Set MCP server host to 0.0.0.0 in config (@Sisyphus-Junior subagent)","version":"1.3.0","summary":{"additions":0,"deletions":0,"files":0},"permission":[{"permission":"task","pattern":"*","action":"deny"},{"permission":"call_omo_agent","pattern":"*","action":"allow"},{"permission":"question","pattern":"*","a

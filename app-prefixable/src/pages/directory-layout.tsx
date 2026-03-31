@@ -57,9 +57,9 @@ export function DirectoryLayout(props: ParentProps) {
     <For each={directories()} fallback={<Navigate href="/" />}>
       {(dir: string) => (
         <SDKProvider directory={dir}>
-          <EventProvider>
-            <ConfigProvider>
-              <SyncProvider>
+          <SyncProvider>
+            <EventProvider>
+              <ConfigProvider>
                 <FileProvider>
                   <PermissionProvider>
                     <ProviderProvider>
@@ -73,9 +73,9 @@ export function DirectoryLayout(props: ParentProps) {
                     </ProviderProvider>
                   </PermissionProvider>
                 </FileProvider>
-              </SyncProvider>
-            </ConfigProvider>
-          </EventProvider>
+              </ConfigProvider>
+            </EventProvider>
+          </SyncProvider>
         </SDKProvider>
       )}
     </For>

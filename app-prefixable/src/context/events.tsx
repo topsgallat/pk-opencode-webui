@@ -1,4 +1,4 @@
-import { createContext, useContext, onCleanup, onMount, type ParentProps } from "solid-js"
+import { createContext, useContext, onCleanup, onMount, createSignal, type ParentProps } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import type { Event, SessionStatus, QuestionRequest } from "../sdk/client"
 import { useBasePath } from "./base-path"
@@ -12,6 +12,8 @@ interface EventContextValue {
   status: Record<string, SessionStatus>
   pendingQuestions: Record<string, QuestionRequest | undefined>
   dismissQuestion: (sessionID: string, requestID: string) => void
+  connected: () => boolean
+  reconnecting: () => boolean
 }
 
 export const EventContext = createContext<EventContextValue>()
@@ -23,6 +25,8 @@ export function EventProvider(props: ParentProps) {
   const handlers = new Set<EventHandler>()
   const [status, setStatus] = createStore<Record<string, SessionStatus>>({})
   const [pendingQuestions, setPendingQuestions] = createStore<Record<string, QuestionRequest | undefined>>({})
+  const [connected, setConnected] = createSignal(false)
+  const [reconnecting, setReconnecting] = createSignal(false)
 
   const sseAskedQuestions = new Set<string>()
   const sseClearedRequests = new Set<string>()
@@ -30,8 +34,18 @@ export function EventProvider(props: ParentProps) {
 
   function handleRawEvent(event: Event | SyncEvent) {
     const e = event as Event
+    const eventType = e.type as string
     if (!e || !e.type) return
     console.log("[Events] Received:", e.type, e.properties)
+
+    if (eventType === "server.connected") {
+      setConnected(true)
+      setReconnecting(false)
+    }
+    if (eventType === "server.disconnected") {
+      setConnected(false)
+      setReconnecting(true)
+    }
 
     if (e.type === "session.status") {
       const p = e.properties
@@ -79,6 +93,8 @@ export function EventProvider(props: ParentProps) {
 
     eventSource.onopen = () => {
       console.log("[Events] Connected")
+      setConnected(true)
+      setReconnecting(false)
     }
 
     eventSource.onmessage = (e) => {
@@ -97,6 +113,8 @@ export function EventProvider(props: ParentProps) {
 
     eventSource.onerror = (e) => {
       console.error("[Events] Connection error, reconnecting...", e)
+      setConnected(false)
+      setReconnecting(true)
       eventSource?.close()
       eventSource = null
 
@@ -153,7 +171,7 @@ export function EventProvider(props: ParentProps) {
     }))
   }
 
-  return <EventContext.Provider value={{ subscribe, status, pendingQuestions, dismissQuestion }}>{props.children}</EventContext.Provider>
+  return <EventContext.Provider value={{ subscribe, status, pendingQuestions, dismissQuestion, connected, reconnecting }}>{props.children}</EventContext.Provider>
 }
 
 export function useEvents() {

@@ -4,7 +4,8 @@ import { useParams } from "@solidjs/router"
 import { useSync } from "../context/sync"
 import { useProviders } from "../context/providers"
 import { getContextTokens } from "../utils/tokens"
-import { Zap, CornerDownLeft, Square } from "lucide-solid"
+import { CornerDownLeft, Square, Zap } from "lucide-solid"
+import { ConnectionBadge } from "./connection-badge"
 
 interface SessionInfoProps {
   input: () => string
@@ -252,6 +253,7 @@ export function SessionInfo(props: SessionInfoProps) {
                 <span class="flex items-center gap-1.5 shrink-0">
                   <span class="opacity-60">Cost:</span>
                   <span style={{ color: "var(--text-base)" }}>{s().cost}</span>
+                  <ConnectionBadge />
                 </span>
               </button>
 

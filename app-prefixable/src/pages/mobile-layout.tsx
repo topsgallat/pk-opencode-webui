@@ -41,6 +41,7 @@ import {
     Trash2,
     Pencil,
     MoreHorizontal,
+    FolderOpen,
 } from "lucide-solid"
 import { sessionHasQuestion, buildChildMap } from "../utils/session-tree-request"
 
@@ -63,6 +64,25 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     const [searchQuery, setSearchQuery] = createSignal("")
     const [showArchived, setShowArchived] = createSignal(false)
     const [menuSession, setMenuSession] = createSignal<Session | null>(null)
+    const [showProjectHistory, setShowProjectHistory] = createSignal(false)
+    const [historyProjects, setHistoryProjects] = createSignal<Project[]>([])
+
+    function openProjectHistory() {
+        const stored = localStorage.getItem(PROJECTS_STORAGE_KEY)
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored) as Project[]
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setHistoryProjects(parsed)
+                    setShowProjectHistory(true)
+                    return
+                }
+            } catch (e) {
+                console.error("[MobileLayout] Failed to parse projects history:", e)
+            }
+        }
+        props.onOpenProject?.()
+    }
 
     const dirSlug = createMemo(() => directory ? base64Encode(directory) : "")
     const projectName = createMemo(() => getFilename(directory || ""))
@@ -212,8 +232,8 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                     style={{ "border-bottom": "1px solid var(--border-base)", background: "var(--background-stronger)" }}
                 >
                     <button
-                        onClick={() => props.onOpenProject?.()}
-                        class="flex items-center gap-2 max-w-[70%] rounded-md px-2 py-1.5 -ml-2 active:opacity-70 transition-opacity text-left"
+                        onClick={openProjectHistory}
+                        class="flex items-center gap-2 max-w-[70%] rounded-md px-2 py-1.5 -ml-2 active:opacity-70 transition-opacity text-left min-w-0"
                         style={{ background: "var(--surface-inset)" }}
                         aria-label="Switch Project"
                     >
@@ -418,6 +438,67 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                             </div>
                         </div>
                     )}
+                </Show>
+
+                {/* Project History Bottom Sheet */}
+                <Show when={showProjectHistory()}>
+                    <div class="fixed inset-0 z-50" onClick={() => setShowProjectHistory(false)}>
+                        <div class="absolute inset-0 bg-black/40" />
+                        <div
+                            class="absolute bottom-0 left-0 right-0 rounded-t-2xl overflow-hidden flex flex-col max-h-[80vh]"
+                            style={{ background: "var(--background-base)", "padding-bottom": "env(safe-area-inset-bottom, 16px)" }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Sheet handle */}
+                            <div class="flex justify-center py-3 shrink-0">
+                                <div class="w-10 h-1 rounded-full" style={{ background: "var(--border-strong)" }} />
+                            </div>
+                            {/* Title */}
+                            <div class="px-4 pb-3 text-sm font-medium shrink-0" style={{ color: "var(--text-strong)" }}>
+                                Recent Projects
+                            </div>
+                            
+                            {/* Scrollable list */}
+                            <div class="overflow-y-auto min-h-0" style={{ "border-top": "1px solid var(--border-base)" }}>
+                                <For each={historyProjects()}>
+                                    {(project) => (
+                                        <button
+                                            class="w-full flex flex-col px-4 py-3 text-left active:opacity-70 transition-opacity"
+                                            style={{ "border-bottom": "1px solid var(--border-base)" }}
+                                            onClick={() => {
+                                                setShowProjectHistory(false)
+                                                navigate(`/${base64Encode(project.worktree)}/session`)
+                                                setMobileTab("chat")
+                                            }}
+                                        >
+                                            <span 
+                                                class="text-sm font-medium truncate w-full" 
+                                                style={{ color: directory === project.worktree ? "var(--text-interactive-base)" : "var(--text-strong)" }}
+                                            >
+                                                {project.name || getFilename(project.worktree)}
+                                            </span>
+                                            <span class="text-xs truncate w-full mt-0.5" style={{ color: "var(--text-weak)" }}>
+                                                {project.worktree}
+                                            </span>
+                                        </button>
+                                    )}
+                                </For>
+                                
+                                {/* Browse Row */}
+                                <button
+                                    class="w-full flex items-center gap-3 px-4 py-4 text-sm active:opacity-70 transition-opacity"
+                                    style={{ color: "var(--text-base)" }}
+                                    onClick={() => {
+                                        setShowProjectHistory(false)
+                                        props.onOpenProject?.()
+                                    }}
+                                >
+                                    <FolderOpen class="w-5 h-5" style={{ color: "var(--icon-weak)" }} />
+                                    <span>Browse / Open new project...</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </Show>
             </div>
         )

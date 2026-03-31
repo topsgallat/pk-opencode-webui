@@ -6,7 +6,7 @@ import { ImagePreview } from "./image-preview"
 import { errorText } from "../types/message"
 import type { DisplayMessage, Turn } from "../types/message"
 import type { Part } from "../sdk/client"
-import { extractTextContent } from "../utils/message"
+import { extractTextContent, parseUserText } from "../utils/message"
 import { formatRelativeTime, formatAbsoluteTime, formatDuration } from "../utils/time"
 
 // Type for file parts with image/PDF data
@@ -223,7 +223,10 @@ export function MessageTurn(props: {
     setExpanded(defaultVal)
   })
 
-  const userText = createMemo(() => extractTextContent(props.turn.userMessage.parts).trim())
+  const parsedUser = createMemo(() => parseUserText(props.turn.userMessage.parts))
+  const userText = createMemo(() => parsedUser().text)
+  const systemBlocks = createMemo(() => parsedUser().systemBlocks)
+  const [systemOpen, setSystemOpen] = createSignal(false)
 
   // Detect text overflow for expand/collapse
   createEffect(() => {
@@ -348,7 +351,26 @@ export function MessageTurn(props: {
             </button>
           </Show>
           {/* Status line */}
-          <div class="flex items-center gap-2 text-xs mt-1" style={{ color: "var(--text-weak)" }}>
+          <div class="flex items-center gap-2 text-xs mt-1 flex-wrap" style={{ color: "var(--text-weak)" }}>
+            <Show when={systemBlocks().length > 0}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSystemOpen(!systemOpen())
+                }}
+                class="flex items-center gap-1 hover:opacity-80 transition-opacity"
+                style={{
+                  background: "var(--surface-inset)",
+                  padding: "2px 6px",
+                  "border-radius": "12px",
+                  border: "1px solid var(--border-base)"
+                }}
+              >
+                <span>⚙ {systemBlocks().length} system injection{systemBlocks().length > 1 ? "s" : ""}</span>
+              </button>
+              <span>·</span>
+            </Show>
             <Show when={attachments().length > 0}>
               <span>
                 {attachments().length} attachment{attachments().length > 1 ? "s" : ""}
@@ -367,6 +389,23 @@ export function MessageTurn(props: {
             </Show>
             <span>{props.turn.assistantMessages.length > 0 ? "completed" : "pending"}</span>
           </div>
+
+          <Show when={systemOpen() && systemBlocks().length > 0}>
+            <div class="mt-2 space-y-2">
+              <For each={systemBlocks()}>
+                {(block) => (
+                  <div class="rounded overflow-hidden text-xs" style={{ border: "1px solid var(--border-base)" }}>
+                    <div class="px-2 py-1 font-medium" style={{ background: "var(--surface-inset)", "border-bottom": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
+                      {block.label}
+                    </div>
+                    <pre class="p-2 overflow-x-auto whitespace-pre-wrap break-words m-0 font-mono" style={{ background: "var(--surface-base)", color: "var(--text-base)", "font-size": "11px" }}>
+                      {block.content}
+                    </pre>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
         </div>
 
         {/* Relative timestamp */}

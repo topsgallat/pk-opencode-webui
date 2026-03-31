@@ -12,3 +12,4 @@ Static file serving builds filePath by concatenation; use path.resolve and prefi
 - High-impact: static file serving concatenates DIST_DIR + path without path.resolve guard; add normalization and prefix-check to prevent traversal.
 
 Verification note: Playwright verification completed successfully on 2026-03-30 — the SSE/API decoding test passed and no ERR_CONTENT_DECODING_FAILED was observed. Smoke curl checks confirm Content-Length is set for /provider, entry.js is served gzipped when requested, and hashed chunks return immutable cache headers.
+Healthcheck switched from wget to curl -fsS -o /dev/null for ui-only compose

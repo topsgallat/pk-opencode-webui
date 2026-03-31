@@ -314,7 +314,15 @@ export function MessageTurn(props: {
                 "max-height": textExpanded() ? "none" : "64px",
               }}
             >
-              {userText() || "(empty message)"}
+              <Show when={userText()} fallback={
+                <Show when={systemBlocks().length > 0}
+                  fallback={<span style={{ color: "var(--text-weak)", "font-style": "italic" }}>(empty message)</span>}
+                >
+                  <span style={{ color: "var(--text-weak)", "font-style": "italic" }}>⚙ Automated task</span>
+                </Show>
+              }>
+                {userText()}
+              </Show>
             </div>
             {/* Gradient fade when collapsed and can expand */}
             <Show when={canExpand() && !textExpanded()}>
@@ -544,6 +552,23 @@ export function MessageTurn(props: {
                     </Show>
                   )
                 }}
+              </For>
+            </div>
+          </Show>
+
+          <Show when={!userText() && systemBlocks().length > 0}>
+            <div class="space-y-2">
+              <For each={systemBlocks()}>
+                {(block) => (
+                  <div class="rounded overflow-hidden text-xs" style={{ border: "1px solid var(--border-base)" }}>
+                    <div class="px-2 py-1 font-medium" style={{ background: "var(--surface-inset)", "border-bottom": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
+                      {block.label}
+                    </div>
+                    <pre class="p-2 overflow-x-auto whitespace-pre-wrap break-words m-0 font-mono" style={{ background: "var(--surface-base)", color: "var(--text-base)", "font-size": "11px" }}>
+                      {block.content}
+                    </pre>
+                  </div>
+                )}
               </For>
             </div>
           </Show>

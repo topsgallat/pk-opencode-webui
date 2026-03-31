@@ -15,3 +15,4 @@ Verification note: Playwright verification completed successfully on 2026-03-30 
 Healthcheck switched from wget to curl -fsS -o /dev/null for ui-only compose
 - Browser smoke check on http://localhost:8080 passed: Root element (#app-root) rendered successfully without uncaught exceptions; screenshot captured to /tmp/opencode-smoke.png.
 2026-03-31 14:57:02 - Moved ConfigProvider inside EventProvider in app-prefixable/src/pages/directory-layout.tsx so useEvents() runs with EventContext available.
+Reverted sub-agent session filter in layout.tsx due to mobile list regression.

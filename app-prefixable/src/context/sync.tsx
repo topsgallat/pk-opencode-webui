@@ -4,8 +4,7 @@ import type { Session, Message, Part, Provider } from "../sdk/client"
 import { useBasePath } from "./base-path"
 import { useSDK } from "./sdk"
 
-// Event type - looser than SDK type to handle all events
-type SyncEvent = {
+export type SyncEvent = {
   type: string
   properties: Record<string, unknown>
 }
@@ -43,9 +42,10 @@ interface SyncContextValue {
     get: (sessionID: string) => Session | undefined
   }
   refresh: () => Promise<void>
+  registerExternalListener: (fn: (event: SyncEvent) => void) => () => void
 }
 
-const SyncContext = createContext<SyncContextValue>()
+export const SyncContext = createContext<SyncContextValue>()
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
@@ -82,6 +82,7 @@ export function SyncProvider(props: ParentProps) {
   })
 
   const inflight = new Map<string, Promise<void>>()
+  const externalListeners = new Set<(event: SyncEvent) => void>()
   // Queue for micro-batching incoming part delta events to avoid many
   // synchronous setStore calls which block the main thread during heavy streams.
   // Keyed by `${messageID}:${partID}` and accumulates per-field string deltas
@@ -174,7 +175,10 @@ export function SyncProvider(props: ParentProps) {
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
   function connect() {
-    if (eventSource) return
+    if (eventSource) {
+      eventSource.close()
+      eventSource = null
+    }
 
     const dirParam = directory ? `?directory=${encodeURIComponent(directory)}` : ""
     const eventUrl = prefix(`/event${dirParam}`)
@@ -451,6 +455,8 @@ export function SyncProvider(props: ParentProps) {
         setStore("provider", data)
       }
     }
+
+    for (const fn of externalListeners) fn(event)
   }
 
   async function bootstrap() {
@@ -601,6 +607,10 @@ export function SyncProvider(props: ParentProps) {
       },
     },
     refresh,
+    registerExternalListener(fn) {
+      externalListeners.add(fn)
+      return () => externalListeners.delete(fn)
+    },
   }
 
   return <SyncContext.Provider value={value}>{props.children}</SyncContext.Provider>

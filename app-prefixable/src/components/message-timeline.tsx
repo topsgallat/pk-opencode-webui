@@ -173,17 +173,17 @@ export function MessageTimeline(props: {
   // Scroll to bottom
   function scrollToBottom(force = false) {
     if (userScrolledUp() && !force) return
-    requestAnimationFrame(() => {
-      endRef?.scrollIntoView({ behavior: "smooth" })
-    })
+    if (containerRef) {
+      containerRef.scrollTop = containerRef.scrollHeight
+    }
   }
 
   // Auto-scroll when messages change (if not scrolled up)
   createEffect(() => {
-    // Track dependencies
-    const msgCount = props.messages.length
-    const isProcessing = props.processing
-    // Scroll to bottom for new content
+    // Track last message (including its parts) so streaming updates re-run this effect
+    const msgs = props.messages
+    const last = msgs[msgs.length - 1]
+    if (last) void last.parts
     scrollToBottom()
   })
 
@@ -353,13 +353,16 @@ export function FlatMessageList(props: {
 
   function scrollToBottom(force = false) {
     if (userScrolledUp() && !force) return
-    requestAnimationFrame(() => {
-      endRef?.scrollIntoView({ behavior: "smooth" })
-    })
+    if (containerRef) {
+      containerRef.scrollTop = containerRef.scrollHeight
+    }
   }
 
   createEffect(() => {
-    const msgCount = props.messages.length
+    // Track last message (including its parts) so streaming updates re-run this effect
+    const msgs = props.messages
+    const last = msgs[msgs.length - 1]
+    if (last) void last.parts
     scrollToBottom()
   })
 

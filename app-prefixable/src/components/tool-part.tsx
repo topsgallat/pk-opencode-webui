@@ -149,6 +149,43 @@ function codePill(text: string): JSX.Element {
   );
 }
 
+function CopyButton(props: { getText: () => string }) {
+  const [copied, setCopied] = createSignal(false);
+  const copy = () => {
+    const text = props.getText();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    } else {
+      const el = document.createElement("textarea");
+      el.value = text;
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); copy(); }}
+      class="w-6 h-6 flex items-center justify-center rounded transition-colors shrink-0"
+      style={{ background: "transparent", border: "none", cursor: "pointer" }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-inset)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+      title="Copy to clipboard"
+    >
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        style={{ color: copied() ? "var(--status-success-text)" : "var(--text-weak)" }}>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d={copied() ? "M5 13l4 4L19 7" : "M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"} />
+      </svg>
+    </button>
+  );
+}
+
 function renderToolInput(tool: string, input: Record<string, unknown>): JSX.Element {
   switch (tool) {
     case "bash": {
@@ -917,14 +954,17 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
             background: "var(--surface-overlay)",
           }}
         >
-          <div class="flex items-start gap-1.5 mb-1">
-            <span style={{ color: "var(--status-success-text)", "flex-shrink": 0 }}>$</span>
-            <pre
-              class="whitespace-pre-wrap"
-              style={{ color: "var(--text-strong)" }}
-            >
-              {bashInput()}
-            </pre>
+          <div class="flex items-start justify-between gap-1.5 mb-1">
+            <div class="flex items-start gap-1.5">
+              <span style={{ color: "var(--status-success-text)", "flex-shrink": 0 }}>$</span>
+              <pre
+                class="whitespace-pre-wrap"
+                style={{ color: "var(--text-strong)" }}
+              >
+                {bashInput()}
+              </pre>
+            </div>
+            <CopyButton getText={() => bashInput() + (getOutput(state()) ? "\n" + getOutput(state()) : "")} />
           </div>
           <Show when={getOutput(state())}>
             {(output) => (
@@ -956,14 +996,15 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
             style={{ "border-top": "1px solid var(--border-base)" }}
           >
             <div
-              class="px-3 py-1.5 text-xs font-mono"
+              class="px-3 py-1.5 text-xs font-mono flex justify-between items-center gap-2"
               style={{
                 background: "var(--surface-inset)",
                 color: "var(--text-weak)",
                 "border-bottom": "1px solid var(--border-base)",
               }}
             >
-              {readFilePath()}
+              <span class="truncate">{readFilePath()}</span>
+              <CopyButton getText={() => parseReadOutput(output())} />
             </div>
             <div class="overflow-x-auto max-h-96 overflow-y-auto">
               <ContentCode
@@ -984,18 +1025,19 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
           const paths = lines.filter(l => l.startsWith("/") || l.startsWith("./") || (!l.startsWith("Found") && l.includes("/")));
           return (
             <div style={{ "border-top": "1px solid var(--border-base)" }}>
-              <Show when={summary}>
-                <div
-                  class="px-3 py-1.5 text-xs"
-                  style={{
-                    background: "var(--surface-inset)",
-                    color: "var(--text-weak)",
-                    "border-bottom": paths.length > 0 ? "1px solid var(--border-base)" : "none",
-                  }}
-                >
-                  {summary}
-                </div>
-              </Show>
+              <div
+                class="px-3 py-1.5 text-xs flex justify-between items-center gap-2"
+                style={{
+                  background: "var(--surface-inset)",
+                  color: "var(--text-weak)",
+                  "border-bottom": paths.length > 0 ? "1px solid var(--border-base)" : "none",
+                }}
+              >
+                <Show when={summary} fallback={<span />}>
+                  <span class="truncate">{summary}</span>
+                </Show>
+                <CopyButton getText={() => paths.join("\n")} />
+              </div>
               <div class="px-3 py-2 flex flex-col gap-0.5 max-h-64 overflow-y-auto">
                 <For each={paths}>
                   {(p) => (
@@ -1035,6 +1077,22 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
             background: "var(--background-stronger)",
           }}
         >
+          <Show when={getOutput(state()) || props.part.tool === "todowrite"}>
+            <div class="flex justify-end mb-2">
+              <CopyButton getText={() => {
+                const out = getOutput(state());
+                if (out) return out;
+                if (props.part.tool === "todowrite") {
+                  const input = getInput(state()) as { todos?: { content: string; status: string; priority?: string }[] };
+                  if (Array.isArray(input?.todos)) {
+                    return input.todos.map(t => `[${t.status}] ${t.content}`).join("\n");
+                  }
+                }
+                return "";
+              }} />
+            </div>
+          </Show>
+
           {/* Input */}
           <Show when={getInput(state())}>
             {(input) => (

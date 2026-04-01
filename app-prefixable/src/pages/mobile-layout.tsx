@@ -4,8 +4,6 @@ import {
     createMemo,
     Show,
     For,
-    onMount,
-    onCleanup,
     createEffect,
 } from "solid-js"
 import { A, useLocation, useNavigate } from "@solidjs/router"
@@ -17,7 +15,6 @@ import { useLayout } from "../context/layout"
 import { usePermission } from "../context/permission"
 import { useBranding } from "../context/branding"
 import { base64Encode } from "../utils/path"
-import { Spinner } from "../components/ui/spinner"
 import {
     OpenCodeLogo,
     getFilename,
@@ -58,8 +55,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     const navigate = useNavigate()
     const branding = useBranding()
 
-    const [sessions, setSessions] = createSignal<Session[]>([])
-    const [loading, setLoading] = createSignal(true)
+    
     const [mobileTab, setMobileTab] = createSignal<"chat" | "sessions" | "review" | "settings">("chat")
     const [searchQuery, setSearchQuery] = createSignal("")
     const [showArchived, setShowArchived] = createSignal(false)
@@ -100,45 +96,12 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
         }
     })
 
-    // Load sessions
-    onMount(() => {
-        loadSessions()
-    })
-
-    // Subscribe to session events
-    createEffect(() => {
-        const unsub = events.subscribe((event) => {
-            if (
-                event.type === "session.created" ||
-                event.type === "session.updated" ||
-                event.type === "session.deleted"
-            ) {
-                loadSessions()
-            }
-        })
-        onCleanup(unsub)
-    })
-
-    async function loadSessions() {
-        try {
-            setLoading(true)
-            const res = await client.session.list({})
-            if (res.data) {
-                const all = Object.values(res.data) as Session[]
-                setSessions(all.sort((a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0)))
-            }
-        } catch (e) {
-            console.error("[MobileLayout] Failed to load sessions:", e)
-        } finally {
-            setLoading(false)
-        }
-    }
+    
 
     async function createNewSession() {
         try {
             const res = await client.session.create({})
             if (res.data) {
-                setSessions((prev) => [res.data as Session, ...prev])
                 navigate(`/${dirSlug()}/session/${res.data.id}`)
                 setMobileTab("chat")
             }
@@ -156,7 +119,6 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     async function deleteSession(session: Session) {
         try {
             await client.session.delete({ sessionID: session.id })
-            setSessions((prev) => prev.filter((s) => s.id !== session.id))
             setMenuSession(null)
             // If deleting the currently active session, go to session list
             if (location.pathname.includes(session.id)) {
@@ -175,7 +137,6 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                 time: { archived: Date.now() },
             })
             setMenuSession(null)
-            loadSessions()
         } catch (e) {
             console.error("Failed to archive session:", e)
         }
@@ -183,11 +144,15 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
 
     // Filtered sessions
     const activeSessions = createMemo(() =>
-        sessions().filter((s) => !s.time?.archived)
+        sync.sessions()
+            .filter((s) => s.directory === directory && !s.time?.archived)
+            .sort((a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0))
     )
 
     const archivedSessions = createMemo(() =>
-        sessions().filter((s) => !!s.time?.archived)
+        sync.sessions()
+            .filter((s) => s.directory === directory && !!s.time?.archived)
+            .sort((a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0))
     )
 
     const filteredSessions = createMemo(() => {
@@ -305,65 +270,59 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
 
                 {/* Session List */}
                 <div class="flex-1 overflow-auto min-h-0">
-                    <Show when={!loading()} fallback={
-                        <div class="flex items-center justify-center py-12">
-                            <Spinner class="w-5 h-5" />
+                    <Show when={filteredSessions().length > 0} fallback={
+                        <div class="flex flex-col items-center justify-center py-12 text-center">
+                            <MessageCircle class="w-8 h-8 mb-2" style={{ color: "var(--icon-weak)", opacity: 0.3 }} />
+                            <span class="text-sm" style={{ color: "var(--text-weak)" }}>
+                                {searchQuery() ? "No matching sessions" : showArchived() ? "No archived sessions" : "No sessions yet"}
+                            </span>
                         </div>
                     }>
-                        <Show when={filteredSessions().length > 0} fallback={
-                            <div class="flex flex-col items-center justify-center py-12 text-center">
-                                <MessageCircle class="w-8 h-8 mb-2" style={{ color: "var(--icon-weak)", opacity: 0.3 }} />
-                                <span class="text-sm" style={{ color: "var(--text-weak)" }}>
-                                    {searchQuery() ? "No matching sessions" : showArchived() ? "No archived sessions" : "No sessions yet"}
-                                </span>
-                            </div>
-                        }>
-                            <For each={groupedSessions()}>
-                                {(group) => (
-                                    <div>
-                                        <div
-                                            class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider sticky top-0 z-10"
-                                            style={{ color: "var(--text-weak)", background: "var(--background-stronger)" }}
-                                        >
-                                            {group.label}
-                                        </div>
-                                        <For each={group.sessions}>
-                                            {(session) => (
-                                                <div
-                                                    class="mobile-session-item"
-                                                    style={{
-                                                        background: isActive(session.id) ? "var(--surface-inset)" : "transparent",
-                                                    }}
-                                                    onClick={() => navigateToSession(session.id)}
-                                                >
-                                                    <span class="shrink-0" style={{ color: "var(--icon-weak)" }}>
-                                                        <SessionIcon session={session} />
-                                                    </span>
-                                                    <div class="flex-1 min-w-0">
-                                                        <div
-                                                            class="text-sm truncate"
-                                                            style={{ color: isActive(session.id) ? "var(--text-interactive-base)" : "var(--text-base)" }}
-                                                        >
-                                                            {session.title || "Untitled"}
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            setMenuSession(menuSession()?.id === session.id ? null : session)
-                                                        }}
-                                                        class="p-2 -mr-2 shrink-0"
-                                                        style={{ color: "var(--icon-weak)" }}
-                                                    >
-                                                        <MoreHorizontal class="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </For>
+                        <For each={groupedSessions()}>
+                            {(group) => (
+                                <div>
+                                    <div
+                                        class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider sticky top-0 z-10"
+                                        style={{ color: "var(--text-weak)", background: "var(--background-stronger)" }}
+                                    >
+                                        {group.label}
                                     </div>
-                                )}
-                            </For>
-                        </Show>
+                                    <For each={group.sessions}>
+                                        {(session) => (
+                                            <div
+                                                class="mobile-session-item"
+                                                style={{
+                                                    background: isActive(session.id) ? "var(--surface-inset)" : "transparent",
+                                                }}
+                                                onClick={() => navigateToSession(session.id)}
+                                            >
+                                                <span class="shrink-0" style={{ color: "var(--icon-weak)" }}>
+                                                    <SessionIcon session={session} />
+                                                </span>
+                                                <div class="flex-1 min-w-0">
+                                                    <div
+                                                        class="text-sm truncate"
+                                                        style={{ color: isActive(session.id) ? "var(--text-interactive-base)" : "var(--text-base)" }}
+                                                    >
+                                                        {session.title || "Untitled"}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        setMenuSession(menuSession()?.id === session.id ? null : session)
+                                                    }}
+                                                    class="p-2 -mr-2 shrink-0"
+                                                    style={{ color: "var(--icon-weak)" }}
+                                                >
+                                                    <MoreHorizontal class="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </For>
+                                </div>
+                            )}
+                        </For>
                     </Show>
                 </div>
 
@@ -396,7 +355,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                                                 client.session.update({
                                                     sessionID: session().id,
                                                     time: { archived: 0 },
-                                                }).then(() => { setMenuSession(null); loadSessions() })
+                                                }).then(() => { setMenuSession(null) })
                                             }}
                                         >
                                             <ArchiveRestore class="w-5 h-5" style={{ color: "var(--icon-weak)" }} />

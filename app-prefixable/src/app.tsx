@@ -12,6 +12,7 @@ import { DirectoryLayout } from "./pages/directory-layout"
 import { HomeLayout } from "./pages/home-layout"
 import { Session } from "./pages/session"
 import { Settings } from "./pages/settings"
+import { Logs } from "./pages/logs"
 import { ProjectPicker } from "./pages/project-picker"
 import { base64Decode, deriveDirectoryFromPathname } from "./utils/path"
 import type { Project } from "./components/shared"
@@ -66,6 +67,7 @@ function AppRoutes() {
         <Route path="/session" component={SessionIndex} />
         <Route path="/session/:id" component={Session} />
         <Route path="/settings" component={Settings} />
+        <Route path="/logs" component={Logs} />
       </Route>
     </Router>
   )

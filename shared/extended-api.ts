@@ -394,6 +394,50 @@ export async function handleExtendedEndpoint(
     }
   }
 
+  // GET /api/ext/log-files - List available OpenCode log files
+  if (path === "/api/ext/log-files" && method === "GET") {
+    try {
+      const homeDir = process.env.HOME || os.homedir()
+      const logDir = nodePath.join(homeDir, ".local", "share", "opencode", "log")
+
+      const entries = await fs.promises.readdir(logDir, { withFileTypes: true }).catch(() => [])
+      const files = entries
+        .filter((e) => e.isFile() && e.name.endsWith(".log"))
+        .map((e) => e.name)
+        .sort()
+        .reverse()
+
+      return Response.json(files)
+    } catch (e) {
+      console.error("[ExtAPI] log-files error:", e)
+      return Response.json([])
+    }
+  }
+
+  // GET /api/ext/log-file?name=<filename> - Read a specific OpenCode log file
+  if (path === "/api/ext/log-file" && method === "GET") {
+    const name = url.searchParams.get("name")
+    if (!name) {
+      return Response.json({ error: "name parameter is required" }, { status: 400 })
+    }
+
+    if (name.includes("/") || name.includes("\\") || name.includes("..") || !name.endsWith(".log")) {
+      return Response.json({ error: "invalid log file name" }, { status: 400 })
+    }
+
+    try {
+      const homeDir = process.env.HOME || os.homedir()
+      const logPath = nodePath.join(homeDir, ".local", "share", "opencode", "log", name)
+
+      console.log("[ExtAPI] log-file read:", logPath)
+      const content = await fs.promises.readFile(logPath, "utf-8")
+      return Response.json({ content })
+    } catch (e) {
+      console.error("[ExtAPI] log-file read error:", e)
+      return Response.json({ error: String(e) }, { status: 500 })
+    }
+  }
+
   // Not an extended endpoint
   return undefined
 }

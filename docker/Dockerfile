@@ -76,9 +76,17 @@ RUN case $(uname -m) in \
     curl -L "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${ARCH}.tar.xz" | tar -xJvf - -C /
 
 # Create non-root user and app directory
-RUN id -u 1000 &>/dev/null && echo "UID 1000 exists" || (groupadd -r opencode && useradd -r -g opencode -u 1000 -d /home/opencode -s /bin/bash opencode) && \
-    mkdir -p /opt/opencode-ui /run /home/opencode && \
-    (chown -R 1000:1000 /opt/opencode-ui /run /home/opencode 2>/dev/null || chown -R opencode:opencode /opt/opencode-ui /run /home/opencode)
+# HOST_UID and HOST_GID are passed from docker-compose to match the host user's ID.
+# This ensures the container can read/write the mounted volume correctly.
+ARG HOST_UID=1000
+ARG HOST_GID=1000
+RUN groupadd -r opencode 2>/dev/null || true && \
+    (getent passwd opencode 2>/dev/null && echo "opencode user exists" || \
+     (useradd -r -g opencode -u ${HOST_UID} -d /home/opencode -s /bin/bash opencode 2>/dev/null && echo "created with uid ${HOST_UID}" || \
+      useradd -r -g opencode -u 1000 -d /home/opencode -s /bin/bash opencode 2>/dev/null && echo "created with uid 1000 (fallback)" || \
+      echo "opencode user creation failed, will run as root")) && \
+    mkdir -p /opt/opencode-ui /run && \
+    (chown -R opencode:opencode /opt/opencode-ui /run 2>/dev/null || true)
 
 # Copy built UI from builder stage
 COPY --from=builder /app/app-prefixable/dist /opt/opencode-ui/dist
@@ -101,8 +109,7 @@ RUN chmod -R 755 /etc/services.d/opencode
 ENV PORT=8080 \
     API_URL=http://127.0.0.1:4096 \
     BASE_PATH=/ \
-    OPERATION_MODE=solo \
-    HOME=/home/opencode
+    OPERATION_MODE=solo
 
 USER opencode
 

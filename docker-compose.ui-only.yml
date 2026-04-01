@@ -1,0 +1,44 @@
+# =============================================================================
+# OpenCode Web UI - Docker Compose (UI-Only Mode)
+# =============================================================================
+# A prefix-aware Web UI for OpenCode that works behind reverse proxies.
+#
+# Usage:
+#   docker compose -f docker-compose.ui-only.yml up
+#
+# Prerequisites:
+#   - OpenCode API server must be running on your host:
+#     opencode serve --port 4096
+#
+# This mode runs ONLY the UI server. The OpenCode API must already be running
+# on the host (or another container) at the URL specified by API_URL.
+# =============================================================================
+
+services:
+  opencode-ui-only:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: opencode-web-ui-only:latest
+    container_name: opencode-ui-only
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      - OPERATION_MODE=ui-only
+      - BASE_PATH=/
+      - HOME=${HOME}
+      - XDG_CACHE_HOME=${HOME}/.cache
+      - OPENCODE_WORKSPACE_ROOT=${HOME}
+      - API_URL=http://host.docker.internal:4096
+      - PORT=8080
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${HOME}:${HOME}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -fsS -o /dev/null http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

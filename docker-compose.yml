@@ -4,7 +4,6 @@
 # A prefix-aware Web UI for OpenCode that works behind reverse proxies.
 #
 # Usage:
-#   docker-compose build opencode-ui
 #   docker compose up              # Basic (no reverse proxy)
 #   docker compose -f docker-compose.yml up nginx        # With nginx
 #   docker compose -f docker-compose.yml up traefik      # With Traefik
@@ -16,20 +15,26 @@
 
 services:
   # ---------------------------------------------------------------------------
-  # OpenCode UI Server
+  # OpenCode UI Server (Solo Mode)
+  # ---------------------------------------------------------------------------
+  # Runs the OpenCode API server and UI together in a single container.
+  # OpenCode API is exposed internally at http://127.0.0.1:4096.
   # ---------------------------------------------------------------------------
   opencode-ui:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      args:
+        - HOST_UID=${UID:-1000}
+        - HOST_GID=${GID:-1000}
     container_name: opencode-ui
+    user: "${UID:-1000}:${GID:-1000}"
     environment:
       - PORT=8080
-      - API_URL=http://host.docker.internal:4096
+      - API_URL=http://127.0.0.1:4096
       - BASE_PATH=/
+      - HOME=${HOME}
       - OPENCODE_WORKSPACE_ROOT=${HOME}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
     volumes:
@@ -80,22 +85,3 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-
-# Development override - uses local app-prefixable for hot reload
-x-dev-ui:
-  &dev-ui
-  build:
-    context: ./app-prefixable
-    dockerfile: ../docker/Dockerfile.dev
-  environment:
-    - PORT=3000
-    - API_URL=http://host.docker.internal:4096
-    - BASE_PATH=/
-    - DEV=true
-  extra_hosts:
-    - "host.docker.internal:host-gateway"
-  ports:
-    - "3000:3000"
-  volumes:
-    - ./app-prefixable/src:/app/src
-    - ./app-prefixable/public:/app/public

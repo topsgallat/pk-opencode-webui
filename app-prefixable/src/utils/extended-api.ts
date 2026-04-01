@@ -116,3 +116,33 @@ export async function deleteDir(serverUrl: string, path: string): Promise<boolea
 export async function createFile(serverUrl: string, path: string): Promise<boolean> {
   return writeFile(serverUrl, path, "")
 }
+
+/**
+ * List available OpenCode log files
+ */
+export async function listLogFiles(serverUrl: string): Promise<string[]> {
+  try {
+    const res = await fetch(`${serverUrl}/api/ext/log-files`)
+    if (!res.ok) return []
+    return await res.json()
+  } catch (e) {
+    console.error("[extended-api] listLogFiles failed:", e)
+    return []
+  }
+}
+
+/**
+ * Read a specific OpenCode log file by name
+ */
+export async function readLogFile(serverUrl: string, name: string): Promise<string | null> {
+  try {
+    const params = new URLSearchParams({ name })
+    const res = await fetch(`${serverUrl}/api/ext/log-file?${params}`)
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.content
+  } catch (e) {
+    console.error("[extended-api] readLogFile failed:", e)
+    return null
+  }
+}

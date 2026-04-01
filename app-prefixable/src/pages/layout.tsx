@@ -51,6 +51,7 @@ import {
   PinOff,
   Search,
   GripVertical,
+  ScrollText,
 } from "lucide-solid";
 import { useSync } from "../context/sync";
 import { usePermission } from "../context/permission";
@@ -291,6 +292,7 @@ export function Layout(props: ParentProps) {
   // Effective sidebar state: hidden on settings page or small screens
   const showSidebar = createMemo(() => {
     if (location.pathname.endsWith("/settings")) return false;
+    if (location.pathname.endsWith("/logs")) return false;
     if (windowWidth() < COLLAPSE_BREAKPOINT) return false;
     return sidebarExpanded();
   });
@@ -1974,6 +1976,10 @@ export function Layout(props: ParentProps) {
     return location.pathname.endsWith("/settings");
   }
 
+  function isLogsActive() {
+    return location.pathname.endsWith("/logs");
+  }
+
   function navigateToProject(worktree: string) {
     // Use router navigation - DirectoryLayout uses keyed For
     // to force full remount when directory changes
@@ -2120,6 +2126,22 @@ export function Layout(props: ParentProps) {
                 title="Settings"
               >
                 <Settings class="w-5 h-5" />
+              </button>
+              <button
+                data-hint-target
+                onClick={() => navigate(`/${dirSlug()}/logs`)}
+                class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                style={{
+                  color: isLogsActive()
+                    ? "var(--text-interactive-base)"
+                    : "var(--icon-base)",
+                  background: isLogsActive()
+                    ? "var(--surface-inset)"
+                    : "transparent",
+                }}
+                title="Server Logs"
+              >
+                <ScrollText class="w-5 h-5" />
               </button>
             </div>
           </div>

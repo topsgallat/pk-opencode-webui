@@ -14,7 +14,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Build the UI
 # -----------------------------------------------------------------------------
-FROM oven/bun:1-alpine AS builder
+FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
@@ -30,16 +30,16 @@ RUN bun run build
 # -----------------------------------------------------------------------------
 # Stage 2: Runtime
 # -----------------------------------------------------------------------------
-FROM alpine:3.21
+FROM ubuntu:24.04
 
 # Install system packages
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     git \
     curl \
     openssh-client \
     libstdc++ \
-    gcompat
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Bun
 ARG BUN_VERSION=1.1.42
@@ -67,7 +67,7 @@ RUN case $(uname -m) in \
     curl -L "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${ARCH}.tar.xz" | tar -xJvf - -C /
 
 # Create non-root user and app directory
-RUN addgroup -S opencode && adduser -S -G opencode -u 1000 opencode && \
+RUN groupadd -r opencode && useradd -r -g opencode -u 1000 -d /home/opencode -s /bin/bash opencode && \
     mkdir -p /opt/opencode-ui /run /home/opencode && \
     chown -R opencode:opencode /opt/opencode-ui /run /home/opencode
 
@@ -86,8 +86,7 @@ COPY docker/s6/ /etc/
 # Set permissions
 RUN chmod -R 755 /etc/services.d/opencode
 
-# Set up gcompat for glibc compatibility (needed for OpenCode/Bun)
-ENV LD_PRELOAD=/lib/libgcompat.so.0
+
 
 # Environment variables
 ENV PORT=8080 \

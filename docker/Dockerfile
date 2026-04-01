@@ -35,10 +35,14 @@ FROM ubuntu:24.04
 # Install system packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
-    git \
+    ca-certificates \
     curl \
+    git \
     openssh-client \
-    && rm -rf /var/lib/apt/lists/*
+    unzip \
+    xz-utils \
+    && rm -rf /var/lib/apt/lists/* \
+    && update-ca-certificates
 
 # Install Bun
 ARG BUN_VERSION=1.1.42
@@ -66,9 +70,9 @@ RUN case $(uname -m) in \
     curl -L "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${ARCH}.tar.xz" | tar -xJvf - -C /
 
 # Create non-root user and app directory
-RUN groupadd -r opencode && useradd -r -g opencode -u 1000 -d /home/opencode -s /bin/bash opencode && \
+RUN id -u 1000 &>/dev/null && echo "UID 1000 exists" || (groupadd -r opencode && useradd -r -g opencode -u 1000 -d /home/opencode -s /bin/bash opencode) && \
     mkdir -p /opt/opencode-ui /run /home/opencode && \
-    chown -R opencode:opencode /opt/opencode-ui /run /home/opencode
+    (chown -R 1000:1000 /opt/opencode-ui /run /home/opencode 2>/dev/null || chown -R opencode:opencode /opt/opencode-ui /run /home/opencode)
 
 # Copy built UI from builder stage
 COPY --from=builder /app/app-prefixable/dist /opt/opencode-ui/dist

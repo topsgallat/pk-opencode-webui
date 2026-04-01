@@ -1,8 +1,9 @@
-import { createSignal, createEffect, createMemo, Show, For, createRoot } from "solid-js";
+import { createSignal, createEffect, createMemo, Show, For, createRoot, JSX } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import type { Part, ToolPart as SDKToolPart, ToolState, ReasoningPart as SDKReasoningPart } from "../sdk/client";
 import { ChevronDown, ExternalLink, Users, Sparkles, Brain } from "lucide-solid";
 import { ContentDiff } from "./diff/content-diff";
+import { ContentCode } from "./diff/content-code";
 import { useSync } from "../context/sync";
 import { useParams, useNavigate } from "@solidjs/router";
 import { base64Encode } from "../utils/path";
@@ -129,14 +130,245 @@ function getStatusColor(status: string): string {
   }
 }
 
-// Format tool input for display
-function formatInput(input: unknown): string {
-  if (!input) return "";
-  if (typeof input === "string") return input;
-  try {
-    return JSON.stringify(input, null, 2);
-  } catch {
-    return String(input);
+function fieldLabel(text: string): JSX.Element {
+  return (
+    <span class="text-xs" style={{ color: "var(--text-weak)", "margin-right": "0.35em" }}>
+      {text}
+    </span>
+  );
+}
+
+function codePill(text: string): JSX.Element {
+  return (
+    <code
+      class="text-xs px-1.5 py-0.5 rounded font-mono break-all"
+      style={{ background: "var(--surface-inset)", color: "var(--text-strong)" }}
+    >
+      {text}
+    </code>
+  );
+}
+
+function renderToolInput(tool: string, input: Record<string, unknown>): JSX.Element {
+  switch (tool) {
+    case "bash": {
+      const cmd = String(input.command ?? "");
+      return (
+        <pre
+          class="whitespace-pre-wrap text-xs font-mono px-2 py-1.5 rounded"
+          style={{ background: "var(--surface-inset)", color: "var(--text-strong)" }}
+        >
+          {cmd}
+        </pre>
+      );
+    }
+
+    case "read": {
+      const fp = String(input.filePath ?? "");
+      const offset = input.offset != null ? Number(input.offset) : null;
+      const limit = input.limit != null ? Number(input.limit) : null;
+      return (
+        <div class="flex flex-col gap-1">
+          <div class="flex items-start gap-1 flex-wrap">
+            {fieldLabel("file")}
+            {codePill(fp)}
+          </div>
+          <Show when={offset != null || limit != null}>
+            <div class="flex items-center gap-2 flex-wrap">
+              <Show when={offset != null}>
+                <span class="text-xs" style={{ color: "var(--text-weak)" }}>
+                  line {offset}
+                </span>
+              </Show>
+              <Show when={limit != null}>
+                <span class="text-xs" style={{ color: "var(--text-weak)" }}>
+                  limit {limit}
+                </span>
+              </Show>
+            </div>
+          </Show>
+        </div>
+      );
+    }
+
+    case "write":
+    case "edit": {
+      const fp = String(input.filePath ?? "");
+      return (
+        <div class="flex items-start gap-1 flex-wrap">
+          {fieldLabel("file")}
+          {codePill(fp)}
+        </div>
+      );
+    }
+
+    case "glob": {
+      const pattern = String(input.pattern ?? "");
+      const path = input.path ? String(input.path) : null;
+      return (
+        <div class="flex flex-col gap-1">
+          <div class="flex items-start gap-1 flex-wrap">
+            {fieldLabel("pattern")}
+            {codePill(pattern)}
+          </div>
+          <Show when={path}>
+            <div class="flex items-start gap-1 flex-wrap">
+              {fieldLabel("in")}
+              {codePill(path!)}
+            </div>
+          </Show>
+        </div>
+      );
+    }
+
+    case "grep": {
+      const pattern = String(input.pattern ?? "");
+      const path = input.path ? String(input.path) : null;
+      const include = input.include ? String(input.include) : null;
+      const outputMode = input.output_mode ? String(input.output_mode) : null;
+      return (
+        <div class="flex flex-col gap-1">
+          <div class="flex items-start gap-1 flex-wrap">
+            {fieldLabel("pattern")}
+            {codePill(pattern)}
+          </div>
+          <Show when={path}>
+            <div class="flex items-start gap-1 flex-wrap">
+              {fieldLabel("in")}
+              {codePill(path!)}
+            </div>
+          </Show>
+          <Show when={include}>
+            <div class="flex items-start gap-1 flex-wrap">
+              {fieldLabel("files")}
+              {codePill(include!)}
+            </div>
+          </Show>
+          <Show when={outputMode}>
+            <div class="flex items-center gap-1">
+              {fieldLabel("mode")}
+              <span class="text-xs" style={{ color: "var(--text-base)" }}>{outputMode}</span>
+            </div>
+          </Show>
+        </div>
+      );
+    }
+
+    case "webfetch": {
+      const url = String(input.url ?? "");
+      const fmt = input.format ? String(input.format) : null;
+      return (
+        <div class="flex flex-col gap-1">
+          <div class="flex items-start gap-1 flex-wrap">
+            {fieldLabel("url")}
+            <span
+              class="text-xs font-mono break-all"
+              style={{ color: "var(--text-interactive-base)" }}
+            >
+              {url}
+            </span>
+          </div>
+          <Show when={fmt}>
+            <div class="flex items-center gap-1">
+              {fieldLabel("format")}
+              <span class="text-xs" style={{ color: "var(--text-base)" }}>{fmt}</span>
+            </div>
+          </Show>
+        </div>
+      );
+    }
+
+    case "todowrite": {
+      const todos = Array.isArray(input.todos)
+        ? (input.todos as { content: string; status: string; priority?: string }[])
+        : [];
+      const statusIcon = (s: string) =>
+        s === "completed" ? "✓" : s === "in_progress" ? "▸" : s === "cancelled" ? "✕" : "○";
+      const statusColor = (s: string) =>
+        s === "completed"
+          ? "var(--icon-success-base)"
+          : s === "in_progress"
+          ? "var(--text-interactive-base)"
+          : s === "cancelled"
+          ? "var(--text-weak)"
+          : "var(--text-base)";
+      return (
+        <div class="flex flex-col gap-0.5">
+          <For each={todos}>
+            {(todo) => (
+              <div class="flex items-start gap-1.5 text-xs">
+                <span style={{ color: statusColor(todo.status), "flex-shrink": 0 }}>
+                  {statusIcon(todo.status)}
+                </span>
+                <span style={{ color: "var(--text-base)" }}>{todo.content}</span>
+                <Show when={todo.priority && todo.priority !== "medium"}>
+                  <span
+                    class="ml-auto shrink-0 text-xs"
+                    style={{ color: "var(--text-weak)" }}
+                  >
+                    {todo.priority}
+                  </span>
+                </Show>
+              </div>
+            )}
+          </For>
+        </div>
+      );
+    }
+
+    case "question": {
+      const prompt = String(input.prompt ?? "");
+      const questions = Array.isArray(input.questions)
+        ? (input.questions as { question: string; options?: { label: string }[] }[])
+        : [];
+      return (
+        <div class="flex flex-col gap-2">
+          <Show when={prompt}>
+            <p class="text-xs" style={{ color: "var(--text-base)" }}>{prompt}</p>
+          </Show>
+          <For each={questions}>
+            {(q) => (
+              <div class="flex flex-col gap-0.5">
+                <p class="text-xs font-medium" style={{ color: "var(--text-strong)" }}>{q.question}</p>
+                <Show when={q.options && q.options.length > 0}>
+                  <div class="flex flex-col gap-0.5 pl-2">
+                    <For each={q.options ?? []}>
+                      {(opt) => (
+                        <span class="text-xs" style={{ color: "var(--text-weak)" }}>· {opt.label}</span>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </div>
+            )}
+          </For>
+        </div>
+      );
+    }
+
+    default: {
+      const entries = Object.entries(input).filter(([, v]) => v != null && v !== "");
+      if (entries.length === 0) return <></>;
+      return (
+        <div class="flex flex-col gap-1">
+          <For each={entries}>
+            {([k, v]) => (
+              <div class="flex items-start gap-1 text-xs flex-wrap">
+                {fieldLabel(k)}
+                <span
+                  class="font-mono break-all"
+                  style={{ color: "var(--text-base)" }}
+                >
+                  {typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+                    ? String(v)
+                    : JSON.stringify(v)}
+                </span>
+              </div>
+            )}
+          </For>
+        </div>
+      );
+    }
   }
 }
 
@@ -179,6 +411,27 @@ function getLangFromPath(path: string): string {
     astro: "astro",
   };
   return langMap[ext] || "text";
+}
+
+function parseReadOutput(raw: string): string {
+  const contentMatch = raw.match(/<content>([\s\S]*?)<\/content>/);
+  const text = contentMatch ? contentMatch[1] : raw;
+  return text.replace(/^\d+: /gm, "").replace(/\n$/, "");
+}
+
+// Deterministic color pair for an agent name (mirrors message-turn.tsx)
+function getAgentColors(agent?: string) {
+  const base = { bg: "var(--surface-brand-muted)", fg: "var(--text-interactive-base)" };
+  if (!agent) return base;
+  const palette = [
+    base,
+    { bg: "var(--status-success-dim)", fg: "var(--status-success-text)" },
+    { bg: "var(--status-warning-dim)", fg: "var(--status-warning-text)" },
+    { bg: "var(--status-danger-dim)", fg: "var(--status-danger-text)" },
+    { bg: "var(--surface-inset)", fg: "var(--text-strong)" },
+  ];
+  const hash = Array.from(agent).reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
+  return palette[Math.abs(hash) % palette.length];
 }
 
 // Get metadata from state
@@ -253,6 +506,13 @@ function TaskToolDisplay(props: { part: ToolPart }) {
     );
   });
 
+  const childAgent = createMemo(() => {
+    const first = childMessages().find((m) => m.info.role === "assistant" && (m.info as { agent?: string }).agent);
+    if (!first) return undefined;
+    const info = first.info as { agent: string; providerID: string; modelID: string };
+    return { agent: info.agent, providerID: info.providerID, modelID: info.modelID };
+  });
+
   // Sync child session data when we have a child ID
   createEffect(() => {
     const id = childId();
@@ -302,12 +562,38 @@ function TaskToolDisplay(props: { part: ToolPart }) {
           style={{ color: getStatusColor(status()) }}
         />
 
-        {/* Title */}
-        <span
-          class="font-mono text-sm flex-1 truncate"
-          style={{ color: "var(--text-strong)" }}
-        >
-          {title()}
+        {/* Title + optional agent badge */}
+        <span class="flex items-center gap-1.5 flex-1 min-w-0">
+          <span
+            class="font-mono text-sm truncate"
+            style={{ color: "var(--text-strong)" }}
+          >
+            {title()}
+          </span>
+          <Show when={childAgent()}>
+            {(ca) => {
+              const colors = () => getAgentColors(ca().agent);
+              return (
+                <>
+                  <span style={{ color: "var(--text-weak)", "font-size": "0.7rem" }}>·</span>
+                  <span
+                    style={{
+                      background: colors().bg,
+                      color: colors().fg,
+                      "border-radius": "9999px",
+                      padding: "1px 7px",
+                      "font-size": "0.7rem",
+                      "font-weight": 600,
+                      "white-space": "nowrap",
+                      "flex-shrink": 0,
+                    }}
+                  >
+                    {ca().agent}
+                  </span>
+                </>
+              );
+            }}
+          </Show>
         </span>
 
         {/* Status indicator */}
@@ -353,6 +639,36 @@ function TaskToolDisplay(props: { part: ToolPart }) {
                 </div>
               </div>
             )}
+          </Show>
+
+          {/* Agent + model info */}
+          <Show when={childAgent()}>
+            {(ca) => {
+              const colors = () => getAgentColors(ca().agent);
+              return (
+                <div class="flex items-center gap-1.5 flex-wrap mb-2">
+                  <span class="text-xs" style={{ color: "var(--text-weak)" }}>Agent:</span>
+                  <span
+                    style={{
+                      background: colors().bg,
+                      color: colors().fg,
+                      "border-radius": "9999px",
+                      padding: "1px 8px",
+                      "font-size": "0.7rem",
+                      "font-weight": 600,
+                    }}
+                  >
+                    {ca().agent}
+                  </span>
+                  <Show when={ca().providerID || ca().modelID}>
+                    <span style={{ color: "var(--text-weak)", "font-size": "0.7rem" }}>·</span>
+                    <span class="text-xs" style={{ color: "var(--text-weak)" }}>
+                      {[ca().providerID, ca().modelID].filter(Boolean).join(" / ")}
+                    </span>
+                  </Show>
+                </div>
+              );
+            }}
           </Show>
 
           {/* Child session tools summary */}
@@ -502,18 +818,21 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
   const isFileChange = () =>
     props.part.tool === "edit" || props.part.tool === "write";
   const hasDiff = () => isFileChange() && metadata()?.diff;
-  // Can expand if has output OR has diff
-  const canExpand = () => hasOutput(state()) || hasDiff();
+  const isBash = () => props.part.tool === "bash";
+  const bashInput = () => isBash() ? (getInput(state()) as { command?: string })?.command ?? "" : "";
+  const isRead = () => props.part.tool === "read";
+  const readFilePath = () => isRead() ? (getInput(state()) as { filePath?: string })?.filePath ?? "" : "";
+  const isGlob = () => props.part.tool === "glob";
+  const canExpand = () => (isBash() || isRead()) ? !!getInput(state()) : (hasOutput(state()) || hasDiff());
   const title = () => getTitle(state()) || props.part.tool;
   const filePath = () =>
     (getInput(state()) as { filePath?: string })?.filePath || "";
 
-  // Track if we've already auto-expanded this tool part
   const autoExpandedKey = `auto-${props.part.id}`;
 
-  // Auto-expand edit tools when diff becomes available (only once)
   createEffect(() => {
-    if (hasDiff() && !expandedStore.get(autoExpandedKey)) {
+    const shouldExpand = hasDiff() || (isBash() && !!getInput(state()));
+    if (shouldExpand && !expandedStore.get(autoExpandedKey)) {
       expandedStore.set(autoExpandedKey, true);
       expandedStore.set(props.part.id, true);
     }
@@ -589,6 +908,111 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
         </Show>
       </button>
 
+      {/* Bash terminal block */}
+      <Show when={expanded() && isBash()}>
+        <div
+          class="px-3 py-2 font-mono text-xs overflow-x-auto"
+          style={{
+            "border-top": "1px solid var(--border-base)",
+            background: "var(--surface-overlay)",
+          }}
+        >
+          <div class="flex items-start gap-1.5 mb-1">
+            <span style={{ color: "var(--status-success-text)", "flex-shrink": 0 }}>$</span>
+            <pre
+              class="whitespace-pre-wrap"
+              style={{ color: "var(--text-strong)" }}
+            >
+              {bashInput()}
+            </pre>
+          </div>
+          <Show when={getOutput(state())}>
+            {(output) => (
+              <pre
+                class="whitespace-pre-wrap max-h-64 overflow-y-auto mt-1"
+                style={{ color: "var(--text-base)" }}
+              >
+                {output()}
+              </pre>
+            )}
+          </Show>
+          <Show when={getError(state())}>
+            {(err) => (
+              <pre
+                class="whitespace-pre-wrap mt-1"
+                style={{ color: "var(--icon-critical-base)" }}
+              >
+                {err()}
+              </pre>
+            )}
+          </Show>
+        </div>
+      </Show>
+
+      {/* Read file code viewer block */}
+      <Show when={expanded() && isRead() && getOutput(state())}>
+        {(output) => (
+          <div
+            style={{ "border-top": "1px solid var(--border-base)" }}
+          >
+            <div
+              class="px-3 py-1.5 text-xs font-mono"
+              style={{
+                background: "var(--surface-inset)",
+                color: "var(--text-weak)",
+                "border-bottom": "1px solid var(--border-base)",
+              }}
+            >
+              {readFilePath()}
+            </div>
+            <div class="overflow-x-auto max-h-96 overflow-y-auto">
+              <ContentCode
+                code={parseReadOutput(output())}
+                lang={getLangFromPath(readFilePath())}
+                flush
+              />
+            </div>
+          </div>
+        )}
+      </Show>
+
+      {/* Glob file list block */}
+      <Show when={expanded() && isGlob() && getOutput(state())}>
+        {(output) => {
+          const lines = output().split("\n").map(l => l.trim()).filter(Boolean);
+          const summary = lines.find(l => /^Found \d+/.test(l)) ?? "";
+          const paths = lines.filter(l => l.startsWith("/") || l.startsWith("./") || (!l.startsWith("Found") && l.includes("/")));
+          return (
+            <div style={{ "border-top": "1px solid var(--border-base)" }}>
+              <Show when={summary}>
+                <div
+                  class="px-3 py-1.5 text-xs"
+                  style={{
+                    background: "var(--surface-inset)",
+                    color: "var(--text-weak)",
+                    "border-bottom": paths.length > 0 ? "1px solid var(--border-base)" : "none",
+                  }}
+                >
+                  {summary}
+                </div>
+              </Show>
+              <div class="px-3 py-2 flex flex-col gap-0.5 max-h-64 overflow-y-auto">
+                <For each={paths}>
+                  {(p) => (
+                    <div class="flex items-center gap-1.5 text-xs font-mono">
+                      <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "var(--text-weak)" }}>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span style={{ color: "var(--text-base)" }}>{p}</span>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </div>
+          );
+        }}
+      </Show>
+
       {/* Diff display for edit tools - controlled by expanded state */}
       <Show when={expanded() && hasDiff()}>
         <div
@@ -602,10 +1026,10 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
         </div>
       </Show>
 
-      {/* Expanded content for non-edit tools or when no diff */}
-      <Show when={expanded() && canExpand() && !hasDiff()}>
+      {/* Expanded content for non-bash, non-read, non-glob, non-edit tools or when no diff */}
+      <Show when={expanded() && canExpand() && !hasDiff() && !isBash() && !isRead() && !isGlob()}>
         <div
-          class="px-3 py-2 text-sm font-mono overflow-x-auto"
+          class="px-3 py-2 text-sm overflow-x-auto"
           style={{
             "border-top": "1px solid var(--border-base)",
             background: "var(--background-stronger)",
@@ -618,18 +1042,13 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
                 <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
                   Input:
                 </div>
-                <pre
-                  class="whitespace-pre-wrap text-xs"
-                  style={{ color: "var(--text-base)" }}
-                >
-                  {formatInput(input())}
-                </pre>
+                {renderToolInput(props.part.tool, input() as Record<string, unknown>)}
               </div>
             )}
           </Show>
 
           {/* Output */}
-          <Show when={getOutput(state())}>
+          <Show when={props.part.tool !== "todowrite" && getOutput(state())}>
             {(output) => (
               <div>
                 <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>

@@ -229,6 +229,13 @@ export function Session() {
   const [showSlashPopover, setShowSlashPopover] = createSignal(false);
   const [slashQuery, setSlashQuery] = createSignal("");
   const [slashIndex, setSlashIndex] = createSignal(0);
+  
+  const [showAtPopover, setShowAtPopover] = createSignal(false);
+  const [atQuery, setAtQuery] = createSignal("");
+  const [atIndex, setAtIndex] = createSignal(0);
+  const [atFiles, setAtFiles] = createSignal<string[]>([]);
+  const [atLoading, setAtLoading] = createSignal(false);
+  const [atAnchorPos, setAtAnchorPos] = createSignal(0);
   const [showMCPDialog, setShowMCPDialog] = createSignal(false);
   const [showMCPAddDialog, setShowMCPAddDialog] = createSignal(false);
   const [showModelPicker, setShowModelPicker] = createSignal(false);
@@ -830,6 +837,7 @@ export function Session() {
     if (slashPopoverRef && !slashPopoverRef.contains(target)) {
       setShowSlashPopover(false);
     }
+    if (showAtPopover()) setShowAtPopover(false);
   }
 
   // Handle slash command selection
@@ -842,6 +850,23 @@ export function Session() {
     setTimeout(() => {
       cmd.onSelect();
     }, 0);
+  }
+
+  function selectAtFile(path: string) {
+    if (!path) return;
+    addFileToContext(path);
+    const current = input();
+    const before = current.slice(0, atAnchorPos());
+    const after = current.slice(atAnchorPos() + 1 + atQuery().length);
+    setInput(before + after);
+    if (inputRef) {
+      inputRef.value = before + after;
+      clampInputHeight(inputRef);
+      inputRef.selectionStart = inputRef.selectionEnd = before.length;
+      inputRef.focus();
+    }
+    setShowAtPopover(false);
+    setAtQuery("");
   }
 
   // Handle input changes to detect slash commands
@@ -868,6 +893,19 @@ export function Session() {
     } else {
       setShowSlashPopover(false);
       setSlashQuery("");
+    }
+
+    const atMatch = value.match(/@(\S*)$/);
+    if (atMatch) {
+      const pos = value.lastIndexOf("@");
+      setAtAnchorPos(pos);
+      setAtQuery(atMatch[1]);
+      setAtIndex(0);
+      setShowAtPopover(true);
+      searchAtFiles(atMatch[1]);
+    } else {
+      setShowAtPopover(false);
+      setAtQuery("");
     }
   }
 
@@ -919,6 +957,7 @@ export function Session() {
     if (e.defaultPrevented) return; // Already handled by another component
     // Let dialogs/popovers handle their own Escape
     if (
+      showAtPopover() ||
       showSlashPopover() ||
       showMCPDialog() ||
       showMCPAddDialog() ||
@@ -1161,6 +1200,13 @@ export function Session() {
     const existing = fileContext().find((f) => f.key === key);
     if (existing) return;
     setFileContext((prev) => [...prev, { path, key }]);
+  }
+
+  async function searchAtFiles(query: string) {
+    setAtLoading(true);
+    const res = await client.find.files({ query, dirs: "false" });
+    setAtFiles(res.data ?? []);
+    setAtLoading(false);
   }
 
   function removeFileFromContext(key: string) {
@@ -1797,8 +1843,98 @@ export function Session() {
             background: "var(--background-base)",
             "border-top": "1px solid var(--border-base)",
           }}
-        >
-          <div class="relative w-full">
+          >
+            <div class="relative w-full">
+            <Show when={showAtPopover()}>
+              <div
+                class="absolute bottom-full left-0 mb-2 w-80 max-h-64 rounded-lg shadow-lg z-20 flex flex-col"
+                style={{
+                  background: "var(--background-base)",
+                  border: "1px solid var(--border-base)",
+                }}
+              >
+                <div
+                  class="px-3 py-2 text-xs font-medium sticky top-0"
+                  style={{
+                    color: "var(--text-weak)",
+                    background: "var(--surface-inset)",
+                    "border-bottom": "1px solid var(--border-base)",
+                  }}
+                >
+                  <span>Files</span>
+                  <Show when={atLoading()}>
+                    <span class="ml-2 animate-pulse">Loading...</span>
+                  </Show>
+                </div>
+                <div
+                  class="overflow-y-auto flex-1"
+                  ref={(el) => {
+                    createEffect(() => {
+                      const idx = atIndex();
+                      const selected = el.querySelector(`[data-at-index="${idx}"]`);
+                      if (selected) {
+                        selected.scrollIntoView({ block: "nearest" });
+                      }
+                    });
+                  }}
+                >
+                  <Show
+                    when={atFiles().length > 0}
+                    fallback={
+                      <div class="px-3 py-4 text-sm text-center" style={{ color: "var(--text-weak)" }}>
+                        {atLoading() ? "Searching..." : "No files found"}
+                      </div>
+                    }
+                  >
+                    <For each={atFiles()}>
+                      {(file, idx) => {
+                        const isSelected = () => idx() === atIndex();
+                        const parts = file.split("/");
+                        const filename = parts.pop() || file;
+                        const dir = parts.length > 0 ? parts.join("/") + "/" : "";
+                        return (
+                          <button
+                            type="button"
+                            data-at-index={idx()}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              selectAtFile(file);
+                            }}
+                            class="w-full px-3 py-2 text-left text-sm flex items-start gap-3 transition-colors"
+                            style={{
+                              background: isSelected()
+                                ? "rgba(147, 112, 219, 0.15)"
+                                : "transparent",
+                              "border-left": isSelected()
+                                ? "2px solid rgb(147, 112, 219)"
+                                : "2px solid transparent",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected()) e.currentTarget.style.background = "var(--surface-inset)";
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected()) e.currentTarget.style.background = "transparent";
+                            }}
+                          >
+                            <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "var(--text-weak)" }}>
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <div class="flex-1 overflow-hidden">
+                              <div class="font-medium truncate" style={{ color: "var(--text-strong)" }}>{filename}</div>
+                              <Show when={dir}>
+                                <div class="text-xs truncate" style={{ color: "var(--text-weak)" }}>{dir}</div>
+                              </Show>
+                            </div>
+                          </button>
+                        );
+                      }}
+                    </For>
+                  </Show>
+                </div>
+              </div>
+            </Show>
+
             {/* Slash Command Popover */}
             <Show
               when={showSlashPopover() && filteredSlashCommands().length > 0}
@@ -1998,6 +2134,12 @@ export function Session() {
                     clampInputHeight(e.currentTarget);
                   }}
                   onKeyDown={(e) => {
+                    if (showAtPopover()) {
+                      if (e.key === "ArrowDown") { e.preventDefault(); setAtIndex(i => (i + 1) % atFiles().length); return; }
+                      if (e.key === "ArrowUp") { e.preventDefault(); setAtIndex(i => (i - 1 + atFiles().length) % atFiles().length); return; }
+                      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); selectAtFile(atFiles()[atIndex()]); return; }
+                      if (e.key === "Escape") { e.preventDefault(); setShowAtPopover(false); return; }
+                    }
                     // Handle slash command navigation first
                     if (showSlashPopover()) {
                       handleInputKeyDown(e);
@@ -2038,7 +2180,7 @@ export function Session() {
                       }
                     }
                   }}
-                  placeholder={inputBlocked() ? "Respond to the prompt above to continue..." : "Type a message... (Tab to switch agent, / for commands)"}
+                  placeholder={inputBlocked() ? "Respond to the prompt above to continue..." : "Type a message... (@ for files, / for commands)"}
                   rows={1}
                   class="w-full px-4 pt-3 pb-2 focus:outline-none resize-none bg-transparent"
                   style={{

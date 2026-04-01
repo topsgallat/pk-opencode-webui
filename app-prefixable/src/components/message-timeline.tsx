@@ -255,6 +255,14 @@ export function MessageTimeline(props: {
   onMount(() => {
     tick = window.setInterval(() => setNow(Date.now()), 30_000)
   })
+
+  onMount(() => {
+    if (!props.loadingHistory) requestAnimationFrame(() => autoScroll.forceScrollToBottom())
+  })
+
+  createEffect(on(() => props.loadingHistory, (loading, prev) => {
+    if (prev && !loading) requestAnimationFrame(() => autoScroll.forceScrollToBottom())
+  }))
   onCleanup(() => {
     if (tick !== undefined) clearInterval(tick)
   })

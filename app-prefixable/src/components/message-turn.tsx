@@ -217,6 +217,16 @@ export function MessageTurn(props: {
     props.turn.userMessage.parts.filter((p): p is Part & FilePart => isFilePart(p) && isImageOrPdf(p)),
   )
 
+  const fileRefs = createMemo(() =>
+    props.turn.userMessage.parts
+      .filter((p): p is Part & FilePart => isFilePart(p) && p.mime === "text/plain")
+      .map((p) => {
+        const raw = p.filename ?? p.url.replace(/^file:\/\//, "")
+        const decoded = decodeURIComponent(raw)
+        return decoded.split("/").pop() || decoded
+      })
+  )
+
   // Sync local expanded state with props when defaultExpanded changes
   createEffect(() => {
     const defaultVal = props.defaultExpanded ?? props.isLast ?? false
@@ -357,6 +367,25 @@ export function MessageTurn(props: {
               />
               <span>{textExpanded() ? "Show less" : "Show more"}</span>
             </button>
+          </Show>
+          <Show when={fileRefs().length > 0}>
+            <div class="flex flex-wrap gap-1.5 mt-2">
+              <For each={fileRefs()}>
+                {(name) => (
+                  <div
+                    class="flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
+                    style={{
+                      background: "var(--surface-inset)",
+                      border: "1px solid var(--border-base)",
+                      color: "var(--text-strong)",
+                    }}
+                  >
+                    <FileText class="w-3 h-3 shrink-0" style={{ color: "var(--icon-weak)" }} />
+                    {name}
+                  </div>
+                )}
+              </For>
+            </div>
           </Show>
           {/* Status line */}
           <div class="flex items-center gap-2 text-xs mt-1 flex-wrap" style={{ color: "var(--text-weak)" }}>

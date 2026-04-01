@@ -1,4 +1,5 @@
-import { createSignal, createMemo, createEffect, For, Show, onMount, onCleanup, untrack } from "solid-js"
+import { createSignal, createMemo, createEffect, on, For, Show, onMount, onCleanup, untrack } from "solid-js"
+import { createStore } from "solid-js/store"
 import { Spinner } from "./ui/spinner"
 import { MessageTurn } from "./message-turn"
 // Note: Markdown and MessageParts are used in the FlatMessageList component below
@@ -71,6 +72,175 @@ function hasVisibleContent(message: DisplayMessage): boolean {
   return extractTextContent(message.parts).trim().length > 0
 }
 
+function createAutoScroll(options: { working: () => boolean; bottomThreshold?: number }) {
+  let scroll: HTMLElement | undefined
+  let settling = false
+  let settleTimer: ReturnType<typeof setTimeout> | undefined
+  let autoTimer: ReturnType<typeof setTimeout> | undefined
+  let resizeObserver: ResizeObserver | undefined
+  let observedContent: HTMLElement | undefined
+  let auto: { top: number; time: number } | undefined
+
+  const threshold = options.bottomThreshold ?? 10
+
+  const [store, setStore] = createStore({
+    contentRef: undefined as HTMLElement | undefined,
+    userScrolled: false,
+  })
+
+  const active = () => options.working() || settling
+
+  const distanceFromBottom = (el: HTMLElement) => el.scrollHeight - el.clientHeight - el.scrollTop
+
+  const canScroll = (el: HTMLElement) => el.scrollHeight - el.clientHeight > 1
+
+  const markAuto = (el: HTMLElement) => {
+    auto = { top: Math.max(0, el.scrollHeight - el.clientHeight), time: Date.now() }
+    if (autoTimer) clearTimeout(autoTimer)
+    autoTimer = setTimeout(() => {
+      auto = undefined
+      autoTimer = undefined
+    }, 1500)
+  }
+
+  const isAuto = (el: HTMLElement) => {
+    const a = auto
+    if (!a) return false
+    if (Date.now() - a.time > 1500) { auto = undefined; return false }
+    return Math.abs(el.scrollTop - a.top) < 2
+  }
+
+  const scrollToBottomNow = (el: HTMLElement) => {
+    markAuto(el)
+    el.scrollTop = el.scrollHeight
+  }
+
+  const scrollToBottom = (force: boolean) => {
+    if (!force && !active()) return
+    if (force && store.userScrolled) setStore("userScrolled", false)
+
+    const el = scroll
+    if (!el) return
+    if (!force && store.userScrolled) return
+
+    const distance = distanceFromBottom(el)
+    if (distance < 2) { markAuto(el); return }
+
+    scrollToBottomNow(el)
+  }
+
+  const stop = () => {
+    const el = scroll
+    if (!el) return
+    if (!canScroll(el)) {
+      if (store.userScrolled) setStore("userScrolled", false)
+      return
+    }
+    if (store.userScrolled) return
+    setStore("userScrolled", true)
+  }
+
+  const handleWheel = (e: WheelEvent) => {
+    if (e.deltaY >= 0) return
+    const el = scroll
+    const target = e.target instanceof Element ? e.target : undefined
+    const nested = target?.closest("[data-scrollable]")
+    if (el && nested && nested !== el) return
+    stop()
+  }
+
+  const handleScroll = () => {
+    const el = scroll
+    if (!el) return
+
+    if (!canScroll(el)) {
+      if (store.userScrolled) setStore("userScrolled", false)
+      return
+    }
+
+    if (distanceFromBottom(el) < threshold) {
+      if (store.userScrolled) setStore("userScrolled", false)
+      return
+    }
+
+    if (!store.userScrolled && isAuto(el)) {
+      scrollToBottom(false)
+      return
+    }
+
+    stop()
+  }
+
+  const updateOverflowAnchor = (el: HTMLElement) => {
+    el.style.overflowAnchor = store.userScrolled ? "auto" : "none"
+  }
+
+  const setupResizeObserver = (content: HTMLElement) => {
+    if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = undefined }
+    observedContent = content
+    resizeObserver = new ResizeObserver(() => {
+      const el = scroll
+      if (el && !canScroll(el)) {
+        if (store.userScrolled) setStore("userScrolled", false)
+        return
+      }
+      if (!active()) return
+      if (store.userScrolled) return
+      scrollToBottom(false)
+    })
+    resizeObserver.observe(content)
+  }
+
+  createEffect(() => {
+    const content = store.contentRef
+    if (!content) return
+    if (content === observedContent) return
+    setupResizeObserver(content)
+  })
+
+  createEffect(on(options.working, (working: boolean) => {
+    settling = false
+    if (settleTimer) clearTimeout(settleTimer)
+    settleTimer = undefined
+
+    if (working) {
+      if (!store.userScrolled) scrollToBottom(true)
+      return
+    }
+
+    settling = true
+    settleTimer = setTimeout(() => { settling = false }, 300)
+  }))
+
+  createEffect(() => {
+    store.userScrolled
+    const el = scroll
+    if (!el) return
+    updateOverflowAnchor(el)
+  })
+
+  onCleanup(() => {
+    if (settleTimer) clearTimeout(settleTimer)
+    if (autoTimer) clearTimeout(autoTimer)
+    if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = undefined }
+  })
+
+  return {
+    scrollRef: (el: HTMLElement | undefined) => {
+      if (scroll) scroll.removeEventListener("wheel", handleWheel)
+      scroll = el
+      if (!el) return
+      updateOverflowAnchor(el)
+      el.addEventListener("wheel", handleWheel, { passive: true })
+    },
+    contentRef: (el: HTMLElement | undefined) => setStore("contentRef", el),
+    handleScroll,
+    scrollToBottom: () => scrollToBottom(false),
+    forceScrollToBottom: () => scrollToBottom(true),
+    userScrolled: () => store.userScrolled,
+  }
+}
+
 export function MessageTimeline(props: {
   messages: DisplayMessage[]
   processing: boolean
@@ -78,10 +248,8 @@ export function MessageTimeline(props: {
   sessionStatus?: SessionStatus
   onScroll?: (nearBottom: boolean) => void
 }) {
-  let containerRef: HTMLDivElement | undefined
-  let endRef: HTMLDivElement | undefined
+  const autoScroll = createAutoScroll({ working: () => props.processing })
 
-  // Shared clock signal for relative timestamps — one timer for all turns
   const [now, setNow] = createSignal(Date.now())
   let tick: number | undefined
   onMount(() => {
@@ -91,67 +259,47 @@ export function MessageTimeline(props: {
     if (tick !== undefined) clearInterval(tick)
   })
 
-  // Track which turns are expanded
   const [expanded, setExpanded] = createSignal<Record<string, boolean>>({})
-  // Track how many turns to render (for lazy loading)
   const [renderCount, setRenderCount] = createSignal(INITIAL_TURNS)
-  // Track if user scrolled up
-  const [userScrolledUp, setUserScrolledUp] = createSignal(false)
-  // Track previous turn IDs for session switch detection
   const [prevTurnIds, setPrevTurnIds] = createSignal<Set<string>>(new Set())
 
-  // Convert messages to turns
-  const turns = createMemo(() => {
-    const filtered = props.messages.filter(hasVisibleContent)
-    return messagesToTurns(filtered)
-  })
+  const turns = createMemo(() => messagesToTurns(props.messages.filter(hasVisibleContent)))
 
-  // Calculate which turns to render (from the end, most recent first in render order)
   const renderedTurns = createMemo(() => {
     const all = turns()
     const count = Math.min(renderCount(), all.length)
-    // Take from the end (most recent), but return in chronological order
     return all.slice(Math.max(0, all.length - count))
   })
 
-  // Check if there are more turns to load
   const hasMore = createMemo(() => renderCount() < turns().length)
 
-  // Get the last turn (for showing streaming content)
   const lastTurn = createMemo(() => {
     const all = turns()
     return all.length > 0 ? all[all.length - 1] : null
   })
 
-  // Load more earlier turns with scroll anchoring
+  let containerRef: HTMLDivElement | undefined
+
   function loadMore() {
     if (!containerRef) {
       setRenderCount((prev) => Math.min(prev + TURNS_PER_BATCH, turns().length))
       return
     }
-    // Save scroll position relative to bottom before loading
     const scrollBottom = containerRef.scrollHeight - containerRef.scrollTop
     setRenderCount((prev) => Math.min(prev + TURNS_PER_BATCH, turns().length))
-    // Restore scroll position after DOM update
     requestAnimationFrame(() => {
-      if (containerRef) {
-        containerRef.scrollTop = containerRef.scrollHeight - scrollBottom
-      }
+      if (containerRef) containerRef.scrollTop = containerRef.scrollHeight - scrollBottom
     })
   }
 
-  // Track the previous last turn to collapse it when superseded
   const [prevLastId, setPrevLastId] = createSignal<string | undefined>(undefined)
 
-  // Expand a turn by default when it's the last one
-  // Use functional update to avoid tracking expanded() which would cause infinite recursion
   createEffect(() => {
     const last = lastTurn()
     if (!last) return
-    
+
     const prev = untrack(() => prevLastId())
     if (prev && prev !== last.id) {
-      // Previous last turn has been superseded — collapse it
       setExpanded((e) => {
         const next = { ...e }
         delete next[prev]
@@ -159,79 +307,49 @@ export function MessageTimeline(props: {
       })
     }
     setPrevLastId(last.id)
-    
+
     setExpanded((prev) => {
-      if (prev[last.id] !== undefined) return prev // Return same ref = no update
+      if (prev[last.id] !== undefined) return prev
       return { ...prev, [last.id]: true }
     })
   })
 
-  // Handle turn toggle
   function handleToggle(turnId: string, isExpanded: boolean) {
     setExpanded((prev) => ({ ...prev, [turnId]: isExpanded }))
   }
 
-  // Check if near bottom
-  function isNearBottom(): boolean {
-    if (!containerRef) return true
-    const { scrollTop, scrollHeight, clientHeight } = containerRef
-    return scrollHeight - scrollTop - clientHeight < 100
-  }
-
-  // Handle scroll
-  function handleScroll() {
-    const nearBottom = isNearBottom()
-    setUserScrolledUp(!nearBottom)
-    props.onScroll?.(nearBottom)
-  }
-
-  // Scroll to bottom
-  function scrollToBottom(force = false) {
-    if (userScrolledUp() && !force) return
-    if (containerRef) {
-      containerRef.scrollTop = containerRef.scrollHeight
-    }
-  }
-
-  // Scroll to bottom on mount
-  onMount(() => {
-    setTimeout(() => scrollToBottom(true), 100)
-  })
-
-  // Reset render count when session changes (detect by comparing turn IDs)
   createEffect(() => {
     const currentTurns = turns()
     const currentIds = new Set(currentTurns.map((t) => t.id))
     const prevIds = untrack(() => prevTurnIds())
 
-    // Detect session switch: if most previous IDs are not in current set, it's a new session
     if (prevIds.size > 0) {
       let overlap = 0
       for (const id of prevIds) {
         if (currentIds.has(id)) overlap++
       }
-      // If less than half of previous IDs exist in current, it's likely a session switch
       if (overlap < prevIds.size / 2) {
         setRenderCount(INITIAL_TURNS)
         setExpanded({})
+        autoScroll.forceScrollToBottom()
       }
     }
 
-    // Reset if turns are few
-    if (currentTurns.length <= INITIAL_TURNS) {
-      setRenderCount(INITIAL_TURNS)
-    }
+    if (currentTurns.length <= INITIAL_TURNS) setRenderCount(INITIAL_TURNS)
 
-    // Update previous turn IDs
     setPrevTurnIds(currentIds)
+  })
+
+  createEffect(() => {
+    props.onScroll?.(!autoScroll.userScrolled())
   })
 
   return (
     <div
-      ref={containerRef}
-      onScroll={handleScroll}
+      ref={(el) => { containerRef = el; autoScroll.scrollRef(el) }}
+      onScroll={autoScroll.handleScroll}
       class="flex-1 overflow-y-auto p-6"
-      style={{ background: "var(--background-stronger)", "overflow-anchor": "none" }}
+      style={{ background: "var(--background-stronger)" }}
     >
       {/* Loading history indicator */}
       <Show when={props.loadingHistory}>
@@ -272,7 +390,7 @@ export function MessageTimeline(props: {
         </Show>
 
         {/* Turns */}
-        <div class="space-y-4">
+        <div ref={autoScroll.contentRef} class="space-y-4">
           <For each={renderedTurns()}>
             {(turn, index) => (
               <MessageTurn
@@ -329,8 +447,6 @@ export function MessageTimeline(props: {
           </div>
         </Show>
       </Show>
-
-      <div ref={endRef} style={{ "overflow-anchor": "auto", height: "1px" }} />
     </div>
   )
 }

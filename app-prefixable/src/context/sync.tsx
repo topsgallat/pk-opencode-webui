@@ -535,11 +535,10 @@ export function SyncProvider(props: ParentProps) {
             setStore("message", sessionID, (existing: MessageWithParts[]) => {
               if (!existing || existing.length === 0) return synced
 
-              // Merge: use existing message if it has more recent parts
               const merged = synced.map((s) => {
                 const e = existing.find((m) => m.info.id === s.info.id)
                 if (!e) return s
-                // Keep existing if it has more parts (SSE updates arrived)
+                if (s.info.role === "assistant" && s.info.time.completed) return s
                 return e.parts.length >= s.parts.length ? e : s
               })
 

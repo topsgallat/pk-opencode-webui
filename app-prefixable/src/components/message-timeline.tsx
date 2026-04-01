@@ -5,7 +5,7 @@ import { MessageTurn } from "./message-turn"
 // Note: Markdown and MessageParts are used in the FlatMessageList component below
 import { Markdown } from "./markdown"
 import { MessageParts } from "./tool-part"
-import { ChevronUp, RefreshCw, Clock } from "lucide-solid"
+import { ChevronUp, RefreshCw, Clock, Brain } from "lucide-solid"
 import { errorText } from "../types/message"
 import type { DisplayMessage, Turn } from "../types/message"
 import { extractTextContent } from "../utils/message"
@@ -586,8 +586,11 @@ export function FlatMessageList(props: {
   )
 }
 
+const THINKING_PHRASES = ["Thinking...", "Working...", "Processing...", "Analyzing..."]
+
 function ProcessingIndicator(props: { sessionStatus?: SessionStatus }) {
   const [timeLeft, setTimeLeft] = createSignal<number>(0)
+  const [phraseIndex, setPhraseIndex] = createSignal<number>(0)
 
   // Use a reactive calculation for time left
   const calculateRemaining = () => {
@@ -607,6 +610,11 @@ function ProcessingIndicator(props: { sessionStatus?: SessionStatus }) {
         setTimeLeft(calculateRemaining())
       }, 1000)
       onCleanup(() => clearInterval(timer))
+    } else {
+      const phraseTimer = setInterval(() => {
+        setPhraseIndex((prev) => (prev + 1) % THINKING_PHRASES.length)
+      }, 2000)
+      onCleanup(() => clearInterval(phraseTimer))
     }
   })
 
@@ -621,9 +629,20 @@ function ProcessingIndicator(props: { sessionStatus?: SessionStatus }) {
       <Show
         when={props.sessionStatus?.type === "retry"}
         fallback={
-          <div class="flex items-center gap-2" style={{ color: "var(--text-weak)" }}>
-            <Spinner class="w-4 h-4" />
-            <span class="text-sm font-medium">Thinking...</span>
+          <div class="flex items-center gap-3" style={{ color: "var(--text-interactive-base)" }}>
+            <Brain class="w-5 h-5 animate-pulse" />
+            <div class="flex-1 overflow-hidden">
+              <span class="block text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                {THINKING_PHRASES[phraseIndex()].split("").map((ch, i) => (
+                  <span
+                    class="inline-block char-bounce"
+                    style={{ "animation-delay": `${i * 70}ms`, display: "inline-block" }}
+                  >
+                    {ch === " " ? "\u00A0" : ch}
+                  </span>
+                ))}
+              </span>
+            </div>
           </div>
         }
       >

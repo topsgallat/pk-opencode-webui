@@ -640,6 +640,10 @@
   animation: pk-spin 3s linear infinite;
 }
 
+.animate-fade-cycle {
+  animation: pk-fade-cycle 2s ease-in-out infinite;
+}
+
 @keyframes pk-spin {
   from {
     transform: rotate(0deg);
@@ -648,4 +652,23 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+@keyframes pk-fade-cycle {
+  0% { opacity: 0; transform: translateY(2px); }
+  15% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-2px); }
+}
+
+/* Per-character bounce animation used for thinking text */
+.char-bounce {
+  animation: pk-char-bounce 900ms cubic-bezier(.2,.9,.3,1) both;
+}
+
+@keyframes pk-char-bounce {
+  0% { transform: translateY(6px); opacity: 0 }
+  30% { transform: translateY(0); opacity: 1 }
+  70% { transform: translateY(0); opacity: 1 }
+  100% { transform: translateY(-4px); opacity: 0 }
 }

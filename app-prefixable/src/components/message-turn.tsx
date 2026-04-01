@@ -575,10 +575,9 @@ export function MessageTurn(props: {
 
           {/* Assistant messages */}
           <For each={props.turn.assistantMessages}>
-            {(message, index) => {
+            {(message) => {
               const text = extractTextContent(message.parts).trim()
               const tools = hasTools(message)
-              const isLast = () => index() === props.turn.assistantMessages.length - 1
               const colors = () => getAgentColors(message.agent)
 
               return (
@@ -591,7 +590,7 @@ export function MessageTurn(props: {
                   </div>
                   <div class="flex-1 min-w-0">
                     <Show
-                      when={isLast() && message.agent}
+                      when={message.agent}
                       fallback={
                         <div class="text-xs font-medium mb-1" style={{ color: "var(--text-weak)" }}>
                           ASSISTANT

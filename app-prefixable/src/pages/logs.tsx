@@ -10,6 +10,7 @@ export function Logs() {
 
   const [files, setFiles] = createSignal<string[]>([])
   const [selected, setSelected] = createSignal<string | null>(null)
+  let logContentRef: HTMLPreElement | undefined
   const [content, setContent] = createSignal<string | null>(null)
   const [loadingFiles, setLoadingFiles] = createSignal(true)
   const [loadingContent, setLoadingContent] = createSignal(false)
@@ -49,10 +50,18 @@ export function Logs() {
   })
 
   createEffect(() => {
+    if (content() !== null) {
+      logContentRef?.scrollTo({ top: logContentRef.scrollHeight, behavior: "smooth" })
+    }
+  })
+
+  createEffect(() => {
     if (!autoRefresh()) return
     const name = selected()
     if (!name) return
-    const timer = setInterval(() => fetchContent(name), 3000)
+    const timer = setInterval(() => {
+      fetchContent(name)
+    }, 3000)
     onCleanup(() => clearInterval(timer))
   })
 
@@ -144,6 +153,7 @@ export function Logs() {
           </Show>
           <Show when={!loadingContent() && content() !== null}>
             <pre
+              ref={logContentRef}
               class="flex-1 overflow-auto p-4 text-xs font-mono whitespace-pre-wrap break-all"
               style={{ color: "var(--text-base)" }}
             >

@@ -112,13 +112,14 @@ export function SyncProvider(props: ParentProps) {
 
     // Apply updates in a single SolidJS batch to minimise reactivity churn.
     batch(() => {
-      // 1) Update the per-message "part" store (keyed by messageID)
       const byMessage = new Map<string, typeof entries>()
       for (const e of entries) {
         const arr = byMessage.get(e.messageID) ?? []
         arr.push(e)
         byMessage.set(e.messageID, arr)
       }
+
+      const updatedPartsByMessage = new Map<string, Part[]>()
 
       for (const [messageID, list] of byMessage.entries()) {
         const existingParts = store.part[messageID] ?? []
@@ -130,42 +131,31 @@ export function SyncProvider(props: ParentProps) {
           const updated: any = { ...p }
           for (const [f, v] of Object.entries(matched.fields)) {
             const cur = (updated as any)[f] ?? ""
-            ;(updated as any)[f] = cur + v
+            const result = cur + v
+            console.log(`[Sync:flush] id=${p.id} field=${f} cur=${JSON.stringify(cur.slice(0,80))} delta=${JSON.stringify(v.slice(0,80))} result=${JSON.stringify(result.slice(0,80))}`)
+            ;(updated as any)[f] = result
           }
           changed = true
           return updated as Part
         })
-        if (changed) setStore("part", messageID, next)
+        if (changed) {
+          updatedPartsByMessage.set(messageID, next)
+          setStore("part", messageID, next)
+        }
       }
 
-      // 2) Update the per-session "message" store so MessageWithParts reflect
-      // the concatenated part changes (one setStore per session).
-      const bySession = new Map<string, typeof entries>()
-      for (const e of entries) {
-        const arr = bySession.get(e.sessionID) ?? []
-        arr.push(e)
-        bySession.set(e.sessionID, arr)
-      }
-
-      for (const [sessionID, list] of bySession.entries()) {
+      const affectedSessions = new Set(entries.map((e) => e.sessionID))
+      for (const sessionID of affectedSessions) {
         const msgs = store.message[sessionID] ?? []
         if (!msgs || msgs.length === 0) continue
+        let changed = false
         const nextMsgs = msgs.map((m) => {
-          const updatesForMsg = list.filter((u) => u.messageID === m.info.id)
-          if (updatesForMsg.length === 0) return m
-          const newParts = m.parts.map((p) => {
-            const upd = updatesForMsg.find((u) => u.partID === p.id)
-            if (!upd) return p
-            const updated: any = { ...p }
-            for (const [f, v] of Object.entries(upd.fields)) {
-              const cur = (updated as any)[f] ?? ""
-              ;(updated as any)[f] = cur + v
-            }
-            return updated as Part
-          })
-          return { ...m, parts: newParts }
+          const updated = updatedPartsByMessage.get(m.info.id)
+          if (!updated) return m
+          changed = true
+          return { ...m, parts: updated }
         })
-        setStore("message", sessionID, nextMsgs)
+        if (changed) setStore("message", sessionID, nextMsgs)
       }
     })
   }
@@ -311,6 +301,14 @@ export function SyncProvider(props: ParentProps) {
       const part = props.part as Part
       if (!part?.sessionID || !part?.messageID) return
 
+      const queuedDelta = deltaQueue.get(`${part.messageID}:${part.id}`)
+      console.log(`[Sync:part.updated] id=${part.id} text=${JSON.stringify((part as any).text?.slice(0, 80))} queuedDelta=${JSON.stringify(queuedDelta?.fields)}`)
+
+      // Evict any queued deltas for this part — the updated event carries
+      // authoritative full text, so any accumulated deltas are stale/redundant
+      // and must not be appended on top of the correct value.
+      deltaQueue.delete(`${part.messageID}:${part.id}`)
+
       // Update or insert the part
       setStore("part", part.messageID, (existing: Part[] | undefined) => {
         if (!existing) return sortParts([part])
@@ -357,6 +355,9 @@ export function SyncProvider(props: ParentProps) {
         delta: string
       }
       if (!sessionID || !messageID || !partID) return
+
+      const currentStoreText = (store.part[messageID]?.find(p => p.id === partID) as any)?.[field] ?? ""
+      console.log(`[Sync:part.delta] id=${partID} field=${field} delta=${JSON.stringify(delta.slice(0,80))} storeText=${JSON.stringify(currentStoreText.slice(0,80))}`)
 
       // Micro-batch deltas: accumulate per-part per-field deltas in an
       // in-memory queue and schedule a single flush per animation frame.
@@ -421,6 +422,7 @@ export function SyncProvider(props: ParentProps) {
       })
 
       if (msg.parts) {
+        for (const p of msg.parts) deltaQueue.delete(`${msg.info.id}:${p.id}`)
         setStore("part", msg.info.id, sortParts(msg.parts))
       }
     }
@@ -444,6 +446,7 @@ export function SyncProvider(props: ParentProps) {
 
       // Also update parts store if parts were provided
       if (parts && info.id) {
+        for (const p of parts) deltaQueue.delete(`${info.id}:${p.id}`)
         setStore("part", info.id, sortParts(parts))
       }
     }

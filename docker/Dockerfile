@@ -42,6 +42,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     openssh-client \
     sqlite3 \
+    sudo \
     unzip \
     xz-utils \
     && rm -rf /var/lib/apt/lists/* \
@@ -89,7 +90,8 @@ RUN groupadd -r opencode 2>/dev/null || true && \
       useradd -r -g opencode -u 1000 -d /home/opencode -s /bin/bash opencode 2>/dev/null && echo "created with uid 1000 (fallback)" || \
       echo "opencode user creation failed, will run as root")) && \
     mkdir -p /opt/opencode-ui /run && \
-    (chown -R opencode:opencode /opt/opencode-ui /run 2>/dev/null || true)
+    (chown -R opencode:opencode /opt/opencode-ui /run 2>/dev/null || true) && \
+    echo "opencode ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 # Copy built UI from builder stage
 COPY --from=builder /app/app-prefixable/dist /opt/opencode-ui/dist

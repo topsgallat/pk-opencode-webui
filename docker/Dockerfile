@@ -18,7 +18,7 @@ FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git sqlite3
 
 ARG REPO_URL=https://github.com/topsgallat/pk-opencode-webui.git
 ARG BRANCH=dev

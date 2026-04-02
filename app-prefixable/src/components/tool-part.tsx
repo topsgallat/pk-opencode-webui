@@ -1,4 +1,4 @@
-import { createSignal, createEffect, createMemo, Show, For, createRoot, JSX } from "solid-js";
+import { createSignal, createEffect, createMemo, Show, For, createRoot, JSX, onCleanup } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import type { Part, ToolPart as SDKToolPart, ToolState, ReasoningPart as SDKReasoningPart } from "../sdk/client";
 import { ChevronDown, ExternalLink, Users, Sparkles, Brain } from "lucide-solid";
@@ -946,47 +946,72 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
       </button>
 
       {/* Bash terminal block */}
-      <Show when={expanded() && isBash()}>
-        <div
-          class="px-3 py-2 font-mono text-xs overflow-x-auto"
-          style={{
-            "border-top": "1px solid var(--border-base)",
-            background: "var(--surface-overlay)",
-          }}
-        >
-          <div class="flex items-start justify-between gap-1.5 mb-1">
-            <div class="flex items-start gap-1.5">
-              <span style={{ color: "var(--status-success-text)", "flex-shrink": 0 }}>$</span>
-              <pre
-                class="whitespace-pre-wrap"
-                style={{ color: "var(--text-strong)" }}
-              >
-                {bashInput()}
-              </pre>
+      <Show when={expanded() && isBash() ? true : undefined}>
+        {(_isTrue) => {
+          const [elapsed, setElapsed] = createSignal<number>(0);
+          createEffect(() => {
+            if (status() === "running") {
+              const interval = setInterval(() => setElapsed((prev) => prev + 1), 1000);
+              onCleanup(() => clearInterval(interval));
+            } else {
+              setElapsed(0);
+            }
+          });
+          const formatElapsed = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`);
+
+          return (
+            <div
+              class="px-3 py-2 font-mono text-xs overflow-x-auto"
+              style={{
+                "border-top": "1px solid var(--border-base)",
+                background: "var(--surface-overlay)",
+              }}
+            >
+              <div class="flex items-start justify-between gap-1.5 mb-1">
+                <div class="flex items-start gap-1.5">
+                  <span style={{ color: "var(--status-success-text)", "flex-shrink": 0 }}>$</span>
+                  <pre
+                    class="whitespace-pre-wrap"
+                    style={{ color: "var(--text-strong)" }}
+                  >
+                    {bashInput()}
+                    <Show when={status() === "running" && !getOutput(state())}>
+                      <span class="animate-pulse" style={{ color: "var(--status-success-text)" }}>▊</span>
+                    </Show>
+                  </pre>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <Show when={status() === "running"}>
+                    <span style={{ color: "var(--text-weak)", "font-size": "0.7rem" }}>
+                      {formatElapsed(elapsed())}
+                    </span>
+                  </Show>
+                  <CopyButton getText={() => bashInput() + (getOutput(state()) ? "\n" + getOutput(state()) : "")} />
+                </div>
+              </div>
+              <Show when={getOutput(state())}>
+                {(output) => (
+                  <pre
+                    class="whitespace-pre-wrap max-h-64 overflow-y-auto mt-1"
+                    style={{ color: "var(--text-base)" }}
+                  >
+                    {output()}
+                  </pre>
+                )}
+              </Show>
+              <Show when={getError(state())}>
+                {(err) => (
+                  <pre
+                    class="whitespace-pre-wrap mt-1"
+                    style={{ color: "var(--icon-critical-base)" }}
+                  >
+                    {err()}
+                  </pre>
+                )}
+              </Show>
             </div>
-            <CopyButton getText={() => bashInput() + (getOutput(state()) ? "\n" + getOutput(state()) : "")} />
-          </div>
-          <Show when={getOutput(state())}>
-            {(output) => (
-              <pre
-                class="whitespace-pre-wrap max-h-64 overflow-y-auto mt-1"
-                style={{ color: "var(--text-base)" }}
-              >
-                {output()}
-              </pre>
-            )}
-          </Show>
-          <Show when={getError(state())}>
-            {(err) => (
-              <pre
-                class="whitespace-pre-wrap mt-1"
-                style={{ color: "var(--icon-critical-base)" }}
-              >
-                {err()}
-              </pre>
-            )}
-          </Show>
-        </div>
+          );
+        }}
       </Show>
 
       {/* Read file code viewer block */}

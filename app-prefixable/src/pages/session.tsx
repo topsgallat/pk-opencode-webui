@@ -338,6 +338,8 @@ export function Session() {
   // Track whether the agent was genuinely processing (not initial load)
   const wasProcessing = { value: false };
 
+  const syncGen = { value: 0 };
+
   // Keep sessionId in sync with URL params and sync session data.
   // Track the composite dir+id key so the effect fires on directory changes too,
   // preventing drafts from leaking across projects when id stays undefined.
@@ -379,11 +381,13 @@ export function Session() {
     setPromptSent(false); // Reset so pending prompts fire in the new session
     wasProcessing.value = false; // Reset to avoid false notifications
     if (id) {
-      // Use sync context to load session data - no local state needed
       setLoadingHistory(true);
-      setProcessing(false); // Reset processing state for new session
+      setProcessing(false);
+      const gen = ++syncGen.value;
       sync.session.sync(id).then(() => {
-        setLoadingHistory(false);
+        if (syncGen.value === gen) setLoadingHistory(false);
+      }).catch(() => {
+        if (syncGen.value === gen) setLoadingHistory(false);
       });
 
       // Check if this session is actually busy

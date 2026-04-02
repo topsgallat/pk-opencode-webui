@@ -529,7 +529,7 @@ const server = Bun.serve<{ target: string }>({
       const target = ws.data.target
       console.log("[Proxy] WebSocket client connected, connecting to backend:", target)
 
-      const backend = new WebSocket(target)
+      const backend = new WebSocket(target, proxyAuthHeader ? { headers: { Authorization: proxyAuthHeader } } : undefined)
 
       backend.addEventListener("open", () => {
         console.log("[Proxy] Backend WebSocket connected")

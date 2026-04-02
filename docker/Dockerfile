@@ -18,9 +18,9 @@ FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
-# Copy source
-COPY app-prefixable ./app-prefixable
-COPY shared ./shared
+ARG REPO_URL=https://github.com/topsgallat/pk-opencode-webui.git
+ARG BRANCH=dev
+RUN git clone --depth 1 --branch ${BRANCH} ${REPO_URL} .
 
 # Install dependencies and build
 WORKDIR /app/app-prefixable

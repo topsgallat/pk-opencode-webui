@@ -82,8 +82,10 @@ RUN case $(uname -m) in \
 # Create non-root user and app directory
 # HOST_UID and HOST_GID are passed from docker-compose to match the host user's ID.
 # This ensures the container can read/write the mounted volume correctly.
+# ENABLE_SUDO=1 to allow sudo for opencode user
 ARG HOST_UID=1000
 ARG HOST_GID=1000
+ARG ENABLE_SUDO=0
 RUN groupadd -r opencode 2>/dev/null || true && \
     (getent passwd opencode 2>/dev/null && echo "opencode user exists" || \
      (useradd -r -g opencode -u ${HOST_UID} -d /home/opencode -s /bin/bash opencode 2>/dev/null && echo "created with uid ${HOST_UID}" || \
@@ -91,7 +93,7 @@ RUN groupadd -r opencode 2>/dev/null || true && \
       echo "opencode user creation failed, will run as root")) && \
     mkdir -p /opt/opencode-ui /run && \
     (chown -R opencode:opencode /opt/opencode-ui /run 2>/dev/null || true) && \
-    echo "opencode ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+    if [ "${ENABLE_SUDO}" = "1" ]; then echo "opencode ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers; fi
 
 # Copy built UI from builder stage
 COPY --from=builder /app/app-prefixable/dist /opt/opencode-ui/dist

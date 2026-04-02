@@ -18,6 +18,8 @@ FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y git
+
 ARG REPO_URL=https://github.com/topsgallat/pk-opencode-webui.git
 ARG BRANCH=dev
 RUN git clone --depth 1 --branch ${BRANCH} ${REPO_URL} .

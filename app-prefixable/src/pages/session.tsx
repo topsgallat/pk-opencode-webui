@@ -1000,6 +1000,10 @@ export function Session() {
     if (id) await sync.session.sync(id);
   };
 
+  createEffect(() => {
+    if (sync.ready && loadingHistory()) setLoadingHistory(false);
+  });
+
   // Clear stale localStorage key when sessions are loaded and ID is not found
   createEffect(() => {
     const id = params.id;

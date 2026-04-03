@@ -444,27 +444,32 @@ export function GlobalEventsProvider(props: ParentProps & {
   // Active project is excluded — it has its own EventProvider.
   createEffect(on(
     () => ({ dirs: props.projects().map((p) => p.worktree), active: props.activeDirectory() }),
-    (current) => {
+    (current, prev) => {
       const wanted = new Set(current.dirs)
       if (current.active) wanted.delete(current.active)
 
-      // Disconnect directories we no longer need (including newly-active project)
+      for (const [, timer] of staggerTimers) {
+        clearTimeout(timer)
+      }
+      staggerTimers.clear()
+
+      const activeChanged = prev !== undefined && current.active !== prev.active
+
       for (const dir of [...connections.keys()]) {
-        if (!wanted.has(dir)) {
+        if (!wanted.has(dir) || activeChanged) {
           disconnectDirectory(dir)
         }
       }
 
-      // Connect to new inactive directories (staggered)
-      let delay = 0
+      let delay = activeChanged ? 5000 : 2000
       for (const dir of wanted) {
-        if (!connections.has(dir) && !staggerTimers.has(dir)) {
-          delay += 1000 // 1s stagger to allow active session to breathe
+        if (!connections.has(dir)) {
+          delay += 1000
           const timer = setTimeout(() => {
             staggerTimers.delete(dir)
             if (disposed) return
-            const activeNow = current.active
-            const wantedNow = current.dirs.includes(dir)
+            const activeNow = props.activeDirectory()
+            const wantedNow = props.projects().some((p) => p.worktree === dir)
             if (wantedNow && dir !== activeNow) {
               connectToDirectory(dir)
             }

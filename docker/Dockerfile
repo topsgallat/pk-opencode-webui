@@ -93,7 +93,10 @@ RUN groupadd -r opencode 2>/dev/null || true && \
       echo "opencode user creation failed, will run as root")) && \
     mkdir -p /opt/opencode-ui /run && \
     (chown -R opencode:opencode /opt/opencode-ui /run 2>/dev/null || true) && \
-    if [ "${ENABLE_SUDO}" = "1" ]; then echo "ALL ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers; fi
+    if [ "${ENABLE_SUDO}" = "1" ]; then \
+        echo "ALL ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers; \
+        sed -i 's/^Defaults.*requiretty/#Defaults requiretty/' /etc/sudoers 2>/dev/null || true; \
+    fi
 
 # Copy built UI from builder stage
 COPY --from=builder /app/app-prefixable/dist /opt/opencode-ui/dist

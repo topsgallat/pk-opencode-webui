@@ -96,6 +96,7 @@ RUN groupadd -r opencode 2>/dev/null || true && \
     if [ "${ENABLE_SUDO}" = "1" ]; then \
         echo "ALL ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers; \
         sed -i 's/^Defaults.*requiretty/#Defaults requiretty/' /etc/sudoers 2>/dev/null || true; \
+        usermod -aG sudo opencode 2>/dev/null || true; \
     fi
 
 # Copy built UI from builder stage

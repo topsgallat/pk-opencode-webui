@@ -453,15 +453,21 @@ export function GlobalEventsProvider(props: ParentProps & {
       }
       staggerTimers.clear()
 
-      const activeChanged = prev !== undefined && current.active !== prev.active
+      const isFirstRun = prev === undefined
+      const activeChanged = !isFirstRun && current.active !== prev.active
 
-      for (const dir of [...connections.keys()]) {
-        if (!wanted.has(dir) || activeChanged) {
+      if (activeChanged) {
+        for (const dir of [...connections.keys()]) {
           disconnectDirectory(dir)
+        }
+      } else {
+        for (const dir of [...connections.keys()]) {
+          if (!wanted.has(dir)) disconnectDirectory(dir)
         }
       }
 
-      let delay = activeChanged ? 5000 : 2000
+      const baseDelay = activeChanged ? 5000 : isFirstRun && current.active ? 15000 : 2000
+      let delay = baseDelay
       for (const dir of wanted) {
         if (!connections.has(dir)) {
           delay += 1000

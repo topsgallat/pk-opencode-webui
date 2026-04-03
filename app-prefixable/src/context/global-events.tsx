@@ -56,6 +56,9 @@ export function GlobalEventsProvider(props: ParentProps & {
   // Pending reconnect timers, tracked separately from connections but cleared by disconnectDirectory
   const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
+  // Stagger timers to avoid hitting browser connection limits during initial bootstrap
+  const staggerTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
   // Debounce timers for permission reseeds — prevents multiple rapid permission.replied
   // events from spawning overlapping fetch requests that race each other
   const permReseedTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -287,6 +290,11 @@ export function GlobalEventsProvider(props: ParentProps & {
       clearTimeout(timer)
       reconnectTimers.delete(dir)
     }
+    const stagger = staggerTimers.get(dir)
+    if (stagger) {
+      clearTimeout(stagger)
+      staggerTimers.delete(dir)
+    }
     const reseed = permReseedTimers.get(dir)
     if (reseed) {
       clearTimeout(reseed)
@@ -447,10 +455,21 @@ export function GlobalEventsProvider(props: ParentProps & {
         }
       }
 
-      // Connect to new inactive directories
+      // Connect to new inactive directories (staggered)
+      let delay = 0
       for (const dir of wanted) {
-        if (!connections.has(dir)) {
-          connectToDirectory(dir)
+        if (!connections.has(dir) && !staggerTimers.has(dir)) {
+          delay += 1000 // 1s stagger to allow active session to breathe
+          const timer = setTimeout(() => {
+            staggerTimers.delete(dir)
+            if (disposed) return
+            const activeNow = current.active
+            const wantedNow = current.dirs.includes(dir)
+            if (wantedNow && dir !== activeNow) {
+              connectToDirectory(dir)
+            }
+          }, delay)
+          staggerTimers.set(dir, timer)
         }
       }
     },
@@ -466,6 +485,10 @@ export function GlobalEventsProvider(props: ParentProps & {
       clearTimeout(timer)
     }
     reconnectTimers.clear()
+    for (const [, timer] of staggerTimers) {
+      clearTimeout(timer)
+    }
+    staggerTimers.clear()
     for (const [, timer] of permReseedTimers) {
       clearTimeout(timer)
     }

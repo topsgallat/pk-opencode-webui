@@ -1,4 +1,4 @@
-import { createContext, useContext, onCleanup, batch, type ParentProps } from "solid-js"
+import { createContext, useContext, onCleanup, batch, createSignal, type ParentProps } from "solid-js"
 import { createStore, reconcile, produce } from "solid-js/store"
 import type { Session, Message, Part, Provider } from "../sdk/client"
 import { useBasePath } from "./base-path"
@@ -46,6 +46,9 @@ interface SyncContextValue {
 }
 
 export const SyncContext = createContext<SyncContextValue>()
+
+const [globalSyncReady, setGlobalSyncReady] = createSignal(false)
+export { globalSyncReady }
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
@@ -479,6 +482,7 @@ export function SyncProvider(props: ParentProps) {
         }
 
         setStore("ready", true)
+        setGlobalSyncReady(true)
       })
 
       console.log("[Sync] Bootstrap complete, sessions:", store.session.length)
@@ -582,6 +586,7 @@ export function SyncProvider(props: ParentProps) {
   connect()
 
   onCleanup(() => {
+    setGlobalSyncReady(false)
     eventSource?.close()
     if (reconnectTimer) clearTimeout(reconnectTimer)
   })

@@ -8,6 +8,7 @@ import {
 } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { useBasePath } from "./base-path"
+import { globalSyncReady } from "./sync"
 
 /**
  * Alert priority: permission (highest) > question > busy
@@ -442,49 +443,47 @@ export function GlobalEventsProvider(props: ParentProps & {
 
   // Reactively manage connections when projects or active directory change.
   // Active project is excluded — it has its own EventProvider.
-  createEffect(on(
-    () => ({ dirs: props.projects().map((p) => p.worktree), active: props.activeDirectory() }),
-    (current, prev) => {
-      const wanted = new Set(current.dirs)
-      if (current.active) wanted.delete(current.active)
+  createEffect(() => {
+    const dirs = props.projects().map((p) => p.worktree)
+    const active = props.activeDirectory()
+    const ready = globalSyncReady()
 
-      for (const [, timer] of staggerTimers) {
-        clearTimeout(timer)
+    const wanted = new Set(dirs)
+    if (active) wanted.delete(active)
+
+    for (const [, timer] of staggerTimers) {
+      clearTimeout(timer)
+    }
+    staggerTimers.clear()
+
+    for (const dir of [...connections.keys()]) {
+      if (!wanted.has(dir)) disconnectDirectory(dir)
+    }
+
+    if (active && !ready) {
+      for (const dir of [...connections.keys()]) {
+        disconnectDirectory(dir)
       }
-      staggerTimers.clear()
+      return
+    }
 
-      const isFirstRun = prev === undefined
-      const activeChanged = !isFirstRun && current.active !== prev.active
-
-      if (activeChanged) {
-        for (const dir of [...connections.keys()]) {
-          disconnectDirectory(dir)
-        }
-      } else {
-        for (const dir of [...connections.keys()]) {
-          if (!wanted.has(dir)) disconnectDirectory(dir)
-        }
+    let delay = 1000
+    for (const dir of wanted) {
+      if (!connections.has(dir)) {
+        delay += 1000
+        const timer = setTimeout(() => {
+          staggerTimers.delete(dir)
+          if (disposed) return
+          const activeNow = props.activeDirectory()
+          const wantedNow = props.projects().some((p) => p.worktree === dir)
+          if (wantedNow && dir !== activeNow) {
+            connectToDirectory(dir)
+          }
+        }, delay)
+        staggerTimers.set(dir, timer)
       }
-
-      const baseDelay = activeChanged ? 5000 : isFirstRun && current.active ? 15000 : 2000
-      let delay = baseDelay
-      for (const dir of wanted) {
-        if (!connections.has(dir)) {
-          delay += 1000
-          const timer = setTimeout(() => {
-            staggerTimers.delete(dir)
-            if (disposed) return
-            const activeNow = props.activeDirectory()
-            const wantedNow = props.projects().some((p) => p.worktree === dir)
-            if (wantedNow && dir !== activeNow) {
-              connectToDirectory(dir)
-            }
-          }, delay)
-          staggerTimers.set(dir, timer)
-        }
-      }
-    },
-  ))
+    }
+  })
 
   onCleanup(() => {
     disposed = true

@@ -256,10 +256,6 @@ export function MessageTimeline(props: {
     tick = window.setInterval(() => setNow(Date.now()), 30_000)
   })
 
-  onMount(() => {
-    if (!props.loadingHistory) requestAnimationFrame(() => autoScroll.forceScrollToBottom())
-  })
-
   createEffect(on(() => props.loadingHistory, (loading, prev) => {
     if (prev && !loading) requestAnimationFrame(() => autoScroll.forceScrollToBottom())
   }))
@@ -339,7 +335,6 @@ export function MessageTimeline(props: {
       if (overlap < prevIds.size / 2) {
         setRenderCount(INITIAL_TURNS)
         setExpanded({})
-        autoScroll.forceScrollToBottom()
       }
     }
 

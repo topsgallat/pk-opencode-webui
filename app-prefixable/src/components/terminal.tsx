@@ -4,7 +4,7 @@ import { FitAddon } from "@xterm/addon-fit"
 import "@xterm/xterm/css/xterm.css"
 import { useSDK } from "../context/sdk"
 import { useTheme } from "../context/theme"
-import { Sun, Moon, Monitor } from "lucide-solid"
+import { Sun, Moon, Monitor, Clipboard } from "lucide-solid"
 import type { ITheme } from "@xterm/xterm"
 
 type TerminalColorScheme = "auto" | "light" | "dark"
@@ -107,6 +107,7 @@ export function Terminal(props: TerminalProps) {
   const [status, setStatus] = createSignal<"connecting" | "connected" | "error" | "disconnected">("connecting")
   const [error, setError] = createSignal<string | null>(null)
   const [showBanner, setShowBanner] = createSignal(false)
+  const [pasteMenu, setPasteMenu] = createSignal<{ x: number; y: number } | null>(null)
 
   const resolvedScheme = () => {
     const scheme = terminalScheme()
@@ -279,6 +280,30 @@ export function Terminal(props: TerminalProps) {
     // Focus terminal
     term.focus()
 
+    let longPressTimer: ReturnType<typeof setTimeout> | undefined
+    const handleTouchStart = (e: TouchEvent) => {
+      const touch = e.touches[0]
+      longPressTimer = setTimeout(() => {
+        const rect = wrapper.getBoundingClientRect()
+        setPasteMenu({ x: touch.clientX - rect.left, y: touch.clientY - rect.top })
+      }, 500)
+    }
+    const cancelLongPress = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer)
+        longPressTimer = undefined
+      }
+    }
+    wrapper.addEventListener("touchstart", handleTouchStart, { passive: true })
+    wrapper.addEventListener("touchend", cancelLongPress, { passive: true })
+    wrapper.addEventListener("touchmove", cancelLongPress, { passive: true })
+
+    const dismissPasteMenu = (e: TouchEvent) => {
+      const btn = (e.target as Element).closest("button")
+      if (!btn || !btn.textContent?.includes("Paste")) setPasteMenu(null)
+    }
+    document.addEventListener("touchstart", dismissPasteMenu, { passive: true })
+
     // Reactively update xterm theme when resolved scheme changes
     createEffect(() => {
       const theme = activeTheme()
@@ -290,8 +315,13 @@ export function Terminal(props: TerminalProps) {
       console.log("[Terminal] Cleaning up")
       disposed = true
       if (reconnectTimer) clearTimeout(reconnectTimer)
+      if (longPressTimer) clearTimeout(longPressTimer)
       window.removeEventListener("resize", handleResize)
       resizeObserver.disconnect()
+      wrapper.removeEventListener("touchstart", handleTouchStart)
+      wrapper.removeEventListener("touchend", cancelLongPress)
+      wrapper.removeEventListener("touchmove", cancelLongPress)
+      document.removeEventListener("touchstart", dismissPasteMenu)
       ws?.close()
       term?.dispose()
     })
@@ -310,6 +340,12 @@ export function Terminal(props: TerminalProps) {
     if (s === "auto") return "Auto"
     if (s === "light") return "Light"
     return "Dark"
+  }
+
+  const pasteFromClipboard = async () => {
+    setPasteMenu(null)
+    const text = await navigator.clipboard.readText().catch(() => null)
+    if (text && ws?.readyState === WebSocket.OPEN) ws.send(text)
   }
 
   return (
@@ -369,7 +405,7 @@ export function Terminal(props: TerminalProps) {
       {/* Terminal container */}
       <div
         ref={wrapper}
-        class="flex-1"
+        class="flex-1 relative"
         style={{
           background: activeTheme().background,
           padding: "0 8px 8px 8px",
@@ -377,6 +413,26 @@ export function Terminal(props: TerminalProps) {
         }}
       >
         <div ref={container} class="size-full" style={{ "min-height": "0" }} />
+        <Show when={pasteMenu()}>
+          {(pos) => (
+            <button
+              type="button"
+              class="absolute z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg"
+              style={{
+                left: `${pos().x}px`,
+                top: `${pos().y}px`,
+                transform: "translate(-50%, -110%)",
+                background: activeTheme().background === "#ffffff" ? "#1f2937" : "#e4e4e7",
+                color: activeTheme().background === "#ffffff" ? "#f3f4f6" : "#18181b",
+              }}
+              onClick={pasteFromClipboard}
+              onTouchEnd={(e) => { e.preventDefault(); pasteFromClipboard() }}
+            >
+              <Clipboard class="w-3.5 h-3.5" />
+              Paste
+            </button>
+          )}
+        </Show>
       </div>
     </div>
   )

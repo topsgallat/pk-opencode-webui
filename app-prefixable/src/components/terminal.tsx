@@ -349,24 +349,19 @@ export function Terminal(props: TerminalProps) {
   const enableTouchSel = () => {
     const canvas = container?.querySelector("canvas")
     if (!canvas) return
-    const rect = () => canvas.getBoundingClientRect()
-    const fireMouseEvent = (type: string, touch: Touch, buttons = 0) => {
-      const r = rect()
-      canvas.dispatchEvent(new MouseEvent(type, {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-        screenX: touch.screenX,
-        screenY: touch.screenY,
-        buttons,
-        button: 0,
-      }))
+    const fire = (type: string, touch: Touch, buttons = 0) => {
+      const init = {
+        bubbles: true, cancelable: true, view: window,
+        clientX: touch.clientX, clientY: touch.clientY,
+        screenX: touch.screenX, screenY: touch.screenY,
+        buttons, button: 0, pointerId: 1, pointerType: "touch" as const, isPrimary: true,
+      }
+      canvas.dispatchEvent(new PointerEvent(type, init))
+      canvas.dispatchEvent(new MouseEvent(type.replace("pointer", "mouse"), init))
     }
-    const onStart = (e: TouchEvent) => { e.preventDefault(); fireMouseEvent("mousedown", e.touches[0], 1) }
-    const onMove = (e: TouchEvent) => { e.preventDefault(); fireMouseEvent("mousemove", e.touches[0], 1) }
-    const onEnd = (e: TouchEvent) => { e.preventDefault(); fireMouseEvent("mouseup", e.changedTouches[0]) }
+    const onStart = (e: TouchEvent) => { e.preventDefault(); fire("pointerdown", e.touches[0], 1) }
+    const onMove = (e: TouchEvent) => { e.preventDefault(); fire("pointermove", e.touches[0], 1) }
+    const onEnd = (e: TouchEvent) => { e.preventDefault(); fire("pointerup", e.changedTouches[0]) }
     canvas.addEventListener("touchstart", onStart, { passive: false })
     canvas.addEventListener("touchmove", onMove, { passive: false })
     canvas.addEventListener("touchend", onEnd, { passive: false })

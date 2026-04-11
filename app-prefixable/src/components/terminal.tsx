@@ -4,7 +4,7 @@ import { FitAddon } from "@xterm/addon-fit"
 import "@xterm/xterm/css/xterm.css"
 import { useSDK } from "../context/sdk"
 import { useTheme } from "../context/theme"
-import { Sun, Moon, Monitor, Clipboard, Copy } from "lucide-solid"
+import { Sun, Moon, Monitor, Clipboard, Copy, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from "lucide-solid"
 import type { ITheme } from "@xterm/xterm"
 
 type TerminalColorScheme = "auto" | "light" | "dark"
@@ -355,6 +355,10 @@ export function Terminal(props: TerminalProps) {
     if (text) await navigator.clipboard.writeText(text).catch(() => null)
   }
 
+  const sendKey = (seq: string) => {
+    if (ws?.readyState === WebSocket.OPEN) ws.send(seq)
+  }
+
   return (
     <div class="size-full flex flex-col" style={{ "min-height": "100px" }}>
       <Show when={showBanner()}>
@@ -409,7 +413,54 @@ export function Terminal(props: TerminalProps) {
         </button>
       </div>
 
-      {/* Terminal container */}
+      <div
+        class="flex items-center justify-center gap-1 px-2 py-1 shrink-0 md:hidden"
+        style={{ background: activeTheme().background }}
+      >
+        <button
+          type="button"
+          class="flex items-center justify-center w-9 h-9 rounded opacity-70 active:opacity-100 active:scale-95 transition-all select-none"
+          style={{ color: activeTheme().foreground, background: activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a" }}
+          onTouchStart={(e) => { e.preventDefault(); sendKey("\x1b[D") }}
+          onClick={() => sendKey("\x1b[D")}
+          aria-label="Left"
+        >
+          <ChevronLeft class="w-5 h-5" />
+        </button>
+        <div class="flex flex-col gap-1">
+          <button
+            type="button"
+            class="flex items-center justify-center w-9 h-9 rounded opacity-70 active:opacity-100 active:scale-95 transition-all select-none"
+            style={{ color: activeTheme().foreground, background: activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a" }}
+            onTouchStart={(e) => { e.preventDefault(); sendKey("\x1b[A") }}
+            onClick={() => sendKey("\x1b[A")}
+            aria-label="Up"
+          >
+            <ChevronUp class="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            class="flex items-center justify-center w-9 h-9 rounded opacity-70 active:opacity-100 active:scale-95 transition-all select-none"
+            style={{ color: activeTheme().foreground, background: activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a" }}
+            onTouchStart={(e) => { e.preventDefault(); sendKey("\x1b[B") }}
+            onClick={() => sendKey("\x1b[B")}
+            aria-label="Down"
+          >
+            <ChevronDown class="w-5 h-5" />
+          </button>
+        </div>
+        <button
+          type="button"
+          class="flex items-center justify-center w-9 h-9 rounded opacity-70 active:opacity-100 active:scale-95 transition-all select-none"
+          style={{ color: activeTheme().foreground, background: activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a" }}
+          onTouchStart={(e) => { e.preventDefault(); sendKey("\x1b[C") }}
+          onClick={() => sendKey("\x1b[C")}
+          aria-label="Right"
+        >
+          <ChevronRight class="w-5 h-5" />
+        </button>
+      </div>
+
       <div
         ref={wrapper}
         class="flex-1 relative"

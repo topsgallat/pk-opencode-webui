@@ -434,8 +434,8 @@ export function Terminal(props: TerminalProps) {
               : (activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a"),
             outline: ctrlActive() ? "2px solid currentColor" : "none",
           }}
-          onTouchStart={(e) => { e.preventDefault(); setCtrlActive(v => !v) }}
-          onClick={() => setCtrlActive(v => !v)}
+          onTouchEnd={(e) => { e.preventDefault(); setCtrlActive(v => !v); term?.focus() }}
+          onClick={() => { setCtrlActive(v => !v); term?.focus() }}
           aria-label="Ctrl"
           aria-pressed={ctrlActive()}
         >

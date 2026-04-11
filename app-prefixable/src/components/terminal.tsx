@@ -97,7 +97,6 @@ export function Terminal(props: TerminalProps) {
   const { client, url, directory } = useSDK()
   const appTheme = useTheme()
   let container!: HTMLDivElement
-  let wrapper!: HTMLDivElement
   let term: XTerm | undefined
   let fitAddon: FitAddon | undefined
   let ws: WebSocket | undefined
@@ -107,8 +106,8 @@ export function Terminal(props: TerminalProps) {
   const [status, setStatus] = createSignal<"connecting" | "connected" | "error" | "disconnected">("connecting")
   const [error, setError] = createSignal<string | null>(null)
   const [showBanner, setShowBanner] = createSignal(false)
-  const [pasteMenu, setPasteMenu] = createSignal<{ x: number; y: number; hasSelection: boolean } | null>(null)
   const [ctrlActive, setCtrlActive] = createSignal(false)
+  const [hasSelection, setHasSelection] = createSignal(false)
 
   const resolvedScheme = () => {
     const scheme = terminalScheme()
@@ -117,6 +116,7 @@ export function Terminal(props: TerminalProps) {
   }
 
   const activeTheme = createMemo(() => resolvedScheme() === "dark" ? darkTheme : lightTheme)
+  const btnBg = () => activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a"
 
   function writeStatus(message: string, type: "info" | "error" | "success" = "info") {
     if (!term) return
@@ -240,6 +240,11 @@ export function Terminal(props: TerminalProps) {
       }
     })
 
+    // Track selection changes for Copy button state
+    term.onSelectionChange(() => {
+      setHasSelection(!!(term?.getSelection()))
+    })
+
     // Handle resize
     term.onResize((size) => {
       console.log("[Terminal] Resize:", size.cols, "x", size.rows)
@@ -287,31 +292,6 @@ export function Terminal(props: TerminalProps) {
     // Focus terminal
     term.focus()
 
-    let longPressTimer: ReturnType<typeof setTimeout> | undefined
-    const handleTouchStart = (e: TouchEvent) => {
-      const touch = e.touches[0]
-      longPressTimer = setTimeout(() => {
-        const rect = wrapper.getBoundingClientRect()
-        const hasSelection = !!(term?.getSelection())
-        setPasteMenu({ x: touch.clientX - rect.left, y: touch.clientY - rect.top, hasSelection })
-      }, 500)
-    }
-    const cancelLongPress = () => {
-      if (longPressTimer) {
-        clearTimeout(longPressTimer)
-        longPressTimer = undefined
-      }
-    }
-    wrapper.addEventListener("touchstart", handleTouchStart, { passive: true })
-    wrapper.addEventListener("touchend", cancelLongPress, { passive: true })
-    wrapper.addEventListener("touchmove", cancelLongPress, { passive: true })
-
-    const dismissPasteMenu = (e: TouchEvent) => {
-      const btn = (e.target as Element).closest("button[data-terminal-action]")
-      if (!btn) setPasteMenu(null)
-    }
-    document.addEventListener("touchstart", dismissPasteMenu, { passive: true })
-
     // Reactively update xterm theme when resolved scheme changes
     createEffect(() => {
       const theme = activeTheme()
@@ -323,13 +303,8 @@ export function Terminal(props: TerminalProps) {
       console.log("[Terminal] Cleaning up")
       disposed = true
       if (reconnectTimer) clearTimeout(reconnectTimer)
-      if (longPressTimer) clearTimeout(longPressTimer)
       window.removeEventListener("resize", handleResize)
       resizeObserver.disconnect()
-      wrapper.removeEventListener("touchstart", handleTouchStart)
-      wrapper.removeEventListener("touchend", cancelLongPress)
-      wrapper.removeEventListener("touchmove", cancelLongPress)
-      document.removeEventListener("touchstart", dismissPasteMenu)
       ws?.close()
       term?.dispose()
     })
@@ -351,15 +326,15 @@ export function Terminal(props: TerminalProps) {
   }
 
   const pasteFromClipboard = async () => {
-    setPasteMenu(null)
     const text = await navigator.clipboard.readText().catch(() => null)
     if (text && ws?.readyState === WebSocket.OPEN) ws.send(text)
+    term?.focus()
   }
 
   const copySelection = async () => {
     const text = term?.getSelection()
-    setPasteMenu(null)
     if (text) await navigator.clipboard.writeText(text).catch(() => null)
+    term?.focus()
   }
 
   const sendKey = (seq: string) => {
@@ -400,7 +375,6 @@ export function Terminal(props: TerminalProps) {
           </div>
         </div>
       </Show>
-      {/* Theme toggle */}
       <div
         class="flex items-center justify-end px-2 py-0.5 shrink-0"
         style={{ background: activeTheme().background }}
@@ -431,7 +405,7 @@ export function Terminal(props: TerminalProps) {
             color: ctrlActive() ? (activeTheme().background === "#ffffff" ? "#2563eb" : "#60a5fa") : activeTheme().foreground,
             background: ctrlActive()
               ? (activeTheme().background === "#ffffff" ? "#dbeafe" : "#1e3a5f")
-              : (activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a"),
+              : btnBg(),
             outline: ctrlActive() ? "2px solid currentColor" : "none",
           }}
           onTouchEnd={(e) => { e.preventDefault(); setCtrlActive(v => !v); term?.focus() }}
@@ -450,7 +424,7 @@ export function Terminal(props: TerminalProps) {
           <button
             type="button"
             class="flex items-center justify-center w-10 h-10 rounded opacity-70 active:opacity-100 active:scale-95 transition-all select-none"
-            style={{ color: activeTheme().foreground, background: activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a" }}
+            style={{ color: activeTheme().foreground, background: btnBg() }}
             onTouchStart={(e) => { e.preventDefault(); sendKey(seq) }}
             onClick={() => sendKey(seq)}
             aria-label={label}
@@ -458,62 +432,42 @@ export function Terminal(props: TerminalProps) {
             <Icon class="w-5 h-5" />
           </button>
         ))}
+        <button
+          type="button"
+          class="flex items-center justify-center w-10 h-10 rounded transition-all select-none"
+          style={{
+            color: activeTheme().foreground,
+            background: btnBg(),
+            opacity: hasSelection() ? "1" : "0.35",
+          }}
+          onTouchEnd={(e) => { e.preventDefault(); copySelection() }}
+          onClick={copySelection}
+          aria-label="Copy"
+          disabled={!hasSelection()}
+        >
+          <Copy class="w-5 h-5" />
+        </button>
+        <button
+          type="button"
+          class="flex items-center justify-center w-10 h-10 rounded opacity-70 active:opacity-100 active:scale-95 transition-all select-none"
+          style={{ color: activeTheme().foreground, background: btnBg() }}
+          onTouchEnd={(e) => { e.preventDefault(); pasteFromClipboard() }}
+          onClick={pasteFromClipboard}
+          aria-label="Paste"
+        >
+          <Clipboard class="w-5 h-5" />
+        </button>
       </div>
 
       <div
-        ref={wrapper}
-        class="flex-1 relative"
+        ref={container}
+        class="flex-1"
         style={{
           background: activeTheme().background,
           padding: "0 8px 8px 8px",
           "min-height": "0",
         }}
-      >
-        <div ref={container} class="size-full" style={{ "min-height": "0" }} />
-        <Show when={pasteMenu()}>
-          {(pos) => (
-            <div
-              class="absolute z-50 flex rounded-lg overflow-hidden shadow-lg text-sm font-medium"
-              style={{
-                left: `${pos().x}px`,
-                top: `${pos().y}px`,
-                transform: "translate(-50%, -110%)",
-              }}
-            >
-              <Show when={pos().hasSelection}>
-                <button
-                  type="button"
-                  data-terminal-action="copy"
-                  class="flex items-center gap-1.5 px-3 py-1.5"
-                  style={{
-                    background: activeTheme().background === "#ffffff" ? "#1f2937" : "#e4e4e7",
-                    color: activeTheme().background === "#ffffff" ? "#f3f4f6" : "#18181b",
-                  }}
-                  onClick={copySelection}
-                  onTouchEnd={(e) => { e.preventDefault(); copySelection() }}
-                >
-                  <Copy class="w-3.5 h-3.5" />
-                  Copy
-                </button>
-              </Show>
-              <button
-                type="button"
-                data-terminal-action="paste"
-                class="flex items-center gap-1.5 px-3 py-1.5"
-                style={{
-                  background: activeTheme().background === "#ffffff" ? "#374151" : "#d4d4d8",
-                  color: activeTheme().background === "#ffffff" ? "#f3f4f6" : "#18181b",
-                }}
-                onClick={pasteFromClipboard}
-                onTouchEnd={(e) => { e.preventDefault(); pasteFromClipboard() }}
-              >
-                <Clipboard class="w-3.5 h-3.5" />
-                Paste
-              </button>
-            </div>
-          )}
-        </Show>
-      </div>
+      />
     </div>
   )
 }

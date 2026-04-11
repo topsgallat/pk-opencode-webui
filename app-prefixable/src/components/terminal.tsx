@@ -108,6 +108,7 @@ export function Terminal(props: TerminalProps) {
   const [showBanner, setShowBanner] = createSignal(false)
   const [ctrlActive, setCtrlActive] = createSignal(false)
   const [hasSelection, setHasSelection] = createSignal(false)
+  const [selMode, setSelMode] = createSignal(false)
 
   const resolvedScheme = () => {
     const scheme = terminalScheme()
@@ -305,6 +306,7 @@ export function Terminal(props: TerminalProps) {
       if (reconnectTimer) clearTimeout(reconnectTimer)
       window.removeEventListener("resize", handleResize)
       resizeObserver.disconnect()
+      disableTouchSel()
       ws?.close()
       term?.dispose()
     })
@@ -339,6 +341,53 @@ export function Terminal(props: TerminalProps) {
 
   const sendKey = (seq: string) => {
     if (ws?.readyState === WebSocket.OPEN) ws.send(seq)
+  }
+
+  // Touch → mouse event mapping for selection mode on iOS
+  let touchSelCleanup: (() => void) | undefined
+
+  const enableTouchSel = () => {
+    const canvas = container?.querySelector("canvas")
+    if (!canvas) return
+    const rect = () => canvas.getBoundingClientRect()
+    const fireMouseEvent = (type: string, touch: Touch, buttons = 0) => {
+      const r = rect()
+      canvas.dispatchEvent(new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        screenX: touch.screenX,
+        screenY: touch.screenY,
+        buttons,
+        button: 0,
+      }))
+    }
+    const onStart = (e: TouchEvent) => { e.preventDefault(); fireMouseEvent("mousedown", e.touches[0], 1) }
+    const onMove = (e: TouchEvent) => { e.preventDefault(); fireMouseEvent("mousemove", e.touches[0], 1) }
+    const onEnd = (e: TouchEvent) => { e.preventDefault(); fireMouseEvent("mouseup", e.changedTouches[0]) }
+    canvas.addEventListener("touchstart", onStart, { passive: false })
+    canvas.addEventListener("touchmove", onMove, { passive: false })
+    canvas.addEventListener("touchend", onEnd, { passive: false })
+    touchSelCleanup = () => {
+      canvas.removeEventListener("touchstart", onStart)
+      canvas.removeEventListener("touchmove", onMove)
+      canvas.removeEventListener("touchend", onEnd)
+    }
+  }
+
+  const disableTouchSel = () => {
+    touchSelCleanup?.()
+    touchSelCleanup = undefined
+  }
+
+  const toggleSelMode = () => {
+    const next = !selMode()
+    setSelMode(next)
+    if (next) enableTouchSel()
+    else disableTouchSel()
+    term?.focus()
   }
 
   return (
@@ -414,6 +463,23 @@ export function Terminal(props: TerminalProps) {
           aria-pressed={ctrlActive()}
         >
           Ctrl
+        </button>
+        <button
+          type="button"
+          class="flex items-center justify-center h-10 px-3 rounded text-xs font-mono font-bold transition-all select-none"
+          style={{
+            color: selMode() ? (activeTheme().background === "#ffffff" ? "#2563eb" : "#60a5fa") : activeTheme().foreground,
+            background: selMode()
+              ? (activeTheme().background === "#ffffff" ? "#dbeafe" : "#1e3a5f")
+              : btnBg(),
+            outline: selMode() ? "2px solid currentColor" : "none",
+          }}
+          onTouchEnd={(e) => { e.preventDefault(); toggleSelMode() }}
+          onClick={toggleSelMode}
+          aria-label="Selection mode"
+          aria-pressed={selMode()}
+        >
+          Sel
         </button>
         {([
           ["Left", "\x1b[D", ChevronLeft],

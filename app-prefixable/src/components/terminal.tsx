@@ -414,51 +414,26 @@ export function Terminal(props: TerminalProps) {
       </div>
 
       <div
-        class="flex items-center justify-center gap-1 px-2 py-1 shrink-0 md:hidden"
+        class="flex items-center justify-center gap-2 px-2 py-1 shrink-0 md:hidden"
         style={{ background: activeTheme().background }}
       >
-        <button
-          type="button"
-          class="flex items-center justify-center w-9 h-9 rounded opacity-70 active:opacity-100 active:scale-95 transition-all select-none"
-          style={{ color: activeTheme().foreground, background: activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a" }}
-          onTouchStart={(e) => { e.preventDefault(); sendKey("\x1b[D") }}
-          onClick={() => sendKey("\x1b[D")}
-          aria-label="Left"
-        >
-          <ChevronLeft class="w-5 h-5" />
-        </button>
-        <div class="flex flex-col gap-1">
+        {([
+          ["Left", "\x1b[D", ChevronLeft],
+          ["Up", "\x1b[A", ChevronUp],
+          ["Down", "\x1b[B", ChevronDown],
+          ["Right", "\x1b[C", ChevronRight],
+        ] as const).map(([label, seq, Icon]) => (
           <button
             type="button"
-            class="flex items-center justify-center w-9 h-9 rounded opacity-70 active:opacity-100 active:scale-95 transition-all select-none"
+            class="flex items-center justify-center w-10 h-10 rounded opacity-70 active:opacity-100 active:scale-95 transition-all select-none"
             style={{ color: activeTheme().foreground, background: activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a" }}
-            onTouchStart={(e) => { e.preventDefault(); sendKey("\x1b[A") }}
-            onClick={() => sendKey("\x1b[A")}
-            aria-label="Up"
+            onTouchStart={(e) => { e.preventDefault(); sendKey(seq) }}
+            onClick={() => sendKey(seq)}
+            aria-label={label}
           >
-            <ChevronUp class="w-5 h-5" />
+            <Icon class="w-5 h-5" />
           </button>
-          <button
-            type="button"
-            class="flex items-center justify-center w-9 h-9 rounded opacity-70 active:opacity-100 active:scale-95 transition-all select-none"
-            style={{ color: activeTheme().foreground, background: activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a" }}
-            onTouchStart={(e) => { e.preventDefault(); sendKey("\x1b[B") }}
-            onClick={() => sendKey("\x1b[B")}
-            aria-label="Down"
-          >
-            <ChevronDown class="w-5 h-5" />
-          </button>
-        </div>
-        <button
-          type="button"
-          class="flex items-center justify-center w-9 h-9 rounded opacity-70 active:opacity-100 active:scale-95 transition-all select-none"
-          style={{ color: activeTheme().foreground, background: activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a" }}
-          onTouchStart={(e) => { e.preventDefault(); sendKey("\x1b[C") }}
-          onClick={() => sendKey("\x1b[C")}
-          aria-label="Right"
-        >
-          <ChevronRight class="w-5 h-5" />
-        </button>
+        ))}
       </div>
 
       <div

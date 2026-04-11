@@ -108,6 +108,7 @@ export function Terminal(props: TerminalProps) {
   const [error, setError] = createSignal<string | null>(null)
   const [showBanner, setShowBanner] = createSignal(false)
   const [pasteMenu, setPasteMenu] = createSignal<{ x: number; y: number; hasSelection: boolean } | null>(null)
+  const [ctrlActive, setCtrlActive] = createSignal(false)
 
   const resolvedScheme = () => {
     const scheme = terminalScheme()
@@ -229,7 +230,13 @@ export function Terminal(props: TerminalProps) {
     // Send terminal input to WebSocket
     term.onData((data) => {
       if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(data)
+        if (ctrlActive() && data.length === 1) {
+          setCtrlActive(false)
+          const code = data.toUpperCase().charCodeAt(0) & 0x1f
+          ws.send(String.fromCharCode(code))
+        } else {
+          ws.send(data)
+        }
       }
     })
 
@@ -417,6 +424,23 @@ export function Terminal(props: TerminalProps) {
         class="flex items-center justify-center gap-2 px-2 py-1 shrink-0 md:hidden"
         style={{ background: activeTheme().background }}
       >
+        <button
+          type="button"
+          class="flex items-center justify-center h-10 px-3 rounded text-xs font-mono font-bold transition-all select-none"
+          style={{
+            color: ctrlActive() ? (activeTheme().background === "#ffffff" ? "#2563eb" : "#60a5fa") : activeTheme().foreground,
+            background: ctrlActive()
+              ? (activeTheme().background === "#ffffff" ? "#dbeafe" : "#1e3a5f")
+              : (activeTheme().background === "#ffffff" ? "#f3f4f6" : "#27272a"),
+            outline: ctrlActive() ? "2px solid currentColor" : "none",
+          }}
+          onTouchStart={(e) => { e.preventDefault(); setCtrlActive(v => !v) }}
+          onClick={() => setCtrlActive(v => !v)}
+          aria-label="Ctrl"
+          aria-pressed={ctrlActive()}
+        >
+          Ctrl
+        </button>
         {([
           ["Left", "\x1b[D", ChevronLeft],
           ["Up", "\x1b[A", ChevronUp],

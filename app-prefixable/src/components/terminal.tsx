@@ -306,7 +306,6 @@ export function Terminal(props: TerminalProps) {
       if (reconnectTimer) clearTimeout(reconnectTimer)
       window.removeEventListener("resize", handleResize)
       resizeObserver.disconnect()
-      disableTouchSel()
       ws?.close()
       term?.dispose()
     })
@@ -334,6 +333,13 @@ export function Terminal(props: TerminalProps) {
   }
 
   const copySelection = async () => {
+    if (selMode()) {
+      const native = window.getSelection()?.toString()
+      if (native) await navigator.clipboard.writeText(native).catch(() => null)
+      setSelMode(false)
+      term?.focus()
+      return
+    }
     const text = term?.getSelection()
     if (text) await navigator.clipboard.writeText(text).catch(() => null)
     term?.focus()
@@ -343,47 +349,23 @@ export function Terminal(props: TerminalProps) {
     if (ws?.readyState === WebSocket.OPEN) ws.send(seq)
   }
 
-  // Touch → mouse event mapping for selection mode on iOS
-  let touchSelCleanup: (() => void) | undefined
-
-  const enableTouchSel = () => {
-    const canvas = container?.querySelector("canvas")
-    if (!canvas) return
-    const fire = (type: string, touch: Touch, buttons = 0) => {
-      const init = {
-        bubbles: true, cancelable: true, view: window,
-        clientX: touch.clientX, clientY: touch.clientY,
-        screenX: touch.screenX, screenY: touch.screenY,
-        buttons, button: 0, pointerId: 1, pointerType: "touch" as const, isPrimary: true,
-      }
-      canvas.dispatchEvent(new PointerEvent(type, init))
-      canvas.dispatchEvent(new MouseEvent(type.replace("pointer", "mouse"), init))
+  const readBuffer = () => {
+    if (!term) return []
+    const buf = term.buffer.active
+    const lines: string[] = []
+    for (let i = 0; i < buf.length; i++) {
+      lines.push(buf.getLine(i)?.translateToString(true) ?? "")
     }
-    const onStart = (e: TouchEvent) => { e.preventDefault(); fire("pointerdown", e.touches[0], 1) }
-    const onMove = (e: TouchEvent) => { e.preventDefault(); fire("pointermove", e.touches[0], 1) }
-    const onEnd = (e: TouchEvent) => { e.preventDefault(); fire("pointerup", e.changedTouches[0]) }
-    canvas.addEventListener("touchstart", onStart, { passive: false })
-    canvas.addEventListener("touchmove", onMove, { passive: false })
-    canvas.addEventListener("touchend", onEnd, { passive: false })
-    touchSelCleanup = () => {
-      canvas.removeEventListener("touchstart", onStart)
-      canvas.removeEventListener("touchmove", onMove)
-      canvas.removeEventListener("touchend", onEnd)
-    }
-  }
-
-  const disableTouchSel = () => {
-    touchSelCleanup?.()
-    touchSelCleanup = undefined
+    return lines
   }
 
   const toggleSelMode = () => {
     const next = !selMode()
     setSelMode(next)
-    if (next) enableTouchSel()
-    else disableTouchSel()
-    term?.focus()
+    if (!next) term?.focus()
   }
+
+  const overlayHasSelection = () => !!(selMode() && window.getSelection()?.toString())
 
   return (
     <div class="size-full flex flex-col" style={{ "min-height": "100px" }}>
@@ -499,12 +481,12 @@ export function Terminal(props: TerminalProps) {
           style={{
             color: activeTheme().foreground,
             background: btnBg(),
-            opacity: hasSelection() ? "1" : "0.35",
+            opacity: (hasSelection() || overlayHasSelection()) ? "1" : "0.35",
           }}
           onTouchEnd={(e) => { e.preventDefault(); copySelection() }}
           onClick={copySelection}
           aria-label="Copy"
-          disabled={!hasSelection()}
+          disabled={!hasSelection() && !overlayHasSelection()}
         >
           <Copy class="w-5 h-5" />
         </button>
@@ -520,15 +502,32 @@ export function Terminal(props: TerminalProps) {
         </button>
       </div>
 
-      <div
-        ref={container}
-        class="flex-1"
-        style={{
-          background: activeTheme().background,
-          padding: "0 8px 8px 8px",
-          "min-height": "0",
-        }}
-      />
+      <div class="flex-1 relative" style={{ "min-height": "0" }}>
+        <div
+          ref={container}
+          class="size-full"
+          style={{
+            background: activeTheme().background,
+            padding: "0 8px 8px 8px",
+            "min-height": "0",
+          }}
+        />
+        <Show when={selMode()}>
+          <div
+            class="absolute inset-0 overflow-auto z-10 px-2 py-2 font-mono text-sm whitespace-pre leading-5"
+            style={{
+              background: activeTheme().background,
+              color: activeTheme().foreground,
+              "font-family": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              "font-size": "14px",
+              "-webkit-user-select": "text",
+              "user-select": "text",
+            }}
+          >
+            {readBuffer().join("\n")}
+          </div>
+        </Show>
+      </div>
     </div>
   )
 }

@@ -300,221 +300,222 @@ export function MessageTurn(props: {
     >
       {/* Turn header */}
       <div
-        class="flex items-start gap-3 px-4 py-3 transition-colors group"
+        class="px-4 py-3 transition-colors group"
         style={{
           background: expanded() ? "var(--surface-inset)" : "transparent",
         }}
         onFocusIn={() => setFocused(true)}
         onFocusOut={() => setFocused(false)}
       >
-        {/* User icon */}
-        <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: "var(--surface-brand-muted)" }}>
-          <User class="w-4 h-4 text-brand-600" />
-        </div>
+          <div class="flex items-start gap-3">
+          {/* User icon */}
+          <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: "var(--surface-brand-muted)" }}>
+            <User class="w-4 h-4 text-brand-600" />
+          </div>
 
-        {/* User message preview */}
-        <div class="flex-1 min-w-0">
-          {/* Text with expand/collapse */}
-          <div class="relative">
-            <div
-              ref={textRef}
-              class="text-sm font-medium whitespace-pre-wrap break-words overflow-hidden max-h-16 sm:max-h-[64px]"
-              style={{
-                color: "var(--text-strong)",
-                "max-height": textExpanded() ? "none" : undefined,
-              }}
-            >
-              <Show when={userText()} fallback={
-                <Show when={systemBlocks().length > 0}
-                  fallback={<span style={{ color: "var(--text-weak)", "font-style": "italic" }}>(empty message)</span>}
-                >
-                  <span style={{ color: "var(--text-weak)", "font-style": "italic" }}>⚙ Automated task</span>
+          {/* User message preview */}
+          <div class="flex-1 min-w-0">
+            {/* Text with expand/collapse */}
+            <div class="relative">
+              <div
+                ref={textRef}
+                class="text-sm font-medium whitespace-pre-wrap break-words overflow-hidden max-h-16 sm:max-h-[64px]"
+                style={{
+                  color: "var(--text-strong)",
+                  "max-height": textExpanded() ? "none" : undefined,
+                }}
+              >
+                <Show when={userText()} fallback={
+                  <Show when={systemBlocks().length > 0}
+                    fallback={<span style={{ color: "var(--text-weak)", "font-style": "italic" }}>(empty message)</span>}
+                  >
+                    <span style={{ color: "var(--text-weak)", "font-style": "italic" }}>⚙ Automated task</span>
+                  </Show>
+                }>
+                  {userText()}
                 </Show>
-              }>
-                {userText()}
+              </div>
+              {/* Gradient fade when collapsed and can expand */}
+              <Show when={canExpand() && !textExpanded()}>
+                <div
+                  class="absolute bottom-0 left-0 right-0 h-6 pointer-events-none"
+                  style={{
+                    background: expanded()
+                      ? "linear-gradient(to bottom, transparent, var(--surface-inset))"
+                      : "linear-gradient(to bottom, transparent, var(--background-base))",
+                  }}
+                />
               </Show>
             </div>
-            {/* Gradient fade when collapsed and can expand */}
-            <Show when={canExpand() && !textExpanded()}>
-              <div
-                class="absolute bottom-0 left-0 right-0 h-6 pointer-events-none"
-                style={{
-                  background: expanded()
-                    ? "linear-gradient(to bottom, transparent, var(--surface-inset))"
-                    : "linear-gradient(to bottom, transparent, var(--background-base))",
-                }}
-              />
-            </Show>
-          </div>
-          {/* Expand/collapse text toggle */}
-          <Show when={canExpand()}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                setTextExpanded(!textExpanded())
-              }}
-              class="flex items-center gap-1 text-xs mt-1 transition-colors"
-              style={{ color: "var(--text-weak)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-strong)")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-weak)")}
-              aria-label={textExpanded() ? "Collapse user prompt" : "Expand user prompt"}
-              aria-expanded={textExpanded()}
-            >
-              <ChevronRight
-                class="w-3 h-3 transition-transform"
-                style={{ transform: textExpanded() ? "rotate(90deg)" : "rotate(0deg)" }}
-              />
-              <span>{textExpanded() ? "Show less" : "Show more"}</span>
-            </button>
-          </Show>
-          <Show when={fileRefs().length > 0}>
-            <div class="flex flex-wrap gap-1.5 mt-2">
-              <For each={fileRefs()}>
-                {(name) => (
-                  <div
-                    class="flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
-                    style={{
-                      background: "var(--surface-inset)",
-                      border: "1px solid var(--border-base)",
-                      color: "var(--text-strong)",
-                    }}
-                  >
-                    <FileText class="w-3 h-3 shrink-0" style={{ color: "var(--icon-weak)" }} />
-                    {name}
-                  </div>
-                )}
-              </For>
-            </div>
-          </Show>
-          {/* Status line */}
-          <div class="flex items-center gap-2 text-xs mt-1 flex-wrap" style={{ color: "var(--text-weak)" }}>
-            <Show when={systemBlocks().length > 0}>
+            {/* Expand/collapse text toggle */}
+            <Show when={canExpand()}>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  setSystemOpen(!systemOpen())
+                  setTextExpanded(!textExpanded())
                 }}
-                class="flex items-center gap-1 hover:opacity-80 transition-opacity"
-                style={{
-                  background: "var(--surface-inset)",
-                  padding: "2px 6px",
-                  "border-radius": "12px",
-                  border: "1px solid var(--border-base)"
-                }}
+                class="flex items-center gap-1 text-xs mt-1 transition-colors"
+                style={{ color: "var(--text-weak)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-strong)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-weak)")}
+                aria-label={textExpanded() ? "Collapse user prompt" : "Expand user prompt"}
+                aria-expanded={textExpanded()}
               >
-                <span>⚙ {systemBlocks().length} system injection{systemBlocks().length > 1 ? "s" : ""}</span>
+                <ChevronRight
+                  class="w-3 h-3 transition-transform"
+                  style={{ transform: textExpanded() ? "rotate(90deg)" : "rotate(0deg)" }}
+                />
+                <span>{textExpanded() ? "Show less" : "Show more"}</span>
               </button>
-              <span>·</span>
             </Show>
-            <Show when={attachments().length > 0}>
-              <span>
-                {attachments().length} attachment{attachments().length > 1 ? "s" : ""}
-              </span>
-              <span>·</span>
+            <Show when={fileRefs().length > 0}>
+              <div class="flex flex-wrap gap-1.5 mt-2">
+                <For each={fileRefs()}>
+                  {(name) => (
+                    <div
+                      class="flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
+                      style={{
+                        background: "var(--surface-inset)",
+                        border: "1px solid var(--border-base)",
+                        color: "var(--text-strong)",
+                      }}
+                    >
+                      <FileText class="w-3 h-3 shrink-0" style={{ color: "var(--icon-weak)" }} />
+                      {name}
+                    </div>
+                  )}
+                </For>
+              </div>
             </Show>
-            <Show when={toolCount() > 0}>
-              <span>
-                {toolCount()} tool{toolCount() > 1 ? "s" : ""}
-              </span>
-              <span>·</span>
+            {/* Status line */}
+            <div class="flex items-center gap-2 text-xs mt-1 flex-wrap" style={{ color: "var(--text-weak)" }}>
+              <Show when={systemBlocks().length > 0}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSystemOpen(!systemOpen())
+                  }}
+                  class="flex items-center gap-1 hover:opacity-80 transition-opacity"
+                  style={{
+                    background: "var(--surface-inset)",
+                    padding: "2px 6px",
+                    "border-radius": "12px",
+                    border: "1px solid var(--border-base)"
+                  }}
+                >
+                  <span>⚙ {systemBlocks().length} system injection{systemBlocks().length > 1 ? "s" : ""}</span>
+                </button>
+                <span>·</span>
+              </Show>
+              <Show when={attachments().length > 0}>
+                <span>
+                  {attachments().length} attachment{attachments().length > 1 ? "s" : ""}
+                </span>
+                <span>·</span>
+              </Show>
+              <Show when={toolCount() > 0}>
+                <span>
+                  {toolCount()} tool{toolCount() > 1 ? "s" : ""}
+                </span>
+                <span>·</span>
+              </Show>
+              <Show when={hasError()}>
+                <span style={{ color: "var(--icon-critical-base)" }}>error</span>
+                <span>·</span>
+              </Show>
+              <span>{props.turn.assistantMessages.length > 0 ? "completed" : "pending"}</span>
+            </div>
+
+            <Show when={systemOpen() && systemBlocks().length > 0}>
+              <div class="mt-2 space-y-2">
+                <For each={systemBlocks()}>
+                  {(block) => (
+                    <div class="rounded overflow-hidden text-xs" style={{ border: "1px solid var(--border-base)" }}>
+                      <div class="px-2 py-1 font-medium" style={{ background: "var(--surface-inset)", "border-bottom": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
+                        {block.label}
+                      </div>
+                      <pre class="p-2 overflow-x-auto whitespace-pre-wrap break-words m-0 font-mono" style={{ background: "var(--surface-base)", color: "var(--text-base)", "font-size": "11px" }}>
+                        {block.content}
+                      </pre>
+                    </div>
+                  )}
+                </For>
+              </div>
             </Show>
-            <Show when={hasError()}>
-              <span style={{ color: "var(--icon-critical-base)" }}>error</span>
-              <span>·</span>
-            </Show>
-            <span>{props.turn.assistantMessages.length > 0 ? "completed" : "pending"}</span>
           </div>
 
-          <Show when={systemOpen() && systemBlocks().length > 0}>
-            <div class="mt-2 space-y-2">
-              <For each={systemBlocks()}>
-                {(block) => (
-                  <div class="rounded overflow-hidden text-xs" style={{ border: "1px solid var(--border-base)" }}>
-                    <div class="px-2 py-1 font-medium" style={{ background: "var(--surface-inset)", "border-bottom": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
-                      {block.label}
-                    </div>
-                    <pre class="p-2 overflow-x-auto whitespace-pre-wrap break-words m-0 font-mono" style={{ background: "var(--surface-base)", color: "var(--text-base)", "font-size": "11px" }}>
-                      {block.content}
-                    </pre>
-                  </div>
-                )}
-              </For>
-            </div>
-          </Show>
+          {/* Expand indicator (turn expand/collapse) */}
+          <button
+            type="button"
+            onClick={toggle}
+            aria-expanded={expanded()}
+            aria-label={expanded() ? "Collapse conversation turn" : "Expand conversation turn"}
+            class="shrink-0 p-1 rounded transition-colors"
+            style={{ color: "var(--icon-weak)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-strong)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--icon-weak)")}
+          >
+            <ChevronDown
+              class="w-5 h-5 transition-transform"
+              style={{ transform: expanded() ? "rotate(180deg)" : "rotate(0deg)" }}
+            />
+          </button>
         </div>
 
-        {/* Relative timestamp */}
-        <Show when={relativeTime()}>
-          <span
-            class="shrink-0 text-xs mt-1"
-            style={{ color: "var(--text-weak)" }}
-            title={absoluteTime()}
-          >
-            {relativeTime()}
-          </span>
-        </Show>
+        <div class="flex items-center gap-3 mt-2 pl-11">
+          <Show when={relativeTime()}>
+            <span
+              class="text-xs"
+              style={{ color: "var(--text-weak)" }}
+              title={absoluteTime()}
+            >
+              {relativeTime()}
+            </span>
+          </Show>
 
-        {/* Details toggle button — shown when any detail fields are available */}
-        <Show when={props.turn.userMessage.time?.created != null || props.turn.assistantMessages.length > 0}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              setDetailsOpen(!detailsOpen())
-            }}
-            class="shrink-0 p-1 rounded transition-colors"
-            style={{ color: detailsOpen() || hovered() ? "var(--text-strong)" : "var(--icon-weak)" }}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
-            title="Turn details"
-            aria-label={detailsOpen() ? "Hide turn details" : "Show turn details"}
-            aria-expanded={detailsOpen()}
-          >
-            <Clock class="w-4 h-4" />
-          </button>
-        </Show>
+          <Show when={props.turn.userMessage.time?.created != null || props.turn.assistantMessages.length > 0}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setDetailsOpen(!detailsOpen())
+              }}
+              class="p-1 rounded transition-colors"
+              style={{ color: detailsOpen() || hovered() ? "var(--text-strong)" : "var(--icon-weak)" }}
+              onMouseEnter={() => setHovered(true)}
+              onMouseLeave={() => setHovered(false)}
+              title="Turn details"
+              aria-label={detailsOpen() ? "Hide turn details" : "Show turn details"}
+              aria-expanded={detailsOpen()}
+            >
+              <Clock class="w-4 h-4" />
+            </button>
+          </Show>
 
-        {/* Copy button (appears on hover or focus) */}
-        <Show when={userText()}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              copy()
-            }}
-            class="shrink-0 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-            classList={{ "opacity-100": focused() || copied() }}
-            style={{
-              background: "var(--surface-inset)",
-              color: copied() ? "var(--status-success-text)" : "var(--icon-weak)",
-            }}
-            title={copied() ? "Copied!" : "Copy prompt"}
-            aria-label={copied() ? "Copied!" : "Copy prompt"}
-          >
-            <Show when={copied()} fallback={<Copy class="w-4 h-4" />}>
-              <Check class="w-4 h-4" />
-            </Show>
-          </button>
-        </Show>
-
-        {/* Expand indicator (turn expand/collapse) */}
-        <button
-          type="button"
-          onClick={toggle}
-          aria-expanded={expanded()}
-          aria-label={expanded() ? "Collapse conversation turn" : "Expand conversation turn"}
-          class="shrink-0 p-1 rounded transition-colors"
-          style={{ color: "var(--icon-weak)" }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-strong)")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--icon-weak)")}
-        >
-          <ChevronDown
-            class="w-5 h-5 transition-transform"
-            style={{ transform: expanded() ? "rotate(180deg)" : "rotate(0deg)" }}
-          />
-        </button>
+          <Show when={userText()}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                copy()
+              }}
+              class="p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+              classList={{ "opacity-100": focused() || copied() }}
+              style={{
+                background: "var(--surface-inset)",
+                color: copied() ? "var(--status-success-text)" : "var(--icon-weak)",
+              }}
+              title={copied() ? "Copied!" : "Copy prompt"}
+              aria-label={copied() ? "Copied!" : "Copy prompt"}
+            >
+              <Show when={copied()} fallback={<Copy class="w-4 h-4" />}>
+                <Check class="w-4 h-4" />
+              </Show>
+            </button>
+          </Show>
+        </div>
       </div>
 
       {/* Details panel */}

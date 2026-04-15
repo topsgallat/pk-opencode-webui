@@ -50,12 +50,12 @@ export function SessionHeader(props: SessionHeaderProps) {
       }}
     >
       {/* Left side: Session info (read-only) */}
-      <div class="flex items-center gap-3 min-w-0">
+      <div class="flex items-center gap-3 min-w-0 flex-1">
         {/* Back button for child sessions */}
         <Show when={parentId()}>
           <button
             onClick={navigateToParent}
-            class="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md transition-colors"
+            class="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md transition-colors shrink-0"
             style={{
               border: "1px solid var(--border-base)",
               color: "var(--text-base)",
@@ -66,33 +66,32 @@ export function SessionHeader(props: SessionHeaderProps) {
             title="Return to parent session"
           >
             <ArrowLeft class="w-3 h-3" />
-            <span>Back</span>
+            <span class="hidden sm:inline">Back</span>
           </button>
         </Show>
 
-        <div class="min-w-0">
+        <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
             {/* Sub-agent indicator */}
             <Show when={parentId()}>
               <Users class="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-interactive-base)" }} />
             </Show>
             <h1
-              class="text-sm font-medium truncate"
+              class="text-sm font-medium truncate sm:truncate"
               style={{ color: "var(--text-strong)" }}
             >
               {props.session?.title || "New Session"}
             </h1>
           </div>
           <Show when={props.session}>
-            <p class="text-[11px] truncate" style={{ color: "var(--text-weak)" }}>
+            <p class="text-[11px] truncate hidden sm:block" style={{ color: "var(--text-weak)" }}>
               {parentId() ? "Sub-agent session" : props.session?.id}
             </p>
           </Show>
         </div>
       </div>
 
-      {/* Status indicators */}
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 hidden md:flex">
         {/* Permission Auto-Accept Indicator */}
         <Show when={permission.autoAcceptEnabled()}>
           <button
@@ -153,8 +152,7 @@ export function SessionHeader(props: SessionHeaderProps) {
         </Show>
       </div>
 
-      {/* Right side: panel toggles */}
-      <div class="flex items-center gap-1">
+      <div class="flex items-center gap-1 shrink-0">
         {/* MCP toggle */}
         <button
           data-hint-target
@@ -247,7 +245,7 @@ export function SessionHeader(props: SessionHeaderProps) {
 
         {/* Notification toggle — hidden when Notification API is unsupported */}
         <Show when={typeof window !== "undefined" && "Notification" in window}>
-          <div class="relative">
+          <div class="relative hidden sm:block">
             <button
               onClick={props.onToggleNotify}
               class="p-1.5 rounded-md transition-colors"

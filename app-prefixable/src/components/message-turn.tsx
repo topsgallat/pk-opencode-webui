@@ -318,10 +318,10 @@ export function MessageTurn(props: {
           <div class="relative">
             <div
               ref={textRef}
-              class="text-sm font-medium whitespace-pre-wrap break-words overflow-hidden"
+              class="text-sm font-medium whitespace-pre-wrap break-words overflow-hidden max-h-16 sm:max-h-[64px]"
               style={{
                 color: "var(--text-strong)",
-                "max-height": textExpanded() ? "none" : "64px",
+                "max-height": textExpanded() ? "none" : undefined,
               }}
             >
               <Show when={userText()} fallback={

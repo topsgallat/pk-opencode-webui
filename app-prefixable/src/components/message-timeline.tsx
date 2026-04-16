@@ -247,6 +247,7 @@ export function MessageTimeline(props: {
   loadingHistory: boolean
   sessionStatus?: SessionStatus
   onScroll?: (nearBottom: boolean) => void
+  onRetry?: (turnId: string) => void
 }) {
   const autoScroll = createAutoScroll({ working: () => props.processing })
 
@@ -402,6 +403,7 @@ export function MessageTimeline(props: {
                 isLast={index() === renderedTurns().length - 1}
                 defaultExpanded={expanded()[turn.id] ?? index() === renderedTurns().length - 1}
                 onToggle={handleToggle}
+                onRetry={props.onRetry}
               />
             )}
           </For>

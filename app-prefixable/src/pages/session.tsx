@@ -820,6 +820,34 @@ export function Session() {
     }
   }
 
+  async function retryTurn(messageId: string) {
+    const id = sessionId();
+    if (!id) return;
+    try {
+      if (processing()) {
+        await handleAbort();
+      }
+      await client.session.revert({
+        sessionID: id,
+        messageID: messageId,
+      });
+      const msgs = syncMessages();
+      const target = msgs.find((m) => m.id === messageId);
+      if (target) {
+        const textPart = target.parts.find((p) => p.type === "text") as
+          | { type: "text"; text?: string }
+          | undefined;
+        if (textPart?.text && inputRef) {
+          applyInputAndAutogrow(inputRef, textPart.text);
+        }
+      }
+      showToast("Retrying message...");
+      refetchSession();
+    } catch (err) {
+      showToast(`Failed to retry: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   // Filtered slash commands based on query
   const filteredSlashCommands = createMemo(() => {
     const cmds = baseSlashCommands();
@@ -1797,6 +1825,7 @@ export function Session() {
             }
             loadingHistory={loadingHistory()}
             sessionStatus={sessionId() ? events.status[sessionId()!] : undefined}
+            onRetry={retryTurn}
           />
 
           {/* Question Prompt - rendered outside timeline for proper focus.

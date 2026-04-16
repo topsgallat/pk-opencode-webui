@@ -1,5 +1,5 @@
 import { type Accessor, createSignal, createEffect, Show, For, createMemo, onCleanup } from "solid-js"
-import { ChevronDown, ChevronRight, User, Bot, FileText, Copy, Check, Clock } from "lucide-solid"
+import { ChevronDown, ChevronRight, User, Bot, FileText, Copy, Check, Clock, RotateCcw } from "lucide-solid"
 import { Markdown } from "./markdown"
 import { MessageParts } from "./tool-part"
 import { ImagePreview } from "./image-preview"
@@ -180,6 +180,7 @@ export function MessageTurn(props: {
   defaultExpanded?: boolean
   isLast?: boolean
   onToggle?: (turnId: string, expanded: boolean) => void
+  onRetry?: (messageId: string) => void
 }) {
   const [expanded, setExpanded] = createSignal(props.defaultExpanded ?? props.isLast ?? false)
   const [previewUrl, setPreviewUrl] = createSignal<string | null>(null)
@@ -417,7 +418,21 @@ export function MessageTurn(props: {
                 <span>·</span>
               </Show>
               <Show when={hasError()}>
-                <span style={{ color: "var(--icon-critical-base)" }}>error</span>
+                <button
+                  type="button"
+                  onClick={() => props.onRetry?.(props.turn.userMessage.id)}
+                  class="flex items-center gap-1 hover:opacity-80 transition-opacity"
+                  style={{
+                    background: "var(--status-danger-dim)",
+                    color: "var(--status-danger-text)",
+                    padding: "2px 6px",
+                    "border-radius": "12px",
+                    border: "1px solid var(--icon-critical-base)"
+                  }}
+                >
+                  <RotateCcw class="w-3 h-3" />
+                  <span>Retry</span>
+                </button>
                 <span>·</span>
               </Show>
               <span>{props.turn.assistantMessages.length > 0 ? "completed" : "pending"}</span>

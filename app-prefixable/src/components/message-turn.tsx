@@ -307,14 +307,9 @@ export function MessageTurn(props: {
         onFocusIn={() => setFocused(true)}
         onFocusOut={() => setFocused(false)}
       >
-          <div class="flex items-start gap-3">
-          {/* User icon */}
-          <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: "var(--surface-brand-muted)" }}>
-            <User class="w-4 h-4 text-brand-600" />
-          </div>
-
-          {/* User message preview */}
-          <div class="flex-1 min-w-0">
+          <div class="flex items-start">
+            {/* User message preview */}
+            <div class="flex-1 min-w-0">
             {/* Text with expand/collapse */}
             <div class="relative">
               <div
@@ -464,7 +459,7 @@ export function MessageTurn(props: {
           </button>
         </div>
 
-        <div class="flex items-center gap-3 mt-2 pl-11">
+        <div class="flex items-center gap-3 mt-2">
           <Show when={relativeTime()}>
             <span
               class="text-xs"

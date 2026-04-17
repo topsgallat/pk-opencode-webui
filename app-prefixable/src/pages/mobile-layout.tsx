@@ -110,11 +110,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
             if (lastSession) {
                 const currentPath = location.pathname
                 if (!currentPath.includes("/session/") || currentPath.endsWith("/session")) {
-                    const allSessions = sync.sessions()
-                    const exists = Object.values(allSessions).some((s: Session) => s.id === lastSession)
-                    if (exists) {
-                        navigate(`/${dirSlug()}/session/${lastSession}`, { replace: true })
-                    }
+                    navigate(`/${dirSlug()}/session/${lastSession}`, { replace: true })
                 }
             }
         }

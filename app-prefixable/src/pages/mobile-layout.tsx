@@ -102,6 +102,22 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
 
     onMount(() => {
         loadRootSessions()
+        
+        const dir = directory
+        if (dir) {
+            const lastSessionKey = `opencode.lastSession.${dir}`
+            const lastSession = localStorage.getItem(lastSessionKey)
+            if (lastSession) {
+                const currentPath = location.pathname
+                if (!currentPath.includes("/session/") || currentPath.endsWith("/session")) {
+                    const allSessions = sync.sessions()
+                    const exists = Object.values(allSessions).some((s: Session) => s.id === lastSession)
+                    if (exists) {
+                        navigate(`/${dirSlug()}/session/${lastSession}`, { replace: true })
+                    }
+                }
+            }
+        }
     })
 
     createEffect(() => {

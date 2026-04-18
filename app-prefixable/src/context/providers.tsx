@@ -2,6 +2,7 @@ import { createContext, useContext, createResource, createEffect, type ParentPro
 import { createStore } from "solid-js/store"
 import { useSDK } from "./sdk"
 import { useConfig } from "./config"
+import { getProviderAccounts, saveProviderAccounts, type ProviderAccount } from "../utils/extended-api"
 
 // Storage key
 const MODELS_BY_AGENT_KEY = "opencode.modelsByAgent"
@@ -70,9 +71,10 @@ interface ProviderContextValue {
   setSelectedModel: (model: ModelKey | null) => void
   setSelectedAgent: (agent: string) => void
   refetch: () => void
-  connectProvider: (providerID: string, apiKey: string) => Promise<boolean>
+  connectProvider: (providerID: string, apiKey: string, accountName?: string) => Promise<boolean>
   startOAuth: (providerID: string, methodIndex: number) => Promise<OAuthAuthorization | undefined>
   completeOAuth: (providerID: string, methodIndex: number, code?: string) => Promise<boolean>
+  getAccounts: () => Record<string, ProviderAccount>
 }
 
 const ProviderContext = createContext<ProviderContextValue>()
@@ -240,13 +242,26 @@ export function ProviderProvider(props: ParentProps) {
     setStore("selectedAgent", agent)
   }
 
-  async function connectProvider(providerID: string, apiKey: string): Promise<boolean> {
+  async function connectProvider(providerID: string, apiKey: string, accountName?: string): Promise<boolean> {
     try {
+      const effectiveProviderID = accountName ? `${providerID}:${accountName}` : providerID
+      
       await client.auth.set({
-        providerID,
+        providerID: effectiveProviderID,
         auth: { type: "api", key: apiKey },
       })
-      // Dispose instance to reload provider state, then refresh
+      
+      if (accountName) {
+        const accounts = getProviderAccounts()
+        accounts[effectiveProviderID] = {
+          id: effectiveProviderID,
+          providerType: providerID,
+          accountName,
+          apiKey,
+        }
+        saveProviderAccounts(accounts)
+      }
+      
       await client.instance.dispose()
       await refetchProviders()
       return true
@@ -327,6 +342,7 @@ export function ProviderProvider(props: ParentProps) {
     connectProvider,
     startOAuth,
     completeOAuth,
+    getAccounts: () => getProviderAccounts(),
   }
 
   return <ProviderContext.Provider value={value}>{props.children}</ProviderContext.Provider>

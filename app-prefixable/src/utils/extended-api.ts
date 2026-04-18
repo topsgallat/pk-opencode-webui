@@ -118,6 +118,68 @@ export async function createFile(serverUrl: string, path: string): Promise<boole
 }
 
 /**
+ * Provider account storage keys (localStorage)
+ */
+const PROVIDER_ACCOUNTS_KEY = "opencode.providerAccounts"
+
+/**
+ * Provider account interface
+ */
+export interface ProviderAccount {
+  id: string // unique ID: "providerType:accountName"
+  providerType: string // e.g., "github-copilot"
+  accountName: string // user-provided name, e.g., "work", "personal"
+  apiKey?: string // encrypted storage (in production, should use server-side storage)
+}
+
+/**
+ * Get stored provider accounts from localStorage
+ */
+export function getProviderAccounts(): Record<string, ProviderAccount> {
+  try {
+    const stored = localStorage.getItem(PROVIDER_ACCOUNTS_KEY)
+    return stored ? JSON.parse(stored) : {}
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Save provider accounts to localStorage
+ */
+export function saveProviderAccounts(accounts: Record<string, ProviderAccount>): void {
+  localStorage.setItem(PROVIDER_ACCOUNTS_KEY, JSON.stringify(accounts))
+}
+
+/**
+ * Add a provider account
+ */
+export function addProviderAccount(account: ProviderAccount): boolean {
+  try {
+    const accounts = getProviderAccounts()
+    accounts[account.id] = account
+    saveProviderAccounts(accounts)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Remove a provider account
+ */
+export function removeProviderAccount(id: string): boolean {
+  try {
+    const accounts = getProviderAccounts()
+    delete accounts[id]
+    saveProviderAccounts(accounts)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * List available OpenCode log files
  */
 export async function listLogFiles(serverUrl: string): Promise<string[]> {

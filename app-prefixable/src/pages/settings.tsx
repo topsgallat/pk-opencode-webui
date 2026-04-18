@@ -25,6 +25,7 @@ export function Settings() {
   const device = useDevice()
   const [selectedProvider, setSelectedProvider] = createSignal<string | null>(null)
   const [apiKey, setApiKey] = createSignal("")
+  const [accountName, setAccountName] = createSignal("")
   const [connecting, setConnecting] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
   const [success, setSuccess] = createSignal<string | null>(null)
@@ -452,6 +453,7 @@ Add your project-specific instructions here.
     e.preventDefault()
     const providerID = selectedProvider()
     const key = apiKey().trim()
+    const name = accountName().trim() || undefined
 
     if (!providerID || !key) return
 
@@ -459,13 +461,15 @@ Add your project-specific instructions here.
     setError(null)
     setSuccess(null)
 
-    const ok = await providers.connectProvider(providerID, key)
+    const ok = await providers.connectProvider(providerID, key, name)
 
     setConnecting(false)
 
     if (ok) {
-      setSuccess(`Connected to ${providerID}!`)
+      const displayName = name ? `${providerID}:${name}` : providerID
+      setSuccess(`Connected to ${displayName}!`)
       setApiKey("")
+      setAccountName("")
       setSelectedProvider(null)
     } else {
       setError("Failed to connect. Please check your API key.")
@@ -811,24 +815,36 @@ Add your project-specific instructions here.
                   <Show when={!providers.loading && providers.connected.length > 0}>
                     <div class="space-y-2">
                       <For each={providers.connected}>
-                        {(providerID) => (
-                          <div
-                            class="flex items-center justify-between p-3 rounded-md"
-                            style={{ background: "var(--surface-inset)" }}
-                          >
-                            <div class="flex items-center gap-3">
-                              <div class="w-6 h-6 rounded flex items-center justify-center" style={{ background: "var(--surface-strong)" }}>
-                                <Check class="w-3 h-3" style={{ color: "var(--icon-success-base)" }} />
+                        {(providerID) => {
+                          const colonIdx = providerID.indexOf(":")
+                          const baseProvider = colonIdx > 0 ? providerID.slice(0, colonIdx) : providerID
+                          const account = colonIdx > 0 ? providerID.slice(colonIdx + 1) : null
+                          return (
+                            <div
+                              class="flex items-center justify-between p-3 rounded-md"
+                              style={{ background: "var(--surface-inset)" }}
+                            >
+                              <div class="flex items-center gap-3">
+                                <div class="w-6 h-6 rounded flex items-center justify-center" style={{ background: "var(--surface-strong)" }}>
+                                  <Check class="w-3 h-3" style={{ color: "var(--icon-success-base)" }} />
+                                </div>
+                                <span class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                                  {getProviderDisplayName(baseProvider)}
+                                </span>
                               </div>
-                              <span class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-                                {getProviderDisplayName(providerID)}
-                              </span>
+                              <div class="flex items-center gap-2">
+                                <Show when={account}>
+                                  <span class="text-xs px-2 py-1 rounded" style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}>
+                                    {account}
+                                  </span>
+                                </Show>
+                                <span class="text-xs" style={{ color: "var(--text-weak)" }}>
+                                  Connected
+                                </span>
+                              </div>
                             </div>
-                            <span class="text-xs" style={{ color: "var(--text-weak)" }}>
-                              Connected
-                            </span>
-                          </div>
-                        )}
+                          )
+                        }}
                       </For>
                     </div>
                   </Show>
@@ -1098,6 +1114,18 @@ Add your project-specific instructions here.
                             /* Fallback to API key input if no auth methods defined */
                             <div class="space-y-3">
                               <input
+                                type="text"
+                                value={accountName()}
+                                onInput={(e) => setAccountName(e.currentTarget.value)}
+                                placeholder="Account name (optional, e.g., work, personal)"
+                                class="w-full px-3 py-2 rounded-md text-sm"
+                                style={{
+                                  background: "var(--background-base)",
+                                  border: "1px solid var(--border-base)",
+                                  color: "var(--text-base)",
+                                }}
+                              />
+                              <input
                                 type="password"
                                 value={apiKey()}
                                 onInput={(e) => setApiKey(e.currentTarget.value)}
@@ -1141,6 +1169,18 @@ Add your project-specific instructions here.
                                         <Key class="w-3 h-3" />
                                         <span>{method.label}</span>
                                       </div>
+                                      <input
+                                        type="text"
+                                        value={accountName()}
+                                        onInput={(e) => setAccountName(e.currentTarget.value)}
+                                        placeholder="Account name (optional)"
+                                        class="w-full px-3 py-2 rounded-md text-sm"
+                                        style={{
+                                          background: "var(--background-base)",
+                                          border: "1px solid var(--border-base)",
+                                          color: "var(--text-base)",
+                                        }}
+                                      />
                                       <input
                                         type="password"
                                         value={apiKey()}

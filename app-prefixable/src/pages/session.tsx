@@ -2351,14 +2351,17 @@ export function Session() {
             emptyMessage="No models found. Connect a provider in settings."
             items={providers.providers
               .filter((p) => providers.connected.includes(p.id))
-              .flatMap((p) =>
-                Object.values(p.models).map((m) => ({
+              .flatMap((p) => {
+                const colonIdx = p.id.indexOf(":")
+                const baseProviderID = colonIdx > 0 ? p.id.slice(0, colonIdx) : p.id
+                const accountName = colonIdx > 0 ? p.id.slice(colonIdx + 1) : null
+                return Object.values(p.models).map((m) => ({
                   id: `${p.id}:${m.id}`,
                   title: m.name || m.id,
                   description: `${p.id}/${m.id}`,
-                  group: p.name,
-                })),
-              )}
+                  group: accountName ? `${p.name} (${accountName})` : p.name,
+                }))
+              })}
             onSelect={(item) => {
               const parts = item.id.split(":");
               const providerID = parts[0];

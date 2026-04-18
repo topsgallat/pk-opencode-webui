@@ -117,15 +117,14 @@ export function Settings() {
   // Popular providers shown first
   const popularProviders = ["opencode", "anthropic", "github-copilot", "openai", "google", "openrouter"]
 
-  // Filtered and sorted providers for display
   const filteredProviders = createMemo(() => {
     const search = providerSearch().toLowerCase().trim()
-    const unconnected = providers.providers.filter((p) => !providers.connected.includes(p.id))
+    const all = providers.providers
 
     // Filter by search
     const filtered = search
-      ? unconnected.filter((p) => p.name.toLowerCase().includes(search) || p.id.toLowerCase().includes(search))
-      : unconnected
+      ? all.filter((p) => p.name.toLowerCase().includes(search) || p.id.toLowerCase().includes(search))
+      : all
 
     // Sort: popular first, then alphabetically
     return filtered.sort((a, b) => {
@@ -1084,17 +1083,6 @@ Add your project-specific instructions here.
                         <Show when={filteredProviders().length === 0 && providerSearch()}>
                           <p class="text-sm text-center py-4" style={{ color: "var(--text-weak)" }}>
                             No providers found matching "{providerSearch()}"
-                          </p>
-                        </Show>
-
-                        <Show
-                          when={
-                            providers.providers.filter((p) => !providers.connected.includes(p.id)).length === 0 &&
-                            !providerSearch()
-                          }
-                        >
-                          <p class="text-sm" style={{ color: "var(--text-weak)" }}>
-                            All available providers are connected!
                           </p>
                         </Show>
                       </div>

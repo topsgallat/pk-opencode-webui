@@ -840,6 +840,18 @@ Add your project-specific instructions here.
                                 <span class="text-xs" style={{ color: "var(--text-weak)" }}>
                                   Connected
                                 </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedProvider(baseProvider)
+                                    setAccountName("")
+                                    setApiKey("")
+                                  }}
+                                  class="ml-2 p-1 rounded hover:bg-[var(--surface-raised)] transition-colors"
+                                  title="Add another account"
+                                >
+                                  <Plus class="w-3.5 h-3.5" style={{ color: "var(--text-weak)" }} />
+                                </button>
                               </div>
                             </div>
                           )

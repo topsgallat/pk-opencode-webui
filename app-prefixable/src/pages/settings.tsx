@@ -847,10 +847,11 @@ Add your project-specific instructions here.
                                     setAccountName("")
                                     setApiKey("")
                                   }}
-                                  class="ml-2 p-1 rounded hover:bg-[var(--surface-raised)] transition-colors"
-                                  title="Add another account"
+                                  class="ml-2 flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors"
+                                  style={{ background: "var(--surface-raised)", color: "var(--text-base)" }}
                                 >
-                                  <Plus class="w-3.5 h-3.5" style={{ color: "var(--text-weak)" }} />
+                                  <Plus class="w-3 h-3" />
+                                  Add account
                                 </button>
                               </div>
                             </div>

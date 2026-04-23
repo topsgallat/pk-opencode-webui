@@ -15,6 +15,14 @@ import { useSavedPrompts } from "../context/saved-prompts"
 import { useTheme } from "../context/theme"
 import { useDevice } from "../context/device"
 import { writeFile } from "../utils/extended-api"
+import {
+  getServers,
+  saveServer,
+  removeServer,
+  generateServerId,
+  isValidServerUrl,
+  type ServerConfig,
+} from "../utils/servers"
 import type { Config, PermissionActionConfig } from "../sdk/client"
 
 export function Settings() {
@@ -66,6 +74,85 @@ export function Settings() {
     const next = { ...soundSettings(), ...patch }
     setSoundSettings(next)
     writeSoundSettings(next)
+  }
+
+  // Server management
+  const [servers, setServers] = createSignal<ServerConfig[]>(getServers())
+  const [showServerDialog, setShowServerDialog] = createSignal(false)
+  const [editingServer, setEditingServer] = createSignal<ServerConfig | null>(null)
+  const [serverNameInput, setServerNameInput] = createSignal("")
+  const [serverUrlInput, setServerUrlInput] = createSignal("")
+  const [serverError, setServerError] = createSignal<string | null>(null)
+
+  // Keep servers in sync with localStorage
+  onMount(() => {
+    function handleStorage(e: StorageEvent) {
+      if (e.key === "opencode.servers") setServers(getServers())
+    }
+    window.addEventListener("storage", handleStorage)
+    onCleanup(() => window.removeEventListener("storage", handleStorage))
+  })
+
+  function refreshServers() {
+    setServers(getServers())
+  }
+
+  function openAddServerDialog() {
+    setShowServerDialog(true)
+    setEditingServer(null)
+    setServerNameInput("")
+    setServerUrlInput("")
+    setServerError(null)
+  }
+
+  function openEditServerDialog(server: ServerConfig) {
+    setShowServerDialog(true)
+    setEditingServer(server)
+    setServerNameInput(server.name)
+    setServerUrlInput(server.url)
+    setServerError(null)
+  }
+
+  function closeServerDialog() {
+    setShowServerDialog(false)
+    setEditingServer(null)
+    setServerNameInput("")
+    setServerUrlInput("")
+    setServerError(null)
+  }
+
+  function saveServerDialog() {
+    const name = serverNameInput().trim()
+    const url = serverUrlInput().trim()
+    if (!name || !url) return
+
+    if (!isValidServerUrl(url)) {
+      setServerError("Invalid URL. Must start with http:// or https://")
+      return
+    }
+
+    const server: ServerConfig = {
+      id: editingServer()?.id ?? generateServerId(),
+      name,
+      url: url.replace(/\/$/, ""),
+      isDefault: editingServer()?.isDefault ?? servers().length === 0,
+    }
+
+    saveServer(server)
+    refreshServers()
+    closeServerDialog()
+  }
+
+  function confirmServerDelete(id: string) {
+    removeServer(id)
+    refreshServers()
+  }
+
+  function toggleServerDefault(id: string) {
+    const server = servers().find((s) => s.id === id)
+    if (!server) return
+    saveServer({ ...server, isDefault: true })
+    refreshServers()
   }
 
   // Provider search
@@ -654,6 +741,7 @@ Add your project-specific instructions here.
     }
     base.push({ id: "appearance", label: "Appearance", icon: () => <Palette class="w-4 h-4" />, scope: null })
     base.push({ id: "sounds", label: "Sounds", icon: () => <Volume2 class="w-4 h-4" />, scope: null })
+    base.push({ id: "servers", label: "Servers", icon: () => <Server class="w-4 h-4" />, scope: null })
     return base
   })
 
@@ -2274,6 +2362,140 @@ Add your project-specific instructions here.
               </section>
             </div>
           </Show>
+
+          {/* Servers Tab */}
+          <Show when={activeTab() === "servers"}>
+            <div class="space-y-6">
+              <header>
+                <h1 class="text-lg font-medium" style={{ color: "var(--text-strong)" }}>
+                  OpenCode Servers
+                </h1>
+                <p class="text-sm mt-1" style={{ color: "var(--text-weak)" }}>
+                  Manage connections to multiple OpenCode server instances
+                </p>
+              </header>
+
+              <section
+                class="rounded-lg overflow-hidden"
+                style={{
+                  background: "var(--background-base)",
+                  border: "1px solid var(--border-base)",
+                }}
+              >
+                <div
+                  class="px-4 py-3 flex items-center justify-between"
+                  style={{ "border-bottom": "1px solid var(--border-base)" }}
+                >
+                  <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                    Servers ({servers().length})
+                  </h2>
+                  <Button onClick={openAddServerDialog} variant="primary" size="sm">
+                    + Add Server
+                  </Button>
+                </div>
+
+                <Show when={servers().length === 0}>
+                  <div class="p-6 text-center">
+                    <p class="text-sm" style={{ color: "var(--text-weak)" }}>
+                      No servers configured yet.
+                    </p>
+                    <button
+                      onClick={openAddServerDialog}
+                      class="mt-2 text-sm hover:underline"
+                      style={{ color: "var(--text-interactive-base)" }}
+                    >
+                      Add your first server
+                    </button>
+                  </div>
+                </Show>
+
+                <Show when={servers().length > 0}>
+                  <div class="divide-y" style={{ "border-color": "var(--border-base)" }}>
+                    <For each={servers()}>
+                      {(server) => (
+                        <div class="px-4 py-3 flex items-center justify-between gap-4">
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                              <span class="font-medium text-sm" style={{ color: "var(--text-strong)" }}>
+                                {server.name}
+                              </span>
+                              <Show when={server.isDefault}>
+                                <span
+                                  class="text-xs px-1.5 py-0.5 rounded"
+                                  style={{
+                                    background: "var(--interactive-base)",
+                                    color: "white",
+                                  }}
+                                >
+                                  Default
+                                </span>
+                              </Show>
+                            </div>
+                            <p class="text-xs mt-0.5 truncate" style={{ color: "var(--text-weak)" }}>
+                              {server.url}
+                            </p>
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <Show when={!server.isDefault}>
+                              <button
+                                onClick={() => toggleServerDefault(server.id)}
+                                class="text-xs px-2 py-1 rounded"
+                                style={{
+                                  background: "var(--surface-inset)",
+                                  color: "var(--text-base)",
+                                }}
+                              >
+                                Set Default
+                              </button>
+                            </Show>
+                            <button
+                              onClick={() => openEditServerDialog(server)}
+                              class="p-1.5 rounded transition-colors"
+                              style={{ color: "var(--text-weak)" }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "var(--surface-inset)"
+                                e.currentTarget.style.color = "var(--text-strong)"
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "transparent"
+                                e.currentTarget.style.color = "var(--text-weak)"
+                              }}
+                              title="Edit server"
+                            >
+                              <Pencil class="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => confirmServerDelete(server.id)}
+                              class="p-1.5 rounded transition-colors opacity-50 hover:opacity-100"
+                              style={{ color: "var(--icon-critical-base)" }}
+                              title="Delete server"
+                            >
+                              <Trash2 class="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </section>
+
+              <section
+                class="rounded-lg p-4"
+                style={{
+                  background: "var(--surface-inset)",
+                  border: "1px solid var(--border-base)",
+                }}
+              >
+                <h3 class="text-sm font-medium mb-2" style={{ color: "var(--text-strong)" }}>
+                  About Servers
+                </h3>
+                <p class="text-xs" style={{ color: "var(--text-weak)" }}>
+                  Add multiple OpenCode servers to switch between them. Each server maintains its own providers, projects, and configuration.
+                </p>
+              </section>
+            </div>
+          </Show>
         </div>
       </div>
 
@@ -2316,6 +2538,103 @@ Add your project-specific instructions here.
         onConfirm={confirmPromptDelete}
         onCancel={() => setPromptToDelete(null)}
       />
+
+      {/* Server Add/Edit Dialog */}
+      <Portal>
+        <Show when={showServerDialog()}>
+          {(visible) => (
+            <div
+              class="fixed inset-0 z-50 flex items-center justify-center p-4"
+              style={{ background: "rgba(0,0,0,0.5)" }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  closeServerDialog()
+                }
+              }}
+            >
+              <div
+                class="w-full max-w-md rounded-lg p-6"
+                style={{
+                  background: "var(--background-base)",
+                  border: "1px solid var(--border-base)",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h2 class="text-lg font-medium mb-4" style={{ color: "var(--text-strong)" }}>
+                  {editingServer() ? "Edit Server" : "Add Server"}
+                </h2>
+
+                <Show when={serverError()}>
+                  <div
+                    class="mb-4 p-3 rounded-md text-sm"
+                    style={{
+                      background: "var(--surface-inset)",
+                      border: "1px solid var(--border-base)",
+                      "border-left": "3px solid var(--interactive-critical)",
+                      color: "var(--interactive-critical)",
+                    }}
+                  >
+                    {serverError()}
+                  </div>
+                </Show>
+
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium mb-1" style={{ color: "var(--text-base)" }}>
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      value={serverNameInput()}
+                      onInput={(e) => setServerNameInput(e.currentTarget.value)}
+                      placeholder="e.g., Production, Dev, Local"
+                      class="w-full px-3 py-2 rounded-md text-sm"
+                      style={{
+                        background: "var(--background-base)",
+                        border: "1px solid var(--border-base)",
+                        color: "var(--text-base)",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium mb-1" style={{ color: "var(--text-base)" }}>
+                      Server URL
+                    </label>
+                    <input
+                      type="text"
+                      value={serverUrlInput()}
+                      onInput={(e) => setServerUrlInput(e.currentTarget.value)}
+                      placeholder="e.g., http://localhost:4096"
+                      class="w-full px-3 py-2 rounded-md text-sm"
+                      style={{
+                        background: "var(--background-base)",
+                        border: "1px solid var(--border-base)",
+                        color: "var(--text-base)",
+                      }}
+                    />
+                    <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
+                      The base URL of your OpenCode server
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex justify-end gap-2 mt-6">
+                  <Button onClick={closeServerDialog} variant="secondary">
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={saveServerDialog}
+                    variant="primary"
+                    disabled={!serverNameInput().trim() || !serverUrlInput().trim()}
+                  >
+                    {editingServer() ? "Save" : "Add"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </Show>
+      </Portal>
     </div>
   )
 }

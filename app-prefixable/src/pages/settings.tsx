@@ -747,6 +747,10 @@ Add your project-specific instructions here.
 
   return (
     <div class="h-full flex flex-col md:flex-row" style={{ background: "var(--background-stronger)" }}>
+      {/* Debug banner to verify patch load in UI */}
+      <div id="debug-banner" class="px-4 py-2 text-xs" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)" }}>
+        PATCH LOADED: Settings patch is active
+      </div>
       {/* Tabs sidebar - Hidden on mobile, dropdown used instead */}
       <Show when={!device.isMobile()}>
         <div
@@ -880,11 +884,20 @@ Add your project-specific instructions here.
                   border: "1px solid var(--border-base)",
                 }}
               >
-                <div class="px-4 py-3" style={{ "border-bottom": "1px solid var(--border-base)" }}>
-                  <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-                    Connected Providers
-                  </h2>
-                </div>
+              <div class="px-4 py-3" style={{ "border-bottom": "1px solid var(--border-base)" }}>
+                <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                  Connected Providers
+                </h2>
+                <button
+                  id="debug-provider-cta"
+                  type="button"
+                  class="text-xs px-2 py-1 ml-2 rounded"
+                  style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}
+                  onClick={() => console.log("DEBUG: provider patch triggered")}
+                >
+                  Debug: patch check
+                </button>
+              </div>
                 <div class="p-4">
                   <Show when={providers.loading}>
                     <div class="flex items-center gap-2" style={{ color: "var(--text-weak)" }}>

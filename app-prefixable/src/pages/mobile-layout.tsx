@@ -41,8 +41,10 @@ import {
     Pencil,
     MoreHorizontal,
     FolderOpen,
+    Server,
 } from "lucide-solid"
 import { sessionHasQuestion, buildChildMap } from "../utils/session-tree-request"
+import { useServer } from "../context/server"
 
 const PROJECTS_STORAGE_KEY = "opencode.projects"
 
@@ -56,6 +58,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     const location = useLocation()
     const navigate = useNavigate()
     const branding = useBranding()
+    const server = useServer()
 
     
     const [sessions, setSessions] = createSignal<Session[]>([])
@@ -66,6 +69,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     const [menuSession, setMenuSession] = createSignal<Session | null>(null)
     const [showProjectHistory, setShowProjectHistory] = createSignal(false)
     const [historyProjects, setHistoryProjects] = createSignal<Project[]>([])
+    const [showServerSheet, setShowServerSheet] = createSignal(false)
 
     function openProjectHistory() {
         const stored = localStorage.getItem(PROJECTS_STORAGE_KEY)
@@ -636,7 +640,63 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                     <Settings class="w-5 h-5" />
                     <span>Settings</span>
                 </button>
+                <Show when={server.servers().length > 1}>
+                    <button
+                        onClick={() => setShowServerSheet(true)}
+                        style={{ color: server.selectedServer()?.isDefault ? "var(--text-weak)" : "var(--text-interactive-base)" }}
+                    >
+                        <Server class="w-5 h-5" />
+                        <span>Server</span>
+                    </button>
+                </Show>
             </nav>
+            <Show when={showServerSheet()}>
+                <div class="fixed inset-0 z-50" onClick={() => setShowServerSheet(false)}>
+                    <div class="absolute inset-0 bg-black/40" />
+                    <div
+                        class="absolute bottom-0 left-0 right-0 rounded-t-2xl overflow-hidden flex flex-col"
+                        style={{ background: "var(--background-base)", "padding-bottom": "env(safe-area-inset-bottom, 16px)" }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div class="flex justify-center py-3 shrink-0">
+                            <div class="w-10 h-1 rounded-full" style={{ background: "var(--border-strong)" }} />
+                        </div>
+                        <div class="px-4 pb-3 text-sm font-medium shrink-0" style={{ color: "var(--text-strong)" }}>
+                            Switch Server
+                        </div>
+                        <div style={{ "border-top": "1px solid var(--border-base)" }}>
+                            <For each={server.servers()}>
+                                {(s) => (
+                                    <button
+                                        class="w-full flex items-center gap-3 px-4 py-3.5 text-sm active:opacity-70 transition-opacity"
+                                        onClick={() => { server.setSelectedServer(s.id); setShowServerSheet(false) }}
+                                    >
+                                        <Server class="w-5 h-5 shrink-0" style={{ color: "var(--icon-weak)" }} />
+                                        <div class="flex-1 text-left min-w-0">
+                                            <div class="font-medium truncate" style={{ color: server.selectedServer()?.id === s.id ? "var(--text-interactive-base)" : "var(--text-strong)" }}>
+                                                {s.name}
+                                            </div>
+                                            <div class="text-xs truncate mt-0.5" style={{ color: "var(--text-weak)" }}>{s.url}</div>
+                                        </div>
+                                        <Show when={server.selectedServer()?.id === s.id}>
+                                            <div class="w-2 h-2 rounded-full shrink-0" style={{ background: "var(--text-interactive-base)" }} />
+                                        </Show>
+                                    </button>
+                                )}
+                            </For>
+                        </div>
+                        <div class="mx-4 mt-2 mb-2" style={{ "border-top": "1px solid var(--border-base)" }}>
+                            <button
+                                class="w-full py-3.5 text-sm font-medium text-center"
+                                style={{ color: "var(--text-base)" }}
+                                onClick={() => setShowServerSheet(false)}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Show>
         </div>
     )
 }

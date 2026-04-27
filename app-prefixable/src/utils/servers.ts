@@ -4,6 +4,8 @@
  * Allows connecting to multiple OpenCode servers and switching between them.
  */
 
+import { dispatchStorageEvent } from "./storage"
+
 const SERVERS_KEY = "opencode.servers"
 
 export interface ServerConfig {
@@ -53,7 +55,9 @@ export function getServer(id: string): ServerConfig | undefined {
  * Save servers to localStorage
  */
 export function saveServers(servers: ServerConfig[]): void {
-  localStorage.setItem(SERVERS_KEY, JSON.stringify(servers))
+  const value = JSON.stringify(servers)
+  localStorage.setItem(SERVERS_KEY, value)
+  dispatchStorageEvent(SERVERS_KEY, value)
 }
 
 /**

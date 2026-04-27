@@ -3,6 +3,7 @@ import { createStore, reconcile, produce } from "solid-js/store"
 import type { Session, Message, Part, Provider } from "../sdk/client"
 import { useBasePath } from "./base-path"
 import { useSDK } from "./sdk"
+import { appendTargetParam } from "../utils/path"
 
 export type SyncEvent = {
   type: string
@@ -73,7 +74,7 @@ function binarySearch<T>(arr: T[], id: string, getId: (item: T) => string): { fo
 
 export function SyncProvider(props: ParentProps) {
   const { prefix } = useBasePath()
-  const { client, directory } = useSDK()
+  const { client, directory, targetUrl } = useSDK()
 
   const [store, setStore] = createStore<SyncStore>({
     ready: false,
@@ -174,7 +175,7 @@ export function SyncProvider(props: ParentProps) {
     }
 
     const dirParam = directory ? `?directory=${encodeURIComponent(directory)}` : ""
-    const eventUrl = prefix(`/event${dirParam}`)
+    const eventUrl = appendTargetParam(prefix(`/event${dirParam}`), targetUrl)
     eventSource = new EventSource(eventUrl)
     console.log("[Sync] Connecting to SSE:", eventUrl)
 

@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit"
 import "@xterm/xterm/css/xterm.css"
 import { useSDK } from "../context/sdk"
 import { useTheme } from "../context/theme"
+import { appendTargetParam } from "../utils/path"
 import { Sun, Moon, Monitor, Clipboard, Copy, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from "lucide-solid"
 import type { ITheme } from "@xterm/xterm"
 
@@ -94,7 +95,7 @@ export interface TerminalProps {
 }
 
 export function Terminal(props: TerminalProps) {
-  const { client, url, directory } = useSDK()
+  const { client, url, directory, targetUrl } = useSDK()
   const appTheme = useTheme()
   let container!: HTMLDivElement
   let term: XTerm | undefined
@@ -133,8 +134,11 @@ export function Terminal(props: TerminalProps) {
     if (disposed || !term) return
 
     // Build WebSocket URL
-    const wsUrl =
-      url.replace(/^http/, "ws") + `/pty/${props.ptyId}/connect?directory=${encodeURIComponent(directory || "")}`
+    const wsBase = url.replace(/^http/, "ws")
+    const wsUrl = appendTargetParam(
+      `${wsBase}/pty/${props.ptyId}/connect?directory=${encodeURIComponent(directory || "")}`,
+      targetUrl,
+    )
     console.log("[Terminal] Connecting to:", wsUrl)
 
     setStatus("connecting")

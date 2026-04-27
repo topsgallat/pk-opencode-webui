@@ -15,6 +15,7 @@ import { useSavedPrompts } from "../context/saved-prompts"
 import { useTheme } from "../context/theme"
 import { useDevice } from "../context/device"
 import { writeFile } from "../utils/extended-api"
+import { appendTargetParam } from "../utils/path"
 import {
   getServers,
   saveServer,
@@ -28,7 +29,7 @@ import type { Config, PermissionActionConfig } from "../sdk/client"
 export function Settings() {
   const providers = useProviders()
   const mcp = useMCP()
-  const { client, global, url, directory } = useSDK()
+  const { client, global, url, directory, targetUrl } = useSDK()
   const theme = useTheme()
   const device = useDevice()
   const [selectedProvider, setSelectedProvider] = createSignal<string | null>(null)
@@ -299,7 +300,7 @@ export function Settings() {
       }
 
       const ptyId = ptyRes.data.id
-      const wsUrl = url.replace(/^http/, "ws") + `/pty/${ptyId}/connect`
+      const wsUrl = appendTargetParam(`${url.replace(/^http/, "ws")}/pty/${ptyId}/connect`, targetUrl)
       if (import.meta.env.DEV) console.debug("[runPtyCommand] Connecting to:", wsUrl)
 
       const output = await new Promise<string>((resolve) => {

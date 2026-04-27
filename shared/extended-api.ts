@@ -438,6 +438,33 @@ export async function handleExtendedEndpoint(
     }
   }
 
+  if (path === "/api/ext/probe-server" && method === "GET") {
+    const targetUrl = url.searchParams.get("url")
+    if (!targetUrl) {
+      return Response.json({ ok: false, error: "url parameter is required" }, { status: 400 })
+    }
+
+    let parsed: URL
+    try {
+      parsed = new URL(targetUrl)
+    } catch {
+      return Response.json({ ok: false, error: "invalid URL" }, { status: 400 })
+    }
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return Response.json({ ok: false, error: "only http/https allowed" }, { status: 400 })
+    }
+
+    try {
+      const res = await fetch(`${parsed.origin}/health`, {
+        signal: AbortSignal.timeout(5000),
+      })
+      return Response.json({ ok: res.ok, status: res.status })
+    } catch (e) {
+      return Response.json({ ok: false, error: String(e) })
+    }
+  }
+
   // Not an extended endpoint
   return undefined
 }

@@ -138,8 +138,10 @@ export function Settings() {
     if (!editingServer()) {
       setServerChecking(true)
       setServerError(null)
-      const ok = await fetch(`${cleanUrl}/health`, { signal: AbortSignal.timeout(5000) })
-        .then(r => r.ok)
+      const probeUrl = basePath.prefix(`/api/ext/probe-server?url=${encodeURIComponent(cleanUrl)}`)
+      const ok = await fetch(probeUrl, { signal: AbortSignal.timeout(8000) })
+        .then(r => r.ok ? r.json() : { ok: false })
+        .then((j: { ok: boolean }) => j.ok)
         .catch(() => false)
       setServerChecking(false)
       if (!ok) {

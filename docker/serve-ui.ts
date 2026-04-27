@@ -213,6 +213,41 @@ const validatedBasePath = validateBasePath(BASE_PATH)
 const basePathWithoutTrailing = validatedBasePath.endsWith("/") ? validatedBasePath.slice(0, -1) : validatedBasePath
 const basePathWithTrailing = validatedBasePath.endsWith("/") ? validatedBasePath : validatedBasePath + "/"
 
+function getTargetOverride(req: Request, url: URL): string | undefined {
+  const target = req.headers.get("x-opencode-target") || url.searchParams.get("target")
+  if (!target) return undefined
+  try {
+    const parsed = new URL(target)
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return undefined
+    return parsed.toString()
+  } catch {
+    return undefined
+  }
+}
+
+function buildUpstreamUrl(path: string, url: URL, req: Request, protocol: "http" | "ws" = "http") {
+  const upstream = new URL(getTargetOverride(req, url) || API_URL)
+  if (protocol === "ws") {
+    upstream.protocol = upstream.protocol === "https:" ? "wss:" : "ws:"
+  }
+  const search = new URLSearchParams(url.search)
+  search.delete("target")
+  const query = search.toString()
+  const base = upstream.toString().endsWith("/") ? upstream.toString() : `${upstream.toString()}/`
+  return new URL(`.${path}${query ? `?${query}` : ""}`, base)
+}
+
+function isLoopbackHost(hostname: string) {
+  return hostname === "127.0.0.1" || hostname === "localhost"
+}
+
+function shouldAttachProxyAuth(target: URL) {
+  if (!proxyAuthHeader) return false
+  const apiTarget = new URL(API_URL)
+  if (target.origin === apiTarget.origin) return true
+  return target.port === apiTarget.port && isLoopbackHost(target.hostname) && isLoopbackHost(apiTarget.hostname)
+}
+
 // MIME types for static files
 const mimeTypes: Record<string, string> = {
   js: "application/javascript",
@@ -315,7 +350,7 @@ const server = Bun.serve<{ target: string }>({
     if (isPtyWebSocket(path)) {
       const upgradeHeader = req.headers.get("Upgrade")
       if (upgradeHeader?.toLowerCase() === "websocket") {
-        const target = WS_API_URL + path + url.search
+        const target = buildUpstreamUrl(path, url, req, "ws").toString()
         console.log("[Proxy] WebSocket upgrade for PTY:", target)
         const success = server.upgrade(req, {
           data: { target },
@@ -333,14 +368,16 @@ const server = Bun.serve<{ target: string }>({
 
     // Check if this is an API request (after stripping prefix)
     if (isApiPath(path)) {
-      const target = new URL(path + url.search, API_URL)
+      const targetOverride = getTargetOverride(req, url)
+      const target = buildUpstreamUrl(path, url, req)
       const headers = new Headers(req.headers)
 
       // Add auth header for API proxy in solo mode
-      if (proxyAuthHeader) {
+      if (shouldAttachProxyAuth(target)) {
         headers.set("Authorization", proxyAuthHeader)
       }
 
+      headers.delete("x-opencode-target")
       headers.delete("Accept-Encoding")
 
       // SSE requests need special handling
@@ -530,7 +567,8 @@ const server = Bun.serve<{ target: string }>({
       const target = ws.data.target
       console.log("[Proxy] WebSocket client connected, connecting to backend:", target)
 
-      const backend = new WebSocket(target, proxyAuthHeader ? { headers: { Authorization: proxyAuthHeader } } : undefined)
+      const shouldSendAuth = shouldAttachProxyAuth(new URL(target.replace(/^ws/, "http")))
+      const backend = new WebSocket(target, shouldSendAuth ? { headers: { Authorization: proxyAuthHeader } } : undefined)
 
       backend.addEventListener("open", () => {
         console.log("[Proxy] Backend WebSocket connected")

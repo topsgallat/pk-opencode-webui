@@ -32,6 +32,30 @@ const validatedBasePath = validateBasePath(BASE_PATH)
 const basePathWithoutTrailing = validatedBasePath.endsWith("/") ? validatedBasePath.slice(0, -1) : validatedBasePath
 const basePathWithTrailing = validatedBasePath.endsWith("/") ? validatedBasePath : validatedBasePath + "/"
 
+function getTargetOverride(req: Request, url: URL): string | undefined {
+  const target = req.headers.get("x-opencode-target") || url.searchParams.get("target")
+  if (!target) return undefined
+  try {
+    const parsed = new URL(target)
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return undefined
+    return parsed.toString()
+  } catch {
+    return undefined
+  }
+}
+
+function buildUpstreamUrl(path: string, url: URL, req: Request, protocol: "http" | "ws" = "http") {
+  const upstream = new URL(getTargetOverride(req, url) || API_URL)
+  if (protocol === "ws") {
+    upstream.protocol = upstream.protocol === "https:" ? "wss:" : "ws:"
+  }
+  const search = new URLSearchParams(url.search)
+  search.delete("target")
+  const query = search.toString()
+  const base = upstream.toString().endsWith("/") ? upstream.toString() : `${upstream.toString()}/`
+  return new URL(`.${path}${query ? `?${query}` : ""}`, base)
+}
+
 // Track WebSocket connections: client ws -> backend ws
 const wsConnections = new Map<object, WebSocket>()
 
@@ -53,7 +77,7 @@ const server = Bun.serve<{ target: string }>({
 
     // WebSocket upgrade for /pty routes - proxy to backend
     if (strippedPath.startsWith("/pty/") && req.headers.get("upgrade") === "websocket") {
-      const target = API_URL.replace(/^http/, "ws") + strippedPath + url.search
+      const target = buildUpstreamUrl(strippedPath, url, req, "ws").toString()
       console.log("[Proxy] WebSocket upgrade:", target)
 
       // Upgrade to WebSocket and proxy to backend
@@ -70,8 +94,9 @@ const server = Bun.serve<{ target: string }>({
 
     // API requests go directly to the backend
     if (isApiPath(strippedPath)) {
-      const target = new URL(strippedPath + url.search, API_URL)
+      const target = buildUpstreamUrl(strippedPath, url, req)
       const headers = new Headers(req.headers)
+      headers.delete("x-opencode-target")
 
       // SSE requests - just pass through the response body directly
       if (strippedPath.startsWith("/event")) {

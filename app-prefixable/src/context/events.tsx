@@ -1,7 +1,6 @@
 import { createContext, useContext, onCleanup, onMount, createSignal, type ParentProps } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import type { Event, SessionStatus, QuestionRequest } from "../sdk/client"
-import { useBasePath } from "./base-path"
 import { useSDK } from "./sdk"
 import { SyncContext, type SyncEvent } from "./sync"
 
@@ -19,8 +18,7 @@ interface EventContextValue {
 export const EventContext = createContext<EventContextValue>()
 
 export function EventProvider(props: ParentProps) {
-  const { prefix } = useBasePath()
-  const { client, directory } = useSDK()
+  const { client, directory, url } = useSDK()
   const sync = useContext(SyncContext)
   const handlers = new Set<EventHandler>()
   const [status, setStatus] = createStore<Record<string, SessionStatus>>({})
@@ -87,7 +85,7 @@ export function EventProvider(props: ParentProps) {
     }
 
     const dirParam = directory ? `?directory=${encodeURIComponent(directory)}` : ""
-    const eventUrl = prefix(`/event${dirParam}`)
+    const eventUrl = `${url}/event${dirParam}`
     eventSource = new EventSource(eventUrl)
     console.log("[Events] Connecting to SSE:", eventUrl)
 

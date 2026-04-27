@@ -1,6 +1,5 @@
 import { createContext, useContext, createSignal, type ParentProps } from "solid-js"
 import { useSDK } from "./sdk"
-import { useBasePath } from "./base-path"
 import { mkdir } from "../utils/extended-api"
 
 interface PTYSession {
@@ -27,8 +26,7 @@ interface TerminalContextValue {
 const TerminalContext = createContext<TerminalContextValue>()
 
 export function TerminalProvider(props: ParentProps) {
-  const { client } = useSDK()
-  const { serverUrl } = useBasePath()
+  const { client, url: serverUrl } = useSDK()
   const [sessions, setSessions] = createSignal<PTYSession[]>([])
   const [active, setActive] = createSignal<string | null>(null)
   const [opened, setOpened] = createSignal(false)

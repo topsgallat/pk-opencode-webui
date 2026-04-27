@@ -1,4 +1,4 @@
-import { createContext, useContext, type ParentProps } from "solid-js"
+import { createContext, useContext, createMemo, type ParentProps } from "solid-js"
 import { createOpencodeClient } from "../sdk/client"
 import { useBasePath } from "./base-path"
 import { useServer } from "./server"
@@ -19,25 +19,35 @@ export function SDKProvider(props: ParentProps & { directory?: string }) {
   const { serverUrl: basePathServerUrl } = useBasePath()
   const server = useServer()
 
-  const url = () => {
+  const url = createMemo(() => {
     const selected = server.selectedServer()
     return selected?.url ?? basePathServerUrl
+  })
+
+  const client = createMemo(() =>
+    createOpencodeClient({
+      baseUrl: url(),
+      directory: props.directory,
+      throwOnError: true,
+    })
+  )
+
+  const globalClient = createMemo(() =>
+    createOpencodeClient({
+      baseUrl: url(),
+      throwOnError: true,
+    })
+  )
+
+  const value: SDKContextValue = {
+    get client() { return client() },
+    get global() { return globalClient() },
+    get url() { return url() },
+    directory: props.directory,
   }
 
-  const client = createOpencodeClient({
-    baseUrl: url(),
-    directory: props.directory,
-    throwOnError: true,
-  })
-
-  // Global client without directory - for PTY operations, SSH keys, etc.
-  const global = createOpencodeClient({
-    baseUrl: url(),
-    throwOnError: true,
-  })
-
   return (
-    <SDKContext.Provider value={{ client, global, url: url(), directory: props.directory }}>
+    <SDKContext.Provider value={value}>
       {props.children}
     </SDKContext.Provider>
   )

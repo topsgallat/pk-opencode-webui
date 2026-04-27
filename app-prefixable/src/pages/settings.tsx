@@ -83,6 +83,7 @@ export function Settings() {
   const [serverNameInput, setServerNameInput] = createSignal("")
   const [serverUrlInput, setServerUrlInput] = createSignal("")
   const [serverError, setServerError] = createSignal<string | null>(null)
+  const [serverChecking, setServerChecking] = createSignal(false)
 
   // Keep servers in sync with localStorage
   onMount(() => {
@@ -119,9 +120,10 @@ export function Settings() {
     setServerNameInput("")
     setServerUrlInput("")
     setServerError(null)
+    setServerChecking(false)
   }
 
-  function saveServerDialog() {
+  async function saveServerDialog() {
     const name = serverNameInput().trim()
     const url = serverUrlInput().trim()
     if (!name || !url) return
@@ -131,10 +133,25 @@ export function Settings() {
       return
     }
 
+    const cleanUrl = url.replace(/\/$/, "")
+
+    if (!editingServer()) {
+      setServerChecking(true)
+      setServerError(null)
+      const ok = await fetch(`${cleanUrl}/health`, { signal: AbortSignal.timeout(5000) })
+        .then(r => r.ok)
+        .catch(() => false)
+      setServerChecking(false)
+      if (!ok) {
+        setServerError("Could not connect to server. Check the URL and try again.")
+        return
+      }
+    }
+
     const server: ServerConfig = {
       id: editingServer()?.id ?? generateServerId(),
       name,
-      url: url.replace(/\/$/, ""),
+      url: cleanUrl,
       isDefault: editingServer()?.isDefault ?? servers().length === 0,
     }
 
@@ -2632,15 +2649,15 @@ Add your project-specific instructions here.
                 </div>
 
                 <div class="flex justify-end gap-2 mt-6">
-                  <Button onClick={closeServerDialog} variant="secondary">
+                  <Button onClick={closeServerDialog} variant="secondary" disabled={serverChecking()}>
                     Cancel
                   </Button>
                   <Button
                     onClick={saveServerDialog}
                     variant="primary"
-                    disabled={!serverNameInput().trim() || !serverUrlInput().trim()}
+                    disabled={!serverNameInput().trim() || !serverUrlInput().trim() || serverChecking()}
                   >
-                    {editingServer() ? "Save" : "Add"}
+                    {serverChecking() ? "Checking..." : editingServer() ? "Save" : "Add"}
                   </Button>
                 </div>
               </div>

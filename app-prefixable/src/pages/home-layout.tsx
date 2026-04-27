@@ -8,11 +8,12 @@ import { ProviderProvider } from "../context/providers"
 import { MCPProvider } from "../context/mcp"
 import { ConfigProvider } from "../context/config"
 import { useGlobalEvents } from "../context/global-events"
+import { useServer } from "../context/server"
 import { ProjectDialog } from "../components/project-dialog"
 import { Terminal } from "../components/terminal"
 import { getFilename, OpenCodeLogo, ProjectAvatar, type Project } from "../components/shared"
 import { Spinner } from "../components/ui/spinner"
-import { Plus, X, Settings, SquareTerminal, ChevronDown } from "lucide-solid"
+import { Plus, X, Settings, SquareTerminal, ChevronDown, Server, Check } from "lucide-solid"
 import { dispatchStorageEvent } from "../utils/storage"
 
 // Storage key
@@ -25,6 +26,8 @@ const PROJECTS_STORAGE_KEY = "opencode.projects"
 export function HomeLayout(props: ParentProps) {
   const navigate = useNavigate()
   const globalEvents = useGlobalEvents()
+  const server = useServer()
+  const [serverDropdownOpen, setServerDropdownOpen] = createSignal(false)
 
   const [projects, setProjects] = createSignal<Project[]>([])
   const [projectDialogOpen, setProjectDialogOpen] = createSignal(false)
@@ -215,6 +218,52 @@ export function HomeLayout(props: ParentProps) {
                   >
                     <SquareTerminal class="w-5 h-5" />
                   </button>
+                  <div class="relative">
+                    <button
+                      onClick={() => setServerDropdownOpen(v => !v)}
+                      class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                      style={{
+                        color: server.selectedServer() ? "var(--text-interactive-base)" : "var(--icon-base)",
+                        background: serverDropdownOpen() ? "var(--surface-inset)" : "transparent",
+                      }}
+                      title={server.selectedServer() ? `Server: ${server.selectedServer()!.name}` : "Servers"}
+                    >
+                      <Server class="w-5 h-5" />
+                    </button>
+                    <Show when={serverDropdownOpen()}>
+                      <div
+                        class="absolute left-12 bottom-0 z-50 min-w-48 rounded-lg shadow-lg py-1"
+                        style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}
+                        onMouseLeave={() => setServerDropdownOpen(false)}
+                      >
+                        <Show when={server.servers().length === 0}>
+                          <div class="px-3 py-2 text-xs" style={{ color: "var(--text-subtle)" }}>
+                            No servers configured.
+                          </div>
+                        </Show>
+                        <For each={server.servers()}>
+                          {(s) => (
+                            <button
+                              onClick={() => { server.setSelectedServer(s.id); setServerDropdownOpen(false) }}
+                              class="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+                              style={{ color: "var(--text-base)" }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-inset)")}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                            >
+                              <Check
+                                class="w-3 h-3 shrink-0"
+                                style={{ opacity: server.selectedServer()?.id === s.id ? "1" : "0" }}
+                              />
+                              <div class="flex flex-col min-w-0">
+                                <span class="text-xs font-medium truncate">{s.name}</span>
+                                <span class="text-xs truncate" style={{ color: "var(--text-subtle)" }}>{s.url}</span>
+                              </div>
+                            </button>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
+                  </div>
                   <button
                     onClick={() => navigate("/settings")}
                     class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"

@@ -12,6 +12,7 @@ import {
 import { A, useLocation, useNavigate, useParams } from "@solidjs/router";
 import { useBasePath } from "../context/base-path";
 import { useSDK } from "../context/sdk";
+import { useServer } from "../context/server";
 import { useEvents } from "../context/events";
 import { useProviders } from "../context/providers";
 import { useTerminal } from "../context/terminal";
@@ -52,6 +53,8 @@ import {
   Search,
   GripVertical,
   ScrollText,
+  Server,
+  Check,
 } from "lucide-solid";
 import { useSync } from "../context/sync";
 import { usePermission } from "../context/permission";
@@ -237,6 +240,8 @@ function SortablePinnedSession(props: {
 export function Layout(props: ParentProps) {
   const { client, directory } = useSDK();
   const { basePath } = useBasePath();
+  const server = useServer();
+  const [serverDropdownOpen, setServerDropdownOpen] = createSignal(false);
   const events = useEvents();
   const providers = useProviders();
   const terminal = useTerminal();
@@ -2111,6 +2116,53 @@ export function Layout(props: ParentProps) {
               >
                 <SquareTerminal class="w-5 h-5" />
               </button>
+              <div class="relative">
+                <button
+                  data-hint-target
+                  onClick={() => setServerDropdownOpen(v => !v)}
+                  class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                  style={{
+                    color: server.selectedServer() ? "var(--text-interactive-base)" : "var(--icon-base)",
+                    background: serverDropdownOpen() ? "var(--surface-inset)" : "transparent",
+                  }}
+                  title={server.selectedServer() ? `Server: ${server.selectedServer()!.name}` : "Servers"}
+                >
+                  <Server class="w-5 h-5" />
+                </button>
+                <Show when={serverDropdownOpen()}>
+                  <div
+                    class="absolute left-12 bottom-0 z-50 min-w-48 rounded-lg shadow-lg py-1"
+                    style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}
+                    onMouseLeave={() => setServerDropdownOpen(false)}
+                  >
+                    <Show when={server.servers().length === 0}>
+                      <div class="px-3 py-2 text-xs" style={{ color: "var(--text-subtle)" }}>
+                        No servers configured.
+                      </div>
+                    </Show>
+                    <For each={server.servers()}>
+                      {(s) => (
+                        <button
+                          onClick={() => { server.setSelectedServer(s.id); setServerDropdownOpen(false) }}
+                          class="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+                          style={{ color: "var(--text-base)" }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-inset)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          <Check
+                            class="w-3 h-3 shrink-0"
+                            style={{ opacity: server.selectedServer()?.id === s.id ? "1" : "0" }}
+                          />
+                          <div class="flex flex-col min-w-0">
+                            <span class="text-xs font-medium truncate">{s.name}</span>
+                            <span class="text-xs truncate" style={{ color: "var(--text-subtle)" }}>{s.url}</span>
+                          </div>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </div>
               <button
                 data-hint-target
                 onClick={() => navigate(`/${dirSlug()}/settings`)}

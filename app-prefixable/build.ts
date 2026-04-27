@@ -19,18 +19,25 @@ console.log("CSS built")
 // Build JS with esbuild
 // Use relative paths (./) so assets work with any prefix at runtime
 console.log("Building JS...")
+const isDev = process.env.NODE_ENV !== "production"
+
 const result = await esbuild.build({
   entryPoints: ["./src/entry.tsx"],
   outdir: "./dist",
   publicPath: "./", // Relative paths - works with any prefix!
   bundle: true,
-  minify: process.env.NODE_ENV === "production",
+  minify: !isDev,
   splitting: true,
   format: "esm",
   sourcemap: true,
   target: "esnext",
   plugins: [solidPlugin()],
   metafile: true,
+  define: {
+    "import.meta.env.DEV": isDev ? "true" : "false",
+    "import.meta.env.PROD": isDev ? "false" : "true",
+    "import.meta.env.MODE": isDev ? '"development"' : '"production"',
+  },
 })
 
 console.log(`JS build completed: ${Object.keys(result.metafile?.outputs || {}).length} files`)

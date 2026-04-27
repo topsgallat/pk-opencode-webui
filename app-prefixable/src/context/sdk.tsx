@@ -10,6 +10,7 @@ interface SDKContextValue {
   /** Global client without directory context - for operations that should work regardless of project */
   global: SDKClient
   url: string
+  targetUrl?: string
   directory?: string
 }
 
@@ -19,15 +20,19 @@ export function SDKProvider(props: ParentProps & { directory?: string }) {
   const { serverUrl: basePathServerUrl } = useBasePath()
   const server = useServer()
 
-  const url = createMemo(() => {
+  const targetUrl = createMemo(() => {
     const selected = server.selectedServer()
-    return selected?.url ?? basePathServerUrl
+    if (!selected || selected.isDefault) return undefined
+    return selected.url
   })
+
+  const url = createMemo(() => basePathServerUrl)
 
   const client = createMemo(() =>
     createOpencodeClient({
       baseUrl: url(),
       directory: props.directory,
+      targetUrl: targetUrl(),
       throwOnError: true,
     })
   )
@@ -35,6 +40,7 @@ export function SDKProvider(props: ParentProps & { directory?: string }) {
   const globalClient = createMemo(() =>
     createOpencodeClient({
       baseUrl: url(),
+      targetUrl: targetUrl(),
       throwOnError: true,
     })
   )
@@ -43,6 +49,7 @@ export function SDKProvider(props: ParentProps & { directory?: string }) {
     get client() { return client() },
     get global() { return globalClient() },
     get url() { return url() },
+    get targetUrl() { return targetUrl() },
     directory: props.directory,
   }
 

@@ -5,12 +5,17 @@ import { type Config } from "./gen/client/types.gen.js"
 import { OpencodeClient } from "./gen/sdk.gen.js"
 export { type Config as OpencodeClientConfig, OpencodeClient }
 
-export function createOpencodeClient(config?: Config & { directory?: string }) {
+export function createOpencodeClient(config?: Config & { directory?: string; targetUrl?: string }) {
   if (!config?.fetch) {
-    const customFetch: any = (req: any) => {
-      // @ts-ignore
-      req.timeout = false
-      return fetch(req)
+    const customFetch: typeof fetch = (input, init) => {
+      const request = input instanceof Request ? input : new Request(input, init)
+      const headers = new Headers(request.headers)
+      if (config?.targetUrl) {
+        headers.set("x-opencode-target", config.targetUrl)
+      }
+      const next = new Request(request, { headers }) as Request & { timeout?: boolean }
+      next.timeout = false
+      return fetch(next)
     }
     config = {
       ...config,

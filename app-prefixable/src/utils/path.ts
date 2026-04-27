@@ -69,6 +69,14 @@ export function getServerUrl(): string {
   return "http://localhost:4096"
 }
 
+export function appendTargetParam(url: string, targetUrl?: string): string {
+  if (!targetUrl) return url
+  if (typeof window === "undefined") return url
+  const next = new URL(url, window.location.origin)
+  next.searchParams.set("target", targetUrl)
+  return next.toString()
+}
+
 // URL-safe Base64 encoding for directory paths
 export function base64Encode(value: string): string {
   const bytes = new TextEncoder().encode(value)

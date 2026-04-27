@@ -1,4 +1,4 @@
-import { createSignal, createEffect, Show, Match, Switch, createMemo } from "solid-js"
+import { createSignal, createEffect, Show, Match, Switch, createMemo, onCleanup } from "solid-js"
 import { useFile } from "../context/file"
 import { useSDK } from "../context/sdk"
 import { useBasePath } from "../context/base-path"
@@ -107,7 +107,16 @@ export function FileViewer(props: FileViewerProps) {
 
   const lang = createMemo(() => getLanguage(props.path))
   const isMarkdown = createMemo(() => lang() === "markdown")
+  const isHtml = createMemo(() => lang() === "html")
   const [markdownPreview, setMarkdownPreview] = createSignal(true)
+  const [htmlPreview, setHtmlPreview] = createSignal(true)
+  const htmlBlobUrl = createMemo(() => {
+    if (!isHtml() || !fileContent()) return undefined
+    const blob = new Blob([fileContent()], { type: "text/html" })
+    const url = URL.createObjectURL(blob)
+    onCleanup(() => URL.revokeObjectURL(url))
+    return url
+  })
   const SAFE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"])
 
   createEffect(() => {
@@ -215,6 +224,19 @@ export function FileViewer(props: FileViewerProps) {
                       </Show>
                     </button>
                   </Show>
+                  <Show when={isHtml()}>
+                    <button
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center gap-1"
+                      onClick={() => setHtmlPreview(!htmlPreview())}
+                      title={htmlPreview() ? "Switch to source" : "Switch to preview"}
+                      aria-label={htmlPreview() ? "Switch to source" : "Switch to preview"}
+                      style={{ color: "var(--text-base)" }}
+                    >
+                      <Show when={htmlPreview()} fallback={<Eye class="w-3.5 h-3.5" />}>
+                        <FileCode class="w-3.5 h-3.5" />
+                      </Show>
+                    </button>
+                  </Show>
                   <button
                     class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
                     onClick={() => setIsEditing(true)}
@@ -230,7 +252,20 @@ export function FileViewer(props: FileViewerProps) {
                 <Show when={fileContent()} fallback={<div class="p-4 text-xs" style={{ color: "var(--text-weak)" }}>Empty file</div>}>
                   <Show
                     when={isMarkdown() && markdownPreview()}
-                    fallback={<ContentCode code={fileContent()} lang={lang()} />}
+                    fallback={
+                      <Show
+                        when={isHtml() && htmlPreview()}
+                        fallback={<ContentCode code={fileContent()} lang={lang()} />}
+                      >
+                        <iframe
+                          src={htmlBlobUrl()}
+                          sandbox=""
+                          class="w-full border-0 bg-white"
+                          style={{ "min-height": "400px" }}
+                          title="HTML preview"
+                        />
+                      </Show>
+                    }
                   >
                     <div class="p-4 overflow-y-auto">
                       <Markdown content={fileContent()} class="text-sm" />

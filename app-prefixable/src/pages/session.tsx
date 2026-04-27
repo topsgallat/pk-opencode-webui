@@ -25,6 +25,7 @@ import { useBranding } from "../context/branding";
 import { useSavedPrompts } from "../context/saved-prompts";
 import { useTerminal } from "../context/terminal";
 import { useConfig } from "../context/config";
+import { useServer } from "../context/server";
 import { MessageTimeline } from "../components/message-timeline";
 import { MCPDialog } from "../components/mcp-dialog";
 import { MCPAddDialog } from "../components/mcp-add-dialog";
@@ -100,6 +101,7 @@ export function Session() {
   const savedPrompts = useSavedPrompts();
   const terminal = useTerminal();
   const appConfig = useConfig();
+  const server = useServer();
   const device = useDevice();
 
   // Unified toast system — only one toast visible at a time
@@ -1048,7 +1050,7 @@ export function Session() {
       try {
         const dir = directory || base64Decode(params.dir);
         if (dir && typeof window !== "undefined") {
-          const key = `opencode.lastSession.${dir}`;
+          const key = `opencode.lastSession.${server.selectedServer()?.id ?? "default"}.${dir}`;
           const stored = window.localStorage.getItem(key);
           if (stored === id) {
             window.localStorage.removeItem(key);
@@ -1064,7 +1066,7 @@ export function Session() {
     try {
       const dir = directory || base64Decode(params.dir);
       if (dir && typeof window !== "undefined") {
-        const key = `opencode.lastSession.${dir}`;
+        const key = `opencode.lastSession.${server.selectedServer()?.id ?? "default"}.${dir}`;
         const stored = window.localStorage.getItem(key);
         if (stored === id) window.localStorage.removeItem(key);
       }
@@ -1084,7 +1086,7 @@ export function Session() {
     try {
       const dir = directory || base64Decode(params.dir);
       if (dir && typeof window !== "undefined") {
-        window.localStorage.setItem(`opencode.lastSession.${dir}`, id);
+        window.localStorage.setItem(`opencode.lastSession.${server.selectedServer()?.id ?? "default"}.${dir}`, id);
       }
     } catch (err) {
       console.error("[Session] Failed to persist last session:", err);

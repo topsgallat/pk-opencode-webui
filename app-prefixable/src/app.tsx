@@ -8,7 +8,7 @@ import { CommandProvider } from "./context/command"
 import { RecentProjectsProvider } from "./context/recent-projects"
 import { SavedPromptsProvider } from "./context/saved-prompts"
 import { GlobalEventsProvider } from "./context/global-events"
-import { ServerProvider } from "./context/server"
+import { ServerProvider, useServer } from "./context/server"
 import { DirectoryLayout } from "./pages/directory-layout"
 import { HomeLayout } from "./pages/home-layout"
 import { Session } from "./pages/session"
@@ -20,11 +20,11 @@ import type { Project } from "./components/shared"
 
 const PROJECTS_STORAGE_KEY = "opencode.projects"
 
-function getLastSessionHref(encodedDir: string): string {
+function getLastSessionHref(encodedDir: string, serverId: string): string {
   try {
     const dir = base64Decode(encodedDir)
     const last = typeof window !== "undefined"
-      ? window.localStorage.getItem(`opencode.lastSession.${dir}`)
+      ? window.localStorage.getItem(`opencode.lastSession.${serverId}.${dir}`)
       : null
     if (!last || last.includes("..") || /[\/\\]/.test(last)) return "session"
     return `session/${last}`
@@ -36,14 +36,16 @@ function getLastSessionHref(encodedDir: string): string {
 function DirectoryIndex() {
   const params = useParams<{ dir: string }>()
   const navigate = useNavigate()
-  onMount(() => navigate(getLastSessionHref(params.dir), { replace: true }))
+  const server = useServer()
+  onMount(() => navigate(getLastSessionHref(params.dir, server.selectedServer()?.id ?? "default"), { replace: true }))
   return null
 }
 
 function SessionIndex() {
   const params = useParams<{ dir: string }>()
   const navigate = useNavigate()
-  const href = getLastSessionHref(params.dir)
+  const server = useServer()
+  const href = getLastSessionHref(params.dir, server.selectedServer()?.id ?? "default")
   if (href === "session") return <Session />
   const id = href.replace(/^session\//, "")
   onMount(() => navigate(id, { replace: true }))

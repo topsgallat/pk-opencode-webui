@@ -109,7 +109,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
         
         const dir = directory
         if (dir) {
-            const lastSessionKey = `opencode.lastSession.${dir}`
+            const lastSessionKey = `opencode.lastSession.${server.selectedServer()?.id ?? "default"}.${dir}`
             const lastSession = localStorage.getItem(lastSessionKey)
             if (lastSession) {
                 const currentPath = location.pathname
@@ -669,7 +669,12 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                                 {(s) => (
                                     <button
                                         class="w-full flex items-center gap-3 px-4 py-3.5 text-sm active:opacity-70 transition-opacity"
-                                        onClick={() => { server.setSelectedServer(s.id); setShowServerSheet(false) }}
+                                        onClick={() => {
+                                            server.setSelectedServer(s.id)
+                                            setShowServerSheet(false)
+                                            setMobileTab("sessions")
+                                            navigate(`/${dirSlug()}/session`, { replace: true })
+                                        }}
                                     >
                                         <Server class="w-5 h-5 shrink-0" style={{ color: "var(--icon-weak)" }} />
                                         <div class="flex-1 text-left min-w-0">

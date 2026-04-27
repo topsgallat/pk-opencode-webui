@@ -2143,7 +2143,11 @@ export function Layout(props: ParentProps) {
                     <For each={server.servers()}>
                       {(s) => (
                         <button
-                          onClick={() => { server.setSelectedServer(s.id); setServerDropdownOpen(false); navigate("/") }}
+                              onClick={() => {
+                                server.setSelectedServer(s.id)
+                                setServerDropdownOpen(false)
+                                navigate(`/${dirSlug()}/session`)
+                              }}
                           class="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                           style={{ color: "var(--text-base)" }}
                           onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-inset)")}
@@ -3034,4 +3038,3 @@ export function Layout(props: ParentProps) {
     </>
   );
 }
-

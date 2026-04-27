@@ -41,8 +41,16 @@ export function HomeLayout(props: ParentProps) {
   const [terminalHeight, setTerminalHeight] = createSignal(300)
 
   // Client for PTY operations
-  const ptyUrl = createMemo(() => server.selectedServer()?.url ?? basePathServerUrl)
-  const client = createMemo(() => createOpencodeClient({ baseUrl: ptyUrl(), throwOnError: false }))
+  const ptyTargetUrl = createMemo(() => {
+    const selected = server.selectedServer()
+    if (!selected || selected.isDefault) return undefined
+    return selected.url
+  })
+  const client = createMemo(() => createOpencodeClient({
+    baseUrl: basePathServerUrl,
+    targetUrl: ptyTargetUrl(),
+    throwOnError: false,
+  }))
 
   createEffect(on(() => server.selectedServer()?.id, () => {
     setTerminalOpen(false)
@@ -254,7 +262,7 @@ export function HomeLayout(props: ParentProps) {
                         <For each={server.servers()}>
                           {(s) => (
                             <button
-                              onClick={() => { server.setSelectedServer(s.id); setServerDropdownOpen(false); navigate("/") }}
+                              onClick={() => { server.setSelectedServer(s.id); setServerDropdownOpen(false) }}
                               class="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                               style={{ color: "var(--text-base)" }}
                               onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-inset)")}

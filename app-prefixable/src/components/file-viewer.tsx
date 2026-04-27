@@ -261,7 +261,7 @@ export function FileViewer(props: FileViewerProps) {
                           src={htmlBlobUrl()}
                           sandbox=""
                           class="w-full border-0 bg-white"
-                          style={{ "min-height": "400px" }}
+                          style={{ height: "calc(100vh - 120px)" }}
                           title="HTML preview"
                         />
                       </Show>

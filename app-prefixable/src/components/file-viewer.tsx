@@ -4,9 +4,10 @@ import { useSDK } from "../context/sdk"
 import { useBasePath } from "../context/base-path"
 import { ContentCode } from "./diff/content-code"
 import { Spinner } from "./ui/spinner"
-import { FileCode, Pencil } from "lucide-solid"
+import { FileCode, Pencil, Eye } from "lucide-solid"
 import { writeFile } from "../utils/extended-api"
 import { EditorDialog } from "./editor-dialog"
+import { Markdown } from "./markdown"
 
 interface FileViewerProps {
   path: string
@@ -105,6 +106,8 @@ export function FileViewer(props: FileViewerProps) {
   const [isImage, setIsImage] = createSignal(false)
 
   const lang = createMemo(() => getLanguage(props.path))
+  const isMarkdown = createMemo(() => lang() === "markdown")
+  const [markdownPreview, setMarkdownPreview] = createSignal(true)
   const SAFE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"])
 
   createEffect(() => {
@@ -198,19 +201,41 @@ export function FileViewer(props: FileViewerProps) {
                 style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}
               >
                 <div class="truncate">{props.path}</div>
-                <button
-                  class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
-                  onClick={() => setIsEditing(true)}
-                  title="Edit File"
-                  aria-label="Edit File"
-                  style={{ color: "var(--text-base)" }}
-                >
-                  <Pencil class="w-3.5 h-3.5" />
-                </button>
+                <div class="flex items-center gap-1">
+                  <Show when={isMarkdown()}>
+                    <button
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center gap-1"
+                      onClick={() => setMarkdownPreview(!markdownPreview())}
+                      title={markdownPreview() ? "Switch to source" : "Switch to preview"}
+                      aria-label={markdownPreview() ? "Switch to source" : "Switch to preview"}
+                      style={{ color: "var(--text-base)" }}
+                    >
+                      <Show when={markdownPreview()} fallback={<Eye class="w-3.5 h-3.5" />}>
+                        <FileCode class="w-3.5 h-3.5" />
+                      </Show>
+                    </button>
+                  </Show>
+                  <button
+                    class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    onClick={() => setIsEditing(true)}
+                    title="Edit File"
+                    aria-label="Edit File"
+                    style={{ color: "var(--text-base)" }}
+                  >
+                    <Pencil class="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
               <div class="overflow-x-auto min-h-0">
                 <Show when={fileContent()} fallback={<div class="p-4 text-xs" style={{ color: "var(--text-weak)" }}>Empty file</div>}>
-                  <ContentCode code={fileContent()} lang={lang()} />
+                  <Show
+                    when={isMarkdown() && markdownPreview()}
+                    fallback={<ContentCode code={fileContent()} lang={lang()} />}
+                  >
+                    <div class="p-4 overflow-y-auto">
+                      <Markdown content={fileContent()} class="text-sm" />
+                    </div>
+                  </Show>
                 </Show>
               </div>
             </div>

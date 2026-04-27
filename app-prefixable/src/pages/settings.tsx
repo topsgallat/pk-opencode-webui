@@ -83,6 +83,7 @@ export function Settings() {
   const [serverNameInput, setServerNameInput] = createSignal("")
   const [serverUrlInput, setServerUrlInput] = createSignal("")
   const [serverError, setServerError] = createSignal<string | null>(null)
+  const [serverWarn, setServerWarn] = createSignal<string | null>(null)
   const [serverChecking, setServerChecking] = createSignal(false)
 
   // Keep servers in sync with localStorage
@@ -120,6 +121,7 @@ export function Settings() {
     setServerNameInput("")
     setServerUrlInput("")
     setServerError(null)
+    setServerWarn(null)
     setServerChecking(false)
   }
 
@@ -138,15 +140,14 @@ export function Settings() {
     if (!editingServer()) {
       setServerChecking(true)
       setServerError(null)
+      setServerWarn(null)
       const probeUrl = basePath.prefix(`/api/ext/probe-server?url=${encodeURIComponent(cleanUrl)}`)
-      const ok = await fetch(probeUrl, { signal: AbortSignal.timeout(8000) })
-        .then(r => r.ok ? r.json() : { ok: false })
-        .then((j: { ok: boolean }) => j.ok)
-        .catch(() => false)
+      const probe: { ok: boolean; error?: string } = await fetch(probeUrl, { signal: AbortSignal.timeout(8000) })
+        .then(r => r.json())
+        .catch(e => ({ ok: false, error: e instanceof Error ? e.message : String(e) }))
       setServerChecking(false)
-      if (!ok) {
-        setServerError("Could not connect to server. Check the URL and try again.")
-        return
+      if (!probe.ok) {
+        setServerWarn(`Server may be unreachable from this host: ${probe.error ?? "no response"}. Added anyway.`)
       }
     }
 
@@ -2607,6 +2608,20 @@ Add your project-specific instructions here.
                     }}
                   >
                     {serverError()}
+                  </div>
+                </Show>
+
+                <Show when={serverWarn()}>
+                  <div
+                    class="mb-4 p-3 rounded-md text-sm"
+                    style={{
+                      background: "var(--surface-inset)",
+                      border: "1px solid var(--border-base)",
+                      "border-left": "3px solid var(--interactive-warning)",
+                      color: "var(--interactive-warning)",
+                    }}
+                  >
+                    {serverWarn()}
                   </div>
                 </Show>
 

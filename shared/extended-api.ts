@@ -459,9 +459,10 @@ export async function handleExtendedEndpoint(
       const res = await fetch(`${parsed.origin}/health`, {
         signal: AbortSignal.timeout(5000),
       })
-      return Response.json({ ok: res.ok, status: res.status })
+      return Response.json({ ok: true, status: res.status })
     } catch (e) {
-      return Response.json({ ok: false, error: String(e) })
+      const msg = e instanceof Error ? e.message : String(e)
+      return Response.json({ ok: false, error: msg })
     }
   }
 

@@ -152,6 +152,7 @@ const server = Bun.serve<{ target: string }>({
         "window.__OPENCODE__ = window.__OPENCODE__ || {}",
         `window.__OPENCODE__ = ${config}`,
       )
+      .replace(/__DEFAULT_SERVER_URL__/g, API_URL.replace(/"/g, ""))
     return new Response(injected, {
       headers: { "Content-Type": "text/html" },
     })

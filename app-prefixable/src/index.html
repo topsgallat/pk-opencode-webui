@@ -56,8 +56,7 @@
       // Branding config will be injected by the server as a JSON object
       // Server replacement token: __BRANDING_CONFIG__ -> JSON
       window.__OPENCODE__.branding = __BRANDING_CONFIG__
-      // Server can inject: window.__OPENCODE__.basePath = "/my-prefix/";
-      // Server can inject: window.__OPENCODE__.serverUrl = "http://localhost:4096";
+      window.__OPENCODE__.defaultServerUrl = "__DEFAULT_SERVER_URL__"
     </script>
     <script type="module" src="./entry.js"></script>
   </body>

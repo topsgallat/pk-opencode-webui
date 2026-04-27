@@ -6,25 +6,31 @@
 
 const SERVERS_KEY = "opencode.servers"
 
-/**
- * Server configuration
- */
 export interface ServerConfig {
   id: string
-  name: string // user-friendly name, e.g., "Production", "Dev"
-  url: string // base URL, e.g., "http://localhost:4096"
+  name: string
+  url: string
   isDefault: boolean
 }
 
-/**
- * Get all stored servers
- */
+declare global {
+  interface Window {
+    __OPENCODE__?: { defaultServerUrl?: string }
+  }
+}
+
+function builtinServer(): ServerConfig {
+  const url = window.__OPENCODE__?.defaultServerUrl || "http://127.0.0.1:4096"
+  return { id: "builtin", name: "Local", url, isDefault: true }
+}
+
 export function getServers(): ServerConfig[] {
   try {
     const stored = localStorage.getItem(SERVERS_KEY)
-    return stored ? JSON.parse(stored) : []
+    const list: ServerConfig[] = stored ? JSON.parse(stored) : []
+    return list.length > 0 ? list : [builtinServer()]
   } catch {
-    return []
+    return [builtinServer()]
   }
 }
 

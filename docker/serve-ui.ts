@@ -513,6 +513,7 @@ const server = Bun.serve<{ target: string }>({
           icon: BRANDING_ICON || "",
         }
         html = html.replace(/__BRANDING_CONFIG__/g, JSON.stringify(brandingConfig))
+        html = html.replace(/__DEFAULT_SERVER_URL__/g, API_URL.replace(/"/g, ""))
         return maybeGzip(req, html, "text/html", {
           "Content-Type": "text/html",
           "Cache-Control": "no-cache",

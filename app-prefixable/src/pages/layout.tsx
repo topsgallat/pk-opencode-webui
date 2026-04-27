@@ -2143,7 +2143,7 @@ export function Layout(props: ParentProps) {
                     <For each={server.servers()}>
                       {(s) => (
                         <button
-                          onClick={() => { server.setSelectedServer(s.id); setServerDropdownOpen(false) }}
+                          onClick={() => { server.setSelectedServer(s.id); setServerDropdownOpen(false); navigate("/") }}
                           class="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                           style={{ color: "var(--text-base)" }}
                           onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-inset)")}

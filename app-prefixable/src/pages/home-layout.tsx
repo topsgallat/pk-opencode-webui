@@ -1,7 +1,7 @@
-import { type ParentProps, createSignal, For, onMount, onCleanup, Show } from "solid-js"
+import { type ParentProps, createSignal, createEffect, createMemo, For, on, onMount, onCleanup, Show } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import { createOpencodeClient } from "../sdk/client"
-import { base64Encode, getServerUrl } from "../utils/path"
+import { base64Encode } from "../utils/path"
 import { SDKProvider } from "../context/sdk"
 import { EventProvider } from "../context/events"
 import { ProviderProvider } from "../context/providers"
@@ -9,6 +9,7 @@ import { MCPProvider } from "../context/mcp"
 import { ConfigProvider } from "../context/config"
 import { useGlobalEvents } from "../context/global-events"
 import { useServer } from "../context/server"
+import { useBasePath } from "../context/base-path"
 import { ProjectDialog } from "../components/project-dialog"
 import { Terminal } from "../components/terminal"
 import { getFilename, OpenCodeLogo, ProjectAvatar, type Project } from "../components/shared"
@@ -27,6 +28,7 @@ export function HomeLayout(props: ParentProps) {
   const navigate = useNavigate()
   const globalEvents = useGlobalEvents()
   const server = useServer()
+  const { serverUrl: basePathServerUrl } = useBasePath()
   const [serverDropdownOpen, setServerDropdownOpen] = createSignal(false)
 
   const [projects, setProjects] = createSignal<Project[]>([])
@@ -39,7 +41,13 @@ export function HomeLayout(props: ParentProps) {
   const [terminalHeight, setTerminalHeight] = createSignal(300)
 
   // Client for PTY operations
-  const client = createOpencodeClient({ baseUrl: getServerUrl(), throwOnError: false })
+  const ptyUrl = createMemo(() => server.selectedServer()?.url ?? basePathServerUrl)
+  const client = createMemo(() => createOpencodeClient({ baseUrl: ptyUrl(), throwOnError: false }))
+
+  createEffect(on(() => server.selectedServer()?.id, () => {
+    setTerminalOpen(false)
+    setTerminalPtyId(null)
+  }, { defer: true }))
 
   onMount(() => {
     try {
@@ -56,7 +64,7 @@ export function HomeLayout(props: ParentProps) {
   onCleanup(() => {
     const ptyId = terminalPtyId()
     if (ptyId) {
-      client.pty.remove({ ptyID: ptyId }).catch(() => {})
+      client().pty.remove({ ptyID: ptyId }).catch(() => {})
     }
   })
 
@@ -66,7 +74,7 @@ export function HomeLayout(props: ParentProps) {
       const ptyId = terminalPtyId()
       if (ptyId) {
         try {
-          await client.pty.remove({ ptyID: ptyId })
+          await client().pty.remove({ ptyID: ptyId })
         } catch (e) {
           console.error("[HomeLayout] Failed to close PTY:", e)
         }
@@ -80,11 +88,11 @@ export function HomeLayout(props: ParentProps) {
 
       try {
         // Get home directory
-        const pathRes = await client.path.get()
+        const pathRes = await client().path.get()
         const home = pathRes.data?.home || "~"
 
         // Create PTY in home directory
-        const ptyRes = await client.pty.create({
+        const ptyRes = await client().pty.create({
           command: "/bin/bash",
           args: ["-l"],
           cwd: home,
@@ -137,12 +145,14 @@ export function HomeLayout(props: ParentProps) {
   }
 
   return (
-    <SDKProvider>
-      <EventProvider>
-        <ConfigProvider>
-          <ProviderProvider>
-            <MCPProvider>
-            <div class="flex h-screen" style={{ background: "var(--background-stronger)" }}>
+    <For each={[server.selectedServer()?.id ?? "default"]}>
+      {() => (
+        <SDKProvider>
+          <EventProvider>
+            <ConfigProvider>
+              <ProviderProvider>
+                <MCPProvider>
+                <div class="flex h-screen" style={{ background: "var(--background-stronger)" }}>
               {/* Project Dialog */}
               <ProjectDialog
                 open={projectDialogOpen()}
@@ -244,7 +254,7 @@ export function HomeLayout(props: ParentProps) {
                         <For each={server.servers()}>
                           {(s) => (
                             <button
-                              onClick={() => { server.setSelectedServer(s.id); setServerDropdownOpen(false) }}
+                              onClick={() => { server.setSelectedServer(s.id); setServerDropdownOpen(false); navigate("/") }}
                               class="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                               style={{ color: "var(--text-base)" }}
                               onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-inset)")}
@@ -363,11 +373,13 @@ export function HomeLayout(props: ParentProps) {
                   </div>
                 </Show>
               </div>
-            </div>
-            </MCPProvider>
-          </ProviderProvider>
-        </ConfigProvider>
-      </EventProvider>
-    </SDKProvider>
+                </div>
+                </MCPProvider>
+              </ProviderProvider>
+            </ConfigProvider>
+          </EventProvider>
+        </SDKProvider>
+      )}
+    </For>
   )
 }

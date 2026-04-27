@@ -1,5 +1,6 @@
 import { type ParentProps, createMemo, createEffect, For } from "solid-js"
 import { useParams, Navigate } from "@solidjs/router"
+import { useServer } from "../context/server"
 import { SDKProvider } from "../context/sdk"
 import { EventProvider } from "../context/events"
 import { SyncProvider } from "../context/sync"
@@ -21,6 +22,7 @@ import { Layout } from "./layout"
  */
 export function DirectoryLayout(props: ParentProps) {
   const params = useParams<{ dir: string }>()
+  const server = useServer()
   const recent = useRecentProjects()
 
   const directory = createMemo(() => {
@@ -54,29 +56,33 @@ export function DirectoryLayout(props: ParentProps) {
   })
 
   return (
-    <For each={directories()} fallback={<Navigate href="/" />}>
-      {(dir: string) => (
-        <SDKProvider directory={dir}>
-          <SyncProvider>
-            <EventProvider>
-              <ConfigProvider>
-                <FileProvider>
-                  <PermissionProvider>
-                    <ProviderProvider>
-                      <MCPProvider>
-                        <TerminalProvider>
-                          <LayoutProvider>
-                            <Layout>{props.children}</Layout>
-                          </LayoutProvider>
-                        </TerminalProvider>
-                      </MCPProvider>
-                    </ProviderProvider>
-                  </PermissionProvider>
-                </FileProvider>
-              </ConfigProvider>
-            </EventProvider>
-          </SyncProvider>
-        </SDKProvider>
+    <For each={[server.selectedServer()?.id ?? "default"]}>
+      {() => (
+        <For each={directories()} fallback={<Navigate href="/" />}>
+          {(dir: string) => (
+            <SDKProvider directory={dir}>
+              <SyncProvider>
+                <EventProvider>
+                  <ConfigProvider>
+                    <FileProvider>
+                      <PermissionProvider>
+                        <ProviderProvider>
+                          <MCPProvider>
+                            <TerminalProvider>
+                              <LayoutProvider>
+                                <Layout>{props.children}</Layout>
+                              </LayoutProvider>
+                            </TerminalProvider>
+                          </MCPProvider>
+                        </ProviderProvider>
+                      </PermissionProvider>
+                    </FileProvider>
+                  </ConfigProvider>
+                </EventProvider>
+              </SyncProvider>
+            </SDKProvider>
+          )}
+        </For>
       )}
     </For>
   )

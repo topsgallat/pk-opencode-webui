@@ -9,6 +9,7 @@ import { useSDK } from "../context/sdk"
 import { useEvents } from "../context/events"
 import { usePermission } from "../context/permission"
 import { useProviders } from "../context/providers"
+import { useServer } from "../context/server"
 import { base64Encode } from "../utils/path"
 import { createBackdropDismiss } from "../utils/backdrop"
 import { getFilename } from "./shared"
@@ -33,6 +34,7 @@ export function CommandPalette() {
   const events = useEvents()
   const permission = usePermission()
   const providers = useProviders()
+  const server = useServer()
   const navigate = useNavigate()
 
   const [filter, setFilter] = createSignal("")
@@ -74,7 +76,8 @@ export function CommandPalette() {
     let projects: { worktree: string; name?: string }[] = []
     try {
       if (typeof localStorage !== "undefined") {
-        const stored = localStorage.getItem(PROJECTS_STORAGE_KEY)
+        const key = `${PROJECTS_STORAGE_KEY}.${server.serverKey()}`
+        const stored = localStorage.getItem(key) ?? (server.serverKey() === "default" ? localStorage.getItem(PROJECTS_STORAGE_KEY) : null)
         if (stored) {
           projects = JSON.parse(stored) as { worktree: string; name?: string }[]
         }

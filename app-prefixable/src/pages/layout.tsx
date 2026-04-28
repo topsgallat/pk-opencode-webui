@@ -278,6 +278,10 @@ export function Layout(props: ParentProps) {
   const [promptDropdownIndex, setPromptDropdownIndex] = createSignal(0);
   const [confirmArchiveSession, setConfirmArchiveSession] = createSignal<Session | null>(null);
   const [pinnedIds, setPinnedIds] = createSignal<string[]>([]);
+  const projectsStorageKey = createMemo(() => `${PROJECTS_STORAGE_KEY}.${server.serverKey()}`);
+  const sidebarExpandedKey = createMemo(() => `${SIDEBAR_EXPANDED_KEY}.${server.serverKey()}`);
+  const showArchivedKey = createMemo(() => `${SHOW_ARCHIVED_KEY}.${server.serverKey()}`);
+  const pinnedSessionsKey = createMemo(() => `${PINNED_SESSIONS_PREFIX}${server.serverKey()}.${directory ?? "global"}`);
 
   // Search state
   const [searchQuery, setSearchQuery] = createSignal("");
@@ -311,7 +315,7 @@ export function Layout(props: ParentProps) {
   onMount(() => {
     // Load projects
     try {
-      const stored = localStorage.getItem(PROJECTS_STORAGE_KEY);
+        const stored = localStorage.getItem(projectsStorageKey()) ?? (server.serverKey() === "default" ? localStorage.getItem(PROJECTS_STORAGE_KEY) : null);
       if (stored) {
         setProjects(JSON.parse(stored));
       }
@@ -321,7 +325,7 @@ export function Layout(props: ParentProps) {
 
     // Load sidebar state - default to open when a project is active
     try {
-      const expanded = localStorage.getItem(SIDEBAR_EXPANDED_KEY);
+      const expanded = localStorage.getItem(sidebarExpandedKey());
       if (expanded !== null) {
         setSidebarExpanded(expanded === "true");
       } else if (directory) {
@@ -334,7 +338,7 @@ export function Layout(props: ParentProps) {
 
     // Load show archived state
     try {
-      const archived = localStorage.getItem(SHOW_ARCHIVED_KEY);
+      const archived = localStorage.getItem(showArchivedKey());
       if (archived !== null) {
         setShowArchived(archived === "true");
       }
@@ -345,7 +349,7 @@ export function Layout(props: ParentProps) {
     // Load pinned sessions for current directory
     if (directory) {
       try {
-        const stored = localStorage.getItem(PINNED_SESSIONS_PREFIX + directory);
+        const stored = localStorage.getItem(pinnedSessionsKey());
         if (stored) {
           const parsed = JSON.parse(stored) as string[];
           if (Array.isArray(parsed)) setPinnedIds(parsed.slice(0, MAX_PINNED));
@@ -360,7 +364,7 @@ export function Layout(props: ParentProps) {
       addProject(directory);
       // Ensure sidebar is open when navigating to a project
       setSidebarExpanded(true);
-      localStorage.setItem(SIDEBAR_EXPANDED_KEY, "true");
+      localStorage.setItem(sidebarExpandedKey(), "true");
     }
 
     // Resize listener for responsive sidebar
@@ -375,19 +379,19 @@ export function Layout(props: ParentProps) {
     setProjects(list);
     const value = JSON.stringify(list);
     try {
-      localStorage.setItem(PROJECTS_STORAGE_KEY, value);
+      localStorage.setItem(projectsStorageKey(), value);
     } catch (e) {
       console.error("Failed to save projects:", e);
       return;
     }
-    dispatchStorageEvent(PROJECTS_STORAGE_KEY, value);
+    dispatchStorageEvent(projectsStorageKey(), value);
   }
 
   function toggleSidebar() {
     const next = !sidebarExpanded();
     setSidebarExpanded(next);
     try {
-      localStorage.setItem(SIDEBAR_EXPANDED_KEY, String(next));
+      localStorage.setItem(sidebarExpandedKey(), String(next));
     } catch (e) {
       console.error("Failed to save sidebar state:", e);
     }
@@ -397,7 +401,7 @@ export function Layout(props: ParentProps) {
     const next = !showArchived();
     setShowArchived(next);
     try {
-      localStorage.setItem(SHOW_ARCHIVED_KEY, String(next));
+      localStorage.setItem(showArchivedKey(), String(next));
     } catch (e) {
       console.error("Failed to save show archived state:", e);
     }
@@ -407,7 +411,7 @@ export function Layout(props: ParentProps) {
     setPinnedIds(ids);
     if (!directory) return;
     try {
-      localStorage.setItem(PINNED_SESSIONS_PREFIX + directory, JSON.stringify(ids));
+      localStorage.setItem(pinnedSessionsKey(), JSON.stringify(ids));
     } catch (e) {
       console.error("Failed to save pinned session IDs:", e);
     }
@@ -1991,7 +1995,7 @@ export function Layout(props: ParentProps) {
     // Also ensure sidebar is expanded when selecting a project
     setSidebarExpanded(true);
     try {
-      localStorage.setItem(SIDEBAR_EXPANDED_KEY, "true");
+      localStorage.setItem(sidebarExpandedKey(), "true");
     } catch (e) {
       console.error("Failed to save sidebar state:", e);
     }

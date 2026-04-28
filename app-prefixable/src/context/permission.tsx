@@ -4,6 +4,7 @@ import type { PermissionRequest } from "../sdk/client"
 import { useSDK } from "./sdk"
 import { useEvents } from "./events"
 import { useSync } from "./sync"
+import { useServer } from "./server"
 import { buildChildMap, sessionDescendantIds } from "../utils/session-tree-request"
 
 interface PermissionContextValue {
@@ -31,12 +32,13 @@ export function PermissionProvider(props: ParentProps) {
   const { client, directory } = useSDK()
   const events = useEvents()
   const sync = useSync()
+  const server = useServer()
 
   // Track pending permission requests
   const [permissions, setPermissions] = createStore<Record<string, PermissionRequest>>({})
 
   // Track auto-accept state (persisted in localStorage, loaded in onMount)
-  const storageKey = `prokube-permission-autoaccept-${directory || "global"}`
+  const storageKey = `prokube-permission-autoaccept-${server.serverKey()}-${directory || "global"}`
   const [autoAccept, setAutoAccept] = createSignal(false)
 
   // Track which permissions we've already responded to (avoid duplicates)

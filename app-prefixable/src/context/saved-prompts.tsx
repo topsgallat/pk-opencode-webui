@@ -1,6 +1,7 @@
 import { createContext, useContext, createSignal, createEffect, on, type ParentProps, type Accessor } from "solid-js"
 import { deriveDirectoryFromPathname } from "../utils/path"
 import { generateUUID } from "../utils/uuid"
+import { useServer } from "./server"
 
 interface SavedPrompt {
   id: string
@@ -19,11 +20,11 @@ interface SavedPromptsContextValue {
 
 const LEGACY_KEY = "opencode.savedPrompts"
 
-function storageKey(directory?: string): string {
-  if (!directory) return LEGACY_KEY
+function storageKey(serverKey: string, directory?: string): string {
+  if (!directory) return `${LEGACY_KEY}.${serverKey}`
   // Normalize trailing separators so "/path/to/project" and "/path/to/project/" share the same key
   const normalized = directory.replace(/[\\/]+$/, "")
-  return `opencode.savedPrompts.${normalized}`
+  return `opencode.savedPrompts.${serverKey}.${normalized}`
 }
 
 const SavedPromptsContext = createContext<SavedPromptsContextValue>()
@@ -55,9 +56,9 @@ function saveToStorage(key: string, prompts: SavedPrompt[]) {
 }
 
 /** Migrate legacy prompts to the project-scoped key (one-time, non-destructive). */
-function migrateIfNeeded(directory: string) {
+function migrateIfNeeded(serverKey: string, directory: string) {
   try {
-    const projectKey = storageKey(directory)
+    const projectKey = storageKey(serverKey, directory)
     // Already has project-scoped data — no migration needed
     if (localStorage.getItem(projectKey)) return
     const legacy = localStorage.getItem(LEGACY_KEY)
@@ -70,6 +71,7 @@ function migrateIfNeeded(directory: string) {
 }
 
 export function SavedPromptsProvider(props: ParentProps & { directory?: Accessor<string | undefined> }) {
+  const server = useServer()
   // Keep a "sticky" directory that survives transient undefined flickers
   // during SolidJS router transitions (e.g. project → project settings).
   //
@@ -99,11 +101,11 @@ export function SavedPromptsProvider(props: ParentProps & { directory?: Accessor
   })
 
   const dir = sticky
-  const key = () => storageKey(dir())
+  const key = () => storageKey(server.serverKey(), dir())
 
   // Run migration synchronously before initial load so first render has data
   const initialDir = dir()
-  if (initialDir) migrateIfNeeded(initialDir)
+  if (initialDir) migrateIfNeeded(server.serverKey(), initialDir)
 
   const [prompts, setPrompts] = createSignal<SavedPrompt[]>(
     loadFromStorage(key()).sort((a, b) => b.createdAt - a.createdAt),
@@ -116,7 +118,7 @@ export function SavedPromptsProvider(props: ParentProps & { directory?: Accessor
   // during same-project navigation.
   createEffect(on(key, (k) => {
     const d = dir()
-    if (d) migrateIfNeeded(d)
+    if (d) migrateIfNeeded(server.serverKey(), d)
     setPrompts(loadFromStorage(k).sort((a, b) => b.createdAt - a.createdAt))
   }, { defer: true }))
 

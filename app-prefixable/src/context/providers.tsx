@@ -2,6 +2,7 @@ import { createContext, useContext, createResource, createEffect, type ParentPro
 import { createStore } from "solid-js/store"
 import { useSDK } from "./sdk"
 import { useConfig } from "./config"
+import { useServer } from "./server"
 import { getProviderAccounts, saveProviderAccounts, type ProviderAccount } from "../utils/extended-api"
 
 // Storage key
@@ -82,6 +83,8 @@ const ProviderContext = createContext<ProviderContextValue>()
 export function ProviderProvider(props: ParentProps) {
   const { client } = useSDK()
   const cfg = useConfig()
+  const server = useServer()
+  const storageKey = () => `${MODELS_BY_AGENT_KEY}.${server.serverKey()}`
 
   const [store, setStore] = createStore({
     modelsByAgent: {} as Record<string, ModelKey>,
@@ -94,7 +97,7 @@ export function ProviderProvider(props: ParentProps) {
   // Load models from localStorage
   onMount(() => {
     try {
-      const stored = localStorage.getItem(MODELS_BY_AGENT_KEY)
+      const stored = localStorage.getItem(storageKey()) ?? (server.serverKey() === "default" ? localStorage.getItem(MODELS_BY_AGENT_KEY) : null)
       if (stored) {
         const parsed = JSON.parse(stored)
         setStore("modelsByAgent", parsed)
@@ -107,7 +110,7 @@ export function ProviderProvider(props: ParentProps) {
   // Save models to localStorage whenever they change
   createEffect(() => {
     try {
-      localStorage.setItem(MODELS_BY_AGENT_KEY, JSON.stringify(store.modelsByAgent))
+      localStorage.setItem(storageKey(), JSON.stringify(store.modelsByAgent))
     } catch (e) {
       console.error("Failed to save models to storage:", e)
     }

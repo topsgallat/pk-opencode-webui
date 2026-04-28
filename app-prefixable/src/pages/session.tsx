@@ -83,8 +83,8 @@ const drafts = new Map<string, SessionDraft>();
 
 // Composite key for the drafts Map so drafts are scoped to a directory+session
 // pair. Uses "__new__" as sentinel when there is no session id yet.
-function draftKey(dir: string, id?: string) {
-  return `${dir}:${id ?? "__new__"}`;
+function draftKey(serverKey: string, dir: string, id?: string) {
+  return `${serverKey}:${dir}:${id ?? "__new__"}`;
 }
 
 export function Session() {
@@ -345,7 +345,7 @@ export function Session() {
   // Keep sessionId in sync with URL params and sync session data.
   // Track the composite dir+id key so the effect fires on directory changes too,
   // preventing drafts from leaking across projects when id stays undefined.
-  createEffect(on(() => draftKey(params.dir, params.id), (key, prevKey) => {
+  createEffect(on(() => draftKey(server.serverKey(), params.dir, params.id), (key, prevKey) => {
     const id = params.id;
     // DEBUG: URL param changed - removed console.log for production
 
@@ -1050,7 +1050,7 @@ export function Session() {
       try {
         const dir = directory || base64Decode(params.dir);
         if (dir && typeof window !== "undefined") {
-          const key = `opencode.lastSession.${server.selectedServer()?.id ?? "default"}.${dir}`;
+          const key = `opencode.lastSession.${server.serverKey()}.${dir}`;
           const stored = window.localStorage.getItem(key);
           if (stored === id) {
             window.localStorage.removeItem(key);
@@ -1066,7 +1066,7 @@ export function Session() {
     try {
       const dir = directory || base64Decode(params.dir);
       if (dir && typeof window !== "undefined") {
-        const key = `opencode.lastSession.${server.selectedServer()?.id ?? "default"}.${dir}`;
+        const key = `opencode.lastSession.${server.serverKey()}.${dir}`;
         const stored = window.localStorage.getItem(key);
         if (stored === id) window.localStorage.removeItem(key);
       }
@@ -1086,7 +1086,7 @@ export function Session() {
     try {
       const dir = directory || base64Decode(params.dir);
       if (dir && typeof window !== "undefined") {
-        window.localStorage.setItem(`opencode.lastSession.${server.selectedServer()?.id ?? "default"}.${dir}`, id);
+        window.localStorage.setItem(`opencode.lastSession.${server.serverKey()}.${dir}`, id);
       }
     } catch (err) {
       console.error("[Session] Failed to persist last session:", err);

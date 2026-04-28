@@ -2,7 +2,6 @@ import { createContext, useContext, batch, type ParentProps } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import type { FileNode } from "../sdk/client"
 import { useSDK } from "./sdk"
-import { useBasePath } from "./base-path"
 import { readFile, mkdir, createFile as apiCreateFile, deleteFile as apiDeleteFile, deleteDir as apiDeleteDir } from "../utils/extended-api"
 
 type DirState = {
@@ -59,8 +58,7 @@ function basename(path: string) {
 }
 
 export function FileProvider(props: ParentProps) {
-  const { client, directory } = useSDK()
-  const { serverUrl } = useBasePath()
+  const { client, directory, url: serverUrl, targetUrl } = useSDK()
 
   const [store, setStore] = createStore<FileStore>({
     dirs: {},
@@ -181,7 +179,7 @@ export function FileProvider(props: ParentProps) {
         console.error("[File] Upstream API failed for:", path, e)
         
         // Fallback 1: try extended API
-        const extContent = await readFile(serverUrl, fullPath)
+    const extContent = await readFile(serverUrl, fullPath, targetUrl)
         if (extContent !== null) {
           batch(() => {
             setStore("files", path, produce((f) => {
@@ -234,7 +232,7 @@ export function FileProvider(props: ParentProps) {
 
   async function createFile(path: string): Promise<boolean> {
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
-    const success = await apiCreateFile(serverUrl, fullPath)
+    const success = await apiCreateFile(serverUrl, fullPath, targetUrl)
     if (success) {
       const parentDir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""
       await listDir(parentDir, { force: true })
@@ -244,7 +242,7 @@ export function FileProvider(props: ParentProps) {
 
   async function createDir(path: string): Promise<boolean> {
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
-    const success = await mkdir(serverUrl, fullPath)
+    const success = await mkdir(serverUrl, fullPath, targetUrl)
     if (success) {
       const parentDir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""
       await listDir(parentDir, { force: true })
@@ -254,7 +252,7 @@ export function FileProvider(props: ParentProps) {
 
   async function deleteFile(path: string): Promise<boolean> {
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
-    const success = await apiDeleteFile(serverUrl, fullPath)
+    const success = await apiDeleteFile(serverUrl, fullPath, targetUrl)
     if (success) {
       const parentDir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""
       batch(() => {
@@ -270,7 +268,7 @@ export function FileProvider(props: ParentProps) {
 
   async function deleteDir(path: string): Promise<boolean> {
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
-    const success = await apiDeleteDir(serverUrl, fullPath)
+    const success = await apiDeleteDir(serverUrl, fullPath, targetUrl)
     if (success) {
       const parentDir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""
       batch(() => {

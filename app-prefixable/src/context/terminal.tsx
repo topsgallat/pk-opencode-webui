@@ -26,7 +26,7 @@ interface TerminalContextValue {
 const TerminalContext = createContext<TerminalContextValue>()
 
 export function TerminalProvider(props: ParentProps) {
-  const { client, url: serverUrl } = useSDK()
+  const { client, url: serverUrl, targetUrl } = useSDK()
   const [sessions, setSessions] = createSignal<PTYSession[]>([])
   const [active, setActive] = createSignal<string | null>(null)
   const [opened, setOpened] = createSignal(false)
@@ -41,7 +41,7 @@ export function TerminalProvider(props: ParentProps) {
       // Ensure the directory exists before creating the PTY
       if (cwd) {
         console.log("[Terminal] Ensuring directory exists:", cwd)
-        await mkdir(serverUrl, cwd)
+        await mkdir(serverUrl, cwd, targetUrl)
       }
 
       console.log("[Terminal] Creating PTY session, cwd:", cwd)

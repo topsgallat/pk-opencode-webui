@@ -1,17 +1,11 @@
-/**
- * Extended API functions
- *
- * These functions call endpoints that are handled directly by the serve-ui.ts
- * Bun server, not proxied to the OpenCode backend. This allows us to add
- * features without modifying upstream code.
- */
+import { appendTargetParam } from "./path"
 
 /**
  * Create a directory recursively
  */
-export async function mkdir(serverUrl: string, path: string): Promise<boolean> {
+export async function mkdir(serverUrl: string, path: string, targetUrl?: string): Promise<boolean> {
   try {
-    const res = await fetch(`${serverUrl}/api/ext/mkdir`, {
+    const res = await fetch(appendTargetParam(`${serverUrl}/api/ext/mkdir`, targetUrl), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path }),
@@ -29,7 +23,7 @@ export async function mkdir(serverUrl: string, path: string): Promise<boolean> {
 export async function listDirs(
   serverUrl: string,
   directory: string,
-  options?: { query?: string; limit?: number; depth?: number },
+  options?: { query?: string; limit?: number; depth?: number; targetUrl?: string },
 ): Promise<string[]> {
   try {
     const params = new URLSearchParams({ directory })
@@ -37,7 +31,7 @@ export async function listDirs(
     if (options?.limit) params.set("limit", options.limit.toString())
     if (options?.depth) params.set("depth", options.depth.toString())
 
-    const res = await fetch(`${serverUrl}/api/ext/list-dirs?${params}`)
+    const res = await fetch(appendTargetParam(`${serverUrl}/api/ext/list-dirs?${params}`, options?.targetUrl))
     if (!res.ok) return []
     return await res.json()
   } catch (e) {
@@ -49,8 +43,8 @@ export async function listDirs(
 /**
  * Write content to a file (creates parent directories if needed)
  */
-export async function writeFile(serverUrl: string, path: string, content: string): Promise<boolean> {
-  const res = await fetch(`${serverUrl}/api/ext/file`, {
+export async function writeFile(serverUrl: string, path: string, content: string, targetUrl?: string): Promise<boolean> {
+  const res = await fetch(appendTargetParam(`${serverUrl}/api/ext/file`, targetUrl), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ path, content }),
@@ -65,10 +59,10 @@ export async function writeFile(serverUrl: string, path: string, content: string
 /**
  * Read file content via extended API
  */
-export async function readFile(serverUrl: string, path: string): Promise<string | null> {
+export async function readFile(serverUrl: string, path: string, targetUrl?: string): Promise<string | null> {
   try {
     const params = new URLSearchParams({ path })
-    const res = await fetch(`${serverUrl}/api/ext/file?${params}`)
+    const res = await fetch(appendTargetParam(`${serverUrl}/api/ext/file?${params}`, targetUrl))
     if (!res.ok) return null
     const data = await res.json()
     return data.content
@@ -81,9 +75,9 @@ export async function readFile(serverUrl: string, path: string): Promise<string 
 /**
  * Delete a file via extended API
  */
-export async function deleteFile(serverUrl: string, path: string): Promise<boolean> {
+export async function deleteFile(serverUrl: string, path: string, targetUrl?: string): Promise<boolean> {
   const params = new URLSearchParams({ path })
-  const res = await fetch(`${serverUrl}/api/ext/file?${params}`, {
+  const res = await fetch(appendTargetParam(`${serverUrl}/api/ext/file?${params}`, targetUrl), {
     method: "DELETE",
   }).catch(() => null)
   
@@ -97,9 +91,9 @@ export async function deleteFile(serverUrl: string, path: string): Promise<boole
 /**
  * Delete a directory via extended API
  */
-export async function deleteDir(serverUrl: string, path: string): Promise<boolean> {
+export async function deleteDir(serverUrl: string, path: string, targetUrl?: string): Promise<boolean> {
   const params = new URLSearchParams({ path })
-  const res = await fetch(`${serverUrl}/api/ext/dir?${params}`, {
+  const res = await fetch(appendTargetParam(`${serverUrl}/api/ext/dir?${params}`, targetUrl), {
     method: "DELETE",
   }).catch(() => null)
   
@@ -113,8 +107,8 @@ export async function deleteDir(serverUrl: string, path: string): Promise<boolea
 /**
  * Create an empty file
  */
-export async function createFile(serverUrl: string, path: string): Promise<boolean> {
-  return writeFile(serverUrl, path, "")
+export async function createFile(serverUrl: string, path: string, targetUrl?: string): Promise<boolean> {
+  return writeFile(serverUrl, path, "", targetUrl)
 }
 
 /**

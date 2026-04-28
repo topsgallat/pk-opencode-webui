@@ -29,6 +29,7 @@ export function HomeLayout(props: ParentProps) {
   const globalEvents = useGlobalEvents()
   const server = useServer()
   const { serverUrl: basePathServerUrl } = useBasePath()
+  const projectsStorageKey = createMemo(() => `${PROJECTS_STORAGE_KEY}.${server.serverKey()}`)
   const [serverDropdownOpen, setServerDropdownOpen] = createSignal(false)
 
   const [projects, setProjects] = createSignal<Project[]>([])
@@ -59,7 +60,7 @@ export function HomeLayout(props: ParentProps) {
 
   onMount(() => {
     try {
-      const stored = localStorage.getItem(PROJECTS_STORAGE_KEY)
+      const stored = localStorage.getItem(projectsStorageKey()) ?? (server.serverKey() === "default" ? localStorage.getItem(PROJECTS_STORAGE_KEY) : null)
       if (stored) {
         setProjects(JSON.parse(stored))
       }
@@ -124,12 +125,12 @@ export function HomeLayout(props: ParentProps) {
     setProjects(list)
     const value = JSON.stringify(list)
     try {
-      localStorage.setItem(PROJECTS_STORAGE_KEY, value)
+      localStorage.setItem(projectsStorageKey(), value)
     } catch (e) {
       console.error("Failed to save projects:", e)
       return
     }
-    dispatchStorageEvent(PROJECTS_STORAGE_KEY, value)
+    dispatchStorageEvent(projectsStorageKey(), value)
   }
 
   function addProject(worktree: string) {

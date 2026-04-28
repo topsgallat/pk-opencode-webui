@@ -59,6 +59,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     const navigate = useNavigate()
     const branding = useBranding()
     const server = useServer()
+    const projectsStorageKey = createMemo(() => `${PROJECTS_STORAGE_KEY}.${server.serverKey()}`)
 
     
     const [sessions, setSessions] = createSignal<Session[]>([])
@@ -72,7 +73,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     const [showServerSheet, setShowServerSheet] = createSignal(false)
 
     function openProjectHistory() {
-        const stored = localStorage.getItem(PROJECTS_STORAGE_KEY)
+        const stored = localStorage.getItem(projectsStorageKey()) ?? (server.serverKey() === "default" ? localStorage.getItem(PROJECTS_STORAGE_KEY) : null)
         if (stored) {
             try {
                 const parsed = JSON.parse(stored) as Project[]
@@ -109,7 +110,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
         
         const dir = directory
         if (dir) {
-            const lastSessionKey = `opencode.lastSession.${server.selectedServer()?.id ?? "default"}.${dir}`
+            const lastSessionKey = `opencode.lastSession.${server.serverKey()}.${dir}`
             const lastSession = localStorage.getItem(lastSessionKey)
             if (lastSession) {
                 const currentPath = location.pathname
@@ -670,6 +671,10 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                                     <button
                                         class="w-full flex items-center gap-3 px-4 py-3.5 text-sm active:opacity-70 transition-opacity"
                                         onClick={() => {
+                                            setSessions([])
+                                            setSearchQuery("")
+                                            setShowArchived(false)
+                                            setMenuSession(null)
                                             server.setSelectedServer(s.id)
                                             setShowServerSheet(false)
                                             setMobileTab("sessions")

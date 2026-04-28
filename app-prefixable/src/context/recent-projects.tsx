@@ -1,4 +1,5 @@
 import { createContext, useContext, createSignal, type ParentProps } from "solid-js"
+import { useServer } from "./server"
 
 interface RecentProject {
   path: string
@@ -18,9 +19,13 @@ const MAX_RECENT = 10
 
 const RecentProjectsContext = createContext<RecentProjectsContextValue>()
 
-function loadFromStorage(): RecentProject[] {
+function storageKey(serverKey: string) {
+  return `${STORAGE_KEY}.${serverKey}`
+}
+
+function loadFromStorage(serverKey: string): RecentProject[] {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = localStorage.getItem(storageKey(serverKey)) ?? (serverKey === "default" ? localStorage.getItem(STORAGE_KEY) : null)
     if (!stored) return []
     const parsed = JSON.parse(stored)
     if (!Array.isArray(parsed)) return []
@@ -33,9 +38,9 @@ function loadFromStorage(): RecentProject[] {
   }
 }
 
-function saveToStorage(projects: RecentProject[]) {
+function saveToStorage(serverKey: string, projects: RecentProject[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects))
+    localStorage.setItem(storageKey(serverKey), JSON.stringify(projects))
   } catch {
     // Ignore storage errors
   }
@@ -48,7 +53,9 @@ function getProjectName(path: string): string {
 }
 
 export function RecentProjectsProvider(props: ParentProps) {
-  const [projects, setProjects] = createSignal<RecentProject[]>(loadFromStorage())
+  const server = useServer()
+  const serverKey = () => server.serverKey()
+  const [projects, setProjects] = createSignal<RecentProject[]>(loadFromStorage(serverKey()))
 
   function add(path: string) {
     const normalized = path.replace(/\/+$/, "")
@@ -59,7 +66,7 @@ export function RecentProjectsProvider(props: ParentProps) {
       const updated = [{ path: normalized, name: getProjectName(normalized), lastOpened: Date.now() }, ...filtered]
       // Limit to MAX_RECENT
       const limited = updated.slice(0, MAX_RECENT)
-      saveToStorage(limited)
+      saveToStorage(serverKey(), limited)
       return limited
     })
   }
@@ -68,14 +75,14 @@ export function RecentProjectsProvider(props: ParentProps) {
     const normalized = path.replace(/\/+$/, "")
     setProjects((prev) => {
       const filtered = prev.filter((p) => p.path !== normalized)
-      saveToStorage(filtered)
+      saveToStorage(serverKey(), filtered)
       return filtered
     })
   }
 
   function clear() {
     setProjects([])
-    saveToStorage([])
+    saveToStorage(serverKey(), [])
   }
 
   return (

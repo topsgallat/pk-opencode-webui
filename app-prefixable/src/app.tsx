@@ -1,5 +1,5 @@
 import { Router, Route, useNavigate, useParams } from "@solidjs/router"
-import { createSignal, onMount, onCleanup } from "solid-js"
+import { createMemo, createSignal, For, onMount, onCleanup } from "solid-js"
 import { BasePathProvider, useBasePath } from "./context/base-path"
 import { BrandingProvider } from "./context/branding"
 import { DeviceProvider } from "./context/device"
@@ -20,6 +20,10 @@ import type { Project } from "./components/shared"
 
 const PROJECTS_STORAGE_KEY = "opencode.projects"
 
+function projectsStorageKey(serverKey: string) {
+  return `${PROJECTS_STORAGE_KEY}.${serverKey}`
+}
+
 function getLastSessionHref(encodedDir: string, serverId: string): string {
   try {
     const dir = base64Decode(encodedDir)
@@ -37,7 +41,7 @@ function DirectoryIndex() {
   const params = useParams<{ dir: string }>()
   const navigate = useNavigate()
   const server = useServer()
-  onMount(() => navigate(getLastSessionHref(params.dir, server.selectedServer()?.id ?? "default"), { replace: true }))
+  onMount(() => navigate(getLastSessionHref(params.dir, server.serverKey()), { replace: true }))
   return null
 }
 
@@ -45,7 +49,7 @@ function SessionIndex() {
   const params = useParams<{ dir: string }>()
   const navigate = useNavigate()
   const server = useServer()
-  const href = getLastSessionHref(params.dir, server.selectedServer()?.id ?? "default")
+  const href = getLastSessionHref(params.dir, server.serverKey())
   if (href === "session") return <Session />
   const id = href.replace(/^session\//, "")
   onMount(() => navigate(id, { replace: true }))
@@ -109,12 +113,12 @@ function useActiveDirectory() {
   return dir
 }
 
-function useProjectsList() {
+function useProjectsList(serverKey: string) {
   const [projects, setProjects] = createSignal<Project[]>([])
 
   function load() {
     try {
-      const stored = localStorage.getItem(PROJECTS_STORAGE_KEY)
+      const stored = localStorage.getItem(projectsStorageKey(serverKey)) ?? (serverKey === "default" ? localStorage.getItem(PROJECTS_STORAGE_KEY) : null)
       if (stored) {
         const parsed = JSON.parse(stored)
         setProjects(Array.isArray(parsed) ? parsed : [])
@@ -129,7 +133,7 @@ function useProjectsList() {
   onMount(() => {
     load()
     function onStorage(e: StorageEvent) {
-      if (e.key === PROJECTS_STORAGE_KEY) load()
+      if (e.key === projectsStorageKey(serverKey)) load()
     }
     window.addEventListener("storage", onStorage)
     onCleanup(() => window.removeEventListener("storage", onStorage))
@@ -138,26 +142,43 @@ function useProjectsList() {
   return projects
 }
 
-export function App() {
-  const projects = useProjectsList()
+function ServerScopedApp(props: { serverKey: string }) {
+  const projects = useProjectsList(props.serverKey)
   const activeDirectory = useActiveDirectory()
 
+  return (
+    <RecentProjectsProvider>
+      <SavedPromptsProvider directory={activeDirectory}>
+        <GlobalEventsProvider projects={projects} activeDirectory={activeDirectory}>
+          <CommandProvider>
+            <AppRoutes />
+          </CommandProvider>
+        </GlobalEventsProvider>
+      </SavedPromptsProvider>
+    </RecentProjectsProvider>
+  )
+}
+
+function ServerBoundary() {
+  const server = useServer()
+  const serverKey = createMemo(() => server.serverKey())
+
+  return (
+    <For each={[serverKey()]}>
+      {(key) => <ServerScopedApp serverKey={key} />}
+    </For>
+  )
+}
+
+export function App() {
   return (
     <BasePathProvider>
       <DeviceProvider>
         <ThemeProvider>
           <BrandingProvider>
-            <RecentProjectsProvider>
-              <SavedPromptsProvider directory={activeDirectory}>
-                <GlobalEventsProvider projects={projects} activeDirectory={activeDirectory}>
-                  <CommandProvider>
-                    <ServerProvider>
-                      <AppRoutes />
-                    </ServerProvider>
-                  </CommandProvider>
-                </GlobalEventsProvider>
-              </SavedPromptsProvider>
-            </RecentProjectsProvider>
+            <ServerProvider>
+              <ServerBoundary />
+            </ServerProvider>
           </BrandingProvider>
         </ThemeProvider>
       </DeviceProvider>

@@ -8,7 +8,9 @@ import {
 } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { useBasePath } from "./base-path"
+import { useServer } from "./server"
 import { globalSyncReady } from "./sync"
+import { appendTargetParam } from "../utils/path"
 
 /**
  * Alert priority: permission (highest) > question > busy
@@ -46,6 +48,12 @@ export function GlobalEventsProvider(props: ParentProps & {
   activeDirectory: () => string | undefined
 }) {
   const { prefix } = useBasePath()
+  const server = useServer()
+  const targetUrl = () => {
+    const selected = server.selectedServer()
+    if (!selected || selected.isDefault) return undefined
+    return selected.url
+  }
 
   // Per-directory alert state
   const [alerts, setAlerts] = createStore<Record<string, ProjectAlerts>>({})
@@ -119,7 +127,7 @@ export function GlobalEventsProvider(props: ParentProps & {
     }
 
     const dirParam = `?directory=${encodeURIComponent(dir)}`
-    const url = prefix(`/event${dirParam}`)
+    const url = appendTargetParam(prefix(`/event${dirParam}`), targetUrl())
     const source = new EventSource(url)
 
     connections.set(dir, { source })
@@ -309,7 +317,7 @@ export function GlobalEventsProvider(props: ParentProps & {
   // Returns null on failure so callers can gracefully degrade (seed all sessions)
   // instead of clearing all state with a false-negative empty set.
   function fetchRootSessionIds(dir: string): Promise<Set<string> | null> {
-    return fetch(prefix(`/session?directory=${encodeURIComponent(dir)}&roots=true`))
+    return fetch(appendTargetParam(prefix(`/session?directory=${encodeURIComponent(dir)}&roots=true`), targetUrl()))
       .then((r) => {
         if (!r.ok) {
           console.warn("[GlobalEvents] Failed to fetch root sessions for", dir, `HTTP ${r.status}`)
@@ -350,7 +358,7 @@ export function GlobalEventsProvider(props: ParentProps & {
     // Seed subAgents from all sessions: any session with a parentID is a
     // sub-agent. This covers sessions that existed before the SSE connection.
     if (roots) {
-      await fetch(prefix(`/session?directory=${encodeURIComponent(dir)}`))
+      await fetch(appendTargetParam(prefix(`/session?directory=${encodeURIComponent(dir)}`), targetUrl()))
         .then((r) => {
           if (!r.ok) return
           return r.json()
@@ -378,7 +386,7 @@ export function GlobalEventsProvider(props: ParentProps & {
     // Snapshot sessions added by SSE before the fetch started so we can
     // merge them back, avoiding a race where clear() drops concurrent events.
     const before = new Set(tracking.permissionSessions)
-    return fetch(prefix(`/permission?directory=${encodeURIComponent(dir)}`))
+    return fetch(appendTargetParam(prefix(`/permission?directory=${encodeURIComponent(dir)}`), targetUrl()))
       .then((r) => r.json())
       .then((data) => {
         if (!perDir.has(dir)) return  // disconnected while fetching
@@ -408,7 +416,7 @@ export function GlobalEventsProvider(props: ParentProps & {
   function seedQuestions(dir: string, roots: Set<string> | null) {
     const tracking = perDir.get(dir)
     if (!tracking) return  // disconnected: do not recreate tracking while seeding
-    return fetch(prefix(`/question?directory=${encodeURIComponent(dir)}`))
+    return fetch(appendTargetParam(prefix(`/question?directory=${encodeURIComponent(dir)}`), targetUrl()))
       .then((r) => r.json())
       .then((data) => {
         if (!perDir.has(dir)) return  // disconnected while fetching
@@ -425,7 +433,7 @@ export function GlobalEventsProvider(props: ParentProps & {
   function seedStatuses(dir: string, roots: Set<string> | null) {
     const tracking = perDir.get(dir)
     if (!tracking) return  // disconnected: do not recreate tracking while seeding
-    return fetch(prefix(`/session/status?directory=${encodeURIComponent(dir)}`))
+    return fetch(appendTargetParam(prefix(`/session/status?directory=${encodeURIComponent(dir)}`), targetUrl()))
       .then((r) => r.json())
       .then((data) => {
         if (!perDir.has(dir)) return  // disconnected while fetching

@@ -12,6 +12,7 @@ interface ServerContextValue {
   servers: () => ServerConfig[]
   selectedServerId: () => string | null
   selectedServer: () => ServerConfig | undefined
+  serverKey: () => string
   setSelectedServer: (id: string | null) => void
 }
 
@@ -28,6 +29,8 @@ export function ServerProvider(props: ParentProps) {
     if (id) return servers().find((s) => s.id === id)
     return getDefaultServer()
   }
+
+  const serverKey = () => selectedServer()?.id ?? "default"
 
   const setSelectedServer = (id: string | null) => {
     setSelectedServerId(id)
@@ -58,6 +61,7 @@ export function ServerProvider(props: ParentProps) {
         servers,
         selectedServerId,
         selectedServer,
+        serverKey,
         setSelectedServer,
       }}
     >

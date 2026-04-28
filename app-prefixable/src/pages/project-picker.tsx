@@ -5,9 +5,8 @@ import { formatRelativeTime } from "../utils/time"
 import { Folder, GitBranch } from "lucide-solid"
 import { ProjectDialog } from "../components/project-dialog"
 import { useBranding } from "../context/branding"
-import { useBasePath } from "../context/base-path"
+import { useSDK } from "../context/sdk"
 import { useRecentProjects } from "../context/recent-projects"
-import { createOpencodeClient } from "../sdk/client"
 import { Button } from "../components/ui/button"
 
 // OpenCode Wordmark
@@ -70,7 +69,7 @@ function shortenPath(path: string, home: string): string {
 export function ProjectPicker() {
   const navigate = useNavigate()
   const branding = useBranding()
-  const { serverUrl } = useBasePath()
+  const { global } = useSDK()
   const recent = useRecentProjects()
   const [dialogOpen, setDialogOpen] = createSignal(false)
   const [dialogView, setDialogView] = createSignal<"browse" | "clone">("browse")
@@ -78,8 +77,7 @@ export function ProjectPicker() {
 
   // Get home directory for path shortening
   onMount(async () => {
-    const client = createOpencodeClient({ baseUrl: serverUrl, throwOnError: false })
-    const res = await client.path.get()
+    const res = await global.path.get()
     if (res.data?.home) setHomeDir(res.data.home)
   })
 

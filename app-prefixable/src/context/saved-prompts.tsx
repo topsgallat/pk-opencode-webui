@@ -22,9 +22,13 @@ const LEGACY_KEY = "opencode.savedPrompts"
 
 function storageKey(serverKey: string, directory?: string): string {
   if (!directory) return `${LEGACY_KEY}.${serverKey}`
-  // Normalize trailing separators so "/path/to/project" and "/path/to/project/" share the same key
   const normalized = directory.replace(/[\\/]+$/, "")
   return `opencode.savedPrompts.${serverKey}.${normalized}`
+}
+
+function previousProjectStorageKey(directory: string): string {
+  const normalized = directory.replace(/[\\/]+$/, "")
+  return `opencode.savedPrompts.${normalized}`
 }
 
 const SavedPromptsContext = createContext<SavedPromptsContextValue>()
@@ -55,18 +59,14 @@ function saveToStorage(key: string, prompts: SavedPrompt[]) {
   }
 }
 
-/** Migrate legacy prompts to the project-scoped key (one-time, non-destructive). */
 function migrateIfNeeded(serverKey: string, directory: string) {
   try {
     const projectKey = storageKey(serverKey, directory)
-    // Already has project-scoped data — no migration needed
     if (localStorage.getItem(projectKey)) return
-    const legacy = localStorage.getItem(LEGACY_KEY)
+    const legacy = localStorage.getItem(previousProjectStorageKey(directory)) ?? localStorage.getItem(LEGACY_KEY)
     if (!legacy) return
-    // Copy legacy data to project-scoped key; do NOT delete old key
     localStorage.setItem(projectKey, legacy)
   } catch {
-    // Ignore storage errors during migration
   }
 }
 

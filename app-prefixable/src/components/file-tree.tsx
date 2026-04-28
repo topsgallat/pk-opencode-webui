@@ -3,6 +3,8 @@ import { Portal } from "solid-js/web"
 import { ConfirmDialog } from "./confirm-dialog"
 import type { FileNode } from "../sdk/client"
 import { useFile } from "../context/file"
+import { useServer } from "../context/server"
+import { getServerCapabilities } from "../utils/server-capabilities"
 import { ChevronDown, ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Trash2, Edit2 } from "lucide-solid"
 import { NewFileDialog } from "./new-file-dialog"
 
@@ -42,7 +44,13 @@ interface FileTreeProps {
 
 export function FileTree(props: FileTreeProps) {
   const file = useFile()
+  const server = useServer()
+  const capabilities = () => getServerCapabilities(server.selectedServer())
   const level = () => props.level ?? 0
+  const canCreateFile = () => capabilities().canUseLocalExtFileOps
+  const canCreateDirectory = () => capabilities().canCreateDirectories
+  const canDelete = () => capabilities().canUseLocalExtFileOps
+  const canEdit = () => capabilities().canUseLocalExtFileOps
 
   // Build filter set for "allowed" mode (changed files only)
   const filter = createMemo(() => {
@@ -158,6 +166,10 @@ export function FileTree(props: FileTreeProps) {
   }
 
   const handleContextMenu = (e: MouseEvent, node: FileNode | { type: "directory"; path: string; name: string }) => {
+    const canOpen = node.type === "directory"
+      ? canCreateFile() || canCreateDirectory() || (node.path !== "" && canDelete())
+      : canEdit() || canDelete()
+    if (!canOpen) return
     e.preventDefault()
     e.stopPropagation()
     const x = Math.min(e.clientX, window.innerWidth - 150)
@@ -181,8 +193,9 @@ export function FileTree(props: FileTreeProps) {
       try {
         const message = err instanceof Error ? err.message : String(err)
         alert(`Create failed: ${message}`)
-    } catch (e) {
-    }
+      } catch {
+        return
+      }
     }
   }
 
@@ -201,26 +214,32 @@ export function FileTree(props: FileTreeProps) {
       <Show when={level() === 0}>
         <div class="flex items-center justify-between px-2 py-1 mb-1 border-b border-white/5 dark:border-black/5" style={{ "border-color": "var(--border-base)" }}>
           <span class="text-xs font-semibold" style={{ color: "var(--text-weak)" }}>FILES</span>
+            <Show when={canCreateFile() || canCreateDirectory()}>
             <div class="flex gap-1">
-            <button
-              type="button"
-              class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-              onClick={(e) => { e.stopPropagation(); setDialogState({ open: true, mode: "file", parentPath: "" }) }}
-              title="New File"
-              aria-label="New File"
-            >
-              <FilePlus class="w-3.5 h-3.5" style={{ color: "var(--icon-weak)" }} />
-            </button>
-            <button
-              type="button"
-              class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-              onClick={(e) => { e.stopPropagation(); setDialogState({ open: true, mode: "folder", parentPath: "" }) }}
-              title="New Folder"
-              aria-label="New Folder"
-            >
-              <FolderPlus class="w-3.5 h-3.5" style={{ color: "var(--icon-weak)" }} />
-            </button>
-          </div>
+              <Show when={canCreateFile()}>
+                <button
+                  type="button"
+                  class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  onClick={(e) => { e.stopPropagation(); setDialogState({ open: true, mode: "file", parentPath: "" }) }}
+                  title="New File"
+                  aria-label="New File"
+                >
+                  <FilePlus class="w-3.5 h-3.5" style={{ color: "var(--icon-weak)" }} />
+                </button>
+              </Show>
+              <Show when={canCreateDirectory()}>
+                <button
+                  type="button"
+                  class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  onClick={(e) => { e.stopPropagation(); setDialogState({ open: true, mode: "folder", parentPath: "" }) }}
+                  title="New Folder"
+                  aria-label="New Folder"
+                >
+                  <FolderPlus class="w-3.5 h-3.5" style={{ color: "var(--icon-weak)" }} />
+                </button>
+              </Show>
+            </div>
+            </Show>
         </div>
       </Show>
       <For each={nodes()}>
@@ -323,38 +342,42 @@ export function FileTree(props: FileTreeProps) {
                 }}
               >
                 <Show when={menu().node.type === "directory"}>
-                  <button
-                    class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      const m = menu()
-                      setContextMenu(null)
-                      setDialogState({ open: true, mode: "file", parentPath: m.node.path })
-                    }}
-                    aria-label="New File"
-                  >
-                    <FilePlus class="w-3.5 h-3.5" />
-                    New File
-                  </button>
-                  <button
-                    class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      const m = menu()
-                      setContextMenu(null)
-                      setDialogState({ open: true, mode: "folder", parentPath: m.node.path })
-                    }}
-                    aria-label="New Folder"
-                  >
-                    <FolderPlus class="w-3.5 h-3.5" />
-                    New Folder
-                  </button>
-                  <Show when={menu().node.path !== ""}>
+                  <Show when={canCreateFile()}>
+                    <button
+                      class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const m = menu()
+                        setContextMenu(null)
+                        setDialogState({ open: true, mode: "file", parentPath: m.node.path })
+                      }}
+                      aria-label="New File"
+                    >
+                      <FilePlus class="w-3.5 h-3.5" />
+                      New File
+                    </button>
+                  </Show>
+                  <Show when={canCreateDirectory()}>
+                    <button
+                      class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const m = menu()
+                        setContextMenu(null)
+                        setDialogState({ open: true, mode: "folder", parentPath: m.node.path })
+                      }}
+                      aria-label="New Folder"
+                    >
+                      <FolderPlus class="w-3.5 h-3.5" />
+                      New Folder
+                    </button>
+                  </Show>
+                  <Show when={menu().node.path !== "" && (canDelete() && (canCreateFile() || canCreateDirectory()))}>
                     <div class="h-px w-full my-1" style={{ background: "var(--border-base)" }} />
                   </Show>
                 </Show>
 
-                <Show when={menu().node.type === "file"}>
+                <Show when={menu().node.type === "file" && canEdit()}>
                   <button
                     class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                     onClick={(e) => {
@@ -367,10 +390,12 @@ export function FileTree(props: FileTreeProps) {
                     <Edit2 class="w-3.5 h-3.5" />
                     Edit File
                   </button>
-                  <div class="h-px w-full my-1" style={{ background: "var(--border-base)" }} />
+                  <Show when={canDelete()}>
+                    <div class="h-px w-full my-1" style={{ background: "var(--border-base)" }} />
+                  </Show>
                 </Show>
 
-                <Show when={menu().node.path !== ""}>
+                <Show when={menu().node.path !== "" && canDelete()}>
                   <button
                     class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-red-500/10 text-red-500 transition-colors"
                     onClick={(e) => {

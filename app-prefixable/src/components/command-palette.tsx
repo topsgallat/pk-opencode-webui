@@ -77,7 +77,7 @@ export function CommandPalette() {
     try {
       if (typeof localStorage !== "undefined") {
         const key = `${PROJECTS_STORAGE_KEY}.${server.serverKey()}`
-        const stored = localStorage.getItem(key) ?? (server.serverKey() === "default" ? localStorage.getItem(PROJECTS_STORAGE_KEY) : null)
+      const stored = localStorage.getItem(key)
         if (stored) {
           projects = JSON.parse(stored) as { worktree: string; name?: string }[]
         }

@@ -84,6 +84,7 @@ import { dispatchStorageEvent } from "../utils/storage";
 import { sessionHasQuestion, buildChildMap, rootAncestorId } from "../utils/session-tree-request";
 import { useDevice } from "../context/device";
 import { MobileLayout } from "./mobile-layout";
+import { getServerCapabilities } from "../utils/server-capabilities";
 
 // Storage keys
 const PROJECTS_STORAGE_KEY = "opencode.projects";
@@ -254,6 +255,7 @@ export function Layout(props: ParentProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const device = useDevice();
+  const capabilities = createMemo(() => getServerCapabilities(server.selectedServer()));
 
   const [sessions, setSessions] = createSignal<Session[]>([]);
   const [loading, setLoading] = createSignal(true);
@@ -311,11 +313,22 @@ export function Layout(props: ParentProps) {
     if (!showSidebar()) setSidebarDragging(false);
   });
 
+  createEffect(on(() => server.serverKey(), () => {
+    setProjectDialogOpen(false);
+    setMenuOpenId(null);
+    setConfirmDeleteSession(null);
+    setConfirmArchiveSession(null);
+    setPromptDropdownOpen(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setSearchFocusIdx(-1);
+  }, { defer: true }));
+
   // Load state from storage
   onMount(() => {
     // Load projects
     try {
-        const stored = localStorage.getItem(projectsStorageKey()) ?? (server.serverKey() === "default" ? localStorage.getItem(PROJECTS_STORAGE_KEY) : null);
+      const stored = localStorage.getItem(projectsStorageKey());
       if (stored) {
         setProjects(JSON.parse(stored));
       }
@@ -2187,22 +2200,24 @@ export function Layout(props: ParentProps) {
               >
                 <Settings class="w-5 h-5" />
               </button>
-              <button
-                data-hint-target
-                onClick={() => navigate(`/${dirSlug()}/logs`)}
-                class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
-                style={{
-                  color: isLogsActive()
-                    ? "var(--text-interactive-base)"
-                    : "var(--icon-base)",
-                  background: isLogsActive()
-                    ? "var(--surface-inset)"
-                    : "transparent",
-                }}
-                title="Server Logs"
-              >
-                <ScrollText class="w-5 h-5" />
-              </button>
+              <Show when={capabilities().canReadLocalLogs}>
+                <button
+                  data-hint-target
+                  onClick={() => navigate(`/${dirSlug()}/logs`)}
+                  class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                  style={{
+                    color: isLogsActive()
+                      ? "var(--text-interactive-base)"
+                      : "var(--icon-base)",
+                    background: isLogsActive()
+                      ? "var(--surface-inset)"
+                      : "transparent",
+                  }}
+                  title="Server Logs"
+                >
+                  <ScrollText class="w-5 h-5" />
+                </button>
+              </Show>
             </div>
           </div>
 

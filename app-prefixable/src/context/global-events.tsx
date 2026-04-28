@@ -11,6 +11,7 @@ import { useBasePath } from "./base-path"
 import { useServer } from "./server"
 import { globalSyncReady } from "./sync"
 import { appendTargetParam } from "../utils/path"
+import { getTargetServerUrl } from "../utils/servers"
 
 /**
  * Alert priority: permission (highest) > question > busy
@@ -46,14 +47,10 @@ const GlobalEventsContext = createContext<GlobalEventsContextValue>()
 export function GlobalEventsProvider(props: ParentProps & {
   projects: () => { worktree: string }[]
   activeDirectory: () => string | undefined
-}) {
+  }) {
   const { prefix } = useBasePath()
   const server = useServer()
-  const targetUrl = () => {
-    const selected = server.selectedServer()
-    if (!selected || selected.isDefault) return undefined
-    return selected.url
-  }
+  const targetUrl = () => getTargetServerUrl(server.selectedServer())
 
   // Per-directory alert state
   const [alerts, setAlerts] = createStore<Record<string, ProjectAlerts>>({})

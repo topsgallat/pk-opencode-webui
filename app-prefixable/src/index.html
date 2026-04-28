@@ -53,8 +53,8 @@
     <script>
       // Runtime configuration injection point
       window.__OPENCODE__ = window.__OPENCODE__ || {}
-      // Branding config will be injected by the server as a JSON object
-      // Server replacement token: __BRANDING_CONFIG__ -> JSON
+      // Branding config will be injected by the server as a JSON object.
+      // Server replacement token: __BRANDING_CONFIG__ -> JSON-safe branding config
       window.__OPENCODE__.branding = __BRANDING_CONFIG__
       window.__OPENCODE__.defaultServerUrl = "__DEFAULT_SERVER_URL__"
     </script>

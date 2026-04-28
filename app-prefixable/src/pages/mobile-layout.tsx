@@ -17,6 +17,7 @@ import { useLayout } from "../context/layout"
 import { usePermission } from "../context/permission"
 import { useBranding } from "../context/branding"
 import { base64Encode } from "../utils/path"
+import { getServerCapabilities } from "../utils/server-capabilities"
 import {
     OpenCodeLogo,
     getFilename,
@@ -73,7 +74,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     const [showServerSheet, setShowServerSheet] = createSignal(false)
 
     function openProjectHistory() {
-        const stored = localStorage.getItem(projectsStorageKey()) ?? (server.serverKey() === "default" ? localStorage.getItem(PROJECTS_STORAGE_KEY) : null)
+      const stored = localStorage.getItem(projectsStorageKey())
         if (stored) {
             try {
                 const parsed = JSON.parse(stored) as Project[]
@@ -103,6 +104,14 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
         } else if (isSessionView()) {
             setMobileTab("chat")
         }
+    })
+
+    createEffect(() => {
+        const key = server.serverKey()
+        if (!key) return
+        setShowProjectHistory(false)
+        setHistoryProjects([])
+        setShowServerSheet(false)
     })
 
     onMount(() => {
@@ -644,7 +653,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                 <Show when={server.servers().length > 1}>
                     <button
                         onClick={() => setShowServerSheet(true)}
-                        style={{ color: server.selectedServer()?.isDefault ? "var(--text-weak)" : "var(--text-interactive-base)" }}
+                        style={{ color: getServerCapabilities(server.selectedServer()).isRemoteBackend ? "var(--text-interactive-base)" : "var(--text-weak)" }}
                     >
                         <Server class="w-5 h-5" />
                         <span>Server</span>

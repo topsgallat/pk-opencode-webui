@@ -1,4 +1,4 @@
-import { type ParentProps, createSignal, createEffect, createMemo, For, on, onMount, onCleanup, Show } from "solid-js"
+import { type ParentProps, createSignal, createEffect, createMemo, For, on, onCleanup, Show } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import { createOpencodeClient } from "../sdk/client"
 import { base64Encode } from "../utils/path"
@@ -16,6 +16,7 @@ import { getFilename, OpenCodeLogo, ProjectAvatar, type Project } from "../compo
 import { Spinner } from "../components/ui/spinner"
 import { Plus, X, Settings, SquareTerminal, ChevronDown, Server, Check } from "lucide-solid"
 import { dispatchStorageEvent } from "../utils/storage"
+import { getTargetServerUrl } from "../utils/servers"
 
 // Storage key
 const PROJECTS_STORAGE_KEY = "opencode.projects"
@@ -42,32 +43,32 @@ export function HomeLayout(props: ParentProps) {
   const [terminalHeight, setTerminalHeight] = createSignal(300)
 
   // Client for PTY operations
-  const ptyTargetUrl = createMemo(() => {
-    const selected = server.selectedServer()
-    if (!selected || selected.isDefault) return undefined
-    return selected.url
-  })
+  const ptyTargetUrl = createMemo(() => getTargetServerUrl(server.selectedServer()))
   const client = createMemo(() => createOpencodeClient({
     baseUrl: basePathServerUrl,
     targetUrl: ptyTargetUrl(),
     throwOnError: false,
   }))
 
-  createEffect(on(() => server.selectedServer()?.id, () => {
+  createEffect(on(() => server.serverKey(), () => {
     setTerminalOpen(false)
     setTerminalPtyId(null)
+    setProjectDialogOpen(false)
   }, { defer: true }))
 
-  onMount(() => {
+  createEffect(on(projectsStorageKey, (key) => {
     try {
-      const stored = localStorage.getItem(projectsStorageKey()) ?? (server.serverKey() === "default" ? localStorage.getItem(PROJECTS_STORAGE_KEY) : null)
+      const stored = localStorage.getItem(key)
       if (stored) {
         setProjects(JSON.parse(stored))
+        return
       }
+      setProjects([])
     } catch (e) {
       console.error("Failed to load projects:", e)
+      setProjects([])
     }
-  })
+  }))
 
   // Cleanup PTY on unmount
   onCleanup(() => {
@@ -154,7 +155,7 @@ export function HomeLayout(props: ParentProps) {
   }
 
   return (
-    <For each={[server.selectedServer()?.id ?? "default"]}>
+    <For each={[server.serverKey()]}>
       {() => (
         <SDKProvider>
           <EventProvider>

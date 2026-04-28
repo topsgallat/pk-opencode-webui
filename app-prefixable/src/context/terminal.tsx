@@ -1,6 +1,8 @@
 import { createContext, useContext, createSignal, type ParentProps } from "solid-js"
 import { useSDK } from "./sdk"
+import { useServer } from "./server"
 import { mkdir } from "../utils/extended-api"
+import { getServerCapabilities } from "../utils/server-capabilities"
 
 interface PTYSession {
   id: string
@@ -27,6 +29,8 @@ const TerminalContext = createContext<TerminalContextValue>()
 
 export function TerminalProvider(props: ParentProps) {
   const { client, url: serverUrl, targetUrl } = useSDK()
+  const server = useServer()
+  const capabilities = () => getServerCapabilities(server.selectedServer())
   const [sessions, setSessions] = createSignal<PTYSession[]>([])
   const [active, setActive] = createSignal<string | null>(null)
   const [opened, setOpened] = createSignal(false)
@@ -39,7 +43,7 @@ export function TerminalProvider(props: ParentProps) {
     setError(null)
     try {
       // Ensure the directory exists before creating the PTY
-      if (cwd) {
+      if (cwd && capabilities().canCreateDirectories) {
         console.log("[Terminal] Ensuring directory exists:", cwd)
         await mkdir(serverUrl, cwd, targetUrl)
       }

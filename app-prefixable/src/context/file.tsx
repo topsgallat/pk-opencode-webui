@@ -2,7 +2,9 @@ import { createContext, useContext, batch, type ParentProps } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import type { FileNode } from "../sdk/client"
 import { useSDK } from "./sdk"
+import { useServer } from "./server"
 import { readFile, mkdir, createFile as apiCreateFile, deleteFile as apiDeleteFile, deleteDir as apiDeleteDir } from "../utils/extended-api"
+import { getServerCapabilities } from "../utils/server-capabilities"
 
 type DirState = {
   expanded: boolean
@@ -59,6 +61,8 @@ function basename(path: string) {
 
 export function FileProvider(props: ParentProps) {
   const { client, directory, url: serverUrl, targetUrl } = useSDK()
+  const server = useServer()
+  const capabilities = () => getServerCapabilities(server.selectedServer())
 
   const [store, setStore] = createStore<FileStore>({
     dirs: {},
@@ -178,8 +182,10 @@ export function FileProvider(props: ParentProps) {
       .catch(async (e) => {
         console.error("[File] Upstream API failed for:", path, e)
         
-        // Fallback 1: try extended API
-    const extContent = await readFile(serverUrl, fullPath, targetUrl)
+        // Fallback 1: try local extended API only for local backend mode
+        const extContent = capabilities().canUseLocalExtFileOps
+          ? await readFile(serverUrl, fullPath, targetUrl)
+          : null
         if (extContent !== null) {
           batch(() => {
             setStore("files", path, produce((f) => {
@@ -231,6 +237,7 @@ export function FileProvider(props: ParentProps) {
   }
 
   async function createFile(path: string): Promise<boolean> {
+    if (!capabilities().canUseLocalExtFileOps) return false
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
     const success = await apiCreateFile(serverUrl, fullPath, targetUrl)
     if (success) {
@@ -241,6 +248,7 @@ export function FileProvider(props: ParentProps) {
   }
 
   async function createDir(path: string): Promise<boolean> {
+    if (!capabilities().canCreateDirectories) return false
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
     const success = await mkdir(serverUrl, fullPath, targetUrl)
     if (success) {
@@ -251,6 +259,7 @@ export function FileProvider(props: ParentProps) {
   }
 
   async function deleteFile(path: string): Promise<boolean> {
+    if (!capabilities().canUseLocalExtFileOps) return false
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
     const success = await apiDeleteFile(serverUrl, fullPath, targetUrl)
     if (success) {
@@ -267,6 +276,7 @@ export function FileProvider(props: ParentProps) {
   }
 
   async function deleteDir(path: string): Promise<boolean> {
+    if (!capabilities().canUseLocalExtFileOps) return false
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
     const success = await apiDeleteDir(serverUrl, fullPath, targetUrl)
     if (success) {

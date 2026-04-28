@@ -1,4 +1,4 @@
-import { createSignal, Show, For, createMemo, onMount } from "solid-js"
+import { createSignal, Show, For, createMemo, createEffect, on } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import { base64Encode } from "../utils/path"
 import { formatRelativeTime } from "../utils/time"
@@ -7,6 +7,7 @@ import { ProjectDialog } from "../components/project-dialog"
 import { useBranding } from "../context/branding"
 import { useSDK } from "../context/sdk"
 import { useRecentProjects } from "../context/recent-projects"
+import { useServer } from "../context/server"
 import { Button } from "../components/ui/button"
 
 // OpenCode Wordmark
@@ -70,16 +71,17 @@ export function ProjectPicker() {
   const navigate = useNavigate()
   const branding = useBranding()
   const { global } = useSDK()
+  const server = useServer()
   const recent = useRecentProjects()
   const [dialogOpen, setDialogOpen] = createSignal(false)
   const [dialogView, setDialogView] = createSignal<"browse" | "clone">("browse")
   const [homeDir, setHomeDir] = createSignal("")
 
   // Get home directory for path shortening
-  onMount(async () => {
+  createEffect(on(() => server.serverKey(), async () => {
     const res = await global.path.get()
-    if (res.data?.home) setHomeDir(res.data.home)
-  })
+    setHomeDir(res.data?.home || "")
+  }))
 
   const recentProjects = createMemo(() => recent.projects().slice(0, 5))
   const hasRecent = createMemo(() => recentProjects().length > 0)
@@ -166,12 +168,16 @@ export function ProjectPicker() {
       </Show>
 
       {/* Project Dialog */}
-      <ProjectDialog
-        open={dialogOpen()}
-        onClose={() => setDialogOpen(false)}
-        onSelect={handleProjectSelect}
-        initialView={dialogView()}
-      />
+      <For each={[server.serverKey()]}>
+        {() => (
+          <ProjectDialog
+            open={dialogOpen()}
+            onClose={() => setDialogOpen(false)}
+            onSelect={handleProjectSelect}
+            initialView={dialogView()}
+          />
+        )}
+      </For>
     </div>
   )
 }

@@ -1,12 +1,16 @@
 import { createSignal, createEffect, For, Show, onCleanup } from "solid-js"
 import { useBasePath } from "../context/base-path"
+import { useServer } from "../context/server"
 import { listLogFiles, readLogFile } from "../utils/extended-api"
+import { getServerCapabilities } from "../utils/server-capabilities"
 import { Spinner } from "../components/ui/spinner"
 import { Button } from "../components/ui/button"
 import { RefreshCw, FileText } from "lucide-solid"
 
 export function Logs() {
   const { serverUrl } = useBasePath()
+  const server = useServer()
+  const capabilities = () => getServerCapabilities(server.selectedServer())
 
   const [files, setFiles] = createSignal<string[]>([])
   const [selected, setSelected] = createSignal<string | null>(null)
@@ -18,6 +22,14 @@ export function Logs() {
   const [autoRefresh, setAutoRefresh] = createSignal(false)
 
   async function fetchFiles() {
+    if (!capabilities().canReadLocalLogs) {
+      setFiles([])
+      setSelected(null)
+      setContent(null)
+      setLoadingFiles(false)
+      setError(null)
+      return
+    }
     setLoadingFiles(true)
     setError(null)
     const result = await listLogFiles(serverUrl)
@@ -75,6 +87,14 @@ export function Logs() {
       class="flex flex-col h-full overflow-hidden"
       style={{ background: "var(--background-stronger)" }}
     >
+      <Show when={!capabilities().canReadLocalLogs}>
+        <div class="flex items-center justify-center h-full p-6 text-center">
+          <p class="text-sm" style={{ color: "var(--text-muted)" }}>
+            Server Logs are available only for the local OpenCode backend. Remote backends do not expose UI-local log files.
+          </p>
+        </div>
+      </Show>
+      <Show when={capabilities().canReadLocalLogs}>
       <div
         class="flex items-center justify-between px-4 py-3 shrink-0"
         style={{ "border-bottom": "1px solid var(--border-base)" }}
@@ -169,6 +189,7 @@ export function Logs() {
           </Show>
         </div>
       </div>
+      </Show>
     </div>
   )
 }

@@ -2,11 +2,74 @@ import { createContext, useContext, createSignal, createEffect, type ParentProps
 import {
   getServers,
   getDefaultServer,
-  getServer,
+  resolveSelectedServer,
+  getServerKey,
   type ServerConfig,
 } from "../utils/servers"
 
 const SERVERS_STORAGE_KEY = "opencode.selectedServer"
+const PROJECTS_STORAGE_KEY = "opencode.projects"
+const RECENT_PROJECTS_STORAGE_KEY = "opencode-recent-projects"
+const MODELS_BY_AGENT_STORAGE_KEY = "opencode.modelsByAgent"
+const SIDEBAR_EXPANDED_STORAGE_KEY = "opencode.sidebarExpanded"
+const SHOW_ARCHIVED_STORAGE_KEY = "opencode.showArchived"
+const PINNED_SESSIONS_STORAGE_PREFIX = "opencode.pinnedSessions."
+const LAST_SESSION_STORAGE_PREFIX = "opencode.lastSession."
+const PERMISSION_AUTO_ACCEPT_STORAGE_PREFIX = "prokube-permission-autoaccept-"
+
+const migratedServerStorageKeys = new Set<string>()
+
+function migrateStorageValue(targetKey: string, legacyKey: string) {
+  if (targetKey === legacyKey) return
+  try {
+    if (localStorage.getItem(targetKey) !== null) return
+    const legacy = localStorage.getItem(legacyKey)
+    if (legacy === null) return
+    localStorage.setItem(targetKey, legacy)
+  } catch {
+    return
+  }
+}
+
+function migrateStoragePrefix(targetPrefix: string, legacyPrefix: string) {
+  if (targetPrefix === legacyPrefix) return
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (key?.startsWith(legacyPrefix)) keys.push(key)
+    }
+    for (const key of keys) {
+      const targetKey = `${targetPrefix}${key.slice(legacyPrefix.length)}`
+      if (localStorage.getItem(targetKey) !== null) continue
+      const legacy = localStorage.getItem(key)
+      if (legacy === null) continue
+      localStorage.setItem(targetKey, legacy)
+    }
+  } catch {
+    return
+  }
+}
+
+function migrateServerScopedStorage(server: ServerConfig | undefined) {
+  if (typeof window === "undefined") return
+  const targetKey = server ? getServerKey(server) : "default"
+  if (migratedServerStorageKeys.has(targetKey)) return
+
+  const legacyKeys = server && server.id !== "builtin" ? [server.id] : ["default"]
+  for (const legacyKey of legacyKeys) {
+    migrateStorageValue(`${PROJECTS_STORAGE_KEY}.${targetKey}`, `${PROJECTS_STORAGE_KEY}.${legacyKey}`)
+    migrateStorageValue(`${RECENT_PROJECTS_STORAGE_KEY}.${targetKey}`, `${RECENT_PROJECTS_STORAGE_KEY}.${legacyKey}`)
+    migrateStorageValue(`${MODELS_BY_AGENT_STORAGE_KEY}.${targetKey}`, `${MODELS_BY_AGENT_STORAGE_KEY}.${legacyKey}`)
+    migrateStorageValue(`${SIDEBAR_EXPANDED_STORAGE_KEY}.${targetKey}`, `${SIDEBAR_EXPANDED_STORAGE_KEY}.${legacyKey}`)
+    migrateStorageValue(`${SHOW_ARCHIVED_STORAGE_KEY}.${targetKey}`, `${SHOW_ARCHIVED_STORAGE_KEY}.${legacyKey}`)
+    migrateStoragePrefix(`${PINNED_SESSIONS_STORAGE_PREFIX}${targetKey}.`, `${PINNED_SESSIONS_STORAGE_PREFIX}${legacyKey}.`)
+    migrateStoragePrefix(`${LAST_SESSION_STORAGE_PREFIX}${targetKey}.`, `${LAST_SESSION_STORAGE_PREFIX}${legacyKey}.`)
+    migrateStoragePrefix(`${PERMISSION_AUTO_ACCEPT_STORAGE_PREFIX}${targetKey}-`, `${PERMISSION_AUTO_ACCEPT_STORAGE_PREFIX}${legacyKey}-`)
+  }
+
+  migratedServerStorageKeys.add(targetKey)
+}
 
 interface ServerContextValue {
   servers: () => ServerConfig[]
@@ -24,13 +87,15 @@ export function ServerProvider(props: ParentProps) {
     typeof window === "undefined" ? null : localStorage.getItem(SERVERS_STORAGE_KEY)
   )
 
-  const selectedServer = () => {
-    const id = selectedServerId()
-    if (id) return servers().find((s) => s.id === id)
-    return getDefaultServer()
-  }
+  const selectedServer = () => resolveSelectedServer(selectedServerId(), servers())
 
-  const serverKey = () => selectedServer()?.id ?? "default"
+  migrateServerScopedStorage(selectedServer())
+
+  const serverKey = () => {
+    const selected = selectedServer()
+    if (!selected) return "default"
+    return getServerKey(selected)
+  }
 
   const setSelectedServer = (id: string | null) => {
     setSelectedServerId(id)
@@ -44,9 +109,20 @@ export function ServerProvider(props: ParentProps) {
   }
 
   createEffect(() => {
+    const id = selectedServerId()
+    if (!id) return
+    if (servers().some((server) => server.id === id)) return
+    const fallback = getDefaultServer(servers())
+    setSelectedServer(fallback && fallback.id !== "builtin" ? fallback.id : null)
+  })
+
+  createEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === "opencode.servers") {
         setServers(getServers())
+      }
+      if (e.key === SERVERS_STORAGE_KEY) {
+        setSelectedServerId(e.newValue)
       }
     }
     if (typeof window !== "undefined") {

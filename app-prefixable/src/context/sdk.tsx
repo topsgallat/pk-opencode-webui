@@ -1,5 +1,6 @@
 import { createContext, useContext, createMemo, type ParentProps } from "solid-js"
 import { createOpencodeClient } from "../sdk/client"
+import { getTargetServerUrl } from "../utils/servers"
 import { useBasePath } from "./base-path"
 import { useServer } from "./server"
 
@@ -20,11 +21,7 @@ export function SDKProvider(props: ParentProps & { directory?: string }) {
   const { serverUrl: basePathServerUrl } = useBasePath()
   const server = useServer()
 
-  const targetUrl = createMemo(() => {
-    const selected = server.selectedServer()
-    if (!selected || selected.isDefault) return undefined
-    return selected.url
-  })
+  const targetUrl = createMemo(() => getTargetServerUrl(server.selectedServer()))
 
   const url = createMemo(() => basePathServerUrl)
 

@@ -1,4 +1,4 @@
-import { createContext, useContext, createSignal, type ParentProps } from "solid-js"
+import { createContext, useContext, createSignal, createEffect, on, type ParentProps } from "solid-js"
 import { useServer } from "./server"
 
 interface RecentProject {
@@ -25,7 +25,7 @@ function storageKey(serverKey: string) {
 
 function loadFromStorage(serverKey: string): RecentProject[] {
   try {
-    const stored = localStorage.getItem(storageKey(serverKey)) ?? (serverKey === "default" ? localStorage.getItem(STORAGE_KEY) : null)
+    const stored = localStorage.getItem(storageKey(serverKey))
     if (!stored) return []
     const parsed = JSON.parse(stored)
     if (!Array.isArray(parsed)) return []
@@ -56,6 +56,10 @@ export function RecentProjectsProvider(props: ParentProps) {
   const server = useServer()
   const serverKey = () => server.serverKey()
   const [projects, setProjects] = createSignal<RecentProject[]>(loadFromStorage(serverKey()))
+
+  createEffect(on(serverKey, (key) => {
+    setProjects(loadFromStorage(key))
+  }))
 
   function add(path: string) {
     const normalized = path.replace(/\/+$/, "")

@@ -2,10 +2,12 @@ import { createSignal, createEffect, Show, Match, Switch, createMemo, onCleanup 
 import { useFile } from "../context/file"
 import { useSDK } from "../context/sdk"
 import { useBasePath } from "../context/base-path"
+import { useServer } from "../context/server"
 import { ContentCode } from "./diff/content-code"
 import { Spinner } from "./ui/spinner"
 import { FileCode, Pencil, Eye } from "lucide-solid"
 import { writeFile } from "../utils/extended-api"
+import { getServerCapabilities } from "../utils/server-capabilities"
 import { EditorDialog } from "./editor-dialog"
 import { Markdown } from "./markdown"
 
@@ -92,6 +94,8 @@ export function FileViewer(props: FileViewerProps) {
   const file = useFile()
   const sdk = useSDK()
   const basePath = useBasePath()
+  const server = useServer()
+  const capabilities = () => getServerCapabilities(server.selectedServer())
 
   const [isEditing, setIsEditing] = createSignal(false)
   const [saveError, setSaveError] = createSignal<string | null>(null)
@@ -151,6 +155,10 @@ export function FileViewer(props: FileViewerProps) {
 
   // Bug #8: Save Path
   async function handleSave(newContent: string) {
+    if (!capabilities().canUseLocalExtFileOps) {
+      setSaveError("Saving files directly is available only for the local OpenCode backend.")
+      return
+    }
     const fullPath = sdk.directory && !props.path.startsWith("/")
       ? `${sdk.directory}/${props.path}`
       : props.path
@@ -237,15 +245,17 @@ export function FileViewer(props: FileViewerProps) {
                       </Show>
                     </button>
                   </Show>
-                  <button
-                    class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
-                    onClick={() => setIsEditing(true)}
-                    title="Edit File"
-                    aria-label="Edit File"
-                    style={{ color: "var(--text-base)" }}
-                  >
-                    <Pencil class="w-3.5 h-3.5" />
-                  </button>
+                  <Show when={capabilities().canUseLocalExtFileOps}>
+                    <button
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      onClick={() => setIsEditing(true)}
+                      title="Edit File"
+                      aria-label="Edit File"
+                      style={{ color: "var(--text-base)" }}
+                    >
+                      <Pencil class="w-3.5 h-3.5" />
+                    </button>
+                  </Show>
                 </div>
               </div>
               <div class="overflow-x-auto min-h-0">

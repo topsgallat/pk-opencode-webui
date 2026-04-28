@@ -4,6 +4,8 @@ import { X, Plus, Trash2 } from "lucide-solid"
 import { Button } from "./ui/button"
 import { ConfirmDialog } from "./confirm-dialog"
 import { createBackdropDismiss } from "../utils/backdrop"
+import { useServer } from "../context/server"
+import { getServerCapabilities } from "../utils/server-capabilities"
 
 interface Props {
   onClose: () => void
@@ -12,6 +14,8 @@ interface Props {
 
 export function MCPDialog(props: Props) {
   const mcp = useMCP()
+  const server = useServer()
+  const capabilities = () => getServerCapabilities(server.selectedServer())
   const [loading, setLoading] = createSignal<string | null>(null)
   const [deleting, setDeleting] = createSignal<string | null>(null)
   const [toDelete, setToDelete] = createSignal<string | null>(null)
@@ -43,6 +47,7 @@ export function MCPDialog(props: Props) {
   }
 
   function requestDelete(name: string) {
+    if (!capabilities().canUseLocalExtFileOps) return
     if (loading() || deleting()) return
     setToDelete(name)
   }
@@ -216,18 +221,20 @@ export function MCPDialog(props: Props) {
                     </button>
 
                     {/* Delete Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        requestDelete(item.name)
-                      }}
-                      class="p-1 rounded transition-colors opacity-50 hover:opacity-100"
-                      style={{ color: "var(--icon-critical-base)" }}
-                      disabled={loading() === item.name || deleting() === item.name}
-                      title="Remove server"
-                    >
-                      <Trash2 class="w-4 h-4" />
-                    </button>
+                    <Show when={capabilities().canUseLocalExtFileOps}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          requestDelete(item.name)
+                        }}
+                        class="p-1 rounded transition-colors opacity-50 hover:opacity-100"
+                        style={{ color: "var(--icon-critical-base)" }}
+                        disabled={loading() === item.name || deleting() === item.name}
+                        title="Remove server"
+                      >
+                        <Trash2 class="w-4 h-4" />
+                      </button>
+                    </Show>
                   </div>
                 </div>
               )

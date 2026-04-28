@@ -1,12 +1,14 @@
-import { createSignal, For, Show, onMount, createEffect, createMemo } from "solid-js"
+import { createSignal, For, Show, createEffect, createMemo } from "solid-js"
 import type { Event } from "../sdk/client"
 import { useSDK } from "../context/sdk"
+import { useServer } from "../context/server"
 import { Spinner } from "./ui/spinner"
 import { Button } from "./ui/button"
 import { Folder, X, GitBranch, AlertCircle } from "lucide-solid"
 import { Terminal } from "./terminal"
 import { useEvents } from "../context/events"
 import { mkdir, listDirs } from "../utils/extended-api"
+import { getServerCapabilities } from "../utils/server-capabilities"
 import { createBackdropDismiss } from "../utils/backdrop"
 import fuzzysort from "fuzzysort"
 
@@ -58,9 +60,24 @@ function displayPath(path: string, home: string) {
   return tildeOf(full, home) || full
 }
 
+function resolveTypedPath(input: string, home: string | null) {
+  const value = trimTrailing(input.trim())
+  if (!value) return ""
+  if (value === "~") return home || ""
+  if (value.startsWith("~/")) {
+    if (!home) return ""
+    return trimTrailing(`${home}/${value.slice(2)}`)
+  }
+  if (value.startsWith("/")) return value
+  return ""
+}
+
 export function ProjectDialog(props: ProjectDialogProps) {
-  const { url, targetUrl, client, global } = useSDK()
+  const sdk = useSDK()
+  const server = useServer()
   const events = useEvents()
+  const capabilities = createMemo(() => getServerCapabilities(server.selectedServer()))
+  const isRemoteServer = createMemo(() => !!sdk.targetUrl)
 
   const [homeDirectory, setHomeDirectory] = createSignal<string | null>(null)
   const [filter, setFilter] = createSignal("")
@@ -85,32 +102,43 @@ export function ProjectDialog(props: ProjectDialogProps) {
   let inputRef: HTMLInputElement | undefined
   let cloneUnsubscribe: (() => void) | null = null
 
-  // Load home directory on mount
-  onMount(async () => {
+  function resetBrowseState() {
+    searchToken += 1
+    setFilter("")
+    setResults([])
+    setLoading(false)
+    setSelectedIndex(0)
+    setNewFolderName("")
+    dirCache.clear()
+  }
+
+  // Load home directory for the active server whenever the dialog opens
+  createEffect(async () => {
+    if (!props.open) return
+    const serverId = server.selectedServerId()
+    resetBrowseState()
+    setHomeDirectory(null)
     try {
-      const res = await client.path.get()
-      if (res.data?.home) {
-        setHomeDirectory(res.data.home)
-      }
+      const res = await sdk.client.path.get()
+      if (!props.open || server.selectedServerId() !== serverId) return
+      setHomeDirectory(res.data?.home ?? null)
     } catch (e) {
       console.error("Failed to fetch path info:", e)
+      if (!props.open || server.selectedServerId() !== serverId) return
+      setHomeDirectory(null)
     }
   })
 
   // Reset state when dialog closes
   createEffect(() => {
     if (!props.open) {
-      setFilter("")
-      setResults([])
-      setSelectedIndex(0)
-      setNewFolderName("")
+      resetBrowseState()
       setShowCloneForm(false)
       setClonePtyId(null)
       setCloneError(null)
       setCloneSuccess(false)
       setRepoUrl("")
       setCloneTargetPath(null)
-      dirCache.clear()
       // Cleanup PTY event subscription
       if (cloneUnsubscribe) {
         cloneUnsubscribe()
@@ -132,7 +160,12 @@ export function ProjectDialog(props: ProjectDialogProps) {
   createEffect(() => {
     const value = filter()
     const home = homeDirectory()
-    if (!props.open || !home) return
+    if (!props.open) return
+    if (isRemoteServer()) {
+      searchProjects(value, home)
+      return
+    }
+    if (!home) return
     searchDirectories(value, home)
   })
 
@@ -142,7 +175,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
     if (cached) return cached
 
     try {
-      const dirs = await listDirs(url, key, { limit: 500, depth: 1, targetUrl })
+      const dirs = await listDirs(sdk.url, key, { limit: 500, depth: 1, targetUrl: sdk.targetUrl })
       // Convert to absolute paths
       const absolute = dirs.map(d => `${key}/${d.replace(/\/$/, "")}`.replace(/\/+/g, "/"))
       dirCache.set(key, absolute)
@@ -250,6 +283,50 @@ export function ProjectDialog(props: ProjectDialogProps) {
     }
   }
 
+  async function searchProjects(value: string, home: string | null) {
+    const token = ++searchToken
+    const isActive = () => token === searchToken
+
+    setLoading(true)
+    try {
+      const res = await sdk.global.project.list()
+      if (!isActive()) return
+
+      const projects = Array.isArray(res.data) ? res.data : []
+      const items = projects
+        .map((project) => {
+          const path = trimTrailing(project.worktree)
+          return {
+            path,
+            text: `${project.name || getFilename(path)} ${path}`,
+          }
+        })
+        .sort((a, b) => a.path.localeCompare(b.path))
+
+      const input = value.trim()
+      const manualPath = resolveTypedPath(input, home)
+      const projectResults = input
+        ? fuzzysort.go(input, items, { key: "text", limit: 50 }).map((match) => match.obj.path)
+        : items.map((item) => item.path).slice(0, 50)
+
+      const next = manualPath && !projectResults.includes(manualPath)
+        ? [manualPath, ...projectResults]
+        : projectResults
+
+      if (!input && home && !next.includes(home)) {
+        next.unshift(home)
+      }
+
+      setResults(next)
+      setSelectedIndex(0)
+    } catch (e) {
+      console.error("Project search error:", e)
+      setResults([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   function selectProject(path: string) {
     props.onSelect(path)
     props.onClose()
@@ -287,13 +364,15 @@ export function ProjectDialog(props: ProjectDialogProps) {
       }
     } else if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault()
-      // Tab completion - set path with trailing / to show contents
       const selected = items[selectedIndex()]
-      if (selected) {
-        const home = homeDirectory()
-        const display = home ? displayPath(selected, home) : selected
-        setFilter(display.endsWith("/") ? display : display + "/")
+      if (!selected) return
+      const home = homeDirectory()
+      const display = home ? displayPath(selected, home) : selected
+      if (isRemoteServer()) {
+        setFilter(display)
+        return
       }
+      setFilter(display.endsWith("/") ? display : display + "/")
     }
   }
 
@@ -306,7 +385,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
   async function createFolder() {
     const home = homeDirectory()
     const name = newFolderName().trim()
-    if (!name || !home || creating()) return
+    if (!capabilities().canCreateDirectories || !name || !home || creating()) return
 
     // Determine base directory from current filter
     let baseDir = home
@@ -325,7 +404,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
 
     setCreating(true)
     try {
-      const success = await mkdir(url, fullPath, targetUrl)
+      const success = await mkdir(sdk.url, fullPath, sdk.targetUrl)
       if (success) {
         // Clear cache and select the new folder
         dirCache.clear()
@@ -359,7 +438,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
     setCloneTargetPath(targetPath)
 
     try {
-      const res = await global.pty.create({
+      const res = await sdk.global.pty.create({
         command: "git",
         args: ["clone", url, targetPath],
         cwd: home,
@@ -407,7 +486,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
   async function cancelClone() {
     const ptyId = clonePtyId()
     if (ptyId) {
-      await global.pty.remove({ ptyID: ptyId }).catch(() => {})
+      await sdk.global.pty.remove({ ptyID: ptyId }).catch(() => {})
     }
     setCloning(false)
     setClonePtyId(null)
@@ -478,7 +557,12 @@ export function ProjectDialog(props: ProjectDialogProps) {
                   }}
                 />
                 <p class="mt-1 text-xs" style={{ color: "var(--text-weak)" }}>
-                  Use Tab to auto-complete. Click to select, double-click or Enter to open.
+                  <Show
+                    when={isRemoteServer()}
+                    fallback="Use Tab to auto-complete. Click to select, double-click or Enter to open."
+                  >
+                    Search projects on {server.selectedServer()?.name || "the selected server"}. You can also type a full path and press Enter.
+                  </Show>
                 </p>
               </div>
 
@@ -497,10 +581,16 @@ export function ProjectDialog(props: ProjectDialogProps) {
 
                 <Show when={!loading()}>
                   <Show when={results().length === 0}>
-                    <div class="flex items-center justify-center h-full text-sm" style={{ color: "var(--text-weak)" }}>
-                      {filter() ? "No matching directories" : "Type to search directories"}
-                    </div>
-                  </Show>
+                      <div class="flex items-center justify-center h-full text-sm" style={{ color: "var(--text-weak)" }}>
+                        {filter()
+                          ? isRemoteServer()
+                            ? "No matching projects or paths"
+                            : "No matching directories"
+                          : isRemoteServer()
+                            ? "Type to search projects or enter a full path"
+                            : "Type to search directories"}
+                      </div>
+                    </Show>
 
                   <For each={results()}>
                     {(path, index) => {
@@ -552,32 +642,34 @@ export function ProjectDialog(props: ProjectDialogProps) {
                 </Button>
               </div>
 
-              {/* Create new folder */}
-              <div class="pt-2" style={{ "border-top": "1px solid var(--border-base)" }}>
-                <label class="block text-sm font-medium mb-2" style={{ color: "var(--text-strong)" }}>
-                  Create new folder
-                </label>
-                <div class="flex gap-2">
-                  <input
-                    type="text"
-                    value={newFolderName()}
-                    onInput={(e) => setNewFolderName(e.currentTarget.value)}
-                    placeholder="my-new-project"
-                    class="flex-1 px-3 py-2 rounded-md text-sm"
-                    style={{
-                      background: "var(--background-stronger)",
-                      border: "1px solid var(--border-base)",
-                      color: "var(--text-base)",
-                    }}
-                    onKeyDown={(e) => e.key === "Enter" && createFolder()}
-                  />
-                  <Button onClick={createFolder} variant="primary" disabled={!newFolderName().trim() || creating()}>
-                    <Show when={creating()} fallback="Create">
-                      <Spinner class="w-4 h-4" />
-                    </Show>
-                  </Button>
+              <Show when={capabilities().canCreateDirectories}>
+                {/* Create new folder */}
+                <div class="pt-2" style={{ "border-top": "1px solid var(--border-base)" }}>
+                  <label class="block text-sm font-medium mb-2" style={{ color: "var(--text-strong)" }}>
+                    Create new folder
+                  </label>
+                  <div class="flex gap-2">
+                    <input
+                      type="text"
+                      value={newFolderName()}
+                      onInput={(e) => setNewFolderName(e.currentTarget.value)}
+                      placeholder="my-new-project"
+                      class="flex-1 px-3 py-2 rounded-md text-sm"
+                      style={{
+                        background: "var(--background-stronger)",
+                        border: "1px solid var(--border-base)",
+                        color: "var(--text-base)",
+                      }}
+                      onKeyDown={(e) => e.key === "Enter" && createFolder()}
+                    />
+                    <Button onClick={createFolder} variant="primary" disabled={!newFolderName().trim() || creating()}>
+                      <Show when={creating()} fallback="Create">
+                        <Spinner class="w-4 h-4" />
+                      </Show>
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </Show>
 
               {/* Clone Git Repo button */}
               <div class="pt-2" style={{ "border-top": "1px solid var(--border-base)" }}>

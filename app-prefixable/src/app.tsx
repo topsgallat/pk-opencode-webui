@@ -118,7 +118,7 @@ function useProjectsList(serverKey: string) {
 
   function load() {
     try {
-      const stored = localStorage.getItem(projectsStorageKey(serverKey)) ?? (serverKey === "default" ? localStorage.getItem(PROJECTS_STORAGE_KEY) : null)
+      const stored = localStorage.getItem(projectsStorageKey(serverKey))
       if (stored) {
         const parsed = JSON.parse(stored)
         setProjects(Array.isArray(parsed) ? parsed : [])

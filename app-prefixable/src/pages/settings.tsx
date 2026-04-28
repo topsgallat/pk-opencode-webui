@@ -14,8 +14,10 @@ import { SOUND_OPTIONS, readSoundSettings, writeSoundSettings, playSound, primeA
 import { useSavedPrompts } from "../context/saved-prompts"
 import { useTheme } from "../context/theme"
 import { useDevice } from "../context/device"
+import { useServer } from "../context/server"
 import { writeFile } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
+import { getServerCapabilities } from "../utils/server-capabilities"
 import {
   getServers,
   saveServer,
@@ -32,6 +34,8 @@ export function Settings() {
   const { client, global, url, directory, targetUrl } = useSDK()
   const theme = useTheme()
   const device = useDevice()
+  const server = useServer()
+  const capabilities = () => getServerCapabilities(server.selectedServer())
   const [selectedProvider, setSelectedProvider] = createSignal<string | null>(null)
   const [apiKey, setApiKey] = createSignal("")
   const [accountName, setAccountName] = createSignal("")
@@ -471,6 +475,10 @@ export function Settings() {
   }
 
   async function saveInstruction(path: string) {
+    if (!capabilities().canEditLocalInstructionFiles) {
+      setInstructionError("Instruction file editing is available only for the local OpenCode backend.")
+      return
+    }
     const edits = instructionEdits()
     const content = edits[path]
     if (content === undefined) return
@@ -498,6 +506,10 @@ export function Settings() {
   }
 
   async function createInstructionsFile() {
+    if (!capabilities().canEditLocalInstructionFiles) {
+      setInstructionError("Instruction file creation is available only for the local OpenCode backend.")
+      return
+    }
     if (!directory) return
     setInstructionCreating(true)
     setInstructionError(null)
@@ -695,6 +707,10 @@ Add your project-specific instructions here.
   async function confirmMcpDelete() {
     const name = mcpToDelete()
     if (!name) return
+    if (!capabilities().canUseLocalExtFileOps) {
+      setMcpToDelete(null)
+      return
+    }
     setMcpToDelete(null)
     setMcpDeleting(name)
     try {
@@ -1732,18 +1748,20 @@ Add your project-specific instructions here.
                               </button>
 
                               {/* Delete Button */}
-                              <button
-                                onClick={() => {
-                                  if (mcpLoading() || mcpDeleting()) return
-                                  setMcpToDelete(name)
-                                }}
-                                disabled={mcpLoading() === name || mcpDeleting() === name}
-                                class="p-1 rounded transition-colors opacity-50 hover:opacity-100 disabled:opacity-30"
-                                style={{ color: "var(--icon-critical-base)" }}
-                                title="Remove server"
-                              >
-                                <Trash2 class="w-4 h-4" />
-                              </button>
+                              <Show when={capabilities().canUseLocalExtFileOps}>
+                                <button
+                                  onClick={() => {
+                                    if (mcpLoading() || mcpDeleting()) return
+                                    setMcpToDelete(name)
+                                  }}
+                                  disabled={mcpLoading() === name || mcpDeleting() === name}
+                                  class="p-1 rounded transition-colors opacity-50 hover:opacity-100 disabled:opacity-30"
+                                  style={{ color: "var(--icon-critical-base)" }}
+                                  title="Remove server"
+                                >
+                                  <Trash2 class="w-4 h-4" />
+                                </button>
+                              </Show>
                             </div>
                           </div>
                         )
@@ -2402,10 +2420,10 @@ Add your project-specific instructions here.
             <div class="space-y-6">
               <header>
                 <h1 class="text-lg font-medium" style={{ color: "var(--text-strong)" }}>
-                  OpenCode Servers
+                  OpenCode Backends
                 </h1>
                 <p class="text-sm mt-1" style={{ color: "var(--text-weak)" }}>
-                  Manage connections to multiple OpenCode server instances
+                  Manage connections to multiple OpenCode backend endpoints
                 </p>
               </header>
 
@@ -2525,7 +2543,7 @@ Add your project-specific instructions here.
                   About Servers
                 </h3>
                 <p class="text-xs" style={{ color: "var(--text-weak)" }}>
-                  Add multiple OpenCode servers to switch between them. Each server maintains its own providers, projects, and configuration.
+                  Add multiple OpenCode backends to switch between them. Each backend maintains its own sessions, projects, and server-scoped UI state.
                 </p>
               </section>
             </div>
@@ -2661,7 +2679,7 @@ Add your project-specific instructions here.
                       }}
                     />
                     <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
-                      The base URL of your OpenCode server
+                      The base URL of your OpenCode backend
                     </p>
                   </div>
                 </div>
@@ -2755,6 +2773,8 @@ function ProjectConfigTab() {
   const providers = useProviders()
   const { directory } = useSDK()
   const basePath = useBasePath()
+  const server = useServer()
+  const capabilities = () => getServerCapabilities(server.selectedServer())
   const [view, setView] = createSignal<"form" | "json">("form")
   const [jsonText, setJsonText] = createSignal("")
   const [saveError, setSaveError] = createSignal<string | null>(null)
@@ -2947,6 +2967,11 @@ function ProjectConfigTab() {
   // Write the full config to opencode.json directly (used when clearing keys
   // or full-file saves, since the PATCH API cannot delete keys via deep-merge)
   async function writeConfigFile(content: string): Promise<boolean> {
+    if (!capabilities().canEditLocalInstructionFiles) {
+      setSaving(false)
+      setSaveError("Writing opencode.json directly is available only for the local OpenCode backend.")
+      return false
+    }
     const path = configFilePath()
     if (!path) {
       setSaving(false)

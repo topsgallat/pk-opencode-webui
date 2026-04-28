@@ -56,7 +56,7 @@ export function DirectoryLayout(props: ParentProps) {
   })
 
   return (
-    <For each={[server.selectedServer()?.id ?? "default"]}>
+    <For each={[server.serverKey()]}>
       {() => (
         <For each={directories()} fallback={<Navigate href="/" />}>
           {(dir: string) => (

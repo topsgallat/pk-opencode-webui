@@ -2,6 +2,8 @@ import { createContext, useContext, createSignal, onMount, type ParentProps, cre
 import { createStore, reconcile } from "solid-js/store"
 import { useSDK } from "./sdk"
 import { useEvents } from "./events"
+import { useServer } from "./server"
+import { getServerCapabilities } from "../utils/server-capabilities"
 
 // MCP Status types matching the backend
 type MCPStatus =
@@ -67,7 +69,9 @@ const MCPContext = createContext<MCPContextValue>()
 export function MCPProvider(props: ParentProps) {
   const sdk = useSDK()
   const { client, url } = sdk
+  const server = useServer()
   const events = useEvents()
+  const capabilities = () => getServerCapabilities(server.selectedServer())
   const [servers, setServers] = createStore<Record<string, MCPStatus>>({})
   const [loading, setLoading] = createSignal(true)
   const [projectOverrides, setProjectOverrides] = createSignal<Record<string, McpProjectOverride>>({})
@@ -215,6 +219,9 @@ export function MCPProvider(props: ParentProps) {
   }
 
   async function remove(name: string) {
+    if (!capabilities().canUseLocalExtFileOps) {
+      throw new Error("Removing MCP servers directly is available only for the local OpenCode backend.")
+    }
     try {
       console.log("[MCP] Removing server:", name)
 

@@ -97,7 +97,7 @@ export function ProviderProvider(props: ParentProps) {
   // Load models from localStorage
   onMount(() => {
     try {
-      const stored = localStorage.getItem(storageKey()) ?? (server.serverKey() === "default" ? localStorage.getItem(MODELS_BY_AGENT_KEY) : null)
+    const stored = localStorage.getItem(storageKey())
       if (stored) {
         const parsed = JSON.parse(stored)
         setStore("modelsByAgent", parsed)

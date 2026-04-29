@@ -115,7 +115,8 @@ RUN chmod -R 755 /etc/services.d/opencode
 
 # Ensure home directory exists for the opencode user (created above with -d /home/opencode)
 # The user's home is already created by useradd, but ensure subdirectories exist
-RUN mkdir -p /home/opencode/.cache /home/opencode/.config /home/opencode/.local/state /home/opencode/AppData
+RUN mkdir -p /home/opencode/.cache /home/opencode/.config /home/opencode/.local/state /home/opencode/AppData \
+    && chown -R opencode:opencode /home/opencode
 
 
 

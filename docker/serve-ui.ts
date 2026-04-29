@@ -22,6 +22,7 @@
 
 
 import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
+import { resolveProxyAuthHeader } from "../shared/proxy-auth-session"
 import nodePath from "path"
 // Decompression for proxied responses
 let zlib: any
@@ -305,7 +306,7 @@ let lastActivity = Date.now()
 // Track WebSocket connections: client ws -> backend ws
 const wsConnections = new Map<object, WebSocket>()
 
-const server = Bun.serve<{ target: string }>({
+const server = Bun.serve<{ target: string; cookie: string }>({
   port: PORT,
   hostname: "0.0.0.0",
   idleTimeout: 0, // Disable timeout for SSE connections
@@ -353,7 +354,7 @@ const server = Bun.serve<{ target: string }>({
         const target = buildUpstreamUrl(path, url, req, "ws").toString()
         console.log("[Proxy] WebSocket upgrade for PTY:", target)
         const success = server.upgrade(req, {
-          data: { target },
+          data: { target, cookie: req.headers.get("cookie") || "" },
         })
         if (success) {
           return undefined // Bun handles the response
@@ -363,7 +364,14 @@ const server = Bun.serve<{ target: string }>({
     }
 
     // Extended API endpoints (handled locally, not proxied)
-    const extResponse = await handleExtendedEndpoint(path, req.method, url, req)
+    const extResponse = await handleExtendedEndpoint(path, req.method, url, req, {
+      resolveUpstreamAuthHeader: (target) => {
+        const syncedAuth = resolveProxyAuthHeader(req, target)
+        if (syncedAuth) return syncedAuth
+        if (!shouldAttachProxyAuth(new URL(target))) return undefined
+        return proxyAuthHeader
+      },
+    })
     if (extResponse) return extResponse
 
     // Check if this is an API request (after stripping prefix)
@@ -371,9 +379,13 @@ const server = Bun.serve<{ target: string }>({
       const targetOverride = getTargetOverride(req, url)
       const target = buildUpstreamUrl(path, url, req)
       const headers = new Headers(req.headers)
+      const syncedAuth = resolveProxyAuthHeader(req, target.toString())
+      if (syncedAuth) {
+        headers.set("Authorization", syncedAuth)
+      }
 
       // Add auth header for API proxy in solo mode
-      if (shouldAttachProxyAuth(target)) {
+      if (!syncedAuth && shouldAttachProxyAuth(target)) {
         headers.set("Authorization", proxyAuthHeader)
       }
 
@@ -567,8 +579,15 @@ const server = Bun.serve<{ target: string }>({
       const target = ws.data.target
       console.log("[Proxy] WebSocket client connected, connecting to backend:", target)
 
-      const shouldSendAuth = shouldAttachProxyAuth(new URL(target.replace(/^ws/, "http")))
-      const backend = new WebSocket(target, shouldSendAuth ? { headers: { Authorization: proxyAuthHeader } } : undefined)
+      const authTarget = target.replace(/^ws:/, "http:").replace(/^wss:/, "https:")
+      const authReq = new Request("http://localhost/", {
+        headers: ws.data.cookie ? { cookie: ws.data.cookie } : {},
+      })
+      const syncedAuth = resolveProxyAuthHeader(authReq, authTarget)
+      const shouldSendAuth = shouldAttachProxyAuth(new URL(authTarget))
+      const fallbackAuth = shouldSendAuth ? proxyAuthHeader : undefined
+      const auth = syncedAuth || fallbackAuth
+      const backend = new WebSocket(target, auth ? { headers: { Authorization: auth } } : undefined)
 
       backend.addEventListener("open", () => {
         console.log("[Proxy] Backend WebSocket connected")

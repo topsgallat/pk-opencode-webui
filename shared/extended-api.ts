@@ -9,6 +9,11 @@
 import * as fs from "node:fs"
 import * as nodePath from "node:path"
 import * as os from "node:os"
+import { clearProxyAuthSession, syncProxyAuthSession } from "./proxy-auth-session"
+
+type ExtendedEndpointOptions = {
+  resolveUpstreamAuthHeader?: (target: string) => string | undefined
+}
 
 /** Resolve the working directory from a query param, falling back to cwd */
 function resolveDir(url: URL): string {
@@ -115,7 +120,23 @@ export async function handleExtendedEndpoint(
   method: string,
   url: URL,
   req: Request,
+  options?: ExtendedEndpointOptions,
 ): Promise<Response | undefined> {
+  // POST/PUT /api/ext/auth-session - Sync upstream credentials for target
+  if (path === "/api/ext/auth-session" && (method === "POST" || method === "PUT")) {
+    const body = await req.json().catch(() => null)
+    return syncProxyAuthSession(req, body)
+  }
+
+  // DELETE /api/ext/auth-session?target=<url> - Clear upstream credentials for target
+  if (path === "/api/ext/auth-session" && method === "DELETE") {
+    const target = url.searchParams.get("target") || ""
+    if (!target) {
+      return Response.json({ error: "target parameter is required" }, { status: 400 })
+    }
+    return clearProxyAuthSession(req, target)
+  }
+
   // POST /api/ext/mkdir - Create directory recursively
   if (path === "/api/ext/mkdir" && method === "POST") {
     try {
@@ -455,14 +476,49 @@ export async function handleExtendedEndpoint(
       return Response.json({ ok: false, error: "only http/https allowed" }, { status: 400 })
     }
 
+    const probe = new URL(parsed.toString())
+    const pathWithHealth = probe.pathname === "/"
+      ? "/health"
+      : probe.pathname.endsWith("/")
+        ? `${probe.pathname}health`
+        : `${probe.pathname}/health`
+    probe.pathname = pathWithHealth
+
     try {
-      const res = await fetch(`${parsed.origin}/health`, {
+      const headers = new Headers()
+      const auth = options?.resolveUpstreamAuthHeader?.(probe.toString())
+      if (auth) headers.set("Authorization", auth)
+
+      const res = await fetch(probe.toString(), {
         signal: AbortSignal.timeout(5000),
+        headers,
       })
-      return Response.json({ ok: true, status: res.status })
+
+      if (res.status === 401) {
+        return Response.json({
+          ok: true,
+          reachable: true,
+          authRequired: true,
+          status: res.status,
+          url: probe.toString(),
+        })
+      }
+
+      return Response.json({
+        ok: res.ok,
+        reachable: true,
+        authRequired: false,
+        status: res.status,
+        url: probe.toString(),
+      })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      return Response.json({ ok: false, error: msg })
+      return Response.json({
+        ok: false,
+        reachable: false,
+        authRequired: false,
+        error: msg,
+      })
     }
   }
 

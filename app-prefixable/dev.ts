@@ -1,5 +1,6 @@
 import { watch } from "fs"
 import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
+import { resolveProxyAuthHeader } from "../shared/proxy-auth-session"
 
 const BASE_PATH = process.env.BASE_PATH || "/"
 const PORT = parseInt(process.env.PORT || "3000", 10)
@@ -59,7 +60,7 @@ function buildUpstreamUrl(path: string, url: URL, req: Request, protocol: "http"
 // Track WebSocket connections: client ws -> backend ws
 const wsConnections = new Map<object, WebSocket>()
 
-const server = Bun.serve<{ target: string }>({
+const server = Bun.serve<{ target: string; cookie: string }>({
   port: PORT,
   idleTimeout: 0, // Disable timeout for SSE connections
   async fetch(req, server) {
@@ -82,20 +83,24 @@ const server = Bun.serve<{ target: string }>({
 
       // Upgrade to WebSocket and proxy to backend
       const upgraded = server.upgrade(req, {
-        data: { target },
+        data: { target, cookie: req.headers.get("cookie") || "" },
       })
       if (upgraded) return undefined
       return new Response("WebSocket upgrade failed", { status: 500 })
     }
 
     // Extended API endpoints (handled locally, not proxied)
-    const extResponse = await handleExtendedEndpoint(strippedPath, req.method, url, req)
+    const extResponse = await handleExtendedEndpoint(strippedPath, req.method, url, req, {
+      resolveUpstreamAuthHeader: (target) => resolveProxyAuthHeader(req, target),
+    })
     if (extResponse) return extResponse
 
     // API requests go directly to the backend
     if (isApiPath(strippedPath)) {
       const target = buildUpstreamUrl(strippedPath, url, req)
       const headers = new Headers(req.headers)
+      const syncedAuth = resolveProxyAuthHeader(req, target.toString())
+      if (syncedAuth) headers.set("Authorization", syncedAuth)
       headers.delete("x-opencode-target")
 
       // SSE requests - just pass through the response body directly
@@ -189,7 +194,12 @@ const server = Bun.serve<{ target: string }>({
       console.log("[Proxy] WebSocket client connected, connecting to backend:", target)
 
       // Connect to backend WebSocket
-      const backend = new WebSocket(target)
+      const authTarget = target.replace(/^ws:/, "http:").replace(/^wss:/, "https:")
+      const authReq = new Request("http://localhost/", {
+        headers: ws.data.cookie ? { cookie: ws.data.cookie } : {},
+      })
+      const syncedAuth = resolveProxyAuthHeader(authReq, authTarget)
+      const backend = new WebSocket(target, syncedAuth ? { headers: { Authorization: syncedAuth } } : undefined)
 
       backend.addEventListener("open", () => {
         console.log("[Proxy] Backend WebSocket connected")

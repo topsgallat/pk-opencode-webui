@@ -211,6 +211,9 @@ export function ProjectDialog(props: ProjectDialogProps) {
       } else if (input === "~") {
         baseDir = home
         query = ""
+      } else if (input.startsWith("/")) {
+        baseDir = "/"
+        query = input.slice(1)
       }
 
       // Split query into path segments (keep empty string if ends with /)

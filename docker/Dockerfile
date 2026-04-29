@@ -101,14 +101,14 @@ RUN groupadd -r opencode 2>/dev/null || true && \
 # Copy built UI from builder stage
 COPY --from=builder /app/app-prefixable/dist /opt/opencode-ui/dist
 
-# Copy server script
-COPY docker/serve-ui.ts /opt/opencode-ui/serve-ui.ts
+# Copy server script (from builder stage where git clone was done)
+COPY --from=builder /app/docker/serve-ui.ts /opt/opencode-ui/serve-ui.ts
 
-# Copy shared modules (for serve-ui.ts imports)
-COPY shared /opt/shared
+# Copy shared modules (from builder stage where git clone was done)
+COPY --from=builder /app/shared /opt/shared
 
-# Copy s6 configuration
-COPY docker/s6/ /etc/
+# Copy s6 configuration (from builder stage where git clone was done)
+COPY --from=builder /app/docker/s6/ /etc/
 
 # Set permissions
 RUN chmod -R 755 /etc/services.d/opencode

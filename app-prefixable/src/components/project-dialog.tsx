@@ -72,6 +72,14 @@ function resolveTypedPath(input: string, home: string | null) {
   return ""
 }
 
+function toRemoteListPath(directory: string, home: string) {
+  const key = trimTrailing(directory)
+  const hn = trimTrailing(home)
+  if (!key || key === "/" || key === hn) return "."
+  if (key.startsWith(hn + "/")) return key.slice(hn.length + 1)
+  return key
+}
+
 export function ProjectDialog(props: ProjectDialogProps) {
   const sdk = useSDK()
   const server = useServer()
@@ -172,7 +180,9 @@ export function ProjectDialog(props: ProjectDialogProps) {
 
     try {
       if (isRemoteServer()) {
-        const path = key || "/"
+        const home = homeDirectory()
+        if (!home) return []
+        const path = toRemoteListPath(key || "/", home)
         const res = await sdk.global.file.list({ path })
         const dirs = (res.data ?? [])
           .filter((node) => node.type === "directory")

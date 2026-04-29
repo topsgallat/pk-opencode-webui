@@ -89,6 +89,7 @@ let proxyAuthHeader: string | undefined
 
 if (OPERATION_MODE === "solo") {
   const homeDir = process.env.HOME
+  const workspaceDir = process.env.OPENCODE_WORKSPACE_ROOT || homeDir
   const xdgCache = process.env.XDG_CACHE_HOME
   // Root/host path & non-root checks
   if (!homeDir) {
@@ -96,8 +97,17 @@ if (OPERATION_MODE === "solo") {
     process.exit(1)
   }
 
+  if (!workspaceDir) {
+    console.error("[solo] ERROR: Could not determine a workspace directory. Set OPENCODE_WORKSPACE_ROOT or HOME.")
+    process.exit(1)
+  }
+
   if (isForbiddenHostPath(homeDir)) {
     console.error(`[solo] ERROR: HOME env points to forbidden host location (${homeDir}); must be a container-local path (e.g. /container-user). Aborting.`)
+    process.exit(1)
+  }
+  if (isForbiddenHostPath(workspaceDir)) {
+    console.error(`[solo] ERROR: Workspace root points to forbidden host location (${workspaceDir}); must be a container-local path. Aborting.`)
     process.exit(1)
   }
   if (process.getuid && process.getuid() === 0) {
@@ -136,6 +146,7 @@ if (OPERATION_MODE === "solo") {
     stdout: "inherit",
     stderr: "inherit",
     env: opencodeServerEnv,
+    cwd: workspaceDir,
   })
 
   const modelsRefreshed = await modelsRefresh.exited
@@ -150,6 +161,7 @@ if (OPERATION_MODE === "solo") {
     stdout: "inherit",
     stderr: "inherit",
     env: opencodeServerEnv,
+    cwd: workspaceDir,
   })
 
   const serverPassword = opencodeServerEnv.OPENCODE_SERVER_PASSWORD

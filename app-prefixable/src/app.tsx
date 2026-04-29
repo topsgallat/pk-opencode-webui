@@ -152,16 +152,16 @@ function ServerScopedApp(props: { serverKey: string }) {
   return (
     <RecentProjectsProvider>
       <SavedPromptsProvider directory={activeDirectory}>
-        <GlobalEventsProvider projects={projects} activeDirectory={activeDirectory}>
-          <ServerAuthUIProvider>
-            <ClientAuthProvider>
+        <ClientAuthProvider>
+          <GlobalEventsProvider projects={projects} activeDirectory={activeDirectory}>
+            <ServerAuthUIProvider>
               <CommandProvider>
                 <AppRoutes />
                 <ServerAuthPromptManager />
               </CommandProvider>
-            </ClientAuthProvider>
-          </ServerAuthUIProvider>
-        </GlobalEventsProvider>
+            </ServerAuthUIProvider>
+          </GlobalEventsProvider>
+        </ClientAuthProvider>
       </SavedPromptsProvider>
     </RecentProjectsProvider>
   )

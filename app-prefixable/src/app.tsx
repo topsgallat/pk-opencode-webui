@@ -8,6 +8,9 @@ import { CommandProvider } from "./context/command"
 import { RecentProjectsProvider } from "./context/recent-projects"
 import { SavedPromptsProvider } from "./context/saved-prompts"
 import { GlobalEventsProvider } from "./context/global-events"
+import { ServerAuthUIProvider } from "./context/server-auth-ui"
+import { ClientAuthProvider } from "./context/client-auth"
+import { ServerAuthPromptManager } from "./components/server-auth-prompt"
 import { ServerProvider, useServer } from "./context/server"
 import { DirectoryLayout } from "./pages/directory-layout"
 import { HomeLayout } from "./pages/home-layout"
@@ -150,9 +153,14 @@ function ServerScopedApp(props: { serverKey: string }) {
     <RecentProjectsProvider>
       <SavedPromptsProvider directory={activeDirectory}>
         <GlobalEventsProvider projects={projects} activeDirectory={activeDirectory}>
-          <CommandProvider>
-            <AppRoutes />
-          </CommandProvider>
+          <ServerAuthUIProvider>
+            <ClientAuthProvider>
+              <CommandProvider>
+                <AppRoutes />
+                <ServerAuthPromptManager />
+              </CommandProvider>
+            </ClientAuthProvider>
+          </ServerAuthUIProvider>
         </GlobalEventsProvider>
       </SavedPromptsProvider>
     </RecentProjectsProvider>

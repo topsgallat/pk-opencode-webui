@@ -26,6 +26,12 @@ import {
   isValidServerUrl,
   type ServerConfig,
 } from "../utils/servers"
+import {
+  getServerAuth,
+  setServerAuth,
+  removeServerAuth,
+  clearServerAuthRevalidation,
+} from "../utils/server-auth"
 import type { Config, PermissionActionConfig } from "../sdk/client"
 
 export function Settings() {
@@ -87,6 +93,8 @@ export function Settings() {
   const [editingServer, setEditingServer] = createSignal<ServerConfig | null>(null)
   const [serverNameInput, setServerNameInput] = createSignal("")
   const [serverUrlInput, setServerUrlInput] = createSignal("")
+  const [serverUsernameInput, setServerUsernameInput] = createSignal("")
+  const [serverPasswordInput, setServerPasswordInput] = createSignal("")
   const [serverError, setServerError] = createSignal<string | null>(null)
   const [serverWarn, setServerWarn] = createSignal<string | null>(null)
   const [serverChecking, setServerChecking] = createSignal(false)
@@ -109,6 +117,8 @@ export function Settings() {
     setEditingServer(null)
     setServerNameInput("")
     setServerUrlInput("")
+    setServerUsernameInput("")
+    setServerPasswordInput("")
     setServerError(null)
   }
 
@@ -117,6 +127,9 @@ export function Settings() {
     setEditingServer(server)
     setServerNameInput(server.name)
     setServerUrlInput(server.url)
+    const auth = getServerAuth(server.id)
+    setServerUsernameInput(auth?.username || "")
+    setServerPasswordInput(auth?.password || "")
     setServerError(null)
   }
 
@@ -125,6 +138,8 @@ export function Settings() {
     setEditingServer(null)
     setServerNameInput("")
     setServerUrlInput("")
+    setServerUsernameInput("")
+    setServerPasswordInput("")
     setServerError(null)
     setServerWarn(null)
     setServerChecking(false)
@@ -147,12 +162,18 @@ export function Settings() {
       setServerError(null)
       setServerWarn(null)
       const probeUrl = basePath.prefix(`/api/ext/probe-server?url=${encodeURIComponent(cleanUrl)}`)
-      const probe: { ok: boolean; error?: string } = await fetch(probeUrl, { signal: AbortSignal.timeout(8000) })
+      const probe: { ok: boolean; reachable?: boolean; authRequired?: boolean; status?: number; error?: string } = await fetch(probeUrl, { signal: AbortSignal.timeout(8000) })
         .then(r => r.json())
         .catch(e => ({ ok: false, error: e instanceof Error ? e.message : String(e) }))
       setServerChecking(false)
-      if (!probe.ok) {
-        setServerWarn(`Server may be unreachable from this host: ${probe.error ?? "no response"}. Added anyway.`)
+      if (probe.authRequired) {
+        setServerWarn("Server is reachable but requires authentication. Credentials saved.")
+      } else if (!probe.ok) {
+        if (probe.reachable) {
+          setServerWarn(`Server responded with status ${probe.status ?? "unknown"}. Added anyway.`)
+        } else {
+          setServerWarn(`Server may be unreachable from this host: ${probe.error ?? "no response"}. Added anyway.`)
+        }
       }
     }
 
@@ -161,6 +182,18 @@ export function Settings() {
       name,
       url: cleanUrl,
       isDefault: editingServer()?.isDefault ?? servers().length === 0,
+    }
+
+    const pwd = serverPasswordInput()
+    if (pwd) {
+      setServerAuth(server.id, {
+        username: serverUsernameInput().trim() || "opencode",
+        password: pwd,
+        needsRevalidation: false
+      })
+      clearServerAuthRevalidation(server.id)
+    } else {
+      removeServerAuth(server.id)
     }
 
     saveServer(server)
@@ -2681,6 +2714,42 @@ Add your project-specific instructions here.
                     <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
                       The base URL of your OpenCode backend
                     </p>
+                  </div>
+                  <div class="flex gap-2">
+                    <div class="flex-1">
+                      <label class="block text-sm font-medium mb-1" style={{ color: "var(--text-base)" }}>
+                        Username (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={serverUsernameInput()}
+                        onInput={(e) => setServerUsernameInput(e.currentTarget.value)}
+                        placeholder="opencode"
+                        class="w-full px-3 py-2 rounded-md text-sm"
+                        style={{
+                          background: "var(--background-base)",
+                          border: "1px solid var(--border-base)",
+                          color: "var(--text-base)",
+                        }}
+                      />
+                    </div>
+                    <div class="flex-1">
+                      <label class="block text-sm font-medium mb-1" style={{ color: "var(--text-base)" }}>
+                        Password
+                      </label>
+                      <input
+                        type="password"
+                        value={serverPasswordInput()}
+                        onInput={(e) => setServerPasswordInput(e.currentTarget.value)}
+                        placeholder="Leave blank for no auth"
+                        class="w-full px-3 py-2 rounded-md text-sm"
+                        style={{
+                          background: "var(--background-base)",
+                          border: "1px solid var(--border-base)",
+                          color: "var(--text-base)",
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
 

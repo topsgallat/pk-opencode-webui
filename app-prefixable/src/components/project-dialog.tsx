@@ -201,7 +201,36 @@ export function ProjectDialog(props: ProjectDialogProps) {
     const endsWithSlash = input.endsWith("/")
     
     try {
-      // Determine base directory and query
+      if (input.startsWith("/")) {
+        const dirs = await getDirs(input.endsWith("/") ? input.slice(0, -1) : input)
+        if (!isActive()) return
+
+        let filtered: string[]
+        if (endsWithSlash) {
+          filtered = dirs.slice(0, 50)
+        } else {
+          const tail = input.split("/").filter(Boolean).pop() || ""
+          if (tail) {
+            const items = dirs.map(d => ({ path: d, name: getFilename(d) }))
+            const matches = fuzzysort.go(tail, items, { key: "name", limit: 50 })
+            filtered = matches.map(m => m.obj.path)
+            const exactMatch = dirs.find(d => getFilename(d).toLowerCase() === tail.toLowerCase())
+            if (exactMatch) {
+              const children = await getDirs(exactMatch)
+              if (isActive()) {
+                filtered = Array.from(new Set([...filtered, ...children.slice(0, 30)]))
+              }
+            }
+          } else {
+            filtered = dirs.slice(0, 50)
+          }
+        }
+        setResults(filtered)
+        setSelectedIndex(0)
+        setLoading(false)
+        return
+      }
+
       let baseDir = home
       let query = input
 

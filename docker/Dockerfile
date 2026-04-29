@@ -113,11 +113,9 @@ COPY --from=builder /app/docker/s6/ /etc/
 # Set permissions
 RUN chmod -R 755 /etc/services.d/opencode
 
-# Create generic home directory structure that works with any HOME value
-# This can be overridden by volume mounts at runtime
-RUN mkdir -p /home/sgallat /home/sgallat/.cache /home/sgallat/.config /home/sgallat/.local/state /home/sgallat/AppData \
-    && chown -R opencode:opencode /home/sgallat \
-    && chmod -R 755 /home/sgallat
+# Ensure home directory exists for the opencode user (created above with -d /home/opencode)
+# The user's home is already created by useradd, but ensure subdirectories exist
+RUN mkdir -p /home/opencode/.cache /home/opencode/.config /home/opencode/.local/state /home/opencode/AppData
 
 
 

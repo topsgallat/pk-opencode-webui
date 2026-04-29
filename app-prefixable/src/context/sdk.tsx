@@ -3,6 +3,7 @@ import { createOpencodeClient } from "../sdk/client"
 import { getTargetServerUrl } from "../utils/servers"
 import { useBasePath } from "./base-path"
 import { useServer } from "./server"
+import { useClientAuth } from "./client-auth"
 
 type SDKClient = ReturnType<typeof createOpencodeClient>
 
@@ -20,6 +21,7 @@ const SDKContext = createContext<SDKContextValue>()
 export function SDKProvider(props: ParentProps & { directory?: string }) {
   const { serverUrl: basePathServerUrl } = useBasePath()
   const server = useServer()
+  const auth = useClientAuth()
 
   const targetUrl = createMemo(() => getTargetServerUrl(server.selectedServer()))
 
@@ -31,6 +33,10 @@ export function SDKProvider(props: ParentProps & { directory?: string }) {
       directory: props.directory,
       targetUrl: targetUrl(),
       throwOnError: true,
+      onResponseError: (error) => {
+        const result = auth.classifyAuthFailure(error)
+        if (result.auth) auth.markFailure({ scope: "sdk", status: result.status, message: result.message })
+      },
     })
   )
 
@@ -39,6 +45,10 @@ export function SDKProvider(props: ParentProps & { directory?: string }) {
       baseUrl: url(),
       targetUrl: targetUrl(),
       throwOnError: true,
+      onResponseError: (error) => {
+        const result = auth.classifyAuthFailure(error)
+        if (result.auth) auth.markFailure({ scope: "sdk", status: result.status, message: result.message })
+      },
     })
   )
 

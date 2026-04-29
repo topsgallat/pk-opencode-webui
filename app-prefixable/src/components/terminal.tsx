@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit"
 import "@xterm/xterm/css/xterm.css"
 import { useSDK } from "../context/sdk"
 import { useTheme } from "../context/theme"
+import { useClientAuth } from "../context/client-auth"
 import { appendTargetParam } from "../utils/path"
 import { Sun, Moon, Monitor, Clipboard, Copy, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from "lucide-solid"
 import type { ITheme } from "@xterm/xterm"
@@ -96,6 +97,7 @@ export interface TerminalProps {
 
 export function Terminal(props: TerminalProps) {
   const { client, url, directory, targetUrl } = useSDK()
+  const auth = useClientAuth()
   const appTheme = useTheme()
   let container!: HTMLDivElement
   let term: XTerm | undefined
@@ -132,6 +134,13 @@ export function Terminal(props: TerminalProps) {
 
   function connect() {
     if (disposed || !term) return
+    if (!auth.canReconnect()) {
+      setStatus("error")
+      setError("Authentication required for selected server")
+      setShowBanner(true)
+      writeStatus("Authentication required before terminal reconnect", "error")
+      return
+    }
 
     // Build WebSocket URL
     const wsBase = url.replace(/^http/, "ws")
@@ -183,6 +192,11 @@ export function Terminal(props: TerminalProps) {
       console.log("[Terminal] WebSocket closed:", event.code, event.reason)
       setStatus("disconnected")
 
+      if (event.code === 1008 || event.code === 4401 || event.code === 4403) {
+        auth.markFailure({ scope: "pty-connect", status: event.code, message: event.reason || `WebSocket close ${event.code}` })
+        return
+      }
+
       if (event.code === 1000) {
         writeStatus("Connection closed normally", "info")
       } else if (event.code === 1006) {
@@ -193,9 +207,13 @@ export function Terminal(props: TerminalProps) {
 
       // Reconnect on abnormal close (but not if we're disposing)
       if (!disposed && event.code !== 1000) {
+        if (!auth.canReconnect()) return
         console.log("[Terminal] Scheduling reconnect...")
         writeStatus("Reconnecting in 2 seconds...", "info")
-        reconnectTimer = setTimeout(() => connect(), 2000)
+        reconnectTimer = setTimeout(() => {
+          if (!auth.canReconnect()) return
+          connect()
+        }, 2000)
       }
     })
   }

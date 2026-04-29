@@ -3,6 +3,7 @@ import { useSDK } from "./sdk"
 import { useServer } from "./server"
 import { mkdir } from "../utils/extended-api"
 import { getServerCapabilities } from "../utils/server-capabilities"
+import { useClientAuth } from "./client-auth"
 
 interface PTYSession {
   id: string
@@ -30,6 +31,7 @@ const TerminalContext = createContext<TerminalContextValue>()
 export function TerminalProvider(props: ParentProps) {
   const { client, url: serverUrl, targetUrl } = useSDK()
   const server = useServer()
+  const auth = useClientAuth()
   const capabilities = () => getServerCapabilities(server.selectedServer())
   const [sessions, setSessions] = createSignal<PTYSession[]>([])
   const [active, setActive] = createSignal<string | null>(null)
@@ -39,6 +41,10 @@ export function TerminalProvider(props: ParentProps) {
   const [creating, setCreating] = createSignal(false)
 
   async function create(cwd?: string): Promise<string | null> {
+    if (!auth.canReconnect()) {
+      setError("Authentication required for selected server")
+      return null
+    }
     setCreating(true)
     setError(null)
     try {
@@ -64,6 +70,8 @@ export function TerminalProvider(props: ParentProps) {
       setError("Failed to create terminal: No data in response")
     } catch (e: any) {
       console.error("[Terminal] Failed to create PTY:", e)
+      const result = auth.classifyAuthFailure(e)
+      if (result.auth) auth.markFailure({ scope: "pty-create", status: result.status, message: result.message })
       const msg = e?.message || e?.toString() || "Unknown error"
       setError(`Failed to create terminal: ${msg}`)
     } finally {

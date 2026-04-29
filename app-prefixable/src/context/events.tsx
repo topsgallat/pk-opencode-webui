@@ -4,6 +4,7 @@ import type { Event, SessionStatus, QuestionRequest } from "../sdk/client"
 import { appendTargetParam } from "../utils/path"
 import { useSDK } from "./sdk"
 import { SyncContext, type SyncEvent } from "./sync"
+import { useClientAuth } from "./client-auth"
 
 type EventHandler = (event: Event) => void
 
@@ -21,6 +22,7 @@ export const EventContext = createContext<EventContextValue>()
 export function EventProvider(props: ParentProps) {
   const { client, directory, url, targetUrl } = useSDK()
   const sync = useContext(SyncContext)
+  const auth = useClientAuth()
   const handlers = new Set<EventHandler>()
   const [status, setStatus] = createStore<Record<string, SessionStatus>>({})
   const [pendingQuestions, setPendingQuestions] = createStore<Record<string, QuestionRequest | undefined>>({})
@@ -117,10 +119,24 @@ export function EventProvider(props: ParentProps) {
       eventSource?.close()
       eventSource = null
 
-      if (!reconnectTimer) {
+      const authProbe = fetch(appendTargetParam(`${url}/session/status${dirParam}`, targetUrl))
+        .then((r) => {
+          if (r.status === 401 || r.status === 403) {
+            auth.markFailure({ scope: "events", status: r.status, message: `HTTP ${r.status}` })
+            return false
+          }
+          return true
+        })
+        .catch(() => true)
+
+      if (!reconnectTimer && auth.canReconnect()) {
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null
-          connect()
+          authProbe.then((ok) => {
+            if (!ok) return
+            if (!auth.canReconnect()) return
+            connect()
+          })
         }, 3000)
       }
     }

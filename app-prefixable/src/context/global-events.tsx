@@ -3,7 +3,6 @@ import {
   useContext,
   onCleanup,
   createEffect,
-  on,
   type ParentProps,
 } from "solid-js"
 import { createStore, produce } from "solid-js/store"
@@ -12,6 +11,7 @@ import { useServer } from "./server"
 import { globalSyncReady } from "./sync"
 import { appendTargetParam } from "../utils/path"
 import { getTargetServerUrl } from "../utils/servers"
+import { useClientAuth } from "./client-auth"
 
 /**
  * Alert priority: permission (highest) > question > busy
@@ -50,6 +50,7 @@ export function GlobalEventsProvider(props: ParentProps & {
   }) {
   const { prefix } = useBasePath()
   const server = useServer()
+  const auth = useClientAuth()
   const targetUrl = () => getTargetServerUrl(server.selectedServer())
 
   // Per-directory alert state
@@ -270,14 +271,28 @@ export function GlobalEventsProvider(props: ParentProps & {
       if (disposed) return
       // Clear all state (source, perDir, alerts) so stale badges don't linger
       disconnectDirectory(dir)
+      const authProbe = fetch(appendTargetParam(prefix(`/session/status?directory=${encodeURIComponent(dir)}`), targetUrl()))
+        .then((r) => {
+          if (r.status === 401 || r.status === 403) {
+            auth.markFailure({ scope: "global-events", status: r.status, message: `HTTP ${r.status}` })
+            return false
+          }
+          return true
+        })
+        .catch(() => true)
       // Schedule reconnect outside the connection lifecycle
       const reconnectTimer = setTimeout(() => {
         reconnectTimers.delete(dir)
         if (disposed) return
+        if (!auth.canReconnect()) return
         const active = props.activeDirectory()
         const wanted = props.projects().some((p) => p.worktree === dir)
         if (wanted && dir !== active) {
-          connectToDirectory(dir)
+          authProbe.then((ok) => {
+            if (!ok) return
+            if (!auth.canReconnect()) return
+            connectToDirectory(dir)
+          })
         }
       }, 5000)
       // Store timer so cleanup can cancel it if the component unmounts

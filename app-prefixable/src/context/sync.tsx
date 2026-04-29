@@ -4,6 +4,7 @@ import type { Session, Message, Part, Provider } from "../sdk/client"
 import { useBasePath } from "./base-path"
 import { useSDK } from "./sdk"
 import { appendTargetParam } from "../utils/path"
+import { useClientAuth } from "./client-auth"
 
 export type SyncEvent = {
   type: string
@@ -75,6 +76,7 @@ function binarySearch<T>(arr: T[], id: string, getId: (item: T) => string): { fo
 export function SyncProvider(props: ParentProps) {
   const { prefix } = useBasePath()
   const { client, directory, targetUrl } = useSDK()
+  const auth = useClientAuth()
 
   const [store, setStore] = createStore<SyncStore>({
     ready: false,
@@ -200,10 +202,25 @@ export function SyncProvider(props: ParentProps) {
       eventSource?.close()
       eventSource = null
 
-      if (!reconnectTimer) {
+      const dirParam = directory ? `?directory=${encodeURIComponent(directory)}` : ""
+      const authProbe = fetch(appendTargetParam(prefix(`/session/status${dirParam}`), targetUrl))
+        .then((r) => {
+          if (r.status === 401 || r.status === 403) {
+            auth.markFailure({ scope: "sync", status: r.status, message: `HTTP ${r.status}` })
+            return false
+          }
+          return true
+        })
+        .catch(() => true)
+
+      if (!reconnectTimer && auth.canReconnect()) {
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null
-          connect()
+          authProbe.then((ok) => {
+            if (!ok) return
+            if (!auth.canReconnect()) return
+            connect()
+          })
         }, 3000)
       }
     }
@@ -488,6 +505,8 @@ export function SyncProvider(props: ParentProps) {
 
       console.log("[Sync] Bootstrap complete, sessions:", store.session.length)
     } catch (err) {
+      const result = auth.classifyAuthFailure(err)
+      if (result.auth) auth.markFailure({ scope: "sync", status: result.status, message: result.message })
       console.error("[Sync] Bootstrap failed:", err)
     }
   }

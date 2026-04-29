@@ -5,6 +5,7 @@
  */
 
 import { dispatchStorageEvent } from "./storage"
+import { cleanupServerAuth, markServerAuthForRevalidation, migrateLegacyServerAuth } from "./server-auth"
 
 const SERVERS_KEY = "opencode.servers"
 
@@ -61,13 +62,23 @@ function builtinServer(): ServerConfig {
   return { id: "builtin", name: "Local", url, isDefault: true }
 }
 
+function sanitizeServerConfig(server: ServerConfig): ServerConfig {
+  return {
+    id: server.id,
+    name: server.name,
+    url: normalizeServerUrl(server.url),
+    isDefault: server.isDefault === true,
+  }
+}
+
 export function getServers(): ServerConfig[] {
   try {
     const stored = localStorage.getItem(SERVERS_KEY)
-    const list: ServerConfig[] = stored ? JSON.parse(stored).map((server: ServerConfig) => ({
-      ...server,
-      url: normalizeServerUrl(server.url),
-    })) : []
+    const parsed: ServerConfig[] = stored ? JSON.parse(stored) : []
+    const list = parsed.map((server) => sanitizeServerConfig(server))
+    migrateLegacyServerAuth(parsed)
+    const hasSecretFields = parsed.some((server) => "password" in (server as object) || "username" in (server as object))
+    if (hasSecretFields) saveServers(list)
     return list.length > 0 ? list : [builtinServer()]
   } catch {
     return [builtinServer()]
@@ -100,8 +111,10 @@ export function getServer(id: string): ServerConfig | undefined {
  * Save servers to localStorage
  */
 export function saveServers(servers: ServerConfig[]): void {
-  const value = JSON.stringify(servers)
+  const sanitized = servers.map((server) => sanitizeServerConfig(server))
+  const value = JSON.stringify(sanitized)
   localStorage.setItem(SERVERS_KEY, value)
+  cleanupServerAuth(sanitized)
   dispatchStorageEvent(SERVERS_KEY, value)
 }
 
@@ -110,8 +123,9 @@ export function saveServers(servers: ServerConfig[]): void {
  */
 export function saveServer(server: ServerConfig): void {
   const servers = getServers()
-  const normalized = { ...server, url: normalizeServerUrl(server.url) }
+  const normalized = sanitizeServerConfig(server)
   const existing = servers.findIndex(s => s.id === normalized.id)
+  const previous = existing >= 0 ? servers[existing] : undefined
 
   if (normalized.isDefault) {
     // Clear default from others, set this as default
@@ -126,6 +140,9 @@ export function saveServer(server: ServerConfig): void {
   }
 
   saveServers(servers)
+  if (previous && previous.url !== normalized.url) {
+    markServerAuthForRevalidation(normalized.id)
+  }
 }
 
 /**

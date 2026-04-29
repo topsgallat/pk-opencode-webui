@@ -4,5 +4,9 @@
     "external_directory": "allow",
     "compress": "allow",
     "task": "allow"
-  }
+  },
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md"
+  ]
 }

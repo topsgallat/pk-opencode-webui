@@ -161,10 +161,6 @@ export function ProjectDialog(props: ProjectDialogProps) {
     const value = filter()
     const home = homeDirectory()
     if (!props.open) return
-    if (isRemoteServer()) {
-      searchProjects(value, home)
-      return
-    }
     if (!home) return
     searchDirectories(value, home)
   })
@@ -175,6 +171,17 @@ export function ProjectDialog(props: ProjectDialogProps) {
     if (cached) return cached
 
     try {
+      if (isRemoteServer()) {
+        const path = key || "/"
+        const res = await sdk.global.file.list({ path })
+        const dirs = (res.data ?? [])
+          .filter((node) => node.type === "directory")
+          .map((node) => trimTrailing(node.absolute))
+          .sort((a, b) => a.localeCompare(b))
+        dirCache.set(key, dirs)
+        return dirs
+      }
+
       const dirs = await listDirs(sdk.url, key, { limit: 500, depth: 1, targetUrl: sdk.targetUrl })
       // Convert to absolute paths
       const absolute = dirs.map(d => `${key}/${d.replace(/\/$/, "")}`.replace(/\/+/g, "/"))
@@ -277,50 +284,6 @@ export function ProjectDialog(props: ProjectDialogProps) {
       setSelectedIndex(0)
     } catch (e) {
       console.error("Search error:", e)
-      setResults([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function searchProjects(value: string, home: string | null) {
-    const token = ++searchToken
-    const isActive = () => token === searchToken
-
-    setLoading(true)
-    try {
-      const res = await sdk.global.project.list()
-      if (!isActive()) return
-
-      const projects = Array.isArray(res.data) ? res.data : []
-      const items = projects
-        .map((project) => {
-          const path = trimTrailing(project.worktree)
-          return {
-            path,
-            text: `${project.name || getFilename(path)} ${path}`,
-          }
-        })
-        .sort((a, b) => a.path.localeCompare(b.path))
-
-      const input = value.trim()
-      const manualPath = resolveTypedPath(input, home)
-      const projectResults = input
-        ? fuzzysort.go(input, items, { key: "text", limit: 50 }).map((match) => match.obj.path)
-        : items.map((item) => item.path).slice(0, 50)
-
-      const next = manualPath && !projectResults.includes(manualPath)
-        ? [manualPath, ...projectResults]
-        : projectResults
-
-      if (!input && home && !next.includes(home)) {
-        next.unshift(home)
-      }
-
-      setResults(next)
-      setSelectedIndex(0)
-    } catch (e) {
-      console.error("Project search error:", e)
       setResults([])
     } finally {
       setLoading(false)
@@ -561,7 +524,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
                     when={isRemoteServer()}
                     fallback="Use Tab to auto-complete. Click to select, double-click or Enter to open."
                   >
-                    Search projects on {server.selectedServer()?.name || "the selected server"}. You can also type a full path and press Enter.
+                    Search directories on {server.selectedServer()?.name || "the selected server"}. You can also type a full path and press Enter.
                   </Show>
                 </p>
               </div>
@@ -584,10 +547,10 @@ export function ProjectDialog(props: ProjectDialogProps) {
                       <div class="flex items-center justify-center h-full text-sm" style={{ color: "var(--text-weak)" }}>
                         {filter()
                           ? isRemoteServer()
-                            ? "No matching projects or paths"
+                            ? "No matching directories or paths"
                             : "No matching directories"
                           : isRemoteServer()
-                            ? "Type to search projects or enter a full path"
+                            ? "Type to search directories or enter a full path"
                             : "Type to search directories"}
                       </div>
                     </Show>

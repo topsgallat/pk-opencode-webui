@@ -10,8 +10,8 @@ services:
     environment:
       - OPERATION_MODE=solo
       - BASE_PATH=/
-      - HOME=/tmp/opencode-home
-      - XDG_CACHE_HOME=/tmp/opencode-home/.cache
-    # Run container as non-root for verification (simulate typical non-root image user)
+      - HOME=/home/opencode
+      - OPENCODE_WORKSPACE_ROOT=/home/opencode
+      - XDG_CACHE_HOME=/home/opencode/.cache
     user: "1000:1000"
     restart: unless-stopped

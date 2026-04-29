@@ -81,19 +81,14 @@ RUN case $(uname -m) in \
     curl -L "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${ARCH}.tar.xz" | tar -xJvf - -C /
 
 # Create non-root user and app directory
-# HOST_UID and HOST_GID are passed from docker-compose to match the host user's ID.
-# This ensures the container can read/write the mounted volume correctly.
-# ENABLE_SUDO=1 to allow sudo for opencode user
 ARG HOST_UID=1000
 ARG HOST_GID=1000
 ARG ENABLE_SUDO=0
-RUN groupadd -r opencode 2>/dev/null || true && \
-    (getent passwd opencode 2>/dev/null && echo "opencode user exists" || \
-     (useradd -r -g opencode -u ${HOST_UID} -d /home/opencode -s /bin/bash opencode 2>/dev/null && echo "created with uid ${HOST_UID}" || \
-      useradd -r -g opencode -u 1000 -d /home/opencode -s /bin/bash opencode 2>/dev/null && echo "created with uid 1000 (fallback)" || \
-      echo "opencode user creation failed, will run as root")) && \
-    mkdir -p /opt/opencode-ui /run && \
-    (chown -R opencode:opencode /opt/opencode-ui /run 2>/dev/null || true) && \
+RUN usermod -l opencode ubuntu && \
+    groupmod -n opencode ubuntu && \
+    usermod -d /home/opencode -m opencode && \
+    mkdir -p /opt/opencode-ui /run /home/opencode && \
+    chown -R opencode:opencode /opt/opencode-ui /run /home/opencode && \
     if [ "${ENABLE_SUDO}" = "1" ]; then \
         echo "ALL ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers; \
         sed -i 's/^Defaults.*requiretty/#Defaults requiretty/' /etc/sudoers 2>/dev/null || true; \
@@ -115,7 +110,8 @@ COPY --from=builder /app/docker/s6/ /etc/
 # Set permissions
 RUN chmod -R 755 /etc/services.d/opencode
 
-RUN mkdir -p /home/opencode/.cache /home/opencode/.config /home/opencode/.local/state /home/opencode/AppData
+RUN mkdir -p /home/opencode/.cache /home/opencode/.config /home/opencode/.local/state /home/opencode/AppData && \
+    chown -R opencode:opencode /home/opencode
 
 
 

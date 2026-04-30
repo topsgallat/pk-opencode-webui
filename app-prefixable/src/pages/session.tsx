@@ -554,10 +554,9 @@ export function Session() {
           // Command: New session (debug logs removed)
           try {
             const res = await client.session.create({});
-            if (res.data) {
-                // Created session: res.data.id
-              navigate(`/${dirSlug()}/session/${res.data.id}`);
-            }
+            if (!res.data || !res.data.id) throw new Error("Failed to create session");
+            const newId = res.data.id;
+            navigate(`/${dirSlug()}/session/${newId}`);
           } catch (err) {
             showToast(`Failed to create session: ${err instanceof Error ? err.message : String(err)}`);
           }
@@ -1404,7 +1403,8 @@ export function Session() {
     setImageAttachments([]); // Clear image attachments after sending
 
     // Clear saved draft for this session since the message was sent
-    drafts.delete(draftKey(params.dir, sessionId()));
+    // draftKey(serverKey, dir, id)
+    drafts.delete(draftKey(server.serverKey(), params.dir, sessionId()));
 
     // Track pending user message text to match backend echoes
     setPendingUserMessageText(text);
@@ -1430,9 +1430,10 @@ export function Session() {
 
       if (!id) {
         const createRes = await client.session.create({});
-        if (!createRes.data) throw new Error("Failed to create session");
+        if (!createRes.data || !createRes.data.id) throw new Error("Failed to create session");
 
-        id = createRes.data.id;
+        const newId = createRes.data.id;
+        id = newId;
         setSessionId(id);
         navigate(`/${dirSlug()}/session/${id}`, { replace: true });
       }

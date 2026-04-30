@@ -199,7 +199,15 @@ const server = Bun.serve<{ target: string; cookie: string }>({
         headers: ws.data.cookie ? { cookie: ws.data.cookie } : {},
       })
       const syncedAuth = resolveProxyAuthHeader(authReq, authTarget)
-      const backend = new WebSocket(target, syncedAuth ? { headers: { Authorization: syncedAuth } } : undefined)
+      // Bun's WebSocket client accepts an options object with headers, but the
+      // DOM typings expect the second argument to be protocols (string|string[]).
+      // Create a compatible constructor signature and call via a typed alias
+      // to keep TypeScript happy while preserving runtime behaviour.
+      type WebSocketWithOpts = new (url: string, opts?: { headers?: Record<string, string> }) => WebSocket
+      const WS = WebSocket as unknown as WebSocketWithOpts
+      const backend = syncedAuth
+        ? new WS(target, { headers: { Authorization: syncedAuth } })
+        : new WS(target)
 
       backend.addEventListener("open", () => {
         console.log("[Proxy] Backend WebSocket connected")

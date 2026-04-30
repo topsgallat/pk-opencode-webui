@@ -76,7 +76,7 @@ function toRemoteListPath(directory: string, home: string) {
   const key = trimTrailing(directory)
   const hn = trimTrailing(home)
   if (!key) return hn.replace(/^\/+/, "")
-  if (key === "/") return ""
+  if (key === "/") return "/"
   if (key === hn) return hn.replace(/^\/+/, "")
   if (key.startsWith(hn + "/")) return key.slice(hn.length + 1)
   return key

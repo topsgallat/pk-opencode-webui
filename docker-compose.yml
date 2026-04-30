@@ -31,6 +31,8 @@ services:
     user: "${UID:-1000}:${GID:-1000}"
     environment:
       - PORT=8080
+      - API_PORT=4096
+      - API_HOSTNAME=127.0.0.1
       - API_URL=http://127.0.0.1:4096
       - BASE_PATH=/
       - HOME=${HOME}

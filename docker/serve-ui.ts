@@ -157,7 +157,7 @@ if (OPERATION_MODE === "solo") {
 
   console.log(`[solo] Starting OpenCode API server on port ${API_PORT}...`)
 
-  const apiProc = Bun.spawn(["opencode", "serve", "--port", `${API_PORT}`, "--hostname", "127.0.0.1"], {
+  const apiProc = Bun.spawn(["opencode", "serve", "--port", `${API_PORT}`, "--hostname", process.env.API_HOSTNAME || "127.0.0.1"], {
     stdout: "inherit",
     stderr: "inherit",
     env: opencodeServerEnv,

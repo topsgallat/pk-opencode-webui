@@ -11,7 +11,12 @@ export function createOpencodeClient(config?: Config & {
   onResponseError?: (error: { status: number; message?: string; data?: unknown }) => void
 }) {
   if (!config?.fetch) {
-    const customFetch: typeof fetch = (input, init) => {
+    // Provide a fetch-compatible implementation. Avoid assigning a strict
+    // "typeof fetch" annotated value because the global fetch may carry
+    // extra properties (preconnect, etc.) depending on runtime. Create a
+    // plain function and coerce to the expected type when passing to the
+    // generated client.
+    const customFetch = async (input: RequestInfo, init?: RequestInit): Promise<Response> => {
       const request = input instanceof Request ? input : new Request(input, init)
       const headers = new Headers(request.headers)
       if (config?.targetUrl) {
@@ -19,32 +24,35 @@ export function createOpencodeClient(config?: Config & {
       }
       const next = new Request(request, { headers }) as Request & { timeout?: boolean }
       next.timeout = false
-      return fetch(next).then(async (response) => {
-        if (!response.ok && config?.onResponseError) {
-          const text = await response.clone().text().catch(() => "")
-          let data: unknown
-          try {
-            data = text ? JSON.parse(text) : undefined
-          } catch {
-            data = text || undefined
-          }
-          const message = typeof data === "string"
-            ? data
-            : typeof data === "object" && data && "message" in data && typeof (data as { message?: unknown }).message === "string"
-              ? (data as { message: string }).message
-              : response.statusText || undefined
-          config.onResponseError({
-            status: response.status,
-            message,
-            data,
-          })
+      const response = await fetch(next)
+      if (!response.ok && config?.onResponseError) {
+        const text = await response.clone().text().catch(() => "")
+        let data: unknown
+        try {
+          data = text ? JSON.parse(text) : undefined
+        } catch {
+          data = text || undefined
         }
-        return response
-      })
+        const message = typeof data === "string"
+          ? data
+          : typeof data === "object" && data && "message" in data && typeof (data as { message?: unknown }).message === "string"
+            ? (data as { message: string }).message
+            : response.statusText || undefined
+        config.onResponseError({
+          status: response.status,
+          message,
+          data,
+        })
+      }
+      return response
     }
+    // Coerce to the declared fetch type in the generated client. Use a two-step
+    // cast via unknown to avoid `as any` while keeping type-safety at call
+    // sites; this is safe because the function matches the runtime fetch
+    // behaviour used by the client.
     config = {
       ...config,
-      fetch: customFetch,
+      fetch: (customFetch as unknown) as typeof fetch,
     }
   }
 

@@ -854,14 +854,18 @@ export function Layout(props: ParentProps) {
   const [now, setNow] = createSignal(new Date());
 
   onMount(() => {
-    const timer = { id: 0 as ReturnType<typeof setTimeout> };
+    // Use a flexible timer container whose id type matches setTimeout's return
+    // type across Node, Bun, and browser environments. We declare as
+    // ReturnType<typeof setTimeout> | undefined and guard when clearing.
+    const timer: { id: ReturnType<typeof setTimeout> | undefined } = { id: undefined };
     const schedule = () => {
       const next = new Date();
       next.setHours(24, 0, 0, 0);
-      timer.id = setTimeout(() => { setNow(new Date()); schedule(); }, next.getTime() - Date.now());
+      const delay = next.getTime() - Date.now();
+      timer.id = setTimeout(() => { setNow(new Date()); schedule(); }, delay);
     };
     schedule();
-    onCleanup(() => clearTimeout(timer.id));
+    onCleanup(() => { if (timer.id !== undefined) clearTimeout(timer.id); });
   });
 
   const pinnedSessions = createMemo(() => {

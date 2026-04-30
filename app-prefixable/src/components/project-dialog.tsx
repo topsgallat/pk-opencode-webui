@@ -75,10 +75,10 @@ function resolveTypedPath(input: string, home: string | null) {
 function toRemoteListPath(directory: string, home: string) {
   const key = trimTrailing(directory)
   const hn = trimTrailing(home)
-  if (!key) return hn.replace(/^\/+/, "")
+  if (!key) return hn
   if (key === "/") return "/"
-  if (key === hn) return hn.replace(/^\/+/, "")
-  if (key.startsWith(hn + "/")) return key.slice(hn.length + 1)
+  if (key === hn) return hn
+  if (key.startsWith(hn + "/")) return key
   return key
 }
 
@@ -131,6 +131,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
     try {
       const res = await sdk.client.path.get()
       if (!props.open || server.selectedServerId() !== serverId) return
+      console.log("[ProjectDialog] homeDirectory set to:", res.data?.home)
       setHomeDirectory(res.data?.home ?? null)
     } catch (e) {
       console.error("Failed to fetch path info:", e)
@@ -185,11 +186,14 @@ export function ProjectDialog(props: ProjectDialogProps) {
         const home = homeDirectory()
         if (!home) return []
         const path = toRemoteListPath(key, home)
+        console.log("[getDirs] remote: key:", key, "home:", home, "toRemoteListPath:", path)
         const res = await sdk.global.file.list({ path })
+        console.log("[getDirs] remote: response data:", res.data?.length, "items")
         const dirs = (res.data ?? [])
           .filter((node) => node.type === "directory")
           .map((node) => trimTrailing(node.absolute))
           .sort((a, b) => a.localeCompare(b))
+        console.log("[getDirs] remote: filtered dirs:", dirs.length, "items")
         dirCache.set(key, dirs)
         return dirs
       }
@@ -211,6 +215,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
     setLoading(true)
     const input = value.trim()
     const endsWithSlash = input.endsWith("/")
+    console.log("[searchDirectories] input:", JSON.stringify(input), "home:", home, "endsWithSlash:", endsWithSlash)
     
     try {
       if (input.startsWith("/")) {

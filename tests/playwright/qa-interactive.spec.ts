@@ -5,11 +5,14 @@ import * as path from 'path';
 test('QA interactive flow - proxied API calls', async ({ page }) => {
   const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:8080';
   const consoleErrors: string[] = [];
+  const consoleLogs: string[] = [];
   const networkResponses: any[] = [];
   const actionsLog: string[] = [];
 
   page.on('console', msg => {
-    if (msg.type() === 'error') consoleErrors.push(msg.text());
+    const text = msg.text();
+    if (msg.type() === 'error') consoleErrors.push(text);
+    else consoleLogs.push(`[${msg.type()}] ${text}`);
   });
   page.on('pageerror', error => consoleErrors.push(error.message));
 
@@ -104,6 +107,7 @@ test('QA interactive flow - proxied API calls', async ({ page }) => {
     baseUrl,
     verdict,
     consoleErrors,
+    consoleLogs,
     failingEndpoints,
     apiCheck,
     networkResponses: networkResponses.slice(0, 20),

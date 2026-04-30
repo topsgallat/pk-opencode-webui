@@ -6,6 +6,7 @@
 
 import { dispatchStorageEvent } from "./storage"
 import { cleanupServerAuth, markServerAuthForRevalidation, migrateLegacyServerAuth } from "./server-auth"
+import { getServerUrl } from "./path"
 
 const SERVERS_KEY = "opencode.servers"
 
@@ -47,7 +48,18 @@ export function getDefaultServerUrl(): string {
 export function getTargetServerUrl(server?: Pick<ServerConfig, "url">): string | undefined {
   if (!server) return undefined
   const url = getServerKey(server)
-  if (url === getDefaultServerUrl()) return undefined
+  // If the target server matches the UI's configured server URL, we don't
+  // need to set a target override. Previously this compared against the
+  // build-time/default server value which could differ from the actual
+  // UI server at runtime (causing requests to be routed to the wrong host).
+  // Compare against the runtime UI server URL instead.
+  try {
+    const uiServer = normalizeServerUrl(getServerUrl())
+    if (url === uiServer) return undefined
+  } catch {
+    // Fall back to default behaviour if URL parsing fails
+    if (url === getDefaultServerUrl()) return undefined
+  }
   return url
 }
 

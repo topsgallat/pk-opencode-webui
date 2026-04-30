@@ -75,7 +75,9 @@ function resolveTypedPath(input: string, home: string | null) {
 function toRemoteListPath(directory: string, home: string) {
   const key = trimTrailing(directory)
   const hn = trimTrailing(home)
-  if (!key || key === "/" || key === hn) return "."
+  if (!key) return hn.replace(/^\/+/, "")
+  if (key === "/") return ""
+  if (key === hn) return hn.replace(/^\/+/, "")
   if (key.startsWith(hn + "/")) return key.slice(hn.length + 1)
   return key
 }
@@ -182,7 +184,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
       if (isRemoteServer()) {
         const home = homeDirectory()
         if (!home) return []
-        const path = toRemoteListPath(key || "/", home)
+        const path = toRemoteListPath(key, home)
         const res = await sdk.global.file.list({ path })
         const dirs = (res.data ?? [])
           .filter((node) => node.type === "directory")
@@ -212,7 +214,8 @@ export function ProjectDialog(props: ProjectDialogProps) {
     
     try {
       if (input.startsWith("/")) {
-        const dirs = await getDirs(input.endsWith("/") ? input.slice(0, -1) : input)
+        const target = input === "/" ? "/" : input.endsWith("/") ? input.slice(0, -1) : input
+        const dirs = await getDirs(target)
         if (!isActive()) return
 
         let filtered: string[]

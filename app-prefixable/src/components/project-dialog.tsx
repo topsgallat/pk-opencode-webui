@@ -1,5 +1,6 @@
 import { createSignal, For, Show, createEffect, createMemo } from "solid-js"
 import type { Event } from "../sdk/client"
+import { createOpencodeClient } from "../sdk/client"
 import { useSDK } from "../context/sdk"
 import { useServer } from "../context/server"
 import { Spinner } from "./ui/spinner"
@@ -58,28 +59,6 @@ function tildeOf(absolute: string, home: string) {
 function displayPath(path: string, home: string) {
   const full = trimTrailing(path)
   return tildeOf(full, home) || full
-}
-
-function resolveTypedPath(input: string, home: string | null) {
-  const value = trimTrailing(input.trim())
-  if (!value) return ""
-  if (value === "~") return home || ""
-  if (value.startsWith("~/")) {
-    if (!home) return ""
-    return trimTrailing(`${home}/${value.slice(2)}`)
-  }
-  if (value.startsWith("/")) return value
-  return ""
-}
-
-function toRemoteListPath(directory: string, home: string) {
-  const key = trimTrailing(directory)
-  const hn = trimTrailing(home)
-  if (!key) return hn
-  if (key === "/") return "/"
-  if (key === hn) return hn
-  if (key.startsWith(hn + "/")) return key
-  return key
 }
 
 export function ProjectDialog(props: ProjectDialogProps) {
@@ -185,9 +164,15 @@ export function ProjectDialog(props: ProjectDialogProps) {
       if (isRemoteServer()) {
         const home = homeDirectory()
         if (!home) return []
-        const path = toRemoteListPath(key, home)
-        console.log("[getDirs] remote: key:", key, "home:", home, "toRemoteListPath:", path)
-        const res = await sdk.global.file.list({ path })
+        const directory = key || home
+        const client = createOpencodeClient({
+          baseUrl: sdk.url,
+          targetUrl: sdk.targetUrl,
+          directory,
+          throwOnError: true,
+        })
+        console.log("[getDirs] remote: key:", key, "home:", home, "directory:", directory, "path: .")
+        const res = await client.file.list({ path: "." })
         console.log("[getDirs] remote: response data:", res.data?.length, "items")
         const dirs = (res.data ?? [])
           .filter((node) => node.type === "directory")

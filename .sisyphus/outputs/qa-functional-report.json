@@ -1,21 +1,139 @@
 {
-  "timestamp": "2026-03-31T00:16:00Z",
-  "baseUrl": "http://localhost:8080",
-  "testRun": "tests/playwright/sse-verification.spec.ts",
-  "testStatus": "passed",
-  "duration_seconds": 11.5,
-  "consoleErrors": [],
-  "sse": {
-    "connected": true,
-    "eventsCount": 1,
-    "lastEvent": "{\"type\":\"server.connected\",\"properties\":{}}"
-  },
-  "apiResponses": {
-    "session": { "status": 200, "contentLength": "51299", "contentEncoding": "none" },
-    "provider": { "status": 200, "contentLength": "2921700", "contentEncoding": "none" },
-    "path": { "status": 200, "contentLength": "155", "contentEncoding": "none" },
-    "mcp": { "status": 200, "contentLength": "217", "contentEncoding": "none" }
-  },
+  "timestamp": "2026-04-30T13:28:18.973Z",
+  "baseUrl": "http://192.168.1.173:8090",
   "verdict": "pass",
-  "notes": "All proxied API endpoints returned 200 with correct Content-Length and no Content-Encoding. SSE connected and received server.connected event. No ERR_CONTENT_DECODING_FAILED observed."
+  "consoleErrors": [],
+  "failingEndpoints": [],
+  "apiCheck": [
+    {
+      "endpoint": "/session",
+      "status": 200,
+      "hasContentEncoding": false,
+      "contentLength": "2",
+      "contentType": "application/json"
+    },
+    {
+      "endpoint": "/provider",
+      "status": 200,
+      "hasContentEncoding": false,
+      "contentLength": "3150928",
+      "contentType": "application/json"
+    }
+  ],
+  "networkResponses": [
+    {
+      "url": "http://192.168.1.173:8090/path",
+      "status": 200,
+      "headers": {
+        "content-length": "159",
+        "date": "Thu, 30 Apr 2026 13:28:07 GMT, Thu, 30 Apr 2026 13:28:07 GMT",
+        "content-type": "application/json",
+        "vary": "Origin"
+      },
+      "hasContentEncoding": false
+    },
+    {
+      "url": "http://192.168.1.173:8090/mcp",
+      "status": 200,
+      "headers": {
+        "content-length": "2",
+        "date": "Thu, 30 Apr 2026 13:28:07 GMT, Thu, 30 Apr 2026 13:28:07 GMT",
+        "content-type": "application/json",
+        "vary": "Origin"
+      },
+      "hasContentEncoding": false
+    },
+    {
+      "url": "http://192.168.1.173:8090/provider/auth",
+      "status": 200,
+      "headers": {
+        "content-length": "1590",
+        "date": "Thu, 30 Apr 2026 13:28:07 GMT, Thu, 30 Apr 2026 13:28:07 GMT",
+        "content-type": "application/json",
+        "vary": "Origin"
+      },
+      "hasContentEncoding": false
+    },
+    {
+      "url": "http://192.168.1.173:8090/path",
+      "status": 200,
+      "headers": {
+        "content-length": "159",
+        "date": "Thu, 30 Apr 2026 13:28:07 GMT, Thu, 30 Apr 2026 13:28:07 GMT",
+        "content-type": "application/json",
+        "vary": "Origin"
+      },
+      "hasContentEncoding": false
+    },
+    {
+      "url": "http://192.168.1.173:8090/event?target=http%3A%2F%2F127.0.0.1%3A4096",
+      "status": 200,
+      "headers": {
+        "transfer-encoding": "chunked",
+        "cache-control": "no-cache",
+        "x-accel-buffering": "no",
+        "date": "Thu, 30 Apr 2026 13:28:07 GMT",
+        "content-type": "text/event-stream",
+        "connection": "keep-alive"
+      },
+      "hasContentEncoding": false
+    },
+    {
+      "url": "http://192.168.1.173:8090/provider",
+      "status": 200,
+      "headers": {
+        "content-length": "3150928",
+        "date": "Thu, 30 Apr 2026 13:28:03 GMT, Thu, 30 Apr 2026 13:28:07 GMT",
+        "content-type": "application/json",
+        "vary": "Origin"
+      },
+      "hasContentEncoding": false
+    },
+    {
+      "url": "http://192.168.1.173:8090/mcp",
+      "status": 200,
+      "headers": {
+        "content-length": "2",
+        "date": "Thu, 30 Apr 2026 13:28:08 GMT, Thu, 30 Apr 2026 13:28:07 GMT",
+        "content-type": "application/json",
+        "vary": "Origin"
+      },
+      "hasContentEncoding": false
+    },
+    {
+      "url": "http://192.168.1.173:8090/session",
+      "status": 200,
+      "headers": {
+        "content-length": "2",
+        "date": "Thu, 30 Apr 2026 13:28:08 GMT, Thu, 30 Apr 2026 13:28:08 GMT",
+        "content-type": "application/json",
+        "vary": "Origin"
+      },
+      "hasContentEncoding": false
+    },
+    {
+      "url": "http://192.168.1.173:8090/provider",
+      "status": 200,
+      "headers": {
+        "content-length": "3150928",
+        "date": "Thu, 30 Apr 2026 13:28:08 GMT, Thu, 30 Apr 2026 13:28:13 GMT",
+        "content-type": "application/json",
+        "vary": "Origin"
+      },
+      "hasContentEncoding": false
+    }
+  ],
+  "actionsLog": [
+    "[1] Navigate to http://192.168.1.173:8090",
+    "[1] → status: 200",
+    "[1] Screenshot taken: 01-initial-load.png",
+    "[2] No session button found; 7 total buttons present",
+    "[2] Clicking first available button: \"\"",
+    "[3] In-page API check: [{\"endpoint\":\"/session\",\"status\":200,\"hasContentEncoding\":false,\"contentLength\":\"2\",\"contentType\":\"application/json\"},{\"endpoint\":\"/provider\",\"status\":200,\"hasContentEncoding\":false,\"contentLength\":\"3150928\",\"contentType\":\"application/json\"}]"
+  ],
+  "inheritedWisdom": [
+    "Proxy strips Accept-Encoding and materializes upstream response bodies.",
+    "Gzip magic guard: only gunzip when first two bytes are 0x1f,0x8b.",
+    "Previous Playwright SSE run: verdict=pass, consoleErrors=[], all 4 proxied endpoints HTTP 200, no Content-Encoding."
+  ]
 }

@@ -1,0 +1,6 @@
+## dev...origin/dev
+?? .sisyphus/boulder.json
+?? .sisyphus/evidence/
+?? .sisyphus/notepads/server-switch-correctness/
+?? .sisyphus/plans/mobile-server-switch-correctness.md
+?? .sisyphus/plans/server-switch-correctness.md

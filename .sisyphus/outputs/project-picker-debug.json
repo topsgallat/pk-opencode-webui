@@ -1,0 +1,37 @@
+{
+  "timestamp": "2026-04-30T13:39:09.446Z",
+  "baseUrl": "http://192.168.1.173:8090",
+  "consoleLogs": [
+    "[test] Results count: 0"
+  ],
+  "networkRequests": [
+    {
+      "url": "http://192.168.1.173:8090/path",
+      "method": "GET"
+    },
+    {
+      "url": "http://192.168.1.173:8090/path",
+      "status": 200,
+      "body": "{\"home\":\"/home/opencode\",\"state\":\"/home/opencode/.local/state/opencode\",\"config\":\"/home/opencode/.config/opencode\",\"worktree\":\"/\",\"directory\":\"/home/opencode\"}"
+    },
+    {
+      "url": "http://192.168.1.173:8090/path",
+      "method": "GET"
+    },
+    {
+      "url": "http://192.168.1.173:8090/file?path=home%2Fopencode",
+      "method": "GET"
+    },
+    {
+      "url": "http://192.168.1.173:8090/path",
+      "status": 200,
+      "body": "{\"home\":\"/home/opencode\",\"state\":\"/home/opencode/.local/state/opencode\",\"config\":\"/home/opencode/.config/opencode\",\"worktree\":\"/\",\"directory\":\"/home/opencode\"}"
+    },
+    {
+      "url": "http://192.168.1.173:8090/file?path=home%2Fopencode",
+      "status": 200,
+      "body": "[]"
+    }
+  ],
+  "resultCount": 0
+}

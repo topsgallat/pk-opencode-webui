@@ -5,7 +5,7 @@ import { useBasePath } from "../context/base-path"
 import { useServer } from "../context/server"
 import { ContentCode } from "./diff/content-code"
 import { Spinner } from "./ui/spinner"
-import { FileCode, Pencil, Eye } from "lucide-solid"
+import { FileCode, Pencil, Eye, Maximize2, Minimize2, X } from "lucide-solid"
 import { writeFile } from "../utils/extended-api"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { EditorDialog } from "./editor-dialog"
@@ -114,6 +114,7 @@ export function FileViewer(props: FileViewerProps) {
   const isHtml = createMemo(() => lang() === "html")
   const [markdownPreview, setMarkdownPreview] = createSignal(true)
   const [htmlPreview, setHtmlPreview] = createSignal(true)
+  const [fullscreenPreview, setFullscreenPreview] = createSignal(false)
   const htmlBlobUrl = createMemo(() => {
     if (!isHtml() || !fileContent()) return undefined
     const blob = new Blob([fileContent()], { type: "text/html" })
@@ -243,6 +244,17 @@ export function FileViewer(props: FileViewerProps) {
                       <Show when={htmlPreview()} fallback={<Eye class="w-3.5 h-3.5" />}>
                         <FileCode class="w-3.5 h-3.5" />
                       </Show>
+                    </button>
+                  </Show>
+                  <Show when={() => (isMarkdown() && markdownPreview()) || (isHtml() && htmlPreview())}>
+                    <button
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      onClick={() => setFullscreenPreview(true)}
+                      title="Fullscreen Preview"
+                      aria-label="Fullscreen Preview"
+                      style={{ color: "var(--text-base)" }}
+                    >
+                      <Maximize2 class="w-3.5 h-3.5" />
                     </button>
                   </Show>
                   <Show when={capabilities().canUseLocalExtFileOps}>

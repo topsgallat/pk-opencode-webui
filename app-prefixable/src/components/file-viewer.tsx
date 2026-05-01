@@ -154,6 +154,15 @@ export function FileViewer(props: FileViewerProps) {
     }
   })
 
+  createEffect(() => {
+    if (!fullscreenPreview()) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullscreenPreview(false)
+    }
+    document.addEventListener("keydown", handler)
+    onCleanup(() => document.removeEventListener("keydown", handler))
+  })
+
   // Bug #8: Save Path
   async function handleSave(newContent: string) {
     if (!capabilities().canUseLocalExtFileOps) {
@@ -321,6 +330,48 @@ export function FileViewer(props: FileViewerProps) {
             </button>
           </div>
         )}
+      </Show>
+
+      <Show when={fullscreenPreview()}>
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
+          <div class="w-full h-full bg-white dark:bg-gray-900 relative">
+            <button
+              class="absolute top-4 right-4 z-10 p-2 hover:bg-black/10 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
+              onClick={() => setFullscreenPreview(false)}
+              title="Close Fullscreen"
+              aria-label="Close Fullscreen"
+            >
+              <X class="w-5 h-5" />
+            </button>
+            <button
+              class="absolute top-4 right-16 z-10 p-2 hover:bg-black/10 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
+              onClick={() => setFullscreenPreview(false)}
+              title="Exit Fullscreen"
+              aria-label="Exit Fullscreen"
+            >
+              <Minimize2 class="w-5 h-5" />
+            </button>
+            <div class="w-full h-full overflow-auto">
+              <Show
+                when={isMarkdown() && markdownPreview()}
+                fallback={
+                  <Show when={isHtml() && htmlPreview()}>
+                    <iframe
+                      src={htmlBlobUrl()}
+                      sandbox=""
+                      class="w-full h-full border-0"
+                      title="HTML preview"
+                    />
+                  </Show>
+                }
+              >
+                <div class="p-8 max-w-4xl mx-auto">
+                  <Markdown content={fileContent()} class="text-sm" />
+                </div>
+              </Show>
+            </div>
+          </div>
+        </div>
       </Show>
 
       <EditorDialog

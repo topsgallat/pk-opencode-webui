@@ -176,8 +176,8 @@ function ServerBoundary() {
   const server = useServer()
 
   return (
-    <Show keyed when={server.serverKey()}>
-      {(key) => <ServerScopedApp serverKey={key()} />}
+    <Show keyed when={server.serverKey}>
+      {(key) => <ServerScopedApp serverKey={key} />}
     </Show>
   )
 }

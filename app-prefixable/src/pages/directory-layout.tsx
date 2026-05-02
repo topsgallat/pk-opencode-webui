@@ -1,4 +1,4 @@
-import { type ParentProps, createMemo, createEffect, For } from "solid-js"
+import { type ParentProps, createMemo, For } from "solid-js"
 import { useParams, Navigate } from "@solidjs/router"
 import { useServer } from "../context/server"
 import { SDKProvider } from "../context/sdk"
@@ -11,7 +11,6 @@ import { ConfigProvider } from "../context/config"
 import { PermissionProvider } from "../context/permission"
 import { FileProvider } from "../context/file"
 import { LayoutProvider } from "../context/layout"
-import { useRecentProjects } from "../context/recent-projects"
 import { base64Decode } from "../utils/path"
 import { Layout } from "./layout"
 
@@ -23,7 +22,6 @@ import { Layout } from "./layout"
 export function DirectoryLayout(props: ParentProps) {
   const params = useParams<{ dir: string }>()
   const server = useServer()
-  const recent = useRecentProjects()
 
   const directory = createMemo(() => {
     try {
@@ -40,12 +38,6 @@ export function DirectoryLayout(props: ParentProps) {
     }
   })
 
-  createEffect(() => {
-    const dir = directory()
-    if (dir) {
-      recent.touch(dir)
-    }
-  })
 
   // Use For with a single-element array keyed by directory to force remount
   // This ensures all providers are recreated when switching projects

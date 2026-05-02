@@ -26,7 +26,9 @@ RUN git clone --depth 1 --branch ${BRANCH} ${REPO_URL} .
 
 # Install dependencies and build
 WORKDIR /app/app-prefixable
-RUN bun install
+RUN bun install && \
+    bun add typescript typescript-language-server && \
+    ln -sf ./node_modules/.bin/typescript-language-server /usr/local/bin/typescript-language-server
 RUN bun run build
 
 # -----------------------------------------------------------------------------
@@ -66,7 +68,14 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g playwright && npx playwright install chromium chrome
+# Install popular LSPs
+RUN npm install -g typescript-language-server pyright bash-language-server && \
+    curl -fsSL https://github.com/golang/tools/releases/latest/download/gopls-linux-amd64.tar.gz | tar -C /usr/local/bin -xzf - gopls && \
+    curl -fsSL https://github.com/rust-analyzer/rust-analyzer/releases/latest/download/rust-analyzer-linux | install -m 755 /dev/stdin /usr/local/bin/rust-analyzer && \
+    curl -fsSL https://download.eclipse.org/jdtls/snapshots/repository/latest/jdt-language-server.tar.gz | tar -C /usr/local/bin -xzf - && \
+    npm cache clean --force
+
+RUN npm install -g playwright && npx playwright install chromium
 
 # Install Bun
 ARG BUN_VERSION=1.1.42
@@ -109,6 +118,7 @@ RUN usermod -l opencode ubuntu && \
 
 # Copy built UI from builder stage
 COPY --from=builder /app/app-prefixable/dist /opt/opencode-ui/dist
+COPY --from=builder /app/app-prefixable/node_modules /opt/opencode-ui/node_modules
 
 # Copy server script (from builder stage where git clone was done)
 COPY --from=builder /app/docker/serve-ui.ts /opt/opencode-ui/serve-ui.ts

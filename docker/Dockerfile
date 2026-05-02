@@ -77,8 +77,11 @@ RUN npm install -g typescript typescript-language-server pyright bash-language-s
     npm cache clean --force
 
 # Go LSP (gopls)
-RUN go install golang.org/x/tools/gopls@latest && \
-    ln -sf $(go env GOPATH)/bin/gopls /usr/local/bin/gopls
+ENV GOPATH=/go
+RUN mkdir -p /go/bin && \
+    go install golang.org/x/tools/gopls@latest && \
+    cp /go/bin/gopls /usr/local/bin/gopls && \
+    chmod +x /usr/local/bin/gopls
 
 # Rust LSP (rust-analyzer)
 RUN curl -fsSL https://github.com/rust-analyzer/rust-analyzer/releases/latest/download/rust-analyzer-x86_64-unknown-linux-gnu.gz -o /tmp/rust-analyzer.gz && \

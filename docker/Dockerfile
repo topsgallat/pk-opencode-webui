@@ -78,10 +78,13 @@ RUN npm install -g typescript typescript-language-server pyright bash-language-s
 
 # Go LSP (gopls)
 ENV GOPATH=/go
+ENV PATH=$GOPATH/bin:$PATH
 RUN mkdir -p /go/bin && \
     go install golang.org/x/tools/gopls@latest && \
+    ls -la /go/bin/gopls && \
     cp /go/bin/gopls /usr/local/bin/gopls && \
-    chmod +x /usr/local/bin/gopls
+    chmod 755 /usr/local/bin/gopls && \
+    /usr/local/bin/gopls version
 
 # Rust LSP (rust-analyzer)
 RUN curl -fsSL https://github.com/rust-analyzer/rust-analyzer/releases/latest/download/rust-analyzer-x86_64-unknown-linux-gnu.gz -o /tmp/rust-analyzer.gz && \
@@ -103,7 +106,27 @@ RUN echo "=== Verifying LSP installations ===" && \
     rust-analyzer --version && \
     echo "=== All LSPs installed successfully ==="
 
-RUN npm install -g playwright && npx playwright install chromium chrome
+# Install Playwright with Chrome dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libatspi2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g playwright && \
+    PLAYWRIGHT_BROWSERS_PATH=/usr/local/lib/playwright npx playwright install chromium chrome
 
 # Install Bun
 ARG BUN_VERSION=1.1.42

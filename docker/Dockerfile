@@ -106,7 +106,7 @@ RUN echo "=== Verifying LSP installations ===" && \
     rust-analyzer --version && \
     echo "=== All LSPs installed successfully ==="
 
-# Install Playwright with Chrome dependencies
+# Install Playwright with Chromium (Chrome not needed)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libnss3 \
     libatk1.0-0 \
@@ -125,8 +125,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g playwright && \
-    PLAYWRIGHT_BROWSERS_PATH=/usr/local/lib/playwright npx playwright install chromium chrome
+RUN npm install -g playwright && npx playwright install chromium
 
 # Install Bun
 ARG BUN_VERSION=1.1.42

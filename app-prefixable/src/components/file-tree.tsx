@@ -269,7 +269,7 @@ export function FileTree(props: FileTreeProps) {
                     <span
                       class="flex-1 min-w-0 text-xs truncate"
                       style={{
-                        color: active() ? kindColor(kind()!) : node.ignored ? "var(--text-weaker)" : "var(--text-weak)",
+                        color: active() ? kindColor(kind()!) : node.ignored ? "var(--text-weak)" : "var(--text-weak)",
                       }}
                     >
                       {node.name}
@@ -310,7 +310,7 @@ export function FileTree(props: FileTreeProps) {
                   <span
                     class="flex-1 min-w-0 text-xs truncate"
                     style={{
-                      color: active() ? kindColor(kind()!) : node.ignored ? "var(--text-weaker)" : "var(--text-weak)",
+                        color: active() ? kindColor(kind()!) : node.ignored ? "var(--text-weak)" : "var(--text-weak)",
                     }}
                   >
                     {node.name}

@@ -368,10 +368,10 @@ export function SessionInfo(props: SessionInfoProps) {
               <button
                 type="submit"
                 class="flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg"
-                style={{
-                  background: "var(--interactive-base)",
-                  color: "white"
-                }}
+                 style={{
+                   background: "var(--interactive-base)",
+                   color: "var(--text-on-interactive)"
+                 }}
                 title="Click or press Enter to send"
                 aria-label="Send message"
               >

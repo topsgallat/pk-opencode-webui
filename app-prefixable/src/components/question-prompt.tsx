@@ -242,10 +242,10 @@ export function QuestionPrompt(props: Props) {
                     setSelected(0)
                   }}
                   class="px-3 py-1.5 text-sm rounded-md transition-colors shrink-0"
-                  style={{
-                    background: isActive() ? "var(--interactive-base)" : "var(--surface-inset)",
-                    color: isActive() ? "white" : isAnswered() ? "var(--text-strong)" : "var(--text-weak)",
-                  }}
+                   style={{
+                     background: isActive() ? "var(--interactive-base)" : "var(--surface-inset)",
+                     color: isActive() ? "var(--text-on-interactive)" : isAnswered() ? "var(--text-strong)" : "var(--text-weak)",
+                   }}
                 >
                   {q.header}
                 </button>
@@ -258,10 +258,10 @@ export function QuestionPrompt(props: Props) {
               setSelected(0)
             }}
             class="px-3 py-1.5 text-sm rounded-md transition-colors shrink-0"
-            style={{
-              background: confirm() ? "var(--interactive-base)" : "var(--surface-inset)",
-              color: confirm() ? "white" : "var(--text-weak)",
-            }}
+             style={{
+               background: confirm() ? "var(--interactive-base)" : "var(--surface-inset)",
+               color: confirm() ? "var(--text-on-interactive)" : "var(--text-weak)",
+             }}
           >
             Confirm
           </button>
@@ -302,10 +302,10 @@ export function QuestionPrompt(props: Props) {
                     <div class="flex items-center gap-2">
                       <span
                         class="text-xs font-mono w-5 h-5 flex items-center justify-center rounded"
-                        style={{
-                          background: active() ? "var(--interactive-base)" : "var(--surface-inset)",
-                          color: active() ? "white" : "var(--text-weak)",
-                        }}
+                       style={{
+                           background: active() ? "var(--interactive-base)" : "var(--surface-inset)",
+                           color: active() ? "var(--text-on-interactive)" : "var(--text-weak)",
+                         }}
                       >
                         {i() + 1}
                       </span>
@@ -351,10 +351,10 @@ export function QuestionPrompt(props: Props) {
                   <div class="flex items-center gap-2">
                     <span
                       class="text-xs font-mono w-5 h-5 flex items-center justify-center rounded"
-                      style={{
-                        background: other() ? "var(--interactive-base)" : "var(--surface-inset)",
-                        color: other() ? "white" : "var(--text-weak)",
-                      }}
+                       style={{
+                         background: other() ? "var(--interactive-base)" : "var(--surface-inset)",
+                         color: other() ? "var(--text-on-interactive)" : "var(--text-weak)",
+                       }}
                     >
                       {options().length + 1}
                     </span>

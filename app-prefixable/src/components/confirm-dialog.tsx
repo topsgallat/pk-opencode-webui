@@ -66,25 +66,25 @@ export function ConfirmDialog(props: Props) {
   })
 
   const confirmStyle = () => {
-    if (props.variant === "danger") {
-      return {
-        background: "var(--interactive-critical)",
-        color: "white",
-        border: "none",
-      }
-    }
-    if (props.variant === "warning") {
-      return {
-        background: "var(--interactive-warning)",
-        color: "white",
-        border: "none",
-      }
-    }
-    return {
-      background: "var(--interactive-base)",
-      color: "white",
-      border: "none",
-    }
+     if (props.variant === "danger") {
+       return {
+         background: "var(--interactive-critical)",
+         color: "var(--text-on-interactive)",
+         border: "none",
+       }
+     }
+     if (props.variant === "warning") {
+       return {
+         background: "var(--interactive-warning)",
+         color: "var(--text-on-interactive)",
+         border: "none",
+       }
+     }
+     return {
+       background: "var(--interactive-base)",
+       color: "var(--text-on-interactive)",
+       border: "none",
+     }
   }
 
   return (

@@ -266,14 +266,14 @@ export function FileTree(props: FileTreeProps) {
                     <span style={{ color: "var(--icon-weak)" }}>
                       {expanded() ? <FolderOpen class="w-4 h-4" /> : <Folder class="w-4 h-4" />}
                     </span>
-                    <span
-                      class="flex-1 min-w-0 text-xs truncate"
-                      style={{
-                        color: active() ? kindColor(kind()!) : node.ignored ? "var(--text-weak)" : "var(--text-weak)",
-                      }}
-                    >
-                      {node.name}
-                    </span>
+                      <span
+                        class="flex-1 min-w-0 text-xs truncate"
+                        style={{
+                          color: active() ? kindColor(kind()!) : node.ignored ? "var(--text-weak)" : "var(--text-base)",
+                        }}
+                      >
+                        {node.name}
+                      </span>
                     <Show when={kind()}>
                       {(k) => <div class="w-1.5 h-1.5 rounded-full mr-1" style={{ background: kindColor(k()) }} />}
                     </Show>
@@ -310,7 +310,7 @@ export function FileTree(props: FileTreeProps) {
                   <span
                     class="flex-1 min-w-0 text-xs truncate"
                     style={{
-                        color: active() ? kindColor(kind()!) : node.ignored ? "var(--text-weak)" : "var(--text-weak)",
+                      color: active() ? kindColor(kind()!) : node.ignored ? "var(--text-weak)" : "var(--text-base)",
                     }}
                   >
                     {node.name}

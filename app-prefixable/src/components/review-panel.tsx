@@ -367,7 +367,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
                 class="px-2 py-2"
                 style={{ "border-bottom": "1px solid var(--border-base)" }}
               >
-                <Tabs.List class="flex gap-1">
+                 <Tabs.List class="flex gap-1" style={{ color: "var(--text-strong)" }}>
                   <Tabs.Trigger
                     value="changes"
                     class="flex-1"

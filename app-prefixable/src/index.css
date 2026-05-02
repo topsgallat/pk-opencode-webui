@@ -564,9 +564,13 @@
     opacity: 0 !important;
   }
 
-  .xterm .composition-view {
-    display: none !important;
-  }
+   .xterm .composition-view {
+     display: none !important;
+   }
+
+   [data-slot="tabs-trigger"] {
+     color: var(--text-strong);
+   }
 }
 
 /* ============================================

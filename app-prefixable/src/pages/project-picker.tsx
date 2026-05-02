@@ -150,7 +150,7 @@ export function ProjectPicker() {
           <div class="flex items-center gap-2 text-sm font-medium pl-3 mb-1" style={{ color: "var(--text-weak)" }}>
             <span>Recent Projects</span>
             <Show when={activeServer()}>
-              <span class="text-xs font-normal px-2 py-0.5 rounded-full" style={{ background: "var(--surface-inset)", color: "var(--text-subtle)" }}>
+              <span class="text-xs font-normal" style={{ color: "var(--text-subtle)" }}>
                 {activeServer()}
               </span>
             </Show>

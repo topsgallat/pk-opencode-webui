@@ -1,5 +1,5 @@
 import { Router, Route, useNavigate, useParams } from "@solidjs/router"
-import { createMemo, createSignal, For, onMount, onCleanup } from "solid-js"
+import { createMemo, createSignal, For, Show, onMount, onCleanup } from "solid-js"
 import { BasePathProvider, useBasePath } from "./context/base-path"
 import { BrandingProvider } from "./context/branding"
 import { DeviceProvider } from "./context/device"
@@ -174,12 +174,11 @@ function ServerScopedApp(props: { serverKey: string }) {
 
 function ServerBoundary() {
   const server = useServer()
-  const serverKey = createMemo(() => server.serverKey())
 
   return (
-    <For each={[serverKey()]}>
-      {(key) => <ServerScopedApp serverKey={key} />}
-    </For>
+    <Show keyed when={server.serverKey()}>
+      {(key) => <ServerScopedApp serverKey={key()} />}
+    </Show>
   )
 }
 

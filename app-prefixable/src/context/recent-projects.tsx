@@ -11,7 +11,6 @@ interface RecentProject {
 interface RecentProjectsContextValue {
   projects: () => RecentProject[]
   add: (path: string) => void
-  touch: (path: string) => void
   remove: (path: string) => void
   clear: () => void
 }
@@ -91,18 +90,6 @@ export function RecentProjectsProvider(props: ParentProps) {
     })
   }
 
-  function touch(path: string) {
-    const normalized = path.replace(/\/+$/, "")
-    setProjects((prev) => {
-      const exists = prev.some((p) => p.path === normalized)
-      if (!exists) return prev
-      const filtered = prev.filter((p) => p.path !== normalized)
-      const updated = [{ path: normalized, name: getProjectName(normalized), lastOpened: Date.now() }, ...filtered]
-      saveToStorage(serverKey(), updated)
-      return updated
-    })
-  }
-
   function remove(path: string) {
     const normalized = path.replace(/\/+$/, "")
     setProjects((prev) => {
@@ -118,7 +105,7 @@ export function RecentProjectsProvider(props: ParentProps) {
   }
 
   return (
-    <RecentProjectsContext.Provider value={{ projects, add, touch, remove, clear }}>
+    <RecentProjectsContext.Provider value={{ projects, add, remove, clear }}>
       {props.children}
     </RecentProjectsContext.Provider>
   )

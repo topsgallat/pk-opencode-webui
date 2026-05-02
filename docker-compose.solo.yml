@@ -15,5 +15,7 @@ services:
       - HOME=/home/opencode
       - OPENCODE_WORKSPACE_ROOT=/home/opencode
       - XDG_CACHE_HOME=/home/opencode/.cache
+    volumes:
+      - /DATA/AppData/opencode-test:/home/opencode
     user: "1000:1000"
     restart: unless-stopped

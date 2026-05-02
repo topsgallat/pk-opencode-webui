@@ -127,9 +127,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN npm install -g playwright && npx playwright install chromium
 
-# Install Bun
-ARG BUN_VERSION=1.1.42
-RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}" && \
+# Install Bun (latest stable version)
+RUN curl -fsSL https://bun.sh/install | bash && \
     mv /root/.bun/bin/bun /usr/local/bin/bun && \
     rm -rf /root/.bun
 

@@ -40,11 +40,10 @@ export function DirectoryLayout(props: ParentProps) {
     }
   })
 
-  // Add to recent projects when directory changes
   createEffect(() => {
     const dir = directory()
     if (dir) {
-      recent.add(dir)
+      recent.touch(dir)
     }
   })
 

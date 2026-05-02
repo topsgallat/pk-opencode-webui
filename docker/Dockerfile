@@ -47,6 +47,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo \
     unzip \
     xz-utils \
+    openjdk-17-jdk \
+    golang-go \
     && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates
 
@@ -68,12 +70,35 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Install popular LSPs
-RUN npm install -g typescript-language-server pyright bash-language-server && \
-    curl -fsSL https://github.com/golang/tools/releases/latest/download/gopls-linux-amd64.tar.gz | tar -C /usr/local/bin -xzf - gopls && \
-    curl -fsSL https://github.com/rust-analyzer/rust-analyzer/releases/latest/download/rust-analyzer-linux | install -m 755 /dev/stdin /usr/local/bin/rust-analyzer && \
-    curl -fsSL https://download.eclipse.org/jdtls/snapshots/repository/latest/jdt-language-server.tar.gz | tar -C /usr/local/bin -xzf - && \
+# Install popular LSPs globally
+# Node.js-based LSPs
+RUN npm install -g typescript typescript-language-server pyright bash-language-server && \
+    ln -sf $(which typescript-language-server) /usr/local/bin/tsserver && \
     npm cache clean --force
+
+# Go LSP (gopls)
+RUN go install golang.org/x/tools/gopls@latest && \
+    ln -sf $(go env GOPATH)/bin/gopls /usr/local/bin/gopls
+
+# Rust LSP (rust-analyzer)
+RUN curl -fsSL https://github.com/rust-analyzer/rust-analyzer/releases/latest/download/rust-analyzer-x86_64-unknown-linux-gnu.gz -o /tmp/rust-analyzer.gz && \
+    gunzip /tmp/rust-analyzer.gz && \
+    install -m 755 /tmp/rust-analyzer /usr/local/bin/rust-analyzer && \
+    rm -f /tmp/rust-analyzer
+
+# Java LSP (jdtls)
+RUN mkdir -p /opt/jdtls && \
+    curl -fsSL https://download.eclipse.org/jdtls/snapshots/jdt-language-server-latest.tar.gz | tar -xzf - -C /opt/jdtls && \
+    ln -sf /opt/jdtls/bin/jdtls /usr/local/bin/jdtls
+
+# Verify installations
+RUN echo "=== Verifying LSP installations ===" && \
+    which typescript-language-server pyright bash-language-server gopls rust-analyzer jdtls && \
+    typescript-language-server --version && \
+    pyright --version && \
+    gopls version && \
+    rust-analyzer --version && \
+    echo "=== All LSPs installed successfully ==="
 
 RUN npm install -g playwright && npx playwright install chromium
 

@@ -127,6 +127,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN npm install -g playwright && npx playwright install chromium
 
+ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
+ENV CHROMIUM_FLAGS="--no-sandbox --disable-gpu --headless"
+    ln -sf $(which chromium || which chromium-browser) /usr/bin/google-chrome 2>/dev/null || true
+
+# Verify Playwright can find the browser
+RUN npx playwright install chromium && \
+    npx playwright --version && \
+    echo "Chromium path: $(which chromium || which chromium-browser)"
+
 # Install Bun (latest stable version)
 RUN curl -fsSL https://bun.sh/install | bash && \
     mv /root/.bun/bin/bun /usr/local/bin/bun && \

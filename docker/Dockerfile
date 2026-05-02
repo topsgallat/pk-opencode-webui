@@ -127,7 +127,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN npm install -g playwright && npx playwright install chromium
 
-ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
+ENV HOME=/home/opencode
+ENV XDG_CACHE_HOME=/home/opencode/.cache
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/opencode/.cache/ms-playwright
 ENV CHROMIUM_FLAGS="--no-sandbox --disable-gpu --headless"
 RUN ln -sf $(which chromium || which chromium-browser) /usr/bin/google-chrome 2>/dev/null || true
 
@@ -200,7 +202,7 @@ COPY --from=builder /app/docker/s6/ /etc/
 # Set permissions
 RUN chmod -R 755 /etc/services.d/opencode
 
-RUN mkdir -p /home/opencode/.cache /home/opencode/.config /home/opencode/.local/state /home/opencode/AppData && \
+RUN mkdir -p /home/opencode/.cache/ms-playwright /home/opencode/.config /home/opencode/.local/state /home/opencode/AppData && \
     chown -R opencode:opencode /home/opencode
 
 

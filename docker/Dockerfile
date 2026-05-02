@@ -103,7 +103,7 @@ RUN echo "=== Verifying LSP installations ===" && \
     rust-analyzer --version && \
     echo "=== All LSPs installed successfully ==="
 
-RUN npm install -g playwright && npx playwright install chromium
+RUN npm install -g playwright && npx playwright install chromium chrome
 
 # Install Bun
 ARG BUN_VERSION=1.1.42

@@ -2167,7 +2167,7 @@ export function Layout(props: ParentProps) {
                               onClick={() => {
                                 server.setSelectedServer(s.id)
                                 setServerDropdownOpen(false)
-                                navigate(`/${dirSlug()}/session`)
+                                navigate(`/${dirSlug()}/session?server-switch=1`, { replace: true })
                               }}
                           class="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                           style={{ color: "var(--text-base)" }}

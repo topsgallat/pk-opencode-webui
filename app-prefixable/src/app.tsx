@@ -27,24 +27,28 @@ function projectsStorageKey(serverKey: string) {
   return `${PROJECTS_STORAGE_KEY}.${serverKey}`
 }
 
-function getLastSessionHref(encodedDir: string, serverId: string): string {
+function getLastSessionHref(encodedDir: string, serverId: string, fallbackToRecent = false): string {
   try {
     const dir = base64Decode(encodedDir)
     const last = typeof window !== "undefined"
       ? window.localStorage.getItem(`opencode.lastSession.${serverId}.${dir}`)
       : null
-    if (!last || last.includes("..") || /[\/\\]/.test(last)) return "session"
+    if (!last || last.includes("..") || /[\/\\]/.test(last)) return fallbackToRecent ? "/" : "session"
     return `session/${last}`
   } catch {
-    return "session"
+    return fallbackToRecent ? "/" : "session"
   }
+}
+
+function shouldFallbackToRecent() {
+  return typeof window !== "undefined" && new URL(window.location.href).searchParams.get("server-switch") === "1"
 }
 
 function DirectoryIndex() {
   const params = useParams<{ dir: string }>()
   const navigate = useNavigate()
   const server = useServer()
-  onMount(() => navigate(getLastSessionHref(params.dir, server.serverKey()), { replace: true }))
+  onMount(() => navigate(getLastSessionHref(params.dir, server.serverKey(), shouldFallbackToRecent()), { replace: true }))
   return null
 }
 
@@ -52,7 +56,8 @@ function SessionIndex() {
   const params = useParams<{ dir: string }>()
   const navigate = useNavigate()
   const server = useServer()
-  const href = getLastSessionHref(params.dir, server.serverKey())
+  const href = getLastSessionHref(params.dir, server.serverKey(), shouldFallbackToRecent())
+  if (href === "/") return <ProjectPicker />
   if (href === "session") return <Session />
   const id = href.replace(/^session\//, "")
   onMount(() => navigate(id, { replace: true }))

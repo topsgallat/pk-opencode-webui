@@ -687,7 +687,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                                             server.setSelectedServer(s.id)
                                             setShowServerSheet(false)
                                             setMobileTab("sessions")
-                                            navigate(`/${dirSlug()}/session`, { replace: true })
+                                            navigate(`/${dirSlug()}/session?server-switch=1`, { replace: true })
                                         }}
                                     >
                                         <Server class="w-5 h-5 shrink-0" style={{ color: "var(--icon-weak)" }} />

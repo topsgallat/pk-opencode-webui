@@ -85,6 +85,7 @@ export function ProjectPicker() {
 
   const recentProjects = createMemo(() => recent.projects().slice(0, 5))
   const hasRecent = createMemo(() => recentProjects().length > 0)
+  const activeServer = createMemo(() => server.selectedServer()?.name || server.selectedServer()?.url || "")
 
   function openDialog(view: "browse" | "clone") {
     setDialogView(view)
@@ -146,8 +147,13 @@ export function ProjectPicker() {
       {/* Recent Projects */}
       <Show when={hasRecent()}>
         <div class="mt-12 flex flex-col gap-2">
-          <div class="text-sm font-medium pl-3 mb-1" style={{ color: "var(--text-weak)" }}>
-            Recent Projects
+          <div class="flex items-center gap-2 text-sm font-medium pl-3 mb-1" style={{ color: "var(--text-weak)" }}>
+            <span>Recent Projects</span>
+            <Show when={activeServer()}>
+              <span class="text-xs font-normal px-2 py-0.5 rounded-full" style={{ background: "var(--surface-inset)", color: "var(--text-subtle)" }}>
+                {activeServer()}
+              </span>
+            </Show>
           </div>
           <For each={recentProjects()}>
             {(project) => (

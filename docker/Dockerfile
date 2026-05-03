@@ -187,6 +187,8 @@ RUN usermod -l opencode ubuntu && \
         usermod -aG sudo opencode 2>/dev/null || true; \
     fi
 
+
+RUN chown -R opencode:opencode /usr/local/lib/playwright/
 # Copy built UI from builder stage
 COPY --from=builder /app/app-prefixable/dist /opt/opencode-ui/dist
 COPY --from=builder /app/app-prefixable/node_modules /opt/opencode-ui/node_modules

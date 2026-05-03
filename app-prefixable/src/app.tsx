@@ -57,7 +57,10 @@ function SessionIndex() {
   const navigate = useNavigate()
   const server = useServer()
   const href = getLastSessionHref(params.dir, server.serverKey(), shouldFallbackToRecent())
-  if (href === "/") return <ProjectPicker />
+  if (href === "/") {
+    onMount(() => navigate("/", { replace: true }))
+    return null
+  }
   if (href === "session") return <Session />
   const id = href.replace(/^session\//, "")
   onMount(() => navigate(id, { replace: true }))
@@ -174,9 +177,10 @@ function ServerScopedApp(props: { serverKey: string }) {
 
 function ServerBoundary() {
   const server = useServer()
-
+  const serverKey = createMemo(() => server.serverKey())
+  
   return (
-    <Show keyed when={server.serverKey}>
+    <Show when={serverKey()} keyed>
       {(key) => <ServerScopedApp serverKey={key} />}
     </Show>
   )

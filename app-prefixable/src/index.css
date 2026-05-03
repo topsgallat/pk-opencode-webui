@@ -532,8 +532,19 @@
     border-color: var(--border-base);
   }
 
+  .markdown-table-scroll {
+    @apply max-w-full overflow-x-auto mb-4;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .markdown-content .markdown-table-scroll table {
+    @apply border-collapse mb-0;
+    min-width: 100%;
+    width: max-content;
+  }
+
   .markdown-content table {
-    @apply w-full border-collapse mb-4;
+    @apply border-collapse mb-4;
   }
 
   .markdown-content th {

@@ -64,11 +64,12 @@ RUN case $(uname -m) in \
     chmod +x /usr/local/bin/gh && \
     rm -rf /tmp/gh*
 
-# Install Node.js 20 LTS (via NodeSource)
-ARG NODE_VERSION=20
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
-    apt-get install -y --no-install-recommends nodejs && \
-    rm -rf /var/lib/apt/lists/*
+ARG NODE_VERSION=20.18.3
+RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz && \
+    tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 && \
+    rm -f /tmp/node.tar.xz && \
+    node --version && \
+    npm --version
 
 # Install popular LSPs globally
 # Node.js-based LSPs
@@ -129,7 +130,7 @@ RUN npm install -g playwright && npx playwright install chromium
 
 ENV HOME=/home/opencode
 ENV XDG_CACHE_HOME=/home/opencode/.cache
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/opencode/.cache/ms-playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/lib/playwright
 ENV CHROMIUM_FLAGS="--no-sandbox --disable-gpu --headless"
 RUN ln -sf $(which chromium || which chromium-browser) /usr/bin/google-chrome 2>/dev/null || true
 
@@ -157,8 +158,8 @@ RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash
 # -----------------------------------------------------------------------------
 ENV SHELL=/bin/bash
 RUN curl -fsSL https://opencode.ai/install | bash -s -- --version 1.14.28 && \
-    mv /root/.opencode/bin/opencode /usr/local/bin/opencode && \
-    rm -rf /root/.opencode
+    mv ${HOME}/.opencode/bin/opencode /usr/local/bin/opencode && \
+    rm -rf ${HOME}/.opencode
 
 # Install s6-overlay for process supervision
 ARG S6_OVERLAY_VERSION=3.1.6.2
@@ -176,6 +177,7 @@ ARG HOST_GID=1000
 ARG ENABLE_SUDO=0
 RUN usermod -l opencode ubuntu && \
     groupmod -n opencode ubuntu && \
+    rm -rf /home/opencode 2>/dev/null || true && \
     usermod -d /home/opencode -m opencode && \
     mkdir -p /opt/opencode-ui /run /home/opencode && \
     chown -R opencode:opencode /opt/opencode-ui /run /home/opencode && \
@@ -188,6 +190,8 @@ RUN usermod -l opencode ubuntu && \
 # Copy built UI from builder stage
 COPY --from=builder /app/app-prefixable/dist /opt/opencode-ui/dist
 COPY --from=builder /app/app-prefixable/node_modules /opt/opencode-ui/node_modules
+COPY --from=builder /app/app-prefixable/package.json /opt/opencode-ui/package.json
+RUN cd /opt/opencode-ui && npm install playwright --legacy-peer-deps
 
 # Copy server script (from builder stage where git clone was done)
 COPY --from=builder /app/docker/serve-ui.ts /opt/opencode-ui/serve-ui.ts
@@ -201,7 +205,7 @@ COPY --from=builder /app/docker/s6/ /etc/
 # Set permissions
 RUN chmod -R 755 /etc/services.d/opencode
 
-RUN mkdir -p /home/opencode/.cache/ms-playwright /home/opencode/.config /home/opencode/.local/state /home/opencode/AppData && \
+RUN mkdir -p /home/opencode/.config /home/opencode/.local/state /home/opencode/AppData && \
     chown -R opencode:opencode /home/opencode
 
 

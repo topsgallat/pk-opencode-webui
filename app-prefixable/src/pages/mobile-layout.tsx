@@ -46,8 +46,18 @@ import {
 } from "lucide-solid"
 import { sessionHasQuestion, buildChildMap } from "../utils/session-tree-request"
 import { useServer } from "../context/server"
+import { getServerKey, type ServerConfig } from "../utils/servers"
 
 const PROJECTS_STORAGE_KEY = "opencode.projects"
+
+function getServerSwitchHref(server: ServerConfig, directory?: string) {
+    if (!directory) return "/"
+    const slug = base64Encode(directory)
+    const key = `opencode.lastSession.${getServerKey(server)}.${directory}`
+    const last = typeof window === "undefined" ? null : localStorage.getItem(key)
+    if (!last || last.includes("..") || /[\/\\]/.test(last)) return "/"
+    return `/${slug}/session/${last}`
+}
 
 export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }) {
     const { client, directory } = useSDK()
@@ -684,10 +694,11 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                                             setSearchQuery("")
                                             setShowArchived(false)
                                             setMenuSession(null)
+                                            const href = getServerSwitchHref(s, directory)
                                             server.setSelectedServer(s.id)
                                             setShowServerSheet(false)
                                             setMobileTab("sessions")
-                                            navigate(`/${dirSlug()}/session?server-switch=1`, { replace: true })
+                                            navigate(href, { replace: true })
                                         }}
                                     >
                                         <Server class="w-5 h-5 shrink-0" style={{ color: "var(--icon-weak)" }} />

@@ -188,7 +188,7 @@ export function QuestionPrompt(props: Props) {
 
   return (
     <div
-      class="rounded-lg overflow-hidden"
+      class="rounded-lg max-h-[calc(100dvh-2rem)] overflow-y-auto overflow-x-hidden overscroll-contain"
       style={{
         background: "var(--background-base)",
         border: "2px solid var(--interactive-base)",

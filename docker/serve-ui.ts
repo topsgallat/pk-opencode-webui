@@ -120,6 +120,7 @@ if (OPERATION_MODE === "solo") {
   }
   const opencodeServerEnv = {
     ...process.env,
+    HOME: homeDir,
     OPENCODE_SERVER_PASSWORD: process.env.OPENCODE_SERVER_PASSWORD || "opencode-local",
   }
   const dirs = [

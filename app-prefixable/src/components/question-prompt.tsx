@@ -272,7 +272,7 @@ export function QuestionPrompt(props: Props) {
       <div class="p-4">
         <Show when={!confirm()}>
           {/* Question text */}
-          <div class="mb-4">
+          <div class="mb-4 max-w-full max-h-64 overflow-auto" data-scrollable="true">
             <Markdown
               content={`${question()?.question ?? ""}${multi() ? " *(select all that apply)*" : ""}`}
               class="text-sm font-medium"

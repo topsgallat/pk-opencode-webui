@@ -48,8 +48,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo \
     unzip \
     xz-utils \
-    openjdk-17-jdk \
-    golang-go \
+
     && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates
 

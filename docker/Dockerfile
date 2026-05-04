@@ -115,11 +115,11 @@ RUN mkdir -p /opt/jdtls && \
 
 # Verify installations
 RUN echo "=== Verifying LSP installations ===" && \
-    which typescript-language-server pyright bash-language-server gopls rust-analyzer jdtls && \
+    which typescript-language-server pyright bash-language-server rust-analyzer jdtls && \
     typescript-language-server --version && \
     pyright --version && \
-    gopls version && \
     rust-analyzer --version && \
+    jdtls --version && \
     echo "=== All LSPs installed successfully ==="
 
 # Install Playwright with Chromium (Chrome not needed)

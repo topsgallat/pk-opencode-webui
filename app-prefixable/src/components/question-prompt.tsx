@@ -188,7 +188,7 @@ export function QuestionPrompt(props: Props) {
 
   return (
     <div
-      class="rounded-lg max-h-[calc(100dvh-2rem)] overflow-y-auto overflow-x-hidden overscroll-contain"
+      class="rounded-lg max-h-[calc(100dvh-2rem)] flex min-h-0 flex-col overflow-hidden overscroll-contain"
       style={{
         background: "var(--background-base)",
         border: "2px solid var(--interactive-base)",
@@ -269,7 +269,7 @@ export function QuestionPrompt(props: Props) {
       </Show>
 
       {/* Question content */}
-      <div class="p-4">
+      <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4">
         <Show when={!confirm()}>
           {/* Question text */}
           <div class="mb-4 max-w-full max-h-64 overflow-auto" data-scrollable="true">

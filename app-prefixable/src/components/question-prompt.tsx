@@ -188,7 +188,7 @@ export function QuestionPrompt(props: Props) {
 
   return (
     <div
-      class="rounded-lg max-h-[calc(100dvh-2rem)] flex min-h-0 flex-col overflow-hidden overscroll-contain"
+      class="w-full rounded-lg max-h-[min(40rem,45dvh)] flex min-h-0 flex-col overflow-hidden overscroll-contain"
       style={{
         background: "var(--background-base)",
         border: "2px solid var(--interactive-base)",

@@ -1804,7 +1804,7 @@ export function Session() {
     });
 
     return (
-      <div class="flex flex-col h-full">
+      <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
         {/* Header with panel toggle buttons */}
         <SessionHeader
           session={session()}
@@ -1818,7 +1818,7 @@ export function Session() {
         />
 
         {/* Messages - using rich message timeline with lazy rendering */}
-        <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
           <MessageTimeline
             messages={messages()}
             processing={
@@ -1836,7 +1836,7 @@ export function Session() {
           <Show when={pendingQuestion()}>
             {(q) => (
               <div
-                class="px-6 pb-4"
+                class="min-h-0 overflow-hidden px-6 pb-4"
                 style={{ background: "var(--background-stronger)" }}
               >
                 <QuestionPrompt
@@ -2531,9 +2531,9 @@ export function Session() {
   // Use Show to reactively switch between welcome and chat views
   return (
     <Show when={sessionId()} fallback={<WelcomeScreen />}>
-      <div class="flex h-full overflow-hidden">
+      <div class="flex h-full min-h-0 overflow-hidden">
         {/* Main chat area */}
-        <div class="flex-1 min-w-0 flex flex-col">
+        <div class="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
           <ChatView />
         </div>
 

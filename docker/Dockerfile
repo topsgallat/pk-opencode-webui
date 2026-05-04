@@ -153,7 +153,10 @@ RUN npx playwright install chromium && \
 
 # Install Bun (latest stable version)
 # Use BUN_INSTALL to install directly to /usr/local/bin, avoiding path issues
-RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash
+RUN for i in 1 2 3 4 5; do \
+      curl -fsSL --retry 5 --retry-delay 10 https://bun.sh/install && break; \
+      echo "Attempt $i failed, retrying..."; sleep 15; \
+    done | BUN_INSTALL=/usr/local bash
 
 # Install OpenCode CLI
 # -----------------------------------------------------------------------------

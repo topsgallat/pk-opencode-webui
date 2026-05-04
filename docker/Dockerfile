@@ -48,6 +48,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     gnupg \
     openssh-client \
+    python3 \
     sqlite3 \
     sudo \
     unzip \

@@ -46,14 +46,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     git \
-    gnupg \
     openssh-client \
-    python3 \
     sqlite3 \
     sudo \
     unzip \
     xz-utils \
-
+    openjdk-17-jdk \
+    golang-go \
+    ripgrep \
     && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates
 

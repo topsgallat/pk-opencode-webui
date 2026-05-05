@@ -1188,26 +1188,29 @@ export function Session() {
     const q = pendingQuestion();
     if (!q) return;
 
-    try {
-      // Use the question's own requestID — may belong to a child session
-      await client.question.reply({ requestID: q.id, answers, directory });
-      // Optimistically clear so the UI unblocks without waiting for SSE
-      events.dismissQuestion(q.sessionID, q.id);
-    } catch (e) {
-      console.error("[Session] Failed to reply to question:", e);
-    }
+  try {
+        // Optimistically dismiss so the UI unblocks immediately
+        events.dismissQuestion(q.sessionID, q.id);
+        await client.question.reply({ requestID: q.id, answers, directory });
+      } catch (e) {
+        console.error("[Session] Failed to reply to question:", e);
+        // Re-show on error: re-raise the question
+        events.raiseQuestion(q);
+      }
   }
 
   async function handleQuestionReject() {
     const q = pendingQuestion();
     if (!q) return;
 
-    try {
-      await client.question.reject({ requestID: q.id, directory });
-      events.dismissQuestion(q.sessionID, q.id);
-    } catch (e) {
-      console.error("[Session] Failed to reject question:", e);
-    }
+  try {
+        // Optimistic dismiss so the UI unblocks immediately
+        events.dismissQuestion(q.sessionID, q.id);
+        await client.question.reject({ requestID: q.id, directory });
+      } catch (e) {
+        console.error("[Session] Failed to reject question:", e);
+        events.raiseQuestion(q);
+      }
   }
 
   async function handleAbort() {

@@ -193,7 +193,7 @@ function renderToolInput(tool: string, input: Record<string, unknown>): JSX.Elem
       return (
         <pre
           class="whitespace-pre-wrap text-xs font-mono px-2 py-1.5 rounded"
-          style={{ background: "var(--surface-inset)", color: "var(--text-strong)" }}
+          style={{ background: "var(--background-base)", color: "var(--text-strong)" }}
         >
           {cmd}
         </pre>
@@ -964,7 +964,7 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
               class="px-3 py-2 font-mono text-xs overflow-x-auto"
               style={{
                 "border-top": "1px solid var(--border-base)",
-                background: "var(--surface-overlay)",
+                background: "var(--background-base)",
               }}
             >
               <div class="flex items-start justify-between gap-1.5 mb-1">

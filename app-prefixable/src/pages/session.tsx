@@ -1188,29 +1188,26 @@ export function Session() {
     const q = pendingQuestion();
     if (!q) return;
 
-  try {
-        // Optimistically dismiss so the UI unblocks immediately
-        events.dismissQuestion(q.sessionID, q.id);
-        await client.question.reply({ requestID: q.id, answers, directory });
-      } catch (e) {
-        console.error("[Session] Failed to reply to question:", e);
-        // Re-show on error: re-raise the question
-        events.raiseQuestion(q);
-      }
+    try {
+      // Optimistically dismiss so the UI unblocks immediately
+      events.dismissQuestion(q.sessionID, q.id);
+      await client.question.reply({ requestID: q.id, answers, directory });
+    } catch (e) {
+      console.error("[Session] Failed to reply to question:", e);
+    }
   }
 
   async function handleQuestionReject() {
     const q = pendingQuestion();
     if (!q) return;
 
-  try {
-        // Optimistic dismiss so the UI unblocks immediately
-        events.dismissQuestion(q.sessionID, q.id);
-        await client.question.reject({ requestID: q.id, directory });
-      } catch (e) {
-        console.error("[Session] Failed to reject question:", e);
-        events.raiseQuestion(q);
-      }
+    try {
+      // Optimistically dismiss so the UI unblocks immediately
+      events.dismissQuestion(q.sessionID, q.id);
+      await client.question.reject({ requestID: q.id, directory });
+    } catch (e) {
+      console.error("[Session] Failed to reject question:", e);
+    }
   }
 
   async function handleAbort() {
@@ -1228,6 +1225,8 @@ export function Session() {
       console.error("[Session] Failed to abort session:", e);
     }
   }
+
+  const primaryAgents = () => providers.agents.filter((a) => a.mode === "primary")
 
   // Focus input on mount
   onMount(() => {
@@ -2191,7 +2190,7 @@ export function Session() {
                     // Tab to cycle agents (when input is empty)
                     if (e.key === "Tab" && !input().trim()) {
                       e.preventDefault();
-                      const agents = providers.agents;
+                      const agents = primaryAgents();
                       if (agents.length > 1) {
                         const currentIdx = agents.findIndex(
                           (a) => a.name === providers.selectedAgent,
@@ -2359,7 +2358,6 @@ export function Session() {
               .filter((p) => providers.connected.includes(p.id))
               .flatMap((p) => {
                 const colonIdx = p.id.indexOf(":")
-                const baseProviderID = colonIdx > 0 ? p.id.slice(0, colonIdx) : p.id
                 const accountName = colonIdx > 0 ? p.id.slice(colonIdx + 1) : null
                 return Object.values(p.models).map((m) => ({
                   id: `${p.id}:${m.id}`,
@@ -2384,7 +2382,7 @@ export function Session() {
             title="Select Agent"
             placeholder="Filter agents..."
             emptyMessage="No agents available."
-            items={providers.agents.map((a) => ({
+            items={primaryAgents().map((a) => ({
               id: a.name,
               title: a.name,
               description: `${a.mode} mode`,

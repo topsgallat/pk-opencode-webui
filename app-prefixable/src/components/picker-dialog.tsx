@@ -1,4 +1,4 @@
-import { createSignal, createEffect, createMemo, Show, onMount, onCleanup, Index } from "solid-js"
+import { createSignal, createEffect, createMemo, Show, onMount, onCleanup, For } from "solid-js"
 import { Portal } from "solid-js/web"
 import { X, Search } from "lucide-solid"
 import { createBackdropDismiss } from "../utils/backdrop"
@@ -8,6 +8,11 @@ interface PickerItem {
   title: string
   description?: string
   group?: string
+}
+
+interface PickerSection {
+  group: string
+  items: Array<{ item: PickerItem; idx: number }>
 }
 
 interface Props {
@@ -36,6 +41,22 @@ export function PickerDialog(props: Props) {
         item.description?.toLowerCase().includes(q) ||
         item.group?.toLowerCase().includes(q),
     )
+  })
+
+  const grouped = createMemo<PickerSection[]>(() => {
+    const sections = new Map<string, PickerSection>()
+    const order: string[] = []
+
+    filtered().forEach((item, idx) => {
+      const group = item.group?.trim() || ""
+      if (!sections.has(group)) {
+        sections.set(group, { group, items: [] })
+        order.push(group)
+      }
+      sections.get(group)?.items.push({ item, idx })
+    })
+
+    return order.map((group) => sections.get(group)!).filter((section) => section.items.length > 0)
   })
 
   createEffect(() => {
@@ -177,46 +198,59 @@ export function PickerDialog(props: Props) {
               </div>
             </Show>
 
-            <Index each={filtered()}>
-              {(item, idx) => {
-                const isActive = () => idx === activeIndex()
-                return (
-                  <button
-                    type="button"
-                    id={`picker-option-${idx}`}
-                    role="option"
-                    aria-selected={isActive()}
-                    data-index={idx}
-                    onClick={() => {
-                      props.onSelect(item())
-                      props.onClose()
+            <For each={grouped()}>
+              {(section) => (
+                <div>
+                  <Show when={section.group}>
+                    <div
+                      class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider sticky top-0 z-10"
+                      style={{
+                        color: "var(--text-weak)",
+                        background: "var(--background-base)",
+                        "border-bottom": "1px solid var(--border-base)",
+                      }}
+                    >
+                      {section.group}
+                    </div>
+                  </Show>
+                  <For each={section.items}>
+                    {(row) => {
+                      const isActive = () => row.idx === activeIndex()
+                      return (
+                        <button
+                          type="button"
+                          id={`picker-option-${row.idx}`}
+                          role="option"
+                          aria-selected={isActive()}
+                          data-index={row.idx}
+                          onClick={() => {
+                            props.onSelect(row.item)
+                            props.onClose()
+                          }}
+                          onMouseEnter={() => setActiveIndex(row.idx)}
+                          class="w-full px-4 py-2.5 text-left flex flex-col gap-0.5 transition-colors"
+                          style={{
+                            background: isActive()
+                              ? "color-mix(in srgb, var(--interactive-base) 15%, transparent)"
+                              : "transparent",
+                            "border-left": isActive() ? "3px solid var(--interactive-base)" : "3px solid transparent",
+                          }}
+                        >
+                          <span class="font-medium text-sm" style={{ color: "var(--text-strong)" }}>
+                            {row.item.title}
+                          </span>
+                          <Show when={row.item.description}>
+                            <span class="text-xs" style={{ color: "var(--text-weak)" }}>
+                              {row.item.description}
+                            </span>
+                          </Show>
+                        </button>
+                      )
                     }}
-                    onMouseEnter={() => setActiveIndex(idx)}
-                    class="w-full px-4 py-2.5 text-left flex flex-col gap-0.5 transition-colors"
-                    style={{
-                      background: isActive()
-                        ? "color-mix(in srgb, var(--interactive-base) 15%, transparent)"
-                        : "transparent",
-                      "border-left": isActive() ? "3px solid var(--interactive-base)" : "3px solid transparent",
-                    }}
-                  >
-                    <span class="font-medium text-sm" style={{ color: "var(--text-strong)" }}>
-                      {item().title}
-                    </span>
-                    <Show when={item().description}>
-                      <span class="text-xs" style={{ color: "var(--text-weak)" }}>
-                        {item().description}
-                      </span>
-                    </Show>
-                    <Show when={item().group}>
-                      <span class="text-xs" style={{ color: "var(--text-weak)", opacity: 0.7 }}>
-                        {item().group}
-                      </span>
-                    </Show>
-                  </button>
-                )
-              }}
-            </Index>
+                  </For>
+                </div>
+              )}
+            </For>
           </div>
         </div>
       </div>

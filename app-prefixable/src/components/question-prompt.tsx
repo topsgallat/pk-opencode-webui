@@ -1,5 +1,6 @@
 import { createSignal, createMemo, For, Show, onMount, onCleanup } from "solid-js"
 import { Button } from "./ui/button"
+import { Spinner } from "./ui/spinner"
 import { Markdown } from "./markdown"
 import type { QuestionRequest } from "../sdk/client"
 import { Users } from "lucide-solid"
@@ -22,6 +23,7 @@ export function QuestionPrompt(props: Props) {
   const [custom, setCustom] = createSignal<string[]>([])
   const [selected, setSelected] = createSignal(0)
   const [editing, setEditing] = createSignal(false)
+  const [submitting, setSubmitting] = createSignal(false)
 
   let inputRef: HTMLInputElement | undefined
 
@@ -40,6 +42,7 @@ export function QuestionPrompt(props: Props) {
 
   function submit() {
     const result = questions().map((_, i) => answers()[i] ?? [])
+    setSubmitting(true)
     props.onReply(result)
   }
 
@@ -55,6 +58,7 @@ export function QuestionPrompt(props: Props) {
     }
 
     if (single()) {
+      setSubmitting(true)
       props.onReply([[answer]])
       return
     }
@@ -125,6 +129,7 @@ export function QuestionPrompt(props: Props) {
       return
     }
 
+    setSubmitting(true)
     pick(text, true)
     setEditing(false)
   }
@@ -448,8 +453,13 @@ export function QuestionPrompt(props: Props) {
             </div>
           </div>
 
-          <Button onClick={submit} variant="primary" class="w-full">
-            Submit Answers
+          <Button onClick={submit} variant="primary" class="w-full" disabled={submitting()}>
+            <Show when={submitting()} fallback={<span>Submit Answers</span>}>
+              <span class="inline-flex items-center gap-2">
+                <Spinner class="w-4 h-4" />
+                Submitting
+              </span>
+            </Show>
           </Button>
         </Show>
       </div>

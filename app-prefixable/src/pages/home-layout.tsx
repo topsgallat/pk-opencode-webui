@@ -31,6 +31,7 @@ export function HomeLayout(props: ParentProps) {
   const server = useServer()
   const { serverUrl: basePathServerUrl } = useBasePath()
   const projectsStorageKey = createMemo(() => `${PROJECTS_STORAGE_KEY}.${server.serverKey()}`)
+  const selectedServerLabel = createMemo(() => server.selectedServer()?.name || server.selectedServer()?.url || "Server")
   const [serverDropdownOpen, setServerDropdownOpen] = createSignal(false)
 
   const [projects, setProjects] = createSignal<Project[]>([])
@@ -162,7 +163,7 @@ export function HomeLayout(props: ParentProps) {
             <ConfigProvider>
               <ProviderProvider>
                 <MCPProvider>
-                <div class="flex h-screen" style={{ background: "var(--background-stronger)" }}>
+                <div class="flex h-[100dvh] min-h-0" style={{ background: "var(--background-stronger)" }}>
               {/* Project Dialog */}
               <ProjectDialog
                 open={projectDialogOpen()}
@@ -238,7 +239,7 @@ export function HomeLayout(props: ParentProps) {
                   >
                     <SquareTerminal class="w-5 h-5" />
                   </button>
-                  <div class="relative">
+                  <div class="relative flex items-center gap-2">
                     <button
                       onClick={() => setServerDropdownOpen(v => !v)}
                       class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
@@ -250,6 +251,13 @@ export function HomeLayout(props: ParentProps) {
                     >
                       <Server class="w-5 h-5" />
                     </button>
+                    <span
+                      class="text-xs font-medium max-w-28 truncate"
+                      style={{ color: "var(--text-weak)" }}
+                      title={selectedServerLabel()}
+                    >
+                      {selectedServerLabel()}
+                    </span>
                     <Show when={serverDropdownOpen()}>
                       <div
                         class="absolute left-12 bottom-0 z-50 min-w-48 rounded-lg shadow-lg py-1"
@@ -298,8 +306,8 @@ export function HomeLayout(props: ParentProps) {
               </div>
 
               {/* Main Content + Terminal */}
-              <div class="flex-1 flex flex-col overflow-hidden">
-                <main class="flex-1 flex flex-col overflow-hidden" style={{ background: "var(--background-stronger)" }}>
+              <div class="flex-1 flex min-h-0 flex-col overflow-hidden">
+                <main class="flex-1 flex min-h-0 flex-col overflow-hidden" style={{ background: "var(--background-stronger)" }}>
                   {props.children}
                 </main>
 

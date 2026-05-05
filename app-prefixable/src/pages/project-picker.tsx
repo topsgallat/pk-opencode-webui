@@ -103,7 +103,7 @@ export function ProjectPicker() {
   }
 
   return (
-    <div class="mx-auto mt-40 w-full md:w-auto px-4 max-w-xl">
+    <div class="mx-auto mt-24 flex w-full min-h-0 flex-col px-4 max-w-xl md:mt-40 md:w-auto">
       {/* Logo */}
       <OpenCodeWordmark class="w-full md:w-xl opacity-12 mx-auto" />
 
@@ -146,7 +146,7 @@ export function ProjectPicker() {
 
       {/* Recent Projects */}
       <Show when={hasRecent()}>
-        <div class="mt-12 flex flex-col gap-2">
+        <div class="mt-12 flex min-h-0 flex-1 flex-col gap-2 md:flex-none">
           <div class="flex items-center gap-2 text-sm font-medium pl-3 mb-1" style={{ color: "var(--text-weak)" }}>
             <span>Recent Projects</span>
             <Show when={activeServer()}>
@@ -155,21 +155,23 @@ export function ProjectPicker() {
               </span>
             </Show>
           </div>
-          <For each={recentProjects()}>
-            {(project) => (
-              <Button
-                variant="ghost"
-                size="large"
-                class="text-left justify-between px-3 font-mono text-sm"
-                onClick={() => openRecentProject(project.path)}
-              >
-                <span class="truncate">{shortenPath(project.path, homeDir())}</span>
-                <span class="text-sm font-sans" style={{ color: "var(--text-weak)" }}>
-                  {formatRelativeTime(project.lastOpened)}
-                </span>
-              </Button>
-            )}
-          </For>
+          <div class="min-h-0 flex-1 overflow-y-auto pr-1 md:flex-none md:overflow-visible md:pr-0">
+            <For each={recentProjects()}>
+              {(project) => (
+                <Button
+                  variant="ghost"
+                  size="large"
+                  class="text-left justify-between px-3 font-mono text-sm"
+                  onClick={() => openRecentProject(project.path)}
+                >
+                  <span class="truncate">{shortenPath(project.path, homeDir())}</span>
+                  <span class="text-sm font-sans" style={{ color: "var(--text-weak)" }}>
+                    {formatRelativeTime(project.lastOpened)}
+                  </span>
+                </Button>
+              )}
+            </For>
+          </div>
         </div>
       </Show>
 

@@ -1,15 +1,18 @@
 import { appendTargetParam } from "./path"
+import { fetchWithTimeout } from "./request-timeout"
+
+const EXT_API_TIMEOUT_MS = 15_000
 
 /**
  * Create a directory recursively
  */
 export async function mkdir(serverUrl: string, path: string, targetUrl?: string): Promise<boolean> {
   try {
-    const res = await fetch(appendTargetParam(`${serverUrl}/api/ext/mkdir`, targetUrl), {
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/mkdir`, targetUrl), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path }),
-    })
+    }, EXT_API_TIMEOUT_MS, "extended mkdir")
     return res.ok && (await res.json()) === true
   } catch (e) {
     console.error("[extended-api] mkdir failed:", e)
@@ -31,7 +34,7 @@ export async function listDirs(
     if (options?.limit) params.set("limit", options.limit.toString())
     if (options?.depth) params.set("depth", options.depth.toString())
 
-    const res = await fetch(appendTargetParam(`${serverUrl}/api/ext/list-dirs?${params}`, options?.targetUrl))
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/list-dirs?${params}`, options?.targetUrl), {}, EXT_API_TIMEOUT_MS, "extended listDirs")
     if (!res.ok) return []
     return await res.json()
   } catch (e) {
@@ -44,11 +47,11 @@ export async function listDirs(
  * Write content to a file (creates parent directories if needed)
  */
 export async function writeFile(serverUrl: string, path: string, content: string, targetUrl?: string): Promise<boolean> {
-  const res = await fetch(appendTargetParam(`${serverUrl}/api/ext/file`, targetUrl), {
+  const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/file`, targetUrl), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ path, content }),
-  }).catch(() => null)
+  }, EXT_API_TIMEOUT_MS, "extended writeFile").catch(() => null)
   if (!res?.ok) {
     console.error("[extended-api] writeFile failed:", res?.status)
     return false
@@ -62,7 +65,7 @@ export async function writeFile(serverUrl: string, path: string, content: string
 export async function readFile(serverUrl: string, path: string, targetUrl?: string): Promise<string | null> {
   try {
     const params = new URLSearchParams({ path })
-    const res = await fetch(appendTargetParam(`${serverUrl}/api/ext/file?${params}`, targetUrl))
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/file?${params}`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended readFile")
     if (!res.ok) return null
     const data = await res.json()
     return data.content
@@ -77,9 +80,9 @@ export async function readFile(serverUrl: string, path: string, targetUrl?: stri
  */
 export async function deleteFile(serverUrl: string, path: string, targetUrl?: string): Promise<boolean> {
   const params = new URLSearchParams({ path })
-  const res = await fetch(appendTargetParam(`${serverUrl}/api/ext/file?${params}`, targetUrl), {
+  const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/file?${params}`, targetUrl), {
     method: "DELETE",
-  }).catch(() => null)
+  }, EXT_API_TIMEOUT_MS, "extended deleteFile").catch(() => null)
   
   if (!res?.ok) {
     console.error("[extended-api] deleteFile failed:", res?.status)
@@ -93,10 +96,10 @@ export async function deleteFile(serverUrl: string, path: string, targetUrl?: st
  */
 export async function deleteDir(serverUrl: string, path: string, targetUrl?: string): Promise<boolean> {
   const params = new URLSearchParams({ path })
-  const res = await fetch(appendTargetParam(`${serverUrl}/api/ext/dir?${params}`, targetUrl), {
+  const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/dir?${params}`, targetUrl), {
     method: "DELETE",
-  }).catch(() => null)
-  
+  }, EXT_API_TIMEOUT_MS, "extended deleteDir").catch(() => null)
+
   if (!res?.ok) {
     console.error("[extended-api] deleteDir failed:", res?.status)
     return false

@@ -3,6 +3,9 @@ import { Portal } from "solid-js/web"
 import { X, Search, FileText } from "lucide-solid"
 import { useSDK } from "../context/sdk"
 import { createBackdropDismiss } from "../utils/backdrop"
+import { withTimeout } from "../utils/request-timeout"
+
+const FILE_SEARCH_TIMEOUT_MS = 10_000
 
 interface Props {
   onSelect: (path: string) => void
@@ -20,6 +23,7 @@ export function FilePickerDialog(props: Props) {
   let inputRef: HTMLInputElement | undefined
   let listRef: HTMLDivElement | undefined
   let closeButtonRef: HTMLButtonElement | undefined
+  let searchGen = 0
 
   const filtered = createMemo(() => {
     const q = filter().toLowerCase()
@@ -30,14 +34,21 @@ export function FilePickerDialog(props: Props) {
   })
 
   const search = async (query: string) => {
+    const gen = ++searchGen
     setLoading(true)
     try {
-      const res = await client.find.files({ query, dirs: "false" })
+      const res = await withTimeout(
+        () => client.find.files({ query, dirs: "false" }),
+        FILE_SEARCH_TIMEOUT_MS,
+        "find.files",
+      )
+      if (gen !== searchGen) return
       setFiles(res.data ?? [])
     } catch {
+      if (gen !== searchGen) return
       setFiles([])
     } finally {
-      setLoading(false)
+      if (gen === searchGen) setLoading(false)
     }
   }
 

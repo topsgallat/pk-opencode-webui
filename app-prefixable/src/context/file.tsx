@@ -5,6 +5,10 @@ import { useSDK } from "./sdk"
 import { useServer } from "./server"
 import { readFile, mkdir, createFile as apiCreateFile, deleteFile as apiDeleteFile, deleteDir as apiDeleteDir } from "../utils/extended-api"
 import { getServerCapabilities } from "../utils/server-capabilities"
+import { withTimeout, errorMessage } from "../utils/request-timeout"
+
+const FILE_LIST_TIMEOUT_MS = 10_000
+const FILE_READ_TIMEOUT_MS = 15_000
 
 type DirState = {
   expanded: boolean
@@ -84,8 +88,11 @@ export function FileProvider(props: ParentProps) {
     // Initialize dir state
     setStore("dirs", dir, { expanded: state?.expanded ?? false, loaded: false, loading: true })
 
-    const promise = client.file
-      .list({ path: dir || "." })
+    const promise = withTimeout(
+      () => client.file.list({ path: dir || "." }),
+      FILE_LIST_TIMEOUT_MS,
+      "file.list",
+    )
       .then((res) => {
         const nodes = res.data ?? []
         batch(() => {
@@ -155,8 +162,11 @@ export function FileProvider(props: ParentProps) {
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
     const existingContent = store.files[path]?.content?.content
 
-    const promise = client.file
-      .read({ path })
+    const promise = withTimeout(
+      () => client.file.read({ path }),
+      FILE_READ_TIMEOUT_MS,
+      "file.read",
+    )
       .then((res) => {
         const data = res.data
         batch(() => {
@@ -223,7 +233,7 @@ export function FileProvider(props: ParentProps) {
           path,
           produce((f) => {
             f.loading = false
-            f.error = e instanceof Error ? e.message : "Failed to load file"
+            f.error = errorMessage(e, "Failed to load file")
           }),
         )
       })

@@ -85,6 +85,7 @@ import { sessionHasQuestion, buildChildMap, rootAncestorId } from "../utils/sess
 import { useDevice } from "../context/device";
 import { MobileLayout } from "./mobile-layout";
 import { getServerCapabilities } from "../utils/server-capabilities";
+import { errorMessage, withTimeout } from "../utils/request-timeout";
 
 // Storage keys
 const PROJECTS_STORAGE_KEY = "opencode.projects";
@@ -92,6 +93,7 @@ const SIDEBAR_EXPANDED_KEY = "opencode.sidebarExpanded";
 const SHOW_ARCHIVED_KEY = "opencode.showArchived";
 const PINNED_SESSIONS_PREFIX = "opencode.pinnedSessions.";
 const MAX_PINNED = 10;
+const SESSION_LIST_TIMEOUT_MS = 12_000;
 
 // Group sessions by date bucket
 export function groupSessionsByDate(
@@ -259,6 +261,7 @@ export function Layout(props: ParentProps) {
 
   const [sessions, setSessions] = createSignal<Session[]>([]);
   const [loading, setLoading] = createSignal(true);
+  const [loadError, setLoadError] = createSignal<string | null>(null);
   const [projects, setProjects] = createSignal<Project[]>([]);
   const [sidebarExpanded, setSidebarExpanded] = createSignal(true);
   const [showArchived, setShowArchived] = createSignal(false);
@@ -284,6 +287,7 @@ export function Layout(props: ParentProps) {
   const sidebarExpandedKey = createMemo(() => `${SIDEBAR_EXPANDED_KEY}.${server.serverKey()}`);
   const showArchivedKey = createMemo(() => `${SHOW_ARCHIVED_KEY}.${server.serverKey()}`);
   const pinnedSessionsKey = createMemo(() => `${PINNED_SESSIONS_PREFIX}${server.serverKey()}.${directory ?? "global"}`);
+  const selectedServerLabel = createMemo(() => server.selectedServer()?.name || server.selectedServer()?.url || "Server");
 
   // Search state
   const [searchQuery, setSearchQuery] = createSignal("");
@@ -322,6 +326,10 @@ export function Layout(props: ParentProps) {
     setSearchQuery("");
     setSearchResults([]);
     setSearchFocusIdx(-1);
+    setLoadError(null);
+    setLoading(true);
+    setSessions([]);
+    void loadSessions();
   }, { defer: true }));
 
   // Load state from storage
@@ -1138,8 +1146,15 @@ export function Layout(props: ParentProps) {
   }
 
   async function loadSessions() {
+    setLoadError(null);
     try {
-      const res = await client.session.list({ roots: true });
+      const showSpinner = sessions().length === 0;
+      if (showSpinner) setLoading(true);
+      const res = await withTimeout(
+        () => client.session.list({ roots: true }),
+        SESSION_LIST_TIMEOUT_MS,
+        "Loading sessions",
+      );
       const data = res.data;
       if (Array.isArray(data)) {
         const valid = data.filter(
@@ -1152,7 +1167,7 @@ export function Layout(props: ParentProps) {
       }
     } catch (e) {
       console.error("Failed to load sessions:", e);
-      setSessions([]);
+      setLoadError(errorMessage(e, "Loading sessions failed"));
     } finally {
       setLoading(false);
     }
@@ -2137,7 +2152,7 @@ export function Layout(props: ParentProps) {
               >
                 <SquareTerminal class="w-5 h-5" />
               </button>
-              <div class="relative">
+              <div class="relative flex items-center gap-2">
                 <button
                   data-hint-target
                   onClick={() => setServerDropdownOpen(v => !v)}
@@ -2150,6 +2165,13 @@ export function Layout(props: ParentProps) {
                 >
                   <Server class="w-5 h-5" />
                 </button>
+                <span
+                  class="text-xs font-medium max-w-28 truncate"
+                  style={{ color: "var(--text-weak)" }}
+                  title={selectedServerLabel()}
+                >
+                  {selectedServerLabel()}
+                </span>
                 <Show when={serverDropdownOpen()}>
                   <div
                     class="absolute left-12 bottom-0 z-50 min-w-48 rounded-lg shadow-lg py-1"
@@ -2401,6 +2423,22 @@ export function Layout(props: ParentProps) {
                       style={{ color: "var(--text-interactive-base)" }}
                     />
                     <span class="text-sm">Loading sessions...</span>
+                  </div>
+                </Show>
+
+                <Show when={!loading() && loadError() && !searchQuery().trim() && sessions().length === 0}>
+                  <div
+                    class="flex flex-col items-center justify-center py-8 gap-3 text-center px-4"
+                    style={{ color: "var(--text-weak)" }}
+                  >
+                    <AlertTriangle class="w-5 h-5" style={{ color: "var(--status-warning-text)" }} />
+                    <div>
+                      <p class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>Failed to load sessions</p>
+                      <p class="text-xs mt-1 break-words">{loadError()}</p>
+                    </div>
+                    <Button onClick={() => void loadSessions()} variant="ghost" size="sm">
+                      Retry
+                    </Button>
                   </div>
                 </Show>
 

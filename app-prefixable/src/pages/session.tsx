@@ -52,6 +52,7 @@ import {
 } from "../components/image-attachments";
 import { readNotifyMap, writeNotifyMap } from "../utils/notify";
 import { sessionQuestionRequest } from "../utils/session-tree-request";
+import { errorMessage, withTimeout } from "../utils/request-timeout";
 
 const ACCEPTED_TYPES = [
   "image/png",
@@ -61,6 +62,7 @@ const ACCEPTED_TYPES = [
   "application/pdf",
 ];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
+const SESSION_STATUS_TIMEOUT_MS = 8_000;
 
 interface Command {
   id: string;
@@ -255,6 +257,7 @@ export function Session() {
     ImageAttachment[]
   >([]);
   const [error, setError] = createSignal<string | null>(null);
+  const [historyError, setHistoryError] = createSignal<string | null>(null);
   // Use session tree walk to find pending questions from this session or any descendant.
   // This surfaces child/grandchild session questions in the parent session view.
   const pendingQuestion = createMemo(() =>
@@ -384,17 +387,25 @@ export function Session() {
     wasProcessing.value = false; // Reset to avoid false notifications
     if (id) {
       setLoadingHistory(true);
+      setHistoryError(null);
       setProcessing(false);
       const gen = ++syncGen.value;
       sync.session.sync(id).then(() => {
-        if (syncGen.value === gen) setLoadingHistory(false);
-      }).catch(() => {
-        if (syncGen.value === gen) setLoadingHistory(false);
+        if (syncGen.value !== gen) return;
+        setHistoryError(null);
+        setLoadingHistory(false);
+      }).catch((err) => {
+        if (syncGen.value !== gen) return;
+        setHistoryError(errorMessage(err, "Loading chat history failed"));
+        setLoadingHistory(false);
       });
 
       // Check if this session is actually busy
-      client.session
-        .status({})
+      withTimeout(
+        () => client.session.status({}),
+        SESSION_STATUS_TIMEOUT_MS,
+        "Loading session status",
+      )
         .then((res: { data?: Record<string, { type: string }> }) => {
           const statuses = res.data;
           if (!statuses) return;
@@ -405,9 +416,12 @@ export function Session() {
             if (isBusy) wasProcessing.value = true;
             setProcessing(isBusy);
           }
+        }).catch(() => {
+          return;
         });
     } else {
       setLoadingHistory(false);
+      setHistoryError(null);
       setProcessing(false);
     }
   }));
@@ -1026,12 +1040,14 @@ export function Session() {
   // Refetch is now just re-syncing
   const refetchSession = async () => {
     const id = params.id;
-    if (id) await sync.session.sync(id);
+    if (!id) return;
+    try {
+      await sync.session.sync(id);
+      setHistoryError(null);
+    } catch (err) {
+      setHistoryError(errorMessage(err, "Loading chat history failed"));
+    }
   };
-
-  createEffect(() => {
-    if (sync.ready && loadingHistory()) setLoadingHistory(false);
-  });
 
   // Clear stale localStorage key when sessions are loaded and ID is not found
   createEffect(() => {
@@ -1039,7 +1055,7 @@ export function Session() {
     if (!id) return;
     // loadingHistory() stays true when sync.session.sync() rejects,
     // so this effect only fires after a successful sync — not on transient failures.
-    if (loadingHistory()) return;
+    if (loadingHistory() || historyError()) return;
     const found = sync.session.get(id);
     // Non-archived session exists — keep it
     if (found && !found.time?.archived) return;
@@ -1829,8 +1845,24 @@ export function Session() {
               pendingPermissions().length === 0
             }
             loadingHistory={loadingHistory()}
+            historyError={historyError()}
             sessionStatus={sessionId() ? events.status[sessionId()!] : undefined}
             onRetry={retryTurn}
+            onRetryHistory={() => {
+              const id = params.id;
+              if (!id) return;
+              setLoadingHistory(true);
+              setHistoryError(null);
+              void sync.session.sync(id)
+                .then(() => {
+                  setHistoryError(null);
+                  setLoadingHistory(false);
+                })
+                .catch((err) => {
+                  setHistoryError(errorMessage(err, "Loading chat history failed"));
+                  setLoadingHistory(false);
+                });
+            }}
           />
 
           {/* Question Prompt - rendered outside timeline for proper focus.

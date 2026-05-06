@@ -245,9 +245,11 @@ export function MessageTimeline(props: {
   messages: DisplayMessage[]
   processing: boolean
   loadingHistory: boolean
+  historyError?: string | null
   sessionStatus?: SessionStatus
   onScroll?: (nearBottom: boolean) => void
   onRetry?: (turnId: string) => void
+  onRetryHistory?: () => void
 }) {
   const autoScroll = createAutoScroll({ working: () => props.processing })
 
@@ -367,6 +369,58 @@ export function MessageTimeline(props: {
 
       {/* Main content */}
       <Show when={!props.loadingHistory}>
+        <Show when={props.historyError && turns().length === 0}>
+          <div class="flex flex-col items-center justify-center h-full text-center gap-3 px-6">
+            <p class="text-lg" style={{ color: "var(--status-danger-text)" }}>
+              Failed to load chat history
+            </p>
+            <p class="text-sm max-w-xl" style={{ color: "var(--text-weak)" }}>
+              {props.historyError}
+            </p>
+            <Show when={props.onRetryHistory}>
+              <button
+                onClick={() => props.onRetryHistory?.()}
+                class="px-4 py-2 rounded-lg text-sm transition-colors"
+                style={{
+                  background: "var(--surface-inset)",
+                  color: "var(--text-strong)",
+                  border: "1px solid var(--border-base)",
+                }}
+              >
+                Retry
+              </button>
+            </Show>
+          </div>
+        </Show>
+
+        <Show when={props.historyError && turns().length > 0}>
+          <div
+            class="mb-4 px-4 py-3 rounded-lg flex items-center justify-between gap-3"
+            style={{
+              background: "var(--status-warning-dim)",
+              color: "var(--status-warning-text)",
+              border: "1px solid var(--status-warning-border)",
+            }}
+          >
+            <div class="min-w-0">
+              <div class="text-sm font-medium">Chat history may be incomplete</div>
+              <div class="text-xs opacity-90 break-words">{props.historyError}</div>
+            </div>
+            <Show when={props.onRetryHistory}>
+              <button
+                onClick={() => props.onRetryHistory?.()}
+                class="px-3 py-1.5 rounded-md text-xs shrink-0 transition-colors"
+                style={{
+                  background: "rgba(0, 0, 0, 0.08)",
+                  color: "var(--status-warning-text)",
+                }}
+              >
+                Retry
+              </button>
+            </Show>
+          </div>
+        </Show>
+
         {/* Load earlier button */}
         <Show when={hasMore()}>
           <div class="flex justify-center mb-4">

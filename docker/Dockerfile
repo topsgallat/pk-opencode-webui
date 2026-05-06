@@ -45,13 +45,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     ca-certificates \
     curl \
+    gnupg \
     git \
     openssh-client \
+    python3 \
     sqlite3 \
     sudo \
     unzip \
     xz-utils \
-    openjdk-17-jdk \
     golang-go \
     ripgrep \
     && rm -rf /var/lib/apt/lists/* \
@@ -109,18 +110,12 @@ RUN curl -fsSL https://github.com/rust-analyzer/rust-analyzer/releases/latest/do
     install -m 755 /tmp/rust-analyzer /usr/local/bin/rust-analyzer && \
     rm -f /tmp/rust-analyzer
 
-# Java LSP (jdtls)
-RUN mkdir -p /opt/jdtls && \
-    curl -fsSL https://download.eclipse.org/jdtls/snapshots/jdt-language-server-latest.tar.gz | tar -xzf - -C /opt/jdtls && \
-    ln -sf /opt/jdtls/bin/jdtls /usr/local/bin/jdtls
-
 # Verify installations
 RUN echo "=== Verifying LSP installations ===" && \
-    which typescript-language-server pyright bash-language-server rust-analyzer jdtls && \
+    which typescript-language-server pyright bash-language-server rust-analyzer && \
     typescript-language-server --version && \
     pyright --version && \
     rust-analyzer --version && \
-    jdtls --version && \
     echo "=== All LSPs installed successfully ==="
 
 # Install Playwright with Chromium (Chrome not needed)

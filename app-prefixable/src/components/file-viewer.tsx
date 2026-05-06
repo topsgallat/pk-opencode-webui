@@ -290,7 +290,6 @@ export function FileViewer(props: FileViewerProps) {
                       >
                          <iframe
                            src={htmlBlobUrl()}
-                           sandbox=""
                            class="w-full border-0"
                            style={{ height: "calc(100vh - 120px)", background: "var(--background-base)" }}
                           title="HTML preview"
@@ -358,7 +357,6 @@ export function FileViewer(props: FileViewerProps) {
                   <Show when={isHtml() && htmlPreview()}>
                     <iframe
                       src={htmlBlobUrl()}
-                      sandbox=""
                       class="w-full h-full border-0"
                       title="HTML preview"
                     />

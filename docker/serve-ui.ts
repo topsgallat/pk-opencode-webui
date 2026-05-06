@@ -39,6 +39,8 @@ const PORT = parseInt(process.env.PORT || "8080", 10)
 const API_PORT = parseInt(process.env.OPENCODE_API_PORT || process.env.API_PORT || "4096", 10)
 const API_URL = process.env.API_URL || `http://127.0.0.1:${API_PORT}`
 const OPERATION_MODE = process.env.OPERATION_MODE || "solo"
+const PROXY_REQUEST_TIMEOUT_MS = parseInt(process.env.PROXY_REQUEST_TIMEOUT_MS || "15000", 10)
+const PROXY_SSE_CONNECT_TIMEOUT_MS = parseInt(process.env.PROXY_SSE_CONNECT_TIMEOUT_MS || "10000", 10)
 
 function isForbiddenHostPath(p: string): boolean {
   const norm = nodePath.resolve(p.replace(/\\/g, '/'))
@@ -262,6 +264,52 @@ function shouldAttachProxyAuth(target: URL) {
   return target.port === apiTarget.port && isLoopbackHost(target.hostname) && isLoopbackHost(apiTarget.hostname)
 }
 
+function isAbortError(error: unknown) {
+  return typeof error === "object" && error !== null && "name" in error && (error as { name?: unknown }).name === "AbortError"
+}
+
+function timeoutMessage(label: string, timeoutMs: number) {
+  return `${label} timed out after ${Math.round(timeoutMs / 1000)}s`
+}
+
+async function fetchWithTimeout(target: string, init: RequestInit, timeoutMs: number, label: string) {
+  const controller = new AbortController()
+  const timedOut = { value: false }
+  const timer = setTimeout(() => {
+    timedOut.value = true
+    controller.abort()
+  }, timeoutMs)
+
+  try {
+    return await fetch(target, { ...init, signal: controller.signal })
+  } catch (error) {
+    if (timedOut.value || isAbortError(error)) {
+      throw new Error(timeoutMessage(label, timeoutMs))
+    }
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function readBodyWithTimeout(response: Response, timeoutMs: number, label: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    return await Promise.race([
+      response.arrayBuffer(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(timeoutMessage(label, timeoutMs))), timeoutMs)
+      }),
+    ])
+  } catch (error) {
+    response.body?.cancel().catch(() => {})
+    throw error
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 // MIME types for static files
 const mimeTypes: Record<string, string> = {
   js: "application/javascript",
@@ -409,10 +457,10 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       if (path.startsWith("/event")) {
         console.log("[Proxy] SSE request to:", target.toString())
         try {
-          const response = await fetch(target.toString(), {
+          const response = await fetchWithTimeout(target.toString(), {
             method: req.method,
             headers,
-          })
+          }, PROXY_SSE_CONNECT_TIMEOUT_MS, `SSE upstream ${path}`)
 
           if (!response.ok) {
             console.error("[Proxy] SSE error:", response.status, response.statusText)
@@ -430,23 +478,24 @@ const server = Bun.serve<{ target: string; cookie: string }>({
           })
         } catch (e) {
           console.error("[Proxy] SSE connection error:", e)
-          return new Response("SSE proxy error", { status: 502 })
+          const message = e instanceof Error ? e.message : String(e)
+          return new Response(message, { status: message.includes("timed out") ? 504 : 502 })
         }
       }
 
       // Regular API requests
       console.log("[Proxy] API:", req.method, path)
       try {
-        const response = await fetch(target.toString(), {
+        const response = await fetchWithTimeout(target.toString(), {
           method: req.method,
           headers,
           body: req.body,
-        })
+        }, PROXY_REQUEST_TIMEOUT_MS, `API upstream ${path}`)
 
         // Always materialize upstream response bytes for non-SSE API requests.
         // This prevents Bun from re-compressing streamed responses and allows
         // us to explicitly set Content-Length after optional decompression.
-        const raw = Buffer.from(await response.arrayBuffer())
+        const raw = Buffer.from(await readBodyWithTimeout(response, PROXY_REQUEST_TIMEOUT_MS, `API response body ${path}`))
         let bodyToReturn: Buffer | Uint8Array = raw
 
         const encoding = (response.headers.get("content-encoding") || "").toLowerCase()
@@ -518,7 +567,8 @@ const server = Bun.serve<{ target: string; cookie: string }>({
         })
       } catch (e) {
         console.error("[Proxy] API error:", e)
-        return new Response("API proxy error", { status: 502 })
+        const message = e instanceof Error ? e.message : String(e)
+        return new Response(message, { status: message.includes("timed out") ? 504 : 502 })
       }
     }
 

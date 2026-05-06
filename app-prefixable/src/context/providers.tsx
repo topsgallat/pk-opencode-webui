@@ -4,6 +4,7 @@ import { useSDK } from "./sdk"
 import { useConfig } from "./config"
 import { useServer } from "./server"
 import { getProviderAccounts, saveProviderAccounts, type ProviderAccount } from "../utils/extended-api"
+import { withTimeout } from "../utils/request-timeout"
 
 // Storage key
 const MODELS_BY_AGENT_KEY = "opencode.modelsByAgent"
@@ -12,6 +13,7 @@ const MODELS_BY_AGENT_KEY = "opencode.modelsByAgent"
 const FALLBACK_PROVIDER = "opencode"
 const FALLBACK_MODEL = "big-pickle"
 const FALLBACK_AGENT = "build"
+const PROVIDER_REQUEST_TIMEOUT_MS = 12_000
 
 // Define types locally to avoid SDK type mismatches
 interface Model {
@@ -119,7 +121,7 @@ export function ProviderProvider(props: ParentProps) {
   // Fetch providers
   const [providerData, { refetch: refetchProviders }] = createResource(async () => {
     try {
-      const res = await client.provider.list()
+      const res = await withTimeout(() => client.provider.list(), PROVIDER_REQUEST_TIMEOUT_MS, "Loading providers")
       const data = res.data as ProviderListData | undefined
       if (!data) return undefined
       // Inject providerID into each model since the SDK response doesn't include it
@@ -192,7 +194,7 @@ export function ProviderProvider(props: ParentProps) {
   // Fetch auth methods for all providers (returns { [providerID]: ProviderAuthMethod[] })
   const [authData] = createResource(async () => {
     try {
-      const res = await client.provider.auth()
+      const res = await withTimeout(() => client.provider.auth(), PROVIDER_REQUEST_TIMEOUT_MS, "Loading provider auth methods")
       return (res.data as Record<string, ProviderAuthMethod[]>) ?? {}
     } catch (e) {
       console.error("Failed to fetch auth methods:", e)
@@ -203,7 +205,7 @@ export function ProviderProvider(props: ParentProps) {
   // Fetch agents
   const [agentsData, { refetch: refetchAgents }] = createResource(async () => {
     try {
-      const res = await client.app.agents()
+      const res = await withTimeout(() => client.app.agents(), PROVIDER_REQUEST_TIMEOUT_MS, "Loading agents")
       // The API returns an array directly, SDK wraps it in { data: [...] }
       const agents = res.data
       if (!Array.isArray(agents)) {

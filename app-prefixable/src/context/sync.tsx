@@ -5,6 +5,7 @@ import { useBasePath } from "./base-path"
 import { useSDK } from "./sdk"
 import { appendTargetParam } from "../utils/path"
 import { useClientAuth } from "./client-auth"
+import { errorMessage, fetchWithTimeout, withTimeout } from "../utils/request-timeout"
 
 export type SyncEvent = {
   type: string
@@ -24,6 +25,8 @@ type ProviderData = {
 
 type SyncStore = {
   ready: boolean
+  bootstrapping: boolean
+  bootstrapError: string | null
   session: Session[]
   archivedSession: Session[]
   message: Record<string, MessageWithParts[]>
@@ -34,6 +37,8 @@ type SyncStore = {
 interface SyncContextValue {
   data: SyncStore
   ready: boolean
+  bootstrapping: boolean
+  bootstrapError: string | null
   sessions: () => Session[]
   archivedSessions: () => Session[]
   messages: (sessionID: string) => MessageWithParts[]
@@ -44,6 +49,7 @@ interface SyncContextValue {
     get: (sessionID: string) => Session | undefined
   }
   refresh: () => Promise<void>
+  retryBootstrap: () => Promise<void>
   registerExternalListener: (fn: (event: SyncEvent) => void) => () => void
 }
 
@@ -51,6 +57,9 @@ export const SyncContext = createContext<SyncContextValue>()
 
 const [globalSyncReady, setGlobalSyncReady] = createSignal(false)
 export { globalSyncReady }
+const SYNC_BOOTSTRAP_TIMEOUT_MS = 12_000
+const SYNC_SESSION_TIMEOUT_MS = 12_000
+const SYNC_PROBE_TIMEOUT_MS = 5_000
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
@@ -80,6 +89,8 @@ export function SyncProvider(props: ParentProps) {
 
   const [store, setStore] = createStore<SyncStore>({
     ready: false,
+    bootstrapping: true,
+    bootstrapError: null,
     session: [],
     archivedSession: [],
     message: {},
@@ -203,7 +214,12 @@ export function SyncProvider(props: ParentProps) {
       eventSource = null
 
       const dirParam = directory ? `?directory=${encodeURIComponent(directory)}` : ""
-      const authProbe = fetch(appendTargetParam(prefix(`/session/status${dirParam}`), targetUrl))
+      const authProbe = fetchWithTimeout(
+        appendTargetParam(prefix(`/session/status${dirParam}`), targetUrl),
+        {},
+        SYNC_PROBE_TIMEOUT_MS,
+        "Sync reconnect probe",
+      )
         .then((r) => {
           if (r.status === 401 || r.status === 403) {
             auth.markFailure({ scope: "sync", status: r.status, message: `HTTP ${r.status}` })
@@ -484,8 +500,19 @@ export function SyncProvider(props: ParentProps) {
   }
 
   async function bootstrap() {
+    setStore("bootstrapping", true)
+    setStore("bootstrapError", null)
+
     try {
-      const [sessionsRes, providersRes] = await Promise.all([client.session.list(), client.provider.list()])
+      const [sessionsResult, providersResult] = await Promise.allSettled([
+        withTimeout(() => client.session.list(), SYNC_BOOTSTRAP_TIMEOUT_MS, "Loading sessions"),
+        withTimeout(() => client.provider.list(), SYNC_BOOTSTRAP_TIMEOUT_MS, "Loading providers"),
+      ])
+
+      if (sessionsResult.status === "rejected") throw sessionsResult.reason
+
+      const sessionsRes = sessionsResult.value
+      const providersRes = providersResult.status === "fulfilled" ? providersResult.value : undefined
 
       batch(() => {
         const rawSessions = sessionsRes.data ?? []
@@ -495,11 +522,18 @@ export function SyncProvider(props: ParentProps) {
         setStore("session", reconcile(sessions, { key: "id" }))
         setStore("archivedSession", reconcile(archived, { key: "id" }))
 
-        if (providersRes.data) {
+        if (providersRes?.data) {
           setStore("provider", providersRes.data as unknown as ProviderData)
         }
 
         setStore("ready", true)
+        setStore("bootstrapping", false)
+        setStore(
+          "bootstrapError",
+          providersResult.status === "rejected"
+            ? errorMessage(providersResult.reason, "Loading providers failed")
+            : null,
+        )
         setGlobalSyncReady(true)
       })
 
@@ -508,6 +542,11 @@ export function SyncProvider(props: ParentProps) {
       const result = auth.classifyAuthFailure(err)
       if (result.auth) auth.markFailure({ scope: "sync", status: result.status, message: result.message })
       console.error("[Sync] Bootstrap failed:", err)
+      setStore("bootstrapping", false)
+      setStore("bootstrapError", errorMessage(err, "Loading sessions failed"))
+      setStore("ready", false)
+      setGlobalSyncReady(false)
+      throw err
     }
   }
 
@@ -517,10 +556,14 @@ export function SyncProvider(props: ParentProps) {
 
     const promise = (async () => {
       try {
-        const [sessionRes, messagesRes] = await Promise.all([
-          client.session.get({ sessionID }),
-          client.session.messages({ sessionID }),
-        ])
+        const [sessionRes, messagesRes] = await withTimeout(
+          () => Promise.all([
+            client.session.get({ sessionID }),
+            client.session.messages({ sessionID }),
+          ]),
+          SYNC_SESSION_TIMEOUT_MS,
+          `Loading session ${sessionID}`,
+        )
 
         batch(() => {
           // Update session in appropriate list and remove from other list
@@ -590,6 +633,7 @@ export function SyncProvider(props: ParentProps) {
         })
       } catch (err) {
         console.error("[Sync] Failed to sync session:", sessionID, err)
+        throw err
       }
     })()
 
@@ -618,6 +662,12 @@ export function SyncProvider(props: ParentProps) {
     get ready() {
       return store.ready
     },
+    get bootstrapping() {
+      return store.bootstrapping
+    },
+    get bootstrapError() {
+      return store.bootstrapError
+    },
     sessions: () => store.session,
     archivedSessions: () => store.archivedSession,
     messages: (sessionID: string) => store.message[sessionID] ?? [],
@@ -634,6 +684,7 @@ export function SyncProvider(props: ParentProps) {
       },
     },
     refresh,
+    retryBootstrap: bootstrap,
     registerExternalListener(fn) {
       externalListeners.add(fn)
       return () => externalListeners.delete(fn)

@@ -5,8 +5,11 @@ import { appendTargetParam } from "../utils/path"
 import { useSDK } from "./sdk"
 import { SyncContext, type SyncEvent } from "./sync"
 import { useClientAuth } from "./client-auth"
+import { fetchWithTimeout } from "../utils/request-timeout"
 
 type EventHandler = (event: Event) => void
+const EVENT_SEED_TIMEOUT_MS = 8_000
+const EVENT_PROBE_TIMEOUT_MS = 5_000
 
 interface EventContextValue {
   subscribe: (handler: EventHandler) => () => void
@@ -119,7 +122,12 @@ export function EventProvider(props: ParentProps) {
       eventSource?.close()
       eventSource = null
 
-      const authProbe = fetch(appendTargetParam(`${url}/session/status${dirParam}`, targetUrl))
+      const authProbe = fetchWithTimeout(
+        appendTargetParam(`${url}/session/status${dirParam}`, targetUrl),
+        {},
+        EVENT_PROBE_TIMEOUT_MS,
+        "Event reconnect probe",
+      )
         .then((r) => {
           if (r.status === 401 || r.status === 403) {
             auth.markFailure({ scope: "events", status: r.status, message: `HTTP ${r.status}` })
@@ -155,9 +163,15 @@ export function EventProvider(props: ParentProps) {
     }
 
     if (!directory) return
-    client.question.list({ directory })
+    fetchWithTimeout(
+      appendTargetParam(`${url}/question?directory=${encodeURIComponent(directory)}`, targetUrl),
+      {},
+      EVENT_SEED_TIMEOUT_MS,
+      "Loading pending questions",
+    )
+      .then((r) => r.json())
       .then((res) => {
-        const questions = Array.isArray(res.data) ? res.data : []
+        const questions = Array.isArray(res.data) ? res.data : Array.isArray(res) ? res : []
         for (const q of questions) {
           if (sseAskedQuestions.has(q.sessionID)) continue
           if (sseClearedRequests.has(q.id)) continue
@@ -165,7 +179,13 @@ export function EventProvider(props: ParentProps) {
         }
       })
       .catch((err) => console.error("[Events] Failed to load questions:", err))
-    client.session.status({ directory })
+    fetchWithTimeout(
+      appendTargetParam(`${url}/session/status?directory=${encodeURIComponent(directory)}`, targetUrl),
+      {},
+      EVENT_SEED_TIMEOUT_MS,
+      "Loading session statuses",
+    )
+      .then((r) => r.json())
       .then((res) => {
         const statuses = (res.data ?? {}) as Record<string, SessionStatus>
         for (const [sessionID, s] of Object.entries(statuses)) {

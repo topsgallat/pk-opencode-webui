@@ -7,6 +7,8 @@ import { createBackdropDismiss } from "../utils/backdrop"
 import { useServer } from "../context/server"
 import { getServerCapabilities } from "../utils/server-capabilities"
 
+const MCP_DIALOG_ACTION_TIMEOUT_MS = 15_000
+
 interface Props {
   onClose: () => void
   onAddServer: () => void
@@ -30,20 +32,30 @@ export function MCPDialog(props: Props) {
     if (loading() || deleting()) return
     setLoading(name)
 
-    const status = mcp.servers[name]
-    if (status?.status === "connected") {
-      await mcp.disconnect(name)
-    } else if (status?.status === "needs_auth") {
-      // Start OAuth flow
-      const result = await mcp.startAuth(name)
-      if (result?.authorizationUrl) {
-        window.open(result.authorizationUrl, "_blank")
-      }
-    } else {
-      await mcp.connect(name)
-    }
+    const timer = setTimeout(() => setLoading((current) => (current === name ? null : current)), MCP_DIALOG_ACTION_TIMEOUT_MS)
 
-    setLoading(null)
+    try {
+      const status = mcp.servers[name]
+      if (status?.status === "connected") {
+        await mcp.disconnect(name)
+        return
+      }
+
+      if (status?.status === "needs_auth") {
+        const result = await mcp.startAuth(name)
+        if (result?.authorizationUrl) {
+          window.open(result.authorizationUrl, "_blank")
+        }
+        return
+      }
+
+      await mcp.connect(name)
+    } catch (e) {
+      console.error("[MCPDialog] Failed to toggle server:", name, e)
+    } finally {
+      clearTimeout(timer)
+      setLoading((current) => (current === name ? null : current))
+    }
   }
 
   function requestDelete(name: string) {
@@ -57,12 +69,14 @@ export function MCPDialog(props: Props) {
     if (!name) return
     setToDelete(null)
     setDeleting(name)
+    const timer = setTimeout(() => setDeleting((current) => (current === name ? null : current)), MCP_DIALOG_ACTION_TIMEOUT_MS)
     try {
       await mcp.remove(name)
     } catch (e) {
       console.error("[MCPDialog] Failed to remove server:", e)
     } finally {
-      setDeleting(null)
+      clearTimeout(timer)
+      setDeleting((current) => (current === name ? null : current))
     }
   }
 

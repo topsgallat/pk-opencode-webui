@@ -4,6 +4,7 @@ import { useSDK } from "./sdk"
 import { useEvents } from "./events"
 import { useServer } from "./server"
 import { getServerCapabilities } from "../utils/server-capabilities"
+import { fetchWithTimeout, withTimeout } from "../utils/request-timeout"
 
 // MCP Status types matching the backend
 type MCPStatus =
@@ -66,6 +67,13 @@ interface MCPContextValue {
 
 const MCPContext = createContext<MCPContextValue>()
 
+const MCP_STATUS_TIMEOUT_MS = 12_000
+const MCP_OVERRIDES_TIMEOUT_MS = 12_000
+const MCP_REFRESH_TIMEOUT_MS = 15_000
+const MCP_ACTION_TIMEOUT_MS = 12_000
+const MCP_DELETE_TIMEOUT_MS = 12_000
+const MCP_RESTART_WAIT_MS = 1_500
+
 export function MCPProvider(props: ParentProps) {
   const sdk = useSDK()
   const { client, url } = sdk
@@ -106,7 +114,7 @@ export function MCPProvider(props: ParentProps) {
 
   /** Internal: fetch MCP server status */
   async function fetchStatus(seq: number) {
-    const res = await client.mcp.status().catch((e) => {
+    const res = await withTimeout(() => client.mcp.status(), MCP_STATUS_TIMEOUT_MS, "Loading MCP status").catch((e) => {
       console.error("[MCP] Failed to fetch status:", e)
       return null
     })
@@ -122,7 +130,7 @@ export function MCPProvider(props: ParentProps) {
       setProjectOverrides({})
       return
     }
-    const res = await client.config.get().catch((e) => {
+    const res = await withTimeout(() => client.config.get(), MCP_OVERRIDES_TIMEOUT_MS, "Loading MCP project config").catch((e) => {
       console.error("[MCP] Failed to fetch project config for overrides:", e)
       return null
     })
@@ -138,7 +146,9 @@ export function MCPProvider(props: ParentProps) {
     const seq = ++refreshSeq
     setLoading(true)
     try {
-      await fetchStatus(seq)
+      await withTimeout(() => fetchStatus(seq), MCP_REFRESH_TIMEOUT_MS, "Refreshing MCP status").catch((e) => {
+        console.error("[MCP] Failed to refresh status:", e)
+      })
     } finally {
       if (seq === refreshSeq) setLoading(false)
     }
@@ -149,7 +159,13 @@ export function MCPProvider(props: ParentProps) {
     const seq = ++refreshSeq
     setLoading(true)
     try {
-      await Promise.all([fetchStatus(seq), fetchOverrides(seq)])
+      await withTimeout(
+        () => Promise.all([fetchStatus(seq), fetchOverrides(seq)]),
+        MCP_REFRESH_TIMEOUT_MS,
+        "Refreshing MCP servers",
+      ).catch((e) => {
+        console.error("[MCP] Failed to refresh MCP servers:", e)
+      })
     } finally {
       if (seq === refreshSeq) setLoading(false)
     }
@@ -157,8 +173,12 @@ export function MCPProvider(props: ParentProps) {
 
   async function connect(name: string) {
     try {
-      await client.mcp.connect({ name })
-      await client.global.config.update({ config: { mcp: { [name]: { enabled: true } } } }).catch((e) => console.warn("[MCP] Failed to persist config for", name, e))
+      await withTimeout(() => client.mcp.connect({ name }), MCP_ACTION_TIMEOUT_MS, `Connecting MCP server \"${name}\"`)
+      await withTimeout(
+        () => client.global.config.update({ config: { mcp: { [name]: { enabled: true } } } }),
+        MCP_ACTION_TIMEOUT_MS,
+        `Saving MCP server \"${name}\" config`,
+      ).catch((e) => console.warn("[MCP] Failed to persist config for", name, e))
     } catch (e) {
       console.error("[MCP] Failed to connect:", name, e)
     }
@@ -167,8 +187,12 @@ export function MCPProvider(props: ParentProps) {
 
   async function disconnect(name: string) {
     try {
-      await client.mcp.disconnect({ name })
-      await client.global.config.update({ config: { mcp: { [name]: { enabled: false } } } }).catch((e) => console.warn("[MCP] Failed to persist config for", name, e))
+      await withTimeout(() => client.mcp.disconnect({ name }), MCP_ACTION_TIMEOUT_MS, `Disconnecting MCP server \"${name}\"`)
+      await withTimeout(
+        () => client.global.config.update({ config: { mcp: { [name]: { enabled: false } } } }),
+        MCP_ACTION_TIMEOUT_MS,
+        `Saving MCP server \"${name}\" config`,
+      ).catch((e) => console.warn("[MCP] Failed to persist config for", name, e))
     } catch (e) {
       console.error("[MCP] Failed to disconnect:", name, e)
     }
@@ -181,25 +205,37 @@ export function MCPProvider(props: ParentProps) {
 
       // First, persist the MCP config to the global config file
       // This is necessary because mcp.status() reads from the config file
-      const currentConfig = await client.global.config.get()
+      const currentConfig = await withTimeout(
+        () => client.global.config.get(),
+        MCP_ACTION_TIMEOUT_MS,
+        `Loading MCP config for \"${name}\"`,
+      )
       const existingMcp = (currentConfig.data?.mcp as Record<string, McpConfig> | undefined) || {}
-      await client.global.config.update({
-        config: {
-          mcp: {
-            ...existingMcp,
-            [name]: mcpConfig,
+      await withTimeout(
+        () => client.global.config.update({
+          config: {
+            mcp: {
+              ...existingMcp,
+              [name]: mcpConfig,
+            },
           },
-        },
-      })
+        }),
+        MCP_ACTION_TIMEOUT_MS,
+        `Saving MCP config for \"${name}\"`,
+      )
       console.log("[MCP] Config persisted to global config")
 
       // Now call mcp.add to connect the server
-      const response = await client.mcp.add({ name, config: mcpConfig })
+      const response = await withTimeout(
+        () => client.mcp.add({ name, config: mcpConfig }),
+        MCP_ACTION_TIMEOUT_MS,
+        `Adding MCP server \"${name}\"`,
+      )
       console.log("[MCP] Add server response:", response)
       await refresh()
 
       // Check if the server actually connected successfully
-      const s = await client.mcp.status()
+      const s = await withTimeout(() => client.mcp.status(), MCP_STATUS_TIMEOUT_MS, `Checking MCP server \"${name}\" status`)
       const status = s.data?.[name]
       console.log("[MCP] Server status after add:", status)
 
@@ -226,15 +262,20 @@ export function MCPProvider(props: ParentProps) {
       console.log("[MCP] Removing server:", name)
 
       // First disconnect if connected
-      await client.mcp.disconnect({ name }).catch(() => {
+      await withTimeout(() => client.mcp.disconnect({ name }), MCP_ACTION_TIMEOUT_MS, `Disconnecting MCP server \"${name}\"`).catch(() => {
         // Ignore disconnect errors - server might not be connected
       })
 
       // Remove from global config using extended API endpoint
       // (We can't use the SDK because the backend does a deep merge and doesn't support deletion)
-      const response = await fetch(`${url}/api/ext/mcp/${encodeURIComponent(name)}`, {
-        method: "DELETE",
-      })
+      const response = await fetchWithTimeout(
+        `${url}/api/ext/mcp/${encodeURIComponent(name)}`,
+        {
+          method: "DELETE",
+        },
+        MCP_DELETE_TIMEOUT_MS,
+        `Removing MCP server \"${name}\"`,
+      )
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: response.statusText }))
@@ -245,12 +286,12 @@ export function MCPProvider(props: ParentProps) {
 
       // Trigger a backend restart by updating config (this causes server.instance.disposed)
       // The backend will reload the config file which now has the server removed
-      await client.global.config.update({ config: {} })
+      await withTimeout(() => client.global.config.update({ config: {} }), MCP_ACTION_TIMEOUT_MS, "Restarting MCP backend")
       console.log("[MCP] Triggered backend restart")
 
       // Wait for backend to restart and refresh
       // The server.connected event should also trigger a refresh, but we do it here too for reliability
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await new Promise((resolve) => setTimeout(resolve, MCP_RESTART_WAIT_MS))
       await refresh()
       console.log("[MCP] Refreshed after restart")
     } catch (e) {
@@ -279,11 +320,15 @@ export function MCPProvider(props: ParentProps) {
     try {
       // Deep merge is sufficient — just patch the mcp section with the override.
       // If the project config doesn't exist yet, the backend creates it.
-      await client.config.update({
-        config: {
-          mcp: { [name]: { enabled } },
-        },
-      })
+      await withTimeout(
+        () => client.config.update({
+          config: {
+            mcp: { [name]: { enabled } },
+          },
+        }),
+        MCP_ACTION_TIMEOUT_MS,
+        `Saving project override for MCP server \"${name}\"`,
+      )
       if (enabled) {
         // enabled:true = default, remove from overrides
         setProjectOverrides((prev) => {
@@ -314,11 +359,15 @@ export function MCPProvider(props: ParentProps) {
     }
     addLoading(name)
     try {
-      await client.config.update({
-        config: {
-          mcp: { [name]: { enabled: true } },
-        },
-      })
+      await withTimeout(
+        () => client.config.update({
+          config: {
+            mcp: { [name]: { enabled: true } },
+          },
+        }),
+        MCP_ACTION_TIMEOUT_MS,
+        `Resetting project override for MCP server \"${name}\"`,
+      )
       // Remove from local state — enabled:true is the default / no-override state
       setProjectOverrides((prev) => {
         const next = { ...prev }
@@ -336,7 +385,11 @@ export function MCPProvider(props: ParentProps) {
 
   async function startAuth(name: string): Promise<{ authorizationUrl: string } | null> {
     try {
-      const res = await client.mcp.auth.start({ name })
+      const res = await withTimeout(
+        () => client.mcp.auth.start({ name }),
+        MCP_ACTION_TIMEOUT_MS,
+        `Starting MCP auth for \"${name}\"`,
+      )
       return res.data as { authorizationUrl: string } | null
     } catch (e) {
       console.error("[MCP] Failed to start auth:", name, e)

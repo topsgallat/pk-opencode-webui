@@ -291,8 +291,6 @@ export function ProviderProvider(props: ParentProps) {
 
       // Remove from OpenCode backend (provider-level or account-level)
       await client.auth.remove({ providerID })
-      // Dispose and refetch to refresh the provider state
-      await client.instance.dispose()
       refetch()
       return true
     } catch (e) {

@@ -6,6 +6,7 @@ import { useEvents } from "./events"
 import { useSync } from "./sync"
 import { useServer } from "./server"
 import { buildChildMap, sessionDescendantIds } from "../utils/session-tree-request"
+import { withTimeout } from "../utils/request-timeout"
 
 interface PermissionContextValue {
   pending: () => PermissionRequest[]
@@ -18,6 +19,7 @@ interface PermissionContextValue {
 }
 
 const PermissionContext = createContext<PermissionContextValue>()
+const PERMISSION_TIMEOUT_MS = 15_000
 
 // Permission types that should be auto-accepted when auto-accept is enabled
 function shouldAutoAccept(perm: PermissionRequest): boolean {
@@ -72,13 +74,17 @@ export function PermissionProvider(props: ParentProps) {
     responded.add(id)
     pruneResponded()
 
-    client.permission
-      .respond({
-        sessionID: permission.sessionID,
-        permissionID: id,
-        response,
-        directory,
-      })
+    withTimeout(
+      () =>
+        client.permission.respond({
+          sessionID: permission.sessionID,
+          permissionID: id,
+          response,
+          directory,
+        }),
+      PERMISSION_TIMEOUT_MS,
+      "Permission response",
+    )
       .then(() => {
         // Remove from pending after successful response
         setPermissions(
@@ -132,27 +138,31 @@ export function PermissionProvider(props: ParentProps) {
   onCleanup(unsub)
 
   // Load existing pending permissions on mount
-  client.permission.list({ directory }).then((res: { data?: PermissionRequest[] }) => {
-    const perms = res.data
-    if (!perms) return
+  withTimeout(() => client.permission.list({ directory }), PERMISSION_TIMEOUT_MS, "Permission list")
+    .then((res: { data?: PermissionRequest[] }) => {
+      const perms = res.data
+      if (!perms) return
 
-    for (const perm of perms) {
-      if (!perm?.id) continue
-      if (responded.has(perm.id)) continue
+      for (const perm of perms) {
+        if (!perm?.id) continue
+        if (responded.has(perm.id)) continue
 
-      // Auto-accept if enabled
-      if (autoAccept() && shouldAutoAccept(perm)) {
-        respond(perm.id, "once", perm)
-        continue
+        // Auto-accept if enabled
+        if (autoAccept() && shouldAutoAccept(perm)) {
+          respond(perm.id, "once", perm)
+          continue
+        }
+
+        setPermissions(
+          produce((draft: Record<string, PermissionRequest>) => {
+            draft[perm.id] = perm
+          }),
+        )
       }
-
-      setPermissions(
-        produce((draft: Record<string, PermissionRequest>) => {
-          draft[perm.id] = perm
-        }),
-      )
-    }
-  })
+    })
+    .catch((error: unknown) => {
+      console.error("[Permission] Failed to load pending permissions:", error)
+    })
 
   const pending = createMemo(() => Object.values(permissions))
 

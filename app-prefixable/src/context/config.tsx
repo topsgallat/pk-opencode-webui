@@ -3,6 +3,7 @@ import { createStore, reconcile } from "solid-js/store"
 import { useSDK } from "./sdk"
 import { EventContext } from "./events"
 import type { Config, PermissionConfig, PermissionActionConfig, PermissionRuleConfig } from "../sdk/client"
+import { withTimeout } from "../utils/request-timeout"
 
 interface ConfigContextValue {
   /** Project-scoped config (from opencode.json in project root) */
@@ -22,6 +23,7 @@ interface ConfigContextValue {
 }
 
 const ConfigContext = createContext<ConfigContextValue>()
+const CONFIG_TIMEOUT_MS = 15_000
 
 export function ConfigProvider(props: ParentProps) {
   const sdk = useSDK()
@@ -40,42 +42,45 @@ export function ConfigProvider(props: ParentProps) {
     setLoading(true)
     setError(null)
     const errors: string[] = []
-    // Only fetch project config when a directory is set; otherwise treat as empty
-    if (sdk.directory) {
-      try {
-        const projRes = await sdk.client.config.get()
-        if (seq !== refreshSeq) return // superseded by newer refresh
-        setProject(reconcile((projRes?.data as Config) ?? {}))
-      } catch (e) {
-        console.error("[Config] Failed to fetch project config:", e)
-        if (seq !== refreshSeq) return
-        setProject(reconcile({}))
-        errors.push("project")
-      }
-    } else {
-      setProject(reconcile({}))
-    }
     try {
-      const globalRes = await sdk.client.global.config.get()
-      if (seq !== refreshSeq) return
-      setGlobal(reconcile((globalRes?.data as Config) ?? {}))
-    } catch (e) {
-      console.error("[Config] Failed to fetch global config:", e)
-      if (seq !== refreshSeq) return
-      setGlobal(reconcile({}))
-      errors.push("global")
+      // Only fetch project config when a directory is set; otherwise treat as empty
+      if (sdk.directory) {
+        try {
+          const projRes = await withTimeout(() => sdk.client.config.get(), CONFIG_TIMEOUT_MS, "Config refresh")
+          if (seq !== refreshSeq) return
+          setProject(reconcile((projRes?.data as Config) ?? {}))
+        } catch (e) {
+          console.error("[Config] Failed to fetch project config:", e)
+          if (seq !== refreshSeq) return
+          errors.push("project")
+        }
+      } else {
+        setProject(reconcile({}))
+      }
+      try {
+        const globalRes = await withTimeout(() => sdk.client.global.config.get(), CONFIG_TIMEOUT_MS, "Global config refresh")
+        if (seq !== refreshSeq) return
+        setGlobal(reconcile((globalRes?.data as Config) ?? {}))
+      } catch (e) {
+        console.error("[Config] Failed to fetch global config:", e)
+        if (seq !== refreshSeq) return
+        errors.push("global")
+      }
+      if (errors.length > 0) {
+        setError(`Failed to load ${errors.join(" and ")} configuration`)
+      }
+    } finally {
+      if (seq === refreshSeq) {
+        setInitialLoading(false)
+        setLoading(false)
+      }
     }
-    if (errors.length > 0) {
-      setError(`Failed to load ${errors.join(" and ")} configuration`)
-    }
-    setInitialLoading(false)
-    setLoading(false)
   }
 
   async function updateProject(patch: Config): Promise<Config | null> {
     setError(null)
     try {
-      const res = await sdk.client.config.update({ config: patch })
+      const res = await withTimeout(() => sdk.client.config.update({ config: patch }), CONFIG_TIMEOUT_MS, "Project config update")
       const data = res.data as Config | undefined
       if (data) {
         lastUpdateAt = Date.now()
@@ -93,7 +98,7 @@ export function ConfigProvider(props: ParentProps) {
   async function updateGlobal(patch: Config): Promise<Config | null> {
     setError(null)
     try {
-      const res = await sdk.client.global.config.update({ config: patch })
+      const res = await withTimeout(() => sdk.client.global.config.update({ config: patch }), CONFIG_TIMEOUT_MS, "Global config update")
       const data = res.data as Config | undefined
       if (data) {
         lastUpdateAt = Date.now()

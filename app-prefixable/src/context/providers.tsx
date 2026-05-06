@@ -3,7 +3,7 @@ import { createStore } from "solid-js/store"
 import { useSDK } from "./sdk"
 import { useConfig } from "./config"
 import { useServer } from "./server"
-import { getProviderAccounts, saveProviderAccounts, type ProviderAccount } from "../utils/extended-api"
+import { getProviderAccounts, saveProviderAccounts, removeProviderAccount, type ProviderAccount } from "../utils/extended-api"
 import { withTimeout } from "../utils/request-timeout"
 
 // Storage key
@@ -75,6 +75,7 @@ interface ProviderContextValue {
   setSelectedAgent: (agent: string) => void
   refetch: () => void
   connectProvider: (providerID: string, apiKey: string, accountName?: string) => Promise<boolean>
+  disconnectProvider: (providerID: string) => Promise<boolean>
   startOAuth: (providerID: string, methodIndex: number) => Promise<OAuthAuthorization | undefined>
   completeOAuth: (providerID: string, methodIndex: number, code?: string) => Promise<boolean>
   getAccounts: () => Record<string, ProviderAccount>
@@ -276,6 +277,30 @@ export function ProviderProvider(props: ParentProps) {
     }
   }
 
+  // Disconnect a connected provider/account
+  async function disconnectProvider(providerID: string): Promise<boolean> {
+    try {
+      // If this is an account-scoped provider (provider:account), drop the local account metadata as well
+      if (providerID.includes(":")) {
+        try {
+          removeProviderAccount(providerID)
+        } catch {
+          // Ignore local storage cleanup errors; backend removal is still attempted
+        }
+      }
+
+      // Remove from OpenCode backend (provider-level or account-level)
+      await client.auth.remove({ providerID })
+      // Dispose and refetch to refresh the provider state
+      await client.instance.dispose()
+      refetch()
+      return true
+    } catch (e) {
+      console.error("Failed to disconnect provider:", e)
+      return false
+    }
+  }
+
   async function startOAuth(providerID: string, methodIndex: number): Promise<OAuthAuthorization | undefined> {
     try {
       const res = await client.provider.oauth.authorize({
@@ -345,6 +370,7 @@ export function ProviderProvider(props: ParentProps) {
     setSelectedAgent,
     refetch,
     connectProvider,
+    disconnectProvider,
     startOAuth,
     completeOAuth,
     getAccounts: () => getProviderAccounts(),

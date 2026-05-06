@@ -32,7 +32,7 @@ import {
   removeServerAuth,
   clearServerAuthRevalidation,
 } from "../utils/server-auth"
-import type { Config, PermissionActionConfig } from "../sdk/client"
+import type { Config, PermissionActionConfig, ProviderConfig } from "../sdk/client"
 
 export function Settings() {
   const providers = useProviders()
@@ -252,6 +252,9 @@ export function Settings() {
   const [sshCommandCopied, setSshCommandCopied] = createSignal(false)
   const [sshKeyLoaded, setSshKeyLoaded] = createSignal(false)
 
+  // Disconnect progress state for provider actions
+  const [disconnectingProvider, setDisconnectingProvider] = createSignal<string | null>(null)
+
   // Get auth methods for selected provider
   const selectedProviderAuthMethods = createMemo(() => {
     const id = selectedProvider()
@@ -286,7 +289,9 @@ export function Settings() {
   function onTabChange(tabId: string) {
     setActiveTab(tabId)
     // Persist tab in URL hash for refresh persistence
-    window.history.replaceState(null, "", `#${tabId}`)
+    const url = new URL(window.location.href)
+    url.hash = tabId
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`)
     if (tabId === "git" && !sshKeyLoaded()) {
       setSshKeyLoaded(true)
       loadSshKey()
@@ -817,10 +822,6 @@ Add your project-specific instructions here.
 
   return (
     <div class="h-full flex flex-col md:flex-row" style={{ background: "var(--background-stronger)" }}>
-      {/* Debug banner to verify patch load in UI */}
-      <div id="debug-banner" class="px-4 py-2 text-xs" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)" }}>
-        PATCH LOADED: Settings patch is active
-      </div>
       {/* Tabs sidebar - Hidden on mobile, dropdown used instead */}
       <Show when={!device.isMobile()}>
         <div
@@ -954,20 +955,11 @@ Add your project-specific instructions here.
                   border: "1px solid var(--border-base)",
                 }}
               >
-              <div class="px-4 py-3" style={{ "border-bottom": "1px solid var(--border-base)" }}>
-                <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-                  Connected Providers
-                </h2>
-                <button
-                  id="debug-provider-cta"
-                  type="button"
-                  class="text-xs px-2 py-1 ml-2 rounded"
-                  style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}
-                  onClick={() => console.log("DEBUG: provider patch triggered")}
-                >
-                  Debug: patch check
-                </button>
-              </div>
+                <div class="px-4 py-3" style={{ "border-bottom": "1px solid var(--border-base)" }}>
+                  <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                    Connected Providers
+                  </h2>
+                </div>
                 <div class="p-4">
                   <Show when={providers.loading}>
                     <div class="flex items-center gap-2" style={{ color: "var(--text-weak)" }}>
@@ -989,28 +981,34 @@ Add your project-specific instructions here.
                           const colonIdx = providerID.indexOf(":")
                           const baseProvider = colonIdx > 0 ? providerID.slice(0, colonIdx) : providerID
                           const account = colonIdx > 0 ? providerID.slice(colonIdx + 1) : null
+                          const disconnecting = () => disconnectingProvider() === providerID
+
                           return (
                             <div
-                              class="flex items-center justify-between p-3 rounded-md"
+                              class="flex flex-col gap-3 p-3 rounded-md md:flex-row md:items-center md:justify-between"
                               style={{ background: "var(--surface-inset)" }}
                             >
-                              <div class="flex items-center gap-3">
-                                <div class="w-6 h-6 rounded flex items-center justify-center" style={{ background: "var(--surface-strong)" }}>
+                              <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-6 h-6 rounded flex items-center justify-center shrink-0" style={{ background: "var(--surface-strong)" }}>
                                   <Check class="w-3 h-3" style={{ color: "var(--icon-success-base)" }} />
                                 </div>
-                                <span class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-                                  {getProviderDisplayName(baseProvider)}
-                                </span>
+                                <div class="min-w-0">
+                                  <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                                      {getProviderDisplayName(baseProvider)}
+                                    </span>
+                                    <Show when={account}>
+                                      <span class="text-xs px-2 py-1 rounded" style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}>
+                                        {account}
+                                      </span>
+                                    </Show>
+                                  </div>
+                                  <div class="text-xs mt-0.5" style={{ color: "var(--text-weak)" }}>
+                                    Connected
+                                  </div>
+                                </div>
                               </div>
-                              <div class="flex items-center gap-2">
-                                <Show when={account}>
-                                  <span class="text-xs px-2 py-1 rounded" style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}>
-                                    {account}
-                                  </span>
-                                </Show>
-                                <span class="text-xs" style={{ color: "var(--text-weak)" }}>
-                                  Connected
-                                </span>
+                              <div class="flex items-center gap-2 flex-wrap md:justify-end">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1018,11 +1016,33 @@ Add your project-specific instructions here.
                                     setAccountName("")
                                     setApiKey("")
                                   }}
-                                  class="ml-2 flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors"
+                                  class="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors"
                                   style={{ background: "var(--surface-raised)", color: "var(--text-base)" }}
                                 >
                                   <Plus class="w-3 h-3" />
                                   Add account
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={disconnecting()}
+                                  onClick={async () => {
+                                    setDisconnectingProvider(providerID)
+                                    const ok = await providers.disconnectProvider(providerID)
+                                    if (ok) {
+                                      setSuccess(`Disconnected ${providerID}.`)
+                                      if (selectedProvider() === baseProvider) setSelectedProvider(null)
+                                    } else {
+                                      setError(`Failed to disconnect ${providerID}.`)
+                                    }
+                                    setDisconnectingProvider(null)
+                                  }}
+                                  class="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
+                                  style={{ background: "var(--surface-raised)", color: "var(--interactive-critical)" }}
+                                >
+                                  <Show when={disconnecting()} fallback={<X class="w-3 h-3" />}>
+                                    <Spinner class="w-3 h-3" />
+                                  </Show>
+                                  Disconnect
                                 </button>
                               </div>
                             </div>
@@ -2627,147 +2647,145 @@ Add your project-specific instructions here.
       {/* Server Add/Edit Dialog */}
       <Portal>
         <Show when={showServerDialog()}>
-          {(visible) => (
+          <div
+            class="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.5)" }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                closeServerDialog()
+              }
+            }}
+          >
             <div
-              class="fixed inset-0 z-50 flex items-center justify-center p-4"
-              style={{ background: "rgba(0,0,0,0.5)" }}
-              onClick={(e) => {
-                if (e.target === e.currentTarget) {
-                  closeServerDialog()
-                }
+              class="w-full max-w-md rounded-lg p-6"
+              style={{
+                background: "var(--background-base)",
+                border: "1px solid var(--border-base)",
               }}
+              onClick={(e) => e.stopPropagation()}
             >
-              <div
-                class="w-full max-w-md rounded-lg p-6"
-                style={{
-                  background: "var(--background-base)",
-                  border: "1px solid var(--border-base)",
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h2 class="text-lg font-medium mb-4" style={{ color: "var(--text-strong)" }}>
-                  {editingServer() ? "Edit Server" : "Add Server"}
-                </h2>
+              <h2 class="text-lg font-medium mb-4" style={{ color: "var(--text-strong)" }}>
+                {editingServer() ? "Edit Server" : "Add Server"}
+              </h2>
 
-                <Show when={serverError()}>
-                  <div
-                    class="mb-4 p-3 rounded-md text-sm"
-                    style={{
-                      background: "var(--surface-inset)",
-                      border: "1px solid var(--border-base)",
-                      "border-left": "3px solid var(--interactive-critical)",
-                      color: "var(--interactive-critical)",
-                    }}
-                  >
-                    {serverError()}
-                  </div>
-                </Show>
-
-                <Show when={serverWarn()}>
-                  <div
-                    class="mb-4 p-3 rounded-md text-sm"
-                    style={{
-                      background: "var(--surface-inset)",
-                      border: "1px solid var(--border-base)",
-                      "border-left": "3px solid var(--interactive-warning)",
-                      color: "var(--interactive-warning)",
-                    }}
-                  >
-                    {serverWarn()}
-                  </div>
-                </Show>
-
-                <div class="space-y-4">
-                  <div>
-                    <label class="block text-sm font-medium mb-1" style={{ color: "var(--text-base)" }}>
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      value={serverNameInput()}
-                      onInput={(e) => setServerNameInput(e.currentTarget.value)}
-                      placeholder="e.g., Production, Dev, Local"
-                      class="w-full px-3 py-2 rounded-md text-sm"
-                      style={{
-                        background: "var(--background-base)",
-                        border: "1px solid var(--border-base)",
-                        color: "var(--text-base)",
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium mb-1" style={{ color: "var(--text-base)" }}>
-                      Server URL
-                    </label>
-                    <input
-                      type="text"
-                      value={serverUrlInput()}
-                      onInput={(e) => setServerUrlInput(e.currentTarget.value)}
-                      placeholder="e.g., http://localhost:4096"
-                      class="w-full px-3 py-2 rounded-md text-sm"
-                      style={{
-                        background: "var(--background-base)",
-                        border: "1px solid var(--border-base)",
-                        color: "var(--text-base)",
-                      }}
-                    />
-                    <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
-                      The base URL of your OpenCode backend
-                    </p>
-                  </div>
-                  <div class="flex gap-2">
-                    <div class="flex-1">
-                      <label class="block text-sm font-medium mb-1" style={{ color: "var(--text-base)" }}>
-                        Username (optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={serverUsernameInput()}
-                        onInput={(e) => setServerUsernameInput(e.currentTarget.value)}
-                        placeholder="opencode"
-                        class="w-full px-3 py-2 rounded-md text-sm"
-                        style={{
-                          background: "var(--background-base)",
-                          border: "1px solid var(--border-base)",
-                          color: "var(--text-base)",
-                        }}
-                      />
-                    </div>
-                    <div class="flex-1">
-                      <label class="block text-sm font-medium mb-1" style={{ color: "var(--text-base)" }}>
-                        Password
-                      </label>
-                      <input
-                        type="password"
-                        value={serverPasswordInput()}
-                        onInput={(e) => setServerPasswordInput(e.currentTarget.value)}
-                        placeholder="Leave blank for no auth"
-                        class="w-full px-3 py-2 rounded-md text-sm"
-                        style={{
-                          background: "var(--background-base)",
-                          border: "1px solid var(--border-base)",
-                          color: "var(--text-base)",
-                        }}
-                      />
-                    </div>
-                  </div>
+              <Show when={serverError()}>
+                <div
+                  class="mb-4 p-3 rounded-md text-sm"
+                  style={{
+                    background: "var(--surface-inset)",
+                    border: "1px solid var(--border-base)",
+                    "border-left": "3px solid var(--interactive-critical)",
+                    color: "var(--interactive-critical)",
+                  }}
+                >
+                  {serverError()}
                 </div>
+              </Show>
 
-                <div class="flex justify-end gap-2 mt-6">
-                  <Button onClick={closeServerDialog} variant="secondary" disabled={serverChecking()}>
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={saveServerDialog}
-                    variant="primary"
-                    disabled={!serverNameInput().trim() || !serverUrlInput().trim() || serverChecking()}
-                  >
-                    {serverChecking() ? "Checking..." : editingServer() ? "Save" : "Add"}
-                  </Button>
+              <Show when={serverWarn()}>
+                <div
+                  class="mb-4 p-3 rounded-md text-sm"
+                  style={{
+                    background: "var(--surface-inset)",
+                    border: "1px solid var(--border-base)",
+                    "border-left": "3px solid var(--interactive-warning)",
+                    color: "var(--interactive-warning)",
+                  }}
+                >
+                  {serverWarn()}
+                </div>
+              </Show>
+
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium mb-1" style={{ color: "var(--text-base)" }}>
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={serverNameInput()}
+                    onInput={(e) => setServerNameInput(e.currentTarget.value)}
+                    placeholder="e.g., Production, Dev, Local"
+                    class="w-full px-3 py-2 rounded-md text-sm"
+                    style={{
+                      background: "var(--background-base)",
+                      border: "1px solid var(--border-base)",
+                      color: "var(--text-base)",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1" style={{ color: "var(--text-base)" }}>
+                    Server URL
+                  </label>
+                  <input
+                    type="text"
+                    value={serverUrlInput()}
+                    onInput={(e) => setServerUrlInput(e.currentTarget.value)}
+                    placeholder="e.g., http://localhost:4096"
+                    class="w-full px-3 py-2 rounded-md text-sm"
+                    style={{
+                      background: "var(--background-base)",
+                      border: "1px solid var(--border-base)",
+                      color: "var(--text-base)",
+                    }}
+                  />
+                  <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
+                    The base URL of your OpenCode backend
+                  </p>
+                </div>
+                <div class="flex gap-2">
+                  <div class="flex-1">
+                    <label class="block text-sm font-medium mb-1" style={{ color: "var(--text-base)" }}>
+                      Username (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={serverUsernameInput()}
+                      onInput={(e) => setServerUsernameInput(e.currentTarget.value)}
+                      placeholder="opencode"
+                      class="w-full px-3 py-2 rounded-md text-sm"
+                      style={{
+                        background: "var(--background-base)",
+                        border: "1px solid var(--border-base)",
+                        color: "var(--text-base)",
+                      }}
+                    />
+                  </div>
+                  <div class="flex-1">
+                    <label class="block text-sm font-medium mb-1" style={{ color: "var(--text-base)" }}>
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      value={serverPasswordInput()}
+                      onInput={(e) => setServerPasswordInput(e.currentTarget.value)}
+                      placeholder="Leave blank for no auth"
+                      class="w-full px-3 py-2 rounded-md text-sm"
+                      style={{
+                        background: "var(--background-base)",
+                        border: "1px solid var(--border-base)",
+                        color: "var(--text-base)",
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
+
+              <div class="flex justify-end gap-2 mt-6">
+                <Button onClick={closeServerDialog} variant="secondary" disabled={serverChecking()}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={saveServerDialog}
+                  variant="primary"
+                  disabled={!serverNameInput().trim() || !serverUrlInput().trim() || serverChecking()}
+                >
+                  {serverChecking() ? "Checking..." : editingServer() ? "Save" : "Add"}
+                </Button>
+              </div>
             </div>
-          )}
+          </div>
         </Show>
       </Portal>
     </div>
@@ -2851,6 +2869,14 @@ function ProjectConfigTab() {
   const [saved, setSaved] = createSignal(false)
   const [expandedPerms, setExpandedPerms] = createSignal<string | null>(null)
   const [newPatternTool, setNewPatternTool] = createSignal<string | null>(null)
+  // Local UI state for adding/editing custom providers within Project Config
+  const [newProviderId, setNewProviderId] = createSignal<string>("")
+  const [newProviderName, setNewProviderName] = createSignal<string>("")
+  const [newProviderApi, setNewProviderApi] = createSignal<string>("")
+  const [newProviderNpm, setNewProviderNpm] = createSignal<string>("")
+  const [newProviderEnv, setNewProviderEnv] = createSignal<string>("")
+  const [editingProviderId, setEditingProviderId] = createSignal<string | null>(null)
+  const [providerToRemove, setProviderToRemove] = createSignal<string | null>(null)
   const [newPatternValue, setNewPatternValue] = createSignal("")
   const [newPatternAction, setNewPatternAction] = createSignal<PermissionActionConfig>("deny")
 
@@ -3095,6 +3121,177 @@ function ProjectConfigTab() {
     setSaving(true)
     // Write the full file directly so removed keys are actually deleted
     await writeConfigFile(text)
+  }
+
+  const providerConfigMap = createMemo<Record<string, ProviderConfig>>(() => config.project.provider ?? {})
+
+  const providerOptions = createMemo(() => {
+    const seen = new Set<string>()
+    const result: Array<{ id: string; name: string; connected: boolean; modelIDs: string[] }> = []
+
+    for (const provider of providers.providers) {
+      seen.add(provider.id)
+      result.push({
+        id: provider.id,
+        name: provider.name || provider.id,
+        connected: providers.connected.includes(provider.id),
+        modelIDs: Object.keys(provider.models),
+      })
+    }
+
+    for (const [id, provider] of Object.entries(providerConfigMap())) {
+      if (seen.has(id)) continue
+      result.push({
+        id,
+        name: provider.name || id,
+        connected: providers.connected.includes(id),
+        modelIDs: Object.keys(provider.models ?? {}),
+      })
+    }
+
+    return result.sort((a, b) => a.name.localeCompare(b.name))
+  })
+
+  function resetProviderEditor() {
+    setEditingProviderId(null)
+    setNewProviderId("")
+    setNewProviderName("")
+    setNewProviderApi("")
+    setNewProviderNpm("")
+    setNewProviderEnv("")
+  }
+
+  function projectProviderEnabled(providerID: string) {
+    if (config.project.enabled_providers) return config.project.enabled_providers.includes(providerID)
+    if (config.project.disabled_providers) return !config.project.disabled_providers.includes(providerID)
+    return true
+  }
+
+  async function toggleProjectProvider(providerID: string) {
+    setSaving(true)
+    if (config.project.enabled_providers) {
+      const next = config.project.enabled_providers.includes(providerID)
+        ? config.project.enabled_providers.filter((item) => item !== providerID)
+        : [...config.project.enabled_providers, providerID]
+      const result = await config.updateProject({ enabled_providers: next })
+      setSaving(false)
+      if (result) showSaved()
+      return
+    }
+
+    const disabled = config.project.disabled_providers ?? []
+    const next = disabled.includes(providerID)
+      ? disabled.filter((item) => item !== providerID)
+      : [...disabled, providerID]
+    const result = await config.updateProject({ disabled_providers: next })
+    setSaving(false)
+    if (result) showSaved()
+  }
+
+  function projectProviderModelConfig(providerID: string) {
+    return providerConfigMap()[providerID] ?? {}
+  }
+
+  function projectModelEnabled(providerID: string, modelID: string) {
+    const provider = projectProviderModelConfig(providerID)
+    if (provider.whitelist) return provider.whitelist.includes(modelID)
+    if (provider.blacklist) return !provider.blacklist.includes(modelID)
+    return true
+  }
+
+  async function toggleProjectModel(providerID: string, modelID: string) {
+    setSaving(true)
+    const current = projectProviderModelConfig(providerID)
+    const nextProvider: ProviderConfig = { ...current }
+
+    if (nextProvider.whitelist) {
+      nextProvider.whitelist = nextProvider.whitelist.includes(modelID)
+        ? nextProvider.whitelist.filter((item) => item !== modelID)
+        : [...nextProvider.whitelist, modelID]
+    } else {
+      const blacklist = nextProvider.blacklist ?? []
+      nextProvider.blacklist = blacklist.includes(modelID)
+        ? blacklist.filter((item) => item !== modelID)
+        : [...blacklist, modelID]
+    }
+
+    const result = await config.updateProject({
+      provider: {
+        ...providerConfigMap(),
+        [providerID]: nextProvider,
+      },
+    })
+    setSaving(false)
+    if (result) showSaved()
+  }
+
+  function editProjectProvider(providerID: string) {
+    const provider = providerConfigMap()[providerID]
+    setEditingProviderId(providerID)
+    setNewProviderId(providerID)
+    setNewProviderName(provider?.name ?? providerID)
+    setNewProviderApi(provider?.api ?? "")
+    setNewProviderNpm(provider?.npm ?? "")
+    setNewProviderEnv((provider?.env ?? []).join("\n"))
+  }
+
+  async function saveProjectProvider() {
+    const id = newProviderId().trim()
+    if (!id) {
+      setSaveError("Provider ID is required")
+      return
+    }
+
+    const env = newProviderEnv()
+      .split(/\r?\n/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+
+    const existingID = editingProviderId()
+    const existing = existingID ? providerConfigMap()[existingID] : undefined
+    if (!existingID && providerConfigMap()[id]) {
+      setSaveError(`Provider '${id}' already exists in project config`)
+      return
+    }
+    if (existingID && existingID !== id && providerConfigMap()[id]) {
+      setSaveError(`Provider '${id}' already exists in project config`)
+      return
+    }
+
+    const nextMap = { ...providerConfigMap() }
+    if (existingID && existingID !== id) delete nextMap[existingID]
+
+    nextMap[id] = {
+      ...existing,
+      id,
+      name: newProviderName().trim() || id,
+      ...(newProviderApi().trim() ? { api: newProviderApi().trim() } : {}),
+      ...(newProviderNpm().trim() ? { npm: newProviderNpm().trim() } : {}),
+      ...(env.length > 0 ? { env } : {}),
+    }
+
+    setSaving(true)
+    const result = await config.updateProject({ provider: nextMap })
+    setSaving(false)
+    if (result) {
+      resetProviderEditor()
+      showSaved()
+    }
+  }
+
+  async function removeProjectProvider() {
+    const providerID = providerToRemove()
+    if (!providerID) return
+
+    const full = JSON.parse(JSON.stringify(config.project)) as Config
+    if (full.provider) {
+      delete full.provider[providerID]
+      if (Object.keys(full.provider).length === 0) delete full.provider
+    }
+
+    await writeConfigFile(JSON.stringify(full, null, 2))
+    setProviderToRemove(null)
+    if (editingProviderId() === providerID) resetProviderEditor()
   }
 
   return (
@@ -3388,6 +3585,244 @@ function ProjectConfigTab() {
             </div>
           </section>
 
+          {/* Providers & Models Section */}
+          <section
+            class="rounded-lg overflow-hidden"
+            style={{
+              background: "var(--background-base)",
+              border: "1px solid var(--border-base)",
+            }}
+          >
+            <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
+              <Plug class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
+              <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                Providers and Models
+              </h2>
+            </div>
+            <div class="p-4 space-y-4">
+              <div class="space-y-3">
+                <div>
+                  <h3 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                    Project Provider Access
+                  </h3>
+                  <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
+                    Control which providers are enabled for this project. Connection state is managed in the Providers tab.
+                  </p>
+                </div>
+                <div class="space-y-2">
+                  <For each={providerOptions()}>
+                    {(provider) => (
+                      <div class="flex items-center justify-between gap-4 rounded-md px-3 py-2" style={{ background: "var(--surface-inset)" }}>
+                        <div class="min-w-0">
+                          <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>{provider.name}</span>
+                            <span class="text-xs" style={{ color: "var(--text-weak)" }}>{provider.id}</span>
+                            <Show when={provider.connected}>
+                              <span class="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--surface-raised)", color: "var(--icon-success-base)" }}>
+                                Connected
+                              </span>
+                            </Show>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => toggleProjectProvider(provider.id)}
+                          disabled={saving()}
+                          class="relative w-10 h-5 rounded-full transition-colors disabled:opacity-50"
+                          role="switch"
+                          aria-checked={projectProviderEnabled(provider.id)}
+                          aria-label={`Toggle ${provider.name} for this project`}
+                          style={{ background: projectProviderEnabled(provider.id) ? "var(--interactive-base)" : "var(--surface-raised)" }}
+                        >
+                          <div
+                            class="absolute top-0.5 w-4 h-4 rounded-full transition-all"
+                            style={{
+                              background: "var(--background-base)",
+                              left: projectProviderEnabled(provider.id) ? "calc(100% - 18px)" : "2px",
+                            }}
+                          />
+                        </button>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                <div>
+                  <h3 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                    Project Model Access
+                  </h3>
+                  <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
+                    Model toggles use provider whitelist or blacklist config. If neither exists yet, this UI starts a blacklist for the selected provider.
+                  </p>
+                </div>
+                <div class="space-y-3">
+                  <For each={providerOptions().filter((provider) => provider.modelIDs.length > 0)}>
+                    {(provider) => (
+                      <div class="rounded-md p-3" style={{ background: "var(--surface-inset)" }}>
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                          <div>
+                            <div class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>{provider.name}</div>
+                            <div class="text-xs" style={{ color: "var(--text-weak)" }}>{provider.id}</div>
+                          </div>
+                          <span class="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}>
+                            {projectProviderModelConfig(provider.id).whitelist ? "Whitelist" : "Blacklist"}
+                          </span>
+                        </div>
+                        <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+                          <For each={provider.modelIDs.sort((a, b) => a.localeCompare(b))}>
+                            {(modelID) => (
+                              <div class="flex items-center justify-between gap-3 rounded-md px-3 py-2" style={{ background: "var(--background-base)" }}>
+                                <span class="text-sm truncate" style={{ color: "var(--text-base)" }}>{modelID}</span>
+                                <button
+                                  onClick={() => toggleProjectModel(provider.id, modelID)}
+                                  disabled={saving()}
+                                  class="relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 shrink-0"
+                                  role="switch"
+                                  aria-checked={projectModelEnabled(provider.id, modelID)}
+                                  aria-label={`Toggle ${modelID} for ${provider.name}`}
+                                  style={{ background: projectModelEnabled(provider.id, modelID) ? "var(--interactive-base)" : "var(--surface-inset)" }}
+                                >
+                                  <div
+                                    class="absolute top-0.5 w-4 h-4 rounded-full transition-all"
+                                    style={{
+                                      background: "var(--background-base)",
+                                      left: projectModelEnabled(provider.id, modelID) ? "calc(100% - 18px)" : "2px",
+                                    }}
+                                  />
+                                </button>
+                              </div>
+                            )}
+                          </For>
+                        </div>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                <div>
+                  <h3 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                    Custom Providers
+                  </h3>
+                  <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
+                    Add or edit project-level provider definitions for custom backends. Use JSON view for advanced fields.
+                  </p>
+                </div>
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div class="rounded-md p-3" style={{ background: "var(--surface-inset)" }}>
+                    <div class="flex items-center justify-between gap-2 mb-3">
+                      <span class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                        {editingProviderId() ? `Edit ${editingProviderId()}` : "Add custom provider"}
+                      </span>
+                      <Show when={editingProviderId()}>
+                        <button
+                          onClick={resetProviderEditor}
+                          class="text-xs hover:underline"
+                          style={{ color: "var(--text-interactive-base)" }}
+                        >
+                          Clear
+                        </button>
+                      </Show>
+                    </div>
+                    <div class="space-y-2">
+                      <input
+                        value={newProviderId()}
+                        onInput={(e) => setNewProviderId(e.currentTarget.value)}
+                        placeholder="Provider ID"
+                        class="w-full px-3 py-2 rounded-md text-sm"
+                        style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }}
+                      />
+                      <input
+                        value={newProviderName()}
+                        onInput={(e) => setNewProviderName(e.currentTarget.value)}
+                        placeholder="Display name"
+                        class="w-full px-3 py-2 rounded-md text-sm"
+                        style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }}
+                      />
+                      <input
+                        value={newProviderApi()}
+                        onInput={(e) => setNewProviderApi(e.currentTarget.value)}
+                        placeholder="API module / URL"
+                        class="w-full px-3 py-2 rounded-md text-sm"
+                        style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }}
+                      />
+                      <input
+                        value={newProviderNpm()}
+                        onInput={(e) => setNewProviderNpm(e.currentTarget.value)}
+                        placeholder="NPM package"
+                        class="w-full px-3 py-2 rounded-md text-sm"
+                        style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }}
+                      />
+                      <textarea
+                        value={newProviderEnv()}
+                        onInput={(e) => setNewProviderEnv(e.currentTarget.value)}
+                        rows={4}
+                        placeholder="Environment variables, one per line"
+                        class="w-full px-3 py-2 rounded-md text-sm"
+                        style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }}
+                      />
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <Button onClick={saveProjectProvider} variant="primary" size="sm" disabled={saving() || !newProviderId().trim()}>
+                          <Save class="w-3.5 h-3.5" />
+                          {editingProviderId() ? "Save Provider" : "Add Provider"}
+                        </Button>
+                        <Show when={editingProviderId()}>
+                          <Button onClick={resetProviderEditor} variant="secondary" size="sm" disabled={saving()}>
+                            Cancel
+                          </Button>
+                        </Show>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="rounded-md p-3" style={{ background: "var(--surface-inset)" }}>
+                    <div class="text-sm font-medium mb-3" style={{ color: "var(--text-strong)" }}>
+                      Configured provider entries ({Object.keys(providerConfigMap()).length})
+                    </div>
+                    <Show
+                      when={Object.keys(providerConfigMap()).length > 0}
+                      fallback={<p class="text-sm" style={{ color: "var(--text-weak)" }}>No custom provider config entries yet.</p>}
+                    >
+                      <div class="space-y-2">
+                        <For each={Object.entries(providerConfigMap()).sort((a, b) => a[0].localeCompare(b[0]))}>
+                          {([providerID, provider]) => (
+                            <div class="rounded-md px-3 py-2" style={{ background: "var(--background-base)" }}>
+                              <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                  <div class="text-sm font-medium truncate" style={{ color: "var(--text-strong)" }}>
+                                    {provider.name || providerID}
+                                  </div>
+                                  <div class="text-xs truncate" style={{ color: "var(--text-weak)" }}>{providerID}</div>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                  <button
+                                    onClick={() => editProjectProvider(providerID)}
+                                    class="text-xs px-2 py-1 rounded"
+                                    style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => setProviderToRemove(providerID)}
+                                    class="text-xs px-2 py-1 rounded"
+                                    style={{ background: "var(--surface-inset)", color: "var(--interactive-critical)" }}
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Model Defaults Section */}
           <section
             class="rounded-lg overflow-hidden"
@@ -3570,6 +4005,16 @@ function ProjectConfigTab() {
           </div>
         </section>
       </Show>
+
+      <ConfirmDialog
+        open={!!providerToRemove()}
+        title="Remove Custom Provider"
+        message={`Remove provider '${providerToRemove() ?? ""}' from this project's opencode.json?`}
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={removeProjectProvider}
+        onCancel={() => setProviderToRemove(null)}
+      />
     </div>
   )
 }
@@ -3708,7 +4153,7 @@ function PromptDialog(props: {
               type="button"
               onClick={async () => {
                 try {
-                  await props.onSave();
+                  props.onSave();
                 } catch (err) {
                   console.error("Settings: save failed", err);
                 }

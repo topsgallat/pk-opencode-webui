@@ -181,6 +181,7 @@ export function MessageTurn(props: {
   isLast?: boolean
   onToggle?: (turnId: string, expanded: boolean) => void
   onRetry?: (messageId: string) => void
+  onOpenFile?: (path: string) => void
 }) {
   const [expanded, setExpanded] = createSignal(props.defaultExpanded ?? props.isLast ?? false)
   const [previewUrl, setPreviewUrl] = createSignal<string | null>(null)
@@ -223,8 +224,8 @@ export function MessageTurn(props: {
       .filter((p): p is Part & FilePart => isFilePart(p) && p.mime === "text/plain")
       .map((p) => {
         const raw = p.filename ?? p.url.replace(/^file:\/\//, "")
-        const decoded = decodeURIComponent(raw)
-        return decoded.split("/").pop() || decoded
+        const path = decodeURIComponent(raw)
+        return { path, name: path.split("/").pop() || path }
       })
   )
 
@@ -368,8 +369,13 @@ export function MessageTurn(props: {
             <Show when={fileRefs().length > 0}>
               <div class="flex flex-wrap gap-1.5 mt-2">
                 <For each={fileRefs()}>
-                  {(name) => (
-                    <div
+                  {(file) => (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        props.onOpenFile?.(file.path)
+                      }}
                       class="flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
                       style={{
                         background: "var(--surface-inset)",
@@ -378,8 +384,8 @@ export function MessageTurn(props: {
                       }}
                     >
                       <FileText class="w-3 h-3 shrink-0" style={{ color: "var(--icon-weak)" }} />
-                      {name}
-                    </div>
+                      {file.name}
+                    </button>
                   )}
                 </For>
               </div>
@@ -671,7 +677,7 @@ export function MessageTurn(props: {
                     </Show>
                     {/* Text content */}
                     <Show when={text}>
-                      <Markdown content={text} class="text-sm" />
+                      <Markdown content={text} class="text-sm" onFileClick={props.onOpenFile} linkifyFiles={!!props.onOpenFile} />
                     </Show>
                     {/* Tool calls */}
                     <Show when={tools}>

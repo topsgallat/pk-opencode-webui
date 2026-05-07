@@ -250,6 +250,7 @@ export function MessageTimeline(props: {
   onScroll?: (nearBottom: boolean) => void
   onRetry?: (turnId: string) => void
   onRetryHistory?: () => void
+  onOpenFile?: (path: string) => void
 }) {
   const autoScroll = createAutoScroll({ working: () => props.processing })
 
@@ -458,6 +459,7 @@ export function MessageTimeline(props: {
                 defaultExpanded={expanded()[turn.id] ?? index() === renderedTurns().length - 1}
                 onToggle={handleToggle}
                 onRetry={props.onRetry}
+                onOpenFile={props.onOpenFile}
               />
             )}
           </For>

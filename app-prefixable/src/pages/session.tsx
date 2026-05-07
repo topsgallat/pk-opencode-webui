@@ -106,6 +106,14 @@ export function Session() {
   const server = useServer();
   const device = useDevice();
 
+  function openFilePreview(path: string) {
+    const full = path.startsWith("/") || path.startsWith("file://")
+      ? path.replace(/^file:\/\//, "")
+      : `${directory.replace(/\/$/, "")}/${path}`
+    layout.review.open();
+    layout.tabs.open(full);
+  }
+
   // Unified toast system — only one toast visible at a time
   const [toastTitle, setToastTitle] = createSignal<string | null>(null);
   const [toastMessage, setToastMessage] = createSignal<string | null>(null);
@@ -1848,6 +1856,7 @@ export function Session() {
             historyError={historyError()}
             sessionStatus={sessionId() ? events.status[sessionId()!] : undefined}
             onRetry={retryTurn}
+            onOpenFile={openFilePreview}
             onRetryHistory={() => {
               const id = params.id;
               if (!id) return;
@@ -1864,6 +1873,47 @@ export function Session() {
                 });
             }}
           />
+
+          <Show when={historyError() && !loadingHistory()}>
+            <div
+              class="mx-6 mt-4 px-4 py-3 rounded-lg flex items-center justify-between gap-3"
+              style={{
+                background: "var(--status-danger-dim)",
+                color: "var(--status-danger-text)",
+                border: "1px solid var(--status-danger-border)",
+              }}
+            >
+              <div class="min-w-0">
+                <div class="text-sm font-medium">Failed to load chat history</div>
+                <div class="text-xs opacity-90 break-words">{historyError()}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = params.id;
+                  if (!id) return;
+                  setLoadingHistory(true);
+                  setHistoryError(null);
+                  void sync.session.sync(id)
+                    .then(() => {
+                      setHistoryError(null);
+                      setLoadingHistory(false);
+                    })
+                    .catch((err) => {
+                      setHistoryError(errorMessage(err, "Loading chat history failed"));
+                      setLoadingHistory(false);
+                    });
+                }}
+                class="px-3 py-1.5 rounded-md text-xs shrink-0 transition-colors"
+                style={{
+                  background: "rgba(0, 0, 0, 0.08)",
+                  color: "var(--status-danger-text)",
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          </Show>
 
           {/* Question Prompt - rendered outside timeline for proper focus.
               Uses session tree walk so child/grandchild questions are surfaced here. */}

@@ -49,7 +49,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
   const [diffs, setDiffs] = createSignal<FileDiff[]>([]);
   const [selected, setSelected] = createSignal<string | null>(null);
   const [loading, setLoading] = createSignal(false);
-  const [tab, setTab] = createSignal<"changes" | "all">("changes");
+  const [tab, setTab] = createSignal<"changes" | "all">("all");
   const [isGitRepo, setIsGitRepo] = createSignal<boolean | null>(null); // null = unknown
 
   // Track the latest request to prevent race conditions

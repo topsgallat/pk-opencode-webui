@@ -2,8 +2,11 @@ import {
   createContext,
   useContext,
   createSignal,
+  createEffect,
+  createMemo,
   type ParentProps,
 } from "solid-js";
+import { useSDK } from "./sdk";
 
 // Storage keys
 const LAYOUT_STORAGE_KEY = "opencode.layout";
@@ -31,6 +34,18 @@ interface LayoutState {
   sidebar: { width?: number };
   tabs?: FileTab[];
   activeTab?: string | null; // null = Review tab, string = file path
+}
+
+const DEFAULT_STATE: LayoutState = {
+  review: { opened: false, width: DEFAULT_REVIEW_WIDTH },
+  info: { opened: false, width: DEFAULT_INFO_WIDTH },
+  sidebar: { width: DEFAULT_SIDEBAR_WIDTH },
+  tabs: [],
+  activeTab: null,
+};
+
+function stateKey(directory?: string) {
+  return directory ? `${LAYOUT_STORAGE_KEY}.${directory}` : LAYOUT_STORAGE_KEY;
 }
 
 interface LayoutContextValue {
@@ -74,9 +89,9 @@ function basename(path: string) {
   return idx === -1 ? path : path.slice(idx + 1);
 }
 
-function loadState(): LayoutState {
+function loadState(directory?: string): LayoutState {
   try {
-    const stored = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    const stored = localStorage.getItem(stateKey(directory));
     if (stored) {
       const parsed = JSON.parse(stored);
       const tabs: FileTab[] = parsed.tabs ?? [];
@@ -105,25 +120,21 @@ function loadState(): LayoutState {
   } catch (e) {
     console.error("[Layout] Failed to load state:", e);
   }
-  return {
-    review: { opened: false, width: DEFAULT_REVIEW_WIDTH },
-    info: { opened: false, width: DEFAULT_INFO_WIDTH },
-    sidebar: { width: DEFAULT_SIDEBAR_WIDTH },
-    tabs: [],
-    activeTab: null,
-  };
+  return DEFAULT_STATE;
 }
 
-function saveState(state: LayoutState) {
+function saveState(state: LayoutState, directory?: string) {
   try {
-    localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(stateKey(directory), JSON.stringify(state));
   } catch (e) {
     console.error("[Layout] Failed to save state:", e);
   }
 }
 
 export function LayoutProvider(props: ParentProps) {
-  const initial = loadState();
+  const sdk = useSDK();
+  const directory = createMemo(() => sdk.directory);
+  const initial = loadState(directory());
 
   // Review panel state
   const [reviewOpened, setReviewOpened] = createSignal(initial.review.opened);
@@ -158,8 +169,19 @@ export function LayoutProvider(props: ParentProps) {
       sidebar: { width: sidebarWidth() },
       tabs: fileTabs(),
       activeTab: activeTab(),
-    });
+    }, directory());
   }
+
+  createEffect(() => {
+    const next = loadState(directory());
+    setReviewOpened(next.review.opened);
+    setReviewWidth(next.review.width ?? DEFAULT_REVIEW_WIDTH);
+    setInfoOpened(next.info.opened);
+    setInfoWidth(next.info.width ?? DEFAULT_INFO_WIDTH);
+    setSidebarWidth(Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, next.sidebar.width ?? DEFAULT_SIDEBAR_WIDTH)));
+    setFileTabs(next.tabs ?? []);
+    setActiveTab(next.activeTab ?? null);
+  });
 
   const value: LayoutContextValue = {
     review: {

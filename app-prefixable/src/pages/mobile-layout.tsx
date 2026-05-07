@@ -71,6 +71,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     const branding = useBranding()
     const server = useServer()
     const projectsStorageKey = createMemo(() => `${PROJECTS_STORAGE_KEY}.${server.serverKey()}`)
+    const selectedServerLabel = createMemo(() => server.selectedServer()?.name || server.selectedServer()?.url || "Server")
 
     
     const [sessions, setSessions] = createSignal<Session[]>([])
@@ -660,15 +661,13 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                     <Settings class="w-5 h-5" />
                     <span>Settings</span>
                 </button>
-                <Show when={server.servers().length > 1}>
-                    <button
-                        onClick={() => setShowServerSheet(true)}
-                        style={{ color: getServerCapabilities(server.selectedServer()).isRemoteBackend ? "var(--text-interactive-base)" : "var(--text-weak)" }}
-                    >
-                        <Server class="w-5 h-5" />
-                        <span>Server</span>
-                    </button>
-                </Show>
+                <button
+                    onClick={() => setShowServerSheet(true)}
+                    style={{ color: getServerCapabilities(server.selectedServer()).isRemoteBackend ? "var(--text-interactive-base)" : "var(--text-weak)" }}
+                >
+                    <Server class="w-5 h-5" />
+                    <span class="max-w-16 truncate">{selectedServerLabel()}</span>
+                </button>
             </nav>
             <Show when={showServerSheet()}>
                 <div class="fixed inset-0 z-50" onClick={() => setShowServerSheet(false)}>

@@ -1,8 +1,9 @@
-import { createContext, useContext, batch, type ParentProps } from "solid-js"
+import { createContext, useContext, batch, createEffect, onCleanup, type ParentProps } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import type { FileNode } from "../sdk/client"
 import { useSDK } from "./sdk"
 import { useServer } from "./server"
+import { useEvents } from "./events"
 import { readFile, mkdir, createFile as apiCreateFile, deleteFile as apiDeleteFile, deleteDir as apiDeleteDir } from "../utils/extended-api"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { withTimeout, errorMessage } from "../utils/request-timeout"
@@ -66,6 +67,7 @@ function basename(path: string) {
 export function FileProvider(props: ParentProps) {
   const { client, directory, url: serverUrl, targetUrl } = useSDK()
   const server = useServer()
+  const events = useEvents()
   const capabilities = () => getServerCapabilities(server.selectedServer())
 
   const [store, setStore] = createStore<FileStore>({
@@ -123,6 +125,21 @@ export function FileProvider(props: ParentProps) {
 
     inflight.set(dir, promise)
     return promise
+  }
+
+  function parentDir(path: string) {
+    const idx = path.lastIndexOf("/")
+    return idx === -1 ? "" : path.slice(0, idx)
+  }
+
+  async function refreshDir(dir: string) {
+    batch(() => {
+      setStore("dirs", dir, produce((d) => {
+        d.loaded = false
+        d.loading = false
+      }))
+    })
+    await listDir(dir, { force: true })
   }
 
   function expand(dir: string) {
@@ -251,8 +268,7 @@ export function FileProvider(props: ParentProps) {
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
     const success = await apiCreateFile(serverUrl, fullPath, targetUrl)
     if (success) {
-      const parentDir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""
-      await listDir(parentDir, { force: true })
+      await refreshDir(parentDir(path))
     }
     return success
   }
@@ -262,8 +278,7 @@ export function FileProvider(props: ParentProps) {
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
     const success = await mkdir(serverUrl, fullPath, targetUrl)
     if (success) {
-      const parentDir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""
-      await listDir(parentDir, { force: true })
+      await refreshDir(parentDir(path))
     }
     return success
   }
@@ -273,14 +288,14 @@ export function FileProvider(props: ParentProps) {
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
     const success = await apiDeleteFile(serverUrl, fullPath, targetUrl)
     if (success) {
-      const parentDir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""
+      const dir = parentDir(path)
       batch(() => {
-        if (store.children[parentDir]) {
-          setStore("children", parentDir, store.children[parentDir].filter(c => c.path !== path))
+        if (store.children[dir]) {
+          setStore("children", dir, store.children[dir].filter(c => c.path !== path))
         }
         setStore("files", path, undefined!)
       })
-      await listDir(parentDir, { force: true })
+      await refreshDir(dir)
     }
     return success
   }
@@ -290,10 +305,10 @@ export function FileProvider(props: ParentProps) {
     const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
     const success = await apiDeleteDir(serverUrl, fullPath, targetUrl)
     if (success) {
-      const parentDir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""
+      const dir = parentDir(path)
       batch(() => {
-        if (store.children[parentDir]) {
-          setStore("children", parentDir, store.children[parentDir].filter(c => c.path !== path))
+        if (store.children[dir]) {
+          setStore("children", dir, store.children[dir].filter(c => c.path !== path))
         }
         const prefix = path + "/"
         for (const d of Object.keys(store.dirs)) {
@@ -303,10 +318,26 @@ export function FileProvider(props: ParentProps) {
           if (d === path || d.startsWith(prefix)) setStore("children", d, undefined!)
         }
       })
-      await listDir(parentDir, { force: true })
+      await refreshDir(dir)
     }
     return success
   }
+
+  createEffect(() => {
+    const unsub = events.subscribe((event) => {
+      if (event.type !== "file.watcher.updated") return
+      const file = event.properties?.file
+      if (!file) return
+
+      const normalized = file.replace(/^file:\/\//, "")
+      const local = directory && normalized.startsWith(directory)
+        ? normalized.slice(directory.length).replace(/^\//, "")
+        : normalized.replace(/^\//, "")
+      void refreshDir(parentDir(local))
+    })
+
+    onCleanup(unsub)
+  })
 
   const value: FileContextValue = {
     tree: {

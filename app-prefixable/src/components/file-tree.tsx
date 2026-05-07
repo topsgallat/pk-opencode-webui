@@ -1,4 +1,4 @@
-import { createEffect, createMemo, For, Match, Show, Switch, untrack, createSignal, onCleanup } from "solid-js"
+import { createEffect, createMemo, For, Match, Show, Switch, untrack, createSignal, onCleanup, onMount } from "solid-js"
 import { Portal } from "solid-js/web"
 import { ConfirmDialog } from "./confirm-dialog"
 import type { FileNode } from "../sdk/client"
@@ -26,6 +26,7 @@ const [contextMenu, setContextMenu] = createSignal<{ x: number; y: number; node:
 const [dialogState, setDialogState] = createSignal<{ open: boolean; mode: "file" | "folder"; parentPath: string }>({ open: false, mode: "file", parentPath: "" })
 const [deleteTarget, setDeleteTarget] = createSignal<{ type: "directory" | "file"; path: string; name: string } | FileNode | null>(null)
 const [confirmOpen, setConfirmOpen] = createSignal(false)
+const scrollStore = new Map<string, number>()
 
 if (typeof window !== "undefined") {
   window.addEventListener("click", () => setContextMenu(null))
@@ -77,6 +78,35 @@ export function FileTree(props: FileTreeProps) {
     for (const item of props.kinds?.keys() ?? []) out.add(item)
     if (out.size === 0) return undefined
     return out
+  })
+
+  const scrollKey = createMemo(() => {
+    if (level() !== 0) return undefined
+    if (props.allowed) return `allowed:${props.path}`
+    if (props.modified) return `all:${props.path}`
+    return `plain:${props.path}`
+  })
+
+  let rootRef: HTMLDivElement | undefined
+
+  function saveScroll() {
+    if (!rootRef || !scrollKey()) return
+    scrollStore.set(scrollKey()!, rootRef.scrollTop)
+  }
+
+  function restoreScroll() {
+    if (!rootRef || !scrollKey()) return
+    const y = scrollStore.get(scrollKey()!)
+    if (y == null) return
+    rootRef.scrollTop = y
+  }
+
+  onMount(() => {
+    requestAnimationFrame(restoreScroll)
+  })
+
+  onCleanup(() => {
+    saveScroll()
   })
 
   // Auto-expand directories when in filtered mode
@@ -210,7 +240,12 @@ export function FileTree(props: FileTreeProps) {
   }
 
   return (
-    <div class="flex flex-col gap-0.5 w-full h-full min-h-[100px]" onContextMenu={(e) => level() === 0 ? handleContextMenu(e, { type: "directory", path: "", name: "root" }) : undefined}>
+    <div
+      ref={rootRef}
+      class="flex flex-col gap-0.5 w-full h-full min-h-[100px] overflow-auto"
+      onScroll={saveScroll}
+      onContextMenu={(e) => level() === 0 ? handleContextMenu(e, { type: "directory", path: "", name: "root" }) : undefined}
+    >
       <Show when={level() === 0}>
         <div class="flex items-center justify-between px-2 py-1 mb-1 border-b border-white/5 dark:border-black/5" style={{ "border-color": "var(--border-base)" }}>
           <span class="text-xs font-semibold" style={{ color: "var(--text-weak)" }}>FILES</span>

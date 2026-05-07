@@ -2152,7 +2152,7 @@ export function Layout(props: ParentProps) {
               >
                 <SquareTerminal class="w-5 h-5" />
               </button>
-              <div class="relative flex items-center gap-2">
+              <div class="relative flex flex-col items-center gap-1">
                 <button
                   data-hint-target
                   onClick={() => setServerDropdownOpen(v => !v)}
@@ -2166,7 +2166,7 @@ export function Layout(props: ParentProps) {
                   <Server class="w-5 h-5" />
                 </button>
                 <span
-                  class="text-xs font-medium max-w-28 truncate"
+                  class="text-[10px] font-medium max-w-12 truncate text-center leading-none"
                   style={{ color: "var(--text-weak)" }}
                   title={selectedServerLabel()}
                 >

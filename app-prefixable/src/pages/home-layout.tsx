@@ -163,7 +163,7 @@ export function HomeLayout(props: ParentProps) {
             <ConfigProvider>
               <ProviderProvider>
                 <MCPProvider>
-                <div class="flex h-[100dvh] min-h-0" style={{ background: "var(--background-stronger)" }}>
+                <div class="flex mobile-viewport min-h-0" style={{ background: "var(--background-stronger)" }}>
               {/* Project Dialog */}
               <ProjectDialog
                 open={projectDialogOpen()}
@@ -239,7 +239,7 @@ export function HomeLayout(props: ParentProps) {
                   >
                     <SquareTerminal class="w-5 h-5" />
                   </button>
-                  <div class="relative flex items-center gap-2">
+                  <div class="relative flex flex-col items-center gap-1">
                     <button
                       onClick={() => setServerDropdownOpen(v => !v)}
                       class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
@@ -252,7 +252,7 @@ export function HomeLayout(props: ParentProps) {
                       <Server class="w-5 h-5" />
                     </button>
                     <span
-                      class="text-xs font-medium max-w-28 truncate"
+                      class="text-[10px] font-medium max-w-12 truncate text-center leading-none"
                       style={{ color: "var(--text-weak)" }}
                       title={selectedServerLabel()}
                     >

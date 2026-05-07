@@ -106,12 +106,19 @@ export function Session() {
   const server = useServer();
   const device = useDevice();
 
+  function normalizePreviewPath(raw: string) {
+    const decoded = decodeURIComponent(raw.replace(/^file:\/\//, "")).trim();
+    const withoutLine = decoded.replace(/:\d+(?::\d+)?$/, "");
+    const base = directory.replace(/\/$/, "");
+    if (withoutLine.startsWith(base + "/")) return withoutLine.slice(base.length + 1);
+    if (withoutLine === base) return "";
+    if (withoutLine.startsWith("/")) return withoutLine;
+    return withoutLine.replace(/^\.\//, "");
+  }
+
   function openFilePreview(path: string) {
-    const full = path.startsWith("/") || path.startsWith("file://")
-      ? path.replace(/^file:\/\//, "")
-      : `${directory.replace(/\/$/, "")}/${path}`
     layout.review.open();
-    layout.tabs.open(full);
+    layout.tabs.open(normalizePreviewPath(path));
   }
 
   // Unified toast system — only one toast visible at a time

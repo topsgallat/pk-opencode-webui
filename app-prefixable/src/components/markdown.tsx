@@ -49,7 +49,7 @@ interface MarkdownProps {
   linkifyFiles?: boolean
 }
 
-const FILE_LINK_RE = /(?<![\w./-])((?:\.\.?\/|\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:md|markdown|html|htm|tsx|ts|jsx|js|json|ya?ml|txt|py|go|rs|sh|bash|c|cc|cpp|h|hpp|toml|xml|css))(?![\w./-])/g
+const FILE_LINK_RE = /(?<![\w./-])((?:\.\.?\/|\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:md|markdown|html|htm|tsx|ts|jsx|js|json|ya?ml|txt|py|go|rs|sh|bash|c|cc|cpp|h|hpp|toml|xml|css)(?::\d+(?::\d+)?)?)(?![\w./-])/g
 
 function shouldSkipNode(node: Node) {
   const parent = node.parentElement

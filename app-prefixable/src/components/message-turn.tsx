@@ -223,9 +223,9 @@ export function MessageTurn(props: {
     props.turn.userMessage.parts
       .filter((p): p is Part & FilePart => isFilePart(p) && p.mime === "text/plain")
       .map((p) => {
-        const raw = p.filename ?? p.url.replace(/^file:\/\//, "")
-        const path = decodeURIComponent(raw)
-        return { path, name: path.split("/").pop() || path }
+        const path = decodeURIComponent(p.url.replace(/^file:\/\//, ""))
+        const name = p.filename ?? (path.split("/").pop() || path)
+        return { path, name }
       })
   )
 

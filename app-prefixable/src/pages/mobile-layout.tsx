@@ -488,66 +488,6 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                     )}
                 </Show>
 
-                {/* Project History Bottom Sheet */}
-                <Show when={showProjectHistory()}>
-                    <div class="fixed inset-0 z-50" onClick={() => setShowProjectHistory(false)}>
-                        <div class="absolute inset-0 bg-black/40" />
-                        <div
-                            class="absolute bottom-0 left-0 right-0 rounded-t-2xl overflow-hidden flex flex-col max-h-[80vh]"
-                            style={{ background: "var(--background-base)", "padding-bottom": "env(safe-area-inset-bottom, 16px)" }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            {/* Sheet handle */}
-                            <div class="flex justify-center py-3 shrink-0">
-                                <div class="w-10 h-1 rounded-full" style={{ background: "var(--border-strong)" }} />
-                            </div>
-                            {/* Title */}
-                            <div class="px-4 pb-3 text-sm font-medium shrink-0" style={{ color: "var(--text-strong)" }}>
-                                Recent Projects
-                            </div>
-                            
-                            {/* Scrollable list */}
-                            <div class="overflow-y-auto min-h-0" style={{ "border-top": "1px solid var(--border-base)" }}>
-                                <For each={historyProjects()}>
-                                    {(project) => (
-                                        <button
-                                            class="w-full flex flex-col px-4 py-3 text-left active:opacity-70 transition-opacity"
-                                            style={{ "border-bottom": "1px solid var(--border-base)" }}
-                                            onClick={() => {
-                                                setShowProjectHistory(false)
-                                                navigate(`/${base64Encode(project.worktree)}/session`)
-                                                setMobileTab("chat")
-                                            }}
-                                        >
-                                            <span 
-                                                class="text-sm font-medium truncate w-full" 
-                                                style={{ color: directory === project.worktree ? "var(--text-interactive-base)" : "var(--text-strong)" }}
-                                            >
-                                                {project.name || getFilename(project.worktree)}
-                                            </span>
-                                            <span class="text-xs truncate w-full mt-0.5" style={{ color: "var(--text-weak)" }}>
-                                                {project.worktree}
-                                            </span>
-                                        </button>
-                                    )}
-                                </For>
-                                
-                                {/* Browse Row */}
-                                <button
-                                    class="w-full flex items-center gap-3 px-4 py-4 text-sm active:opacity-70 transition-opacity"
-                                    style={{ color: "var(--text-base)" }}
-                                    onClick={() => {
-                                        setShowProjectHistory(false)
-                                        props.onOpenProject?.()
-                                    }}
-                                >
-                                    <FolderOpen class="w-5 h-5" style={{ color: "var(--icon-weak)" }} />
-                                    <span>Browse / Open new project...</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </Show>
             </div>
         )
     }
@@ -669,6 +609,61 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                     <span class="max-w-16 truncate">{selectedServerLabel()}</span>
                 </button>
             </nav>
+            <Show when={showProjectHistory()}>
+                <div class="fixed inset-0 z-50" onClick={() => setShowProjectHistory(false)}>
+                    <div class="absolute inset-0 bg-black/40" />
+                    <div
+                        class="absolute bottom-0 left-0 right-0 rounded-t-2xl overflow-hidden flex flex-col max-h-[80vh]"
+                        style={{ background: "var(--background-base)", "padding-bottom": "env(safe-area-inset-bottom, 16px)" }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div class="flex justify-center py-3 shrink-0">
+                            <div class="w-10 h-1 rounded-full" style={{ background: "var(--border-strong)" }} />
+                        </div>
+                        <div class="px-4 pb-3 text-sm font-medium shrink-0" style={{ color: "var(--text-strong)" }}>
+                            Recent Projects
+                        </div>
+                        <div class="overflow-y-auto min-h-0" style={{ "border-top": "1px solid var(--border-base)" }}>
+                            <For each={historyProjects()}>
+                                {(project) => (
+                                    <button
+                                        class="w-full flex flex-col px-4 py-3 text-left active:opacity-70 transition-opacity"
+                                        style={{ "border-bottom": "1px solid var(--border-base)" }}
+                                        onClick={() => {
+                                            setShowProjectHistory(false)
+                                            navigate(`/${base64Encode(project.worktree)}/session`)
+                                            setMobileTab("chat")
+                                        }}
+                                    >
+                                        <span
+                                            class="text-sm font-medium truncate w-full"
+                                            style={{ color: directory === project.worktree ? "var(--text-interactive-base)" : "var(--text-strong)" }}
+                                        >
+                                            {project.name || getFilename(project.worktree)}
+                                        </span>
+                                        <span class="text-xs truncate w-full mt-0.5" style={{ color: "var(--text-weak)" }}>
+                                            {project.worktree}
+                                        </span>
+                                    </button>
+                                )}
+                            </For>
+                        </div>
+                        <div class="shrink-0" style={{ "border-top": "1px solid var(--border-base)" }}>
+                            <button
+                                class="w-full flex items-center gap-3 px-4 py-4 text-sm active:opacity-70 transition-opacity"
+                                style={{ color: "var(--text-base)" }}
+                                onClick={() => {
+                                    setShowProjectHistory(false)
+                                    props.onOpenProject?.()
+                                }}
+                            >
+                                <FolderOpen class="w-5 h-5" style={{ color: "var(--icon-weak)" }} />
+                                <span>Browse / Open new project...</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Show>
             <Show when={showServerSheet()}>
                 <div class="fixed inset-0 z-50" onClick={() => setShowServerSheet(false)}>
                     <div class="absolute inset-0 bg-black/40" />

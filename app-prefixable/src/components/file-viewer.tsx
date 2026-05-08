@@ -1,11 +1,12 @@
 import { createSignal, createEffect, Show, Match, Switch, createMemo, onCleanup } from "solid-js"
+import { Portal } from "solid-js/web"
 import { useFile } from "../context/file"
 import { useSDK } from "../context/sdk"
 import { useBasePath } from "../context/base-path"
 import { useServer } from "../context/server"
 import { ContentCode } from "./diff/content-code"
 import { Spinner } from "./ui/spinner"
-import { FileCode, Pencil, Eye, Maximize2, Minimize2, X } from "lucide-solid"
+import { FileCode, Pencil, Eye, Maximize2, X } from "lucide-solid"
 import { writeFile } from "../utils/extended-api"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { EditorDialog } from "./editor-dialog"
@@ -90,6 +91,22 @@ function getLanguage(path: string) {
   }
 }
 
+function normalizePath(path: string) {
+  const absolute = path.startsWith("/")
+  const stack: string[] = []
+
+  for (const part of path.split("/")) {
+    if (!part || part === ".") continue
+    if (part === "..") {
+      stack.pop()
+      continue
+    }
+    stack.push(part)
+  }
+
+  return `${absolute ? "/" : ""}${stack.join("/")}`
+}
+
 export function FileViewer(props: FileViewerProps) {
   const file = useFile()
   const sdk = useSDK()
@@ -115,6 +132,7 @@ export function FileViewer(props: FileViewerProps) {
   const [markdownPreview, setMarkdownPreview] = createSignal(true)
   const [htmlPreview, setHtmlPreview] = createSignal(true)
   const [fullscreenPreview, setFullscreenPreview] = createSignal(false)
+  let fullscreenRef: HTMLDivElement | undefined
   const htmlBlobUrl = createMemo(() => {
     if (!isHtml() || !fileContent()) return undefined
     const blob = new Blob([fileContent()], { type: "text/html" })
@@ -156,11 +174,49 @@ export function FileViewer(props: FileViewerProps) {
 
   createEffect(() => {
     if (!fullscreenPreview()) return
+    const active = document.activeElement as HTMLElement | null
+    const overflow = document.body.style.overflow
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setFullscreenPreview(false)
+      if (e.key === "Escape") {
+        e.preventDefault()
+        setFullscreenPreview(false)
+        return
+      }
+
+      if (e.key !== "Tab" || !fullscreenRef) return
+
+      const focusable = fullscreenRef.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+      if (!focusable.length) {
+        e.preventDefault()
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+        return
+      }
+
+      if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
+
+    document.body.style.overflow = "hidden"
     document.addEventListener("keydown", handler)
+    setTimeout(() => {
+      fullscreenRef?.querySelector<HTMLElement>("button")?.focus()
+    }, 0)
     onCleanup(() => document.removeEventListener("keydown", handler))
+    onCleanup(() => {
+      document.body.style.overflow = overflow
+      active?.focus?.()
+    })
   })
 
   // Bug #8: Save Path
@@ -169,9 +225,13 @@ export function FileViewer(props: FileViewerProps) {
       setSaveError("Saving files directly is available only for the local OpenCode backend.")
       return
     }
-    const fullPath = sdk.directory && !props.path.startsWith("/")
-      ? `${sdk.directory}/${props.path}`
-      : props.path
+    const fullPath = normalizePath(sdk.directory && !props.path.startsWith("/") ? `${sdk.directory}/${props.path}` : props.path)
+    const root = sdk.directory ? normalizePath(sdk.directory) : undefined
+
+    if (root && fullPath !== root && !fullPath.startsWith(`${root}/`)) {
+      setSaveError("Invalid file path.")
+      return
+    }
 
     setSaveError(null)
     const success = await writeFile(basePath.serverUrl, fullPath, newContent)
@@ -227,11 +287,11 @@ export function FileViewer(props: FileViewerProps) {
                 class="px-3 py-1.5 text-xs flex justify-between items-center shrink-0"
                 style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}
               >
-                <div class="truncate">{props.path}</div>
-                <div class="flex items-center gap-1">
+                <div class="truncate flex-1 min-w-0 pr-2">{props.path}</div>
+                <div class="flex items-center gap-1 shrink-0 flex-nowrap">
                   <Show when={isMarkdown()}>
                     <button
-                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center gap-1"
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center gap-1"
                       onClick={() => setMarkdownPreview(!markdownPreview())}
                       title={markdownPreview() ? "Switch to source" : "Switch to preview"}
                       aria-label={markdownPreview() ? "Switch to source" : "Switch to preview"}
@@ -244,7 +304,7 @@ export function FileViewer(props: FileViewerProps) {
                   </Show>
                   <Show when={isHtml()}>
                     <button
-                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center gap-1"
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center gap-1"
                       onClick={() => setHtmlPreview(!htmlPreview())}
                       title={htmlPreview() ? "Switch to source" : "Switch to preview"}
                       aria-label={htmlPreview() ? "Switch to source" : "Switch to preview"}
@@ -255,9 +315,9 @@ export function FileViewer(props: FileViewerProps) {
                       </Show>
                     </button>
                   </Show>
-                  <Show when={() => (isMarkdown() && markdownPreview()) || (isHtml() && htmlPreview())}>
+                  <Show when={(isMarkdown() && markdownPreview()) || (isHtml() && htmlPreview())}>
                     <button
-                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
                       onClick={() => setFullscreenPreview(true)}
                       title="Fullscreen Preview"
                       aria-label="Fullscreen Preview"
@@ -268,7 +328,7 @@ export function FileViewer(props: FileViewerProps) {
                   </Show>
                   <Show when={capabilities().canUseLocalExtFileOps}>
                     <button
-                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
                       onClick={() => setIsEditing(true)}
                       title="Edit File"
                       aria-label="Edit File"
@@ -288,12 +348,13 @@ export function FileViewer(props: FileViewerProps) {
                         when={isHtml() && htmlPreview()}
                         fallback={<ContentCode code={fileContent()} lang={lang()} />}
                       >
-                         <iframe
-                           src={htmlBlobUrl()}
-                           class="w-full border-0"
-                           style={{ height: "calc(100vh - 120px)", background: "var(--background-base)" }}
-                          title="HTML preview"
-                        />
+                    <iframe
+                      src={htmlBlobUrl()}
+                      sandbox=""
+                      class="w-full border-0"
+                      style={{ height: "calc(100vh - 120px)", background: "var(--background-base)" }}
+                      title="HTML preview"
+                    />
                       </Show>
                     }
                   >
@@ -332,44 +393,48 @@ export function FileViewer(props: FileViewerProps) {
       </Show>
 
       <Show when={fullscreenPreview()}>
-         <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
-           <div class="w-full h-full" style={{ background: "var(--background-base)" }}>
-            <button
-              class="absolute top-4 right-4 z-10 p-2 hover:bg-black/10 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
-              onClick={() => setFullscreenPreview(false)}
-              title="Close Fullscreen"
-              aria-label="Close Fullscreen"
+        <Portal>
+          <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" role="presentation">
+            <div
+              ref={fullscreenRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Fullscreen preview"
+              tabIndex={-1}
+              class="w-full h-full relative"
+              style={{ background: "var(--background-base)" }}
             >
-              <X class="w-5 h-5" />
-            </button>
-            <button
-              class="absolute top-4 right-16 z-10 p-2 hover:bg-black/10 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
-              onClick={() => setFullscreenPreview(false)}
-              title="Exit Fullscreen"
-              aria-label="Exit Fullscreen"
-            >
-              <Minimize2 class="w-5 h-5" />
-            </button>
-            <div class="w-full h-full overflow-auto">
-              <Show
-                when={isMarkdown() && markdownPreview()}
-                fallback={
-                  <Show when={isHtml() && htmlPreview()}>
-                    <iframe
-                      src={htmlBlobUrl()}
-                      class="w-full h-full border-0"
-                      title="HTML preview"
-                    />
-                  </Show>
-                }
+              <button
+                class="absolute top-4 right-4 z-10 p-2 hover:bg-black/10 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
+                onClick={() => setFullscreenPreview(false)}
+                title="Close Fullscreen"
+                aria-label="Close Fullscreen"
               >
-                <div class="p-8 max-w-4xl mx-auto">
-                  <Markdown content={fileContent()} class="text-sm" />
-                </div>
-              </Show>
+                <X class="w-5 h-5" />
+              </button>
+              <div class="w-full h-full overflow-auto">
+                <Show
+                  when={isMarkdown() && markdownPreview()}
+                  fallback={
+                    <Show when={isHtml() && htmlPreview()}>
+                      <iframe
+                        src={htmlBlobUrl()}
+                        sandbox=""
+                        tabIndex={-1}
+                        class="w-full h-full border-0"
+                        title="HTML preview"
+                      />
+                    </Show>
+                  }
+                >
+                  <div class="p-8 max-w-4xl mx-auto">
+                    <Markdown content={fileContent()} class="text-sm" />
+                  </div>
+                </Show>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       </Show>
 
       <EditorDialog

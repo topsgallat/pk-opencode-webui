@@ -636,6 +636,14 @@
   overflow: hidden;
 }
 
+.mobile-todo-tray {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-todo-sheet-body {
+  max-height: min(42dvh, 18rem);
+}
+
 .mobile-overlay-header {
   display: flex;
   align-items: center;

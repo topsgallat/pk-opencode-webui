@@ -4,12 +4,77 @@ import { useEvents } from "../context/events"
 import { useProviders } from "../context/providers"
 import { getContextTokens } from "../utils/tokens"
 import { GitBranch, Check, Circle, Loader2, Zap } from "lucide-solid"
+import { splitTodos, useSessionTodos, type Todo } from "../utils/session-todos"
 
-interface Todo {
-  id: string
-  content: string
-  status: string
-  priority: string
+export function TodoListSections(props: { todos: () => Todo[] }) {
+  const pendingTodos = createMemo(() => splitTodos(props.todos()).pending)
+  const completedTodos = createMemo(() => splitTodos(props.todos()).completed)
+
+  const statusIcon = (status: string) => {
+    switch (status) {
+      case "completed":
+        return <Check class="w-3 h-3 shrink-0" style={{ color: "var(--icon-success-base)" }} />
+      case "in_progress":
+        return <Loader2 class="w-3 h-3 shrink-0 animate-spin" style={{ color: "var(--text-interactive-base)" }} />
+      default:
+        return <Circle class="w-3 h-3 shrink-0" style={{ color: "var(--icon-weak)" }} />
+    }
+  }
+
+  return (
+    <div>
+      <Show
+        when={props.todos().length > 0}
+        fallback={
+          <div class="px-3 py-3 text-center">
+            <span class="text-xs" style={{ color: "var(--text-weak)" }}>
+              No tasks
+            </span>
+          </div>
+        }
+      >
+        <Show when={pendingTodos().length > 0}>
+          <div class="px-3 py-2">
+            <div class="text-xs font-medium uppercase mb-1.5" style={{ color: "var(--text-weak)" }}>
+              Tasks ({pendingTodos().length})
+            </div>
+            <div class="space-y-1">
+              <For each={pendingTodos()}>
+                {(todo) => (
+                  <div class="flex items-start gap-2 py-0.5">
+                    <div class="pt-0.5">{statusIcon(todo.status)}</div>
+                    <span class="text-xs" style={{ color: "var(--text-base)" }}>
+                      {todo.content}
+                    </span>
+                  </div>
+                )}
+              </For>
+            </div>
+          </div>
+        </Show>
+
+        <Show when={completedTodos().length > 0}>
+          <div class="px-3 py-2">
+            <div class="text-xs font-medium uppercase mb-1.5" style={{ color: "var(--text-weak)" }}>
+              Done ({completedTodos().length})
+            </div>
+            <div class="space-y-1">
+              <For each={completedTodos()}>
+                {(todo) => (
+                  <div class="flex items-start gap-2 py-0.5 opacity-50">
+                    <div class="pt-0.5">{statusIcon(todo.status)}</div>
+                    <span class="text-xs line-through" style={{ color: "var(--text-weak)" }}>
+                      {todo.content}
+                    </span>
+                  </div>
+                )}
+              </For>
+            </div>
+          </div>
+        </Show>
+      </Show>
+    </div>
+  )
 }
 
 interface SessionSidebarProps {
@@ -21,32 +86,19 @@ export function SessionSidebar(props: SessionSidebarProps) {
   const events = useEvents()
   const providers = useProviders()
 
-  const [todos, setTodos] = createSignal<Todo[]>([])
+  const { todos } = useSessionTodos(() => props.sessionId)
   const [branch, setBranch] = createSignal<string | null>(null)
   const [messages, setMessages] = createSignal<any[]>([])
 
   // Load git branch
   async function loadBranch() {
     try {
-      const res = await client.vcs.get({ directory })
+      const res = await client.vcs.get({ directory: directory ?? "" })
       if (res.data?.branch) {
         setBranch(res.data.branch)
       }
     } catch (e) {
       console.error("[SessionSidebar] Failed to load branch:", e)
-    }
-  }
-
-  // Load todos for session
-  async function loadTodos(sessionId: string) {
-    try {
-      const res = await client.session.todo({ sessionID: sessionId, directory })
-      if (res.data) {
-        setTodos(res.data as Todo[])
-      }
-    } catch (e) {
-      console.error("[SessionSidebar] Failed to load todos:", e)
-      setTodos([])
     }
   }
 
@@ -67,10 +119,8 @@ export function SessionSidebar(props: SessionSidebarProps) {
     const id = props.sessionId
     loadBranch()
     if (id) {
-      loadTodos(id)
       loadMessages(id)
     } else {
-      setTodos([])
       setMessages([])
     }
   })
@@ -117,18 +167,12 @@ export function SessionSidebar(props: SessionSidebarProps) {
     return { tokens: contextTokens, limit, percentage, remaining }
   })
 
-  // Subscribe to todo and message updates
+  // Subscribe to message updates
   createEffect(() => {
     const id = props.sessionId
     if (!id) return
 
     const unsub = events.subscribe((event) => {
-      if (event.type === "todo.updated") {
-        const eventProps = event.properties as { sessionID: string; todos: Todo[] }
-        if (eventProps.sessionID === id) {
-          setTodos(eventProps.todos)
-        }
-      }
       if (event.type === "vcs.branch.updated") {
         const eventProps = event.properties as { branch: string }
         setBranch(eventProps.branch)
@@ -144,20 +188,6 @@ export function SessionSidebar(props: SessionSidebarProps) {
 
     onCleanup(unsub)
   })
-
-  const statusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <Check class="w-3 h-3 shrink-0" style={{ color: "var(--icon-success-base)" }} />
-      case "in_progress":
-        return <Loader2 class="w-3 h-3 shrink-0 animate-spin" style={{ color: "var(--text-interactive-base)" }} />
-      default:
-        return <Circle class="w-3 h-3 shrink-0" style={{ color: "var(--icon-weak)" }} />
-    }
-  }
-
-  const pendingTodos = () => todos().filter((t) => t.status === "pending" || t.status === "in_progress")
-  const completedTodos = () => todos().filter((t) => t.status === "completed" || t.status === "cancelled")
 
   return (
     <div class="h-full flex flex-col overflow-hidden" style={{ background: "var(--background-base)" }}>
@@ -180,58 +210,7 @@ export function SessionSidebar(props: SessionSidebarProps) {
 
       {/* Todos */}
       <div class="flex-1 overflow-y-auto">
-        <Show
-          when={todos().length > 0}
-          fallback={
-            <div class="px-3 py-3 text-center">
-              <span class="text-xs" style={{ color: "var(--text-weak)" }}>
-                No tasks
-              </span>
-            </div>
-          }
-        >
-          {/* Pending/In Progress */}
-          <Show when={pendingTodos().length > 0}>
-            <div class="px-3 py-2">
-              <div class="text-xs font-medium uppercase mb-1.5" style={{ color: "var(--text-weak)" }}>
-                Tasks ({pendingTodos().length})
-              </div>
-              <div class="space-y-1">
-                <For each={pendingTodos()}>
-                  {(todo) => (
-                    <div class="flex items-start gap-2 py-0.5">
-                      <div class="pt-0.5">{statusIcon(todo.status)}</div>
-                      <span class="text-xs" style={{ color: "var(--text-base)" }}>
-                        {todo.content}
-                      </span>
-                    </div>
-                  )}
-                </For>
-              </div>
-            </div>
-          </Show>
-
-          {/* Completed */}
-          <Show when={completedTodos().length > 0}>
-            <div class="px-3 py-2">
-              <div class="text-xs font-medium uppercase mb-1.5" style={{ color: "var(--text-weak)" }}>
-                Done ({completedTodos().length})
-              </div>
-              <div class="space-y-1">
-                <For each={completedTodos()}>
-                  {(todo) => (
-                    <div class="flex items-start gap-2 py-0.5 opacity-50">
-                      <div class="pt-0.5">{statusIcon(todo.status)}</div>
-                      <span class="text-xs line-through" style={{ color: "var(--text-weak)" }}>
-                        {todo.content}
-                      </span>
-                    </div>
-                  )}
-                </For>
-              </div>
-            </div>
-          </Show>
-        </Show>
+        <TodoListSections todos={todos} />
       </div>
 
       {/* Context Usage - below Todos */}

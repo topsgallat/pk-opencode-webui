@@ -14,30 +14,36 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
   const todos = useSessionTodos(props.sessionId)
   const summary = createMemo(() => todos.summary())
   const [lastSession, setLastSession] = createSignal<string | undefined>(undefined)
-  const [suppressed, setSuppressed] = createSignal(false)
+  const [hydrated, setHydrated] = createSignal(false)
 
   createEffect(() => {
     const id = props.sessionId()
     if (id === lastSession()) return
     setLastSession(id)
-    setSuppressed(false)
+    setHydrated(false)
     props.setOpen(false)
   })
 
   createEffect(() => {
     if (summary().total === 0) {
-      setSuppressed(false)
+      setHydrated(false)
       return
     }
 
-    if (props.open() || suppressed()) return
-    setSuppressed(true)
-    props.setOpen(true)
+    if (!hydrated()) {
+      setHydrated(true)
+      return
+    }
+
+    if (summary().active > 0) {
+      if (props.open()) return
+      props.setOpen(true)
+    }
   })
 
   createEffect(() => {
     if (props.processing()) {
-      setSuppressed(true)
+      setHydrated(true)
       props.setOpen(false)
     }
   })
@@ -63,9 +69,6 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
               border: "1px solid var(--border-base)",
             }}
             onClick={() => {
-              if (props.open()) {
-                setSuppressed(true)
-              }
               props.setOpen(!props.open())
             }}
           >
@@ -109,7 +112,6 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
                   class="p-1 rounded-md"
                   style={{ color: "var(--icon-weak)" }}
                   onClick={() => {
-                    setSuppressed(true)
                     props.setOpen(false)
                   }}
                   aria-label="Collapse todo tray"

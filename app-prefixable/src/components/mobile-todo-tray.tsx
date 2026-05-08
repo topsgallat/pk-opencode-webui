@@ -1,4 +1,4 @@
-import { Show, createEffect, createMemo } from "solid-js"
+import { Show, createEffect, createMemo, createSignal } from "solid-js"
 import { ChevronUp, ChevronDown, ListTodo } from "lucide-solid"
 import { TodoListSections } from "./session-sidebar"
 import { useSessionTodos } from "../utils/session-todos"

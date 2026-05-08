@@ -1123,11 +1123,6 @@ export function Session() {
   });
 
   createEffect(() => {
-    sessionId();
-    setShowTodoTray(false)
-  });
-
-  createEffect(() => {
     if (
       showAtPopover() ||
       showSlashPopover() ||

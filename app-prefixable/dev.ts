@@ -1,5 +1,6 @@
 import { watch } from "fs"
 import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
+import { loadCopilotModelMultipliers } from "../shared/copilot-model-multipliers"
 import { resolveProxyAuthHeader } from "../shared/proxy-auth-session"
 
 const BASE_PATH = process.env.BASE_PATH || "/"
@@ -17,6 +18,7 @@ if (BRANDING_NAME) console.log(`  BRANDING: ${BRANDING_NAME}`)
 
 // Initial build
 await import("./build")
+const copilotModelMultipliers = await loadCopilotModelMultipliers()
 
 // Normalize and validate base path (must be a valid path-only prefix)
 function validateBasePath(path: string): string {
@@ -170,6 +172,7 @@ const server = Bun.serve<{ target: string; cookie: string }>({
     const config = JSON.stringify({
       basePath: basePathWithTrailing,
       branding: { name: BRANDING_NAME, url: BRANDING_URL, icon: BRANDING_ICON },
+      copilotModelMultipliers: copilotModelMultipliers.models,
     })
     // HTML-escape basePath for safe insertion into the <base href> attribute
     const escapedBasePath = basePathWithTrailing.replace(/[&<>"']/g, (ch) => {

@@ -2597,8 +2597,10 @@ export function Session() {
                 const accountName = colonIdx > 0 ? p.id.slice(colonIdx + 1) : null
                 return Object.values(p.models).map((m) => {
                   let description = `${p.id}/${m.id}`
-                  if (m.cost) {
-                    const fmt = (n: number) => Number(n.toFixed(2)).toString()
+                  const fmt = (n: number) => Number(n.toFixed(2)).toString()
+                  if (p.id === "github-copilot" && m.copilotMultiplier !== undefined) {
+                    description += ` · x${fmt(m.copilotMultiplier)}`
+                  } else if (m.cost) {
                     description += ` · $${fmt(m.cost.input)}/$${fmt(m.cost.output)}/M tokens`
                   }
                   return {

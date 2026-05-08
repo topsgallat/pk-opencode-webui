@@ -3,6 +3,7 @@ import { createStore } from "solid-js/store"
 import { useSDK } from "./sdk"
 import { useConfig } from "./config"
 import { useServer } from "./server"
+import { getCopilotModelMultipliers, normalizeCopilotModelKey } from "../utils/path"
 import { getProviderAccounts, saveProviderAccounts, removeProviderAccount, type ProviderAccount } from "../utils/extended-api"
 import { withTimeout } from "../utils/request-timeout"
 
@@ -20,6 +21,19 @@ interface Model {
   id: string
   name: string
   providerID?: string  // optional — injected during normalisation
+  copilotMultiplier?: number
+  cost?: {
+    input: number
+    output: number
+    cache_read?: number
+    cache_write?: number
+    context_over_200k?: {
+      input: number
+      output: number
+      cache_read?: number
+      cache_write?: number
+    }
+  }
   limit: {
     context: number
     input?: number
@@ -125,11 +139,19 @@ export function ProviderProvider(props: ParentProps) {
       const res = await withTimeout(() => client.provider.list(), PROVIDER_REQUEST_TIMEOUT_MS, "Loading providers")
       const data = res.data as ProviderListData | undefined
       if (!data) return undefined
+      const multipliers = getCopilotModelMultipliers()
       // Inject providerID into each model since the SDK response doesn't include it
       const all = data.all.map((provider) => ({
         ...provider,
         models: Object.fromEntries(
-          Object.entries(provider.models).map(([k, m]) => [k, { ...m, providerID: provider.id }])
+          Object.entries(provider.models).map(([k, m]) => {
+            const key = normalizeCopilotModelKey(m.name || m.id)
+            return [k, {
+              ...m,
+              providerID: provider.id,
+              copilotMultiplier: provider.id === "github-copilot" ? multipliers[key] : undefined,
+            }]
+          })
         ),
       }))
       return { ...data, all }

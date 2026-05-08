@@ -22,6 +22,7 @@
 
 
 import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
+import { loadCopilotModelMultipliers } from "../shared/copilot-model-multipliers"
 import { resolveProxyAuthHeader } from "../shared/proxy-auth-session"
 import nodePath from "path"
 // Decompression for proxied responses
@@ -205,6 +206,7 @@ const BRANDING_NAME = process.env.BRANDING_NAME || ""
 const BRANDING_URL = process.env.BRANDING_URL || ""
 const BRANDING_ICON = process.env.BRANDING_ICON || ""
 const serverStartTime = Date.now()
+const copilotModelMultipliers = await loadCopilotModelMultipliers()
 
 console.log(`OpenCode UI Server starting...`)
 console.log(`  BASE_PATH: ${BASE_PATH}`)
@@ -624,6 +626,12 @@ const server = Bun.serve<{ target: string; cookie: string }>({
           url: BRANDING_URL || "",
           icon: BRANDING_ICON || "",
         }
+        const opencodeConfig = {
+          basePath: validatedBasePath,
+          branding: brandingConfig,
+          copilotModelMultipliers: copilotModelMultipliers.models,
+        }
+        html = html.replace("window.__OPENCODE__ = window.__OPENCODE__ || {}", `window.__OPENCODE__ = ${JSON.stringify(opencodeConfig)}`)
         html = html.replace(/__BRANDING_CONFIG__/g, JSON.stringify(brandingConfig))
         html = html.replace(/__DEFAULT_SERVER_URL__/g, API_URL.replace(/"/g, ""))
         return maybeGzip(req, html, "text/html", {

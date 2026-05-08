@@ -3,6 +3,7 @@ declare global {
     __OPENCODE__?: {
       basePath?: string
       serverUrl?: string
+      copilotModelMultipliers?: Record<string, number>
     }
   }
 }
@@ -67,6 +68,22 @@ export function getServerUrl(): string {
     return window.location.origin + base
   }
   return "http://localhost:4096"
+}
+
+export function normalizeCopilotModelKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+}
+
+export function getCopilotModelMultipliers(): Record<string, number> {
+  if (typeof window === "undefined") {
+    return {}
+  }
+  return window.__OPENCODE__?.copilotModelMultipliers || {}
 }
 
 export function appendTargetParam(url: string, targetUrl?: string): string {

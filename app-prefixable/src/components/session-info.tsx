@@ -138,6 +138,35 @@ export function SessionInfo(props: SessionInfoProps) {
     return model?.name || selected.modelID
   })
 
+  const modelBadge = createMemo(() => {
+    const selected = providers.selectedModel
+    if (!selected) return null
+    const provider = providers.providers.find((p: { id: string }) => p.id === selected.providerID)
+    const model = provider?.models[selected.modelID]
+    if (!model) return null
+    const fmt = (n: number) => Number(n.toFixed(2)).toString()
+    if (provider?.id === "github-copilot" && model.copilotMultiplier !== undefined) {
+      return (
+        <span
+          class="text-[10px] px-1 py-0.5 rounded shrink-0 leading-none"
+          style={{ color: "var(--text-weak)", background: "var(--surface-inset)" }}
+        >
+          x{fmt(model.copilotMultiplier)}
+        </span>
+      )
+    }
+    const cost = model.cost
+    if (!cost) return null
+    return (
+      <span
+        class="text-[10px] px-1 py-0.5 rounded shrink-0 leading-none"
+        style={{ color: "var(--text-weak)", background: "var(--surface-inset)" }}
+      >
+        ${fmt(cost.input)}/${fmt(cost.output)}/M
+      </span>
+    )
+  })
+
   // Token popover state — reset when session changes
   const [showTokenPopover, setShowTokenPopover] = createSignal(false)
   createEffect(() => {
@@ -219,6 +248,7 @@ export function SessionInfo(props: SessionInfoProps) {
           >
             <span class="opacity-60 shrink-0">Model:</span>
             <span class="truncate" style={{ color: "var(--text-base)" }}>{modelLabel()}</span>
+            {modelBadge()}
           </button>
         </Show>
 

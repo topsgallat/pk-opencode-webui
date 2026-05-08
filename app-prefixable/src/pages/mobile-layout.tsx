@@ -688,11 +688,9 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                                             setSearchQuery("")
                                             setShowArchived(false)
                                             setMenuSession(null)
-                                            const href = getServerSwitchHref(s, directory)
                                             server.setSelectedServer(s.id)
                                             setShowServerSheet(false)
-                                            setMobileTab("sessions")
-                                            navigate(href, { replace: true })
+                                            navigate("/", { replace: true })
                                         }}
                                     >
                                         <Server class="w-5 h-5 shrink-0" style={{ color: "var(--icon-weak)" }} />

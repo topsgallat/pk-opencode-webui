@@ -3,7 +3,7 @@ import { createStore } from "solid-js/store"
 import { useSDK } from "./sdk"
 import { useConfig } from "./config"
 import { useServer } from "./server"
-import { getCopilotModelMultipliers, normalizeCopilotModelKey } from "../utils/path"
+import { getCopilotModelMultipliers, getOpenAIModelPricing, normalizeCopilotModelKey } from "../utils/path"
 import { getProviderAccounts, saveProviderAccounts, removeProviderAccount, type ProviderAccount } from "../utils/extended-api"
 import { withTimeout } from "../utils/request-timeout"
 
@@ -17,14 +17,14 @@ const FALLBACK_AGENT = "build"
 const PROVIDER_REQUEST_TIMEOUT_MS = 12_000
 
 // Define types locally to avoid SDK type mismatches
-interface Model {
+  interface Model {
   id: string
   name: string
   providerID?: string  // optional — injected during normalisation
   copilotMultiplier?: number
-  cost?: {
-    input: number
-    output: number
+    cost?: {
+      input: number
+      output: number
     cache_read?: number
     cache_write?: number
     context_over_200k?: {
@@ -34,11 +34,15 @@ interface Model {
       cache_write?: number
     }
   }
-  limit: {
-    context: number
-    input?: number
-    output: number
+    limit: {
+      context: number
+      input?: number
+      output: number
+    }
   }
+
+function isZeroCost(cost?: Model["cost"]): boolean {
+  return !cost || (cost.input === 0 && cost.output === 0)
 }
 
 interface Provider {
@@ -146,10 +150,18 @@ export function ProviderProvider(props: ParentProps) {
         models: Object.fromEntries(
           Object.entries(provider.models).map(([k, m]) => {
             const key = normalizeCopilotModelKey(m.name || m.id)
+            const openaiPricing = getOpenAIModelPricing(provider.id, m.id, m.name)
             return [k, {
               ...m,
               providerID: provider.id,
               copilotMultiplier: provider.id === "github-copilot" ? multipliers[key] : undefined,
+              cost: openaiPricing && isZeroCost(m.cost)
+                ? {
+                    input: openaiPricing.input,
+                    output: openaiPricing.output,
+                    ...(openaiPricing.cachedInput !== undefined ? { cache_read: openaiPricing.cachedInput } : {}),
+                  }
+                : m.cost,
             }]
           })
         ),

@@ -4,6 +4,11 @@ declare global {
       basePath?: string
       serverUrl?: string
       copilotModelMultipliers?: Record<string, number>
+      openaiPricing?: Record<string, {
+        input: number
+        output: number
+        cachedInput?: number
+      }>
     }
   }
 }
@@ -79,6 +84,17 @@ export function normalizeCopilotModelKey(value: string): string {
     .replace(/^-|-$/g, "")
 }
 
+export function normalizeOpenAIModelKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\[\^.*?\]/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/[^a-z0-9.]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+}
+
 export function getCopilotModelMultipliers(): Record<string, number> {
   if (typeof window === "undefined") {
     return {}
@@ -90,6 +106,12 @@ export function getCopilotMultiplier(providerID: string, modelID: string, modelN
   if (providerID !== "github-copilot") return undefined
   const key = normalizeCopilotModelKey(modelName || modelID)
   return getCopilotModelMultipliers()[key]
+}
+
+export function getOpenAIModelPricing(providerID: string, modelID: string, modelName?: string): { input: number; output: number; cachedInput?: number } | undefined {
+  if (!(providerID === "openai" || providerID.startsWith("openai:"))) return undefined
+  const key = normalizeOpenAIModelKey(modelName || modelID)
+  return window.__OPENCODE__?.openaiPricing?.[key]
 }
 
 export function appendTargetParam(url: string, targetUrl?: string): string {

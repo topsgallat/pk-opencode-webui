@@ -27,6 +27,7 @@ import { useSavedPrompts } from "../context/saved-prompts";
 import { useTerminal } from "../context/terminal";
 import { useConfig } from "../context/config";
 import { useServer } from "../context/server";
+import { getCopilotMultiplier } from "../utils/path";
 import { MessageTimeline } from "../components/message-timeline";
 import { MCPDialog } from "../components/mcp-dialog";
 import { MCPAddDialog } from "../components/mcp-add-dialog";
@@ -2591,8 +2592,9 @@ export function Session() {
                 return Object.values(p.models).map((m) => {
                   let description = `${p.id}/${m.id}`
                   const fmt = (n: number) => Number(n.toFixed(2)).toString()
-                  if (p.id === "github-copilot" && m.copilotMultiplier !== undefined) {
-                    description += ` · x${fmt(m.copilotMultiplier)}`
+                  const multiplier = getCopilotMultiplier(p.id, m.id, m.name) ?? m.copilotMultiplier
+                  if (multiplier !== undefined) {
+                    description += ` · x${fmt(multiplier)}`
                   } else if (m.cost) {
                     description += ` · $${fmt(m.cost.input)}/$${fmt(m.cost.output)}/M tokens`
                   }

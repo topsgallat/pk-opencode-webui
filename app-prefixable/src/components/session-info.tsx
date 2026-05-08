@@ -3,6 +3,7 @@ import { Portal } from "solid-js/web"
 import { useParams } from "@solidjs/router"
 import { useSync } from "../context/sync"
 import { useProviders } from "../context/providers"
+import { getCopilotMultiplier } from "../utils/path"
 import { getContextTokens } from "../utils/tokens"
 import { CornerDownLeft, Square, Zap } from "lucide-solid"
 import { ConnectionBadge } from "./connection-badge"
@@ -145,13 +146,14 @@ export function SessionInfo(props: SessionInfoProps) {
     const model = provider?.models[selected.modelID]
     if (!model) return null
     const fmt = (n: number) => Number(n.toFixed(2)).toString()
-    if (provider?.id === "github-copilot" && model.copilotMultiplier !== undefined) {
+    const multiplier = getCopilotMultiplier(provider?.id || "", model.id, model.name) ?? model.copilotMultiplier
+    if (multiplier !== undefined) {
       return (
         <span
           class="text-[10px] px-1 py-0.5 rounded shrink-0 leading-none"
           style={{ color: "var(--text-weak)", background: "var(--surface-inset)" }}
         >
-          x{fmt(model.copilotMultiplier)}
+          x{fmt(multiplier)}
         </span>
       )
     }

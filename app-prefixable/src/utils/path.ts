@@ -86,6 +86,12 @@ export function getCopilotModelMultipliers(): Record<string, number> {
   return window.__OPENCODE__?.copilotModelMultipliers || {}
 }
 
+export function getCopilotMultiplier(providerID: string, modelID: string, modelName?: string): number | undefined {
+  if (providerID !== "github-copilot") return undefined
+  const key = normalizeCopilotModelKey(modelName || modelID)
+  return getCopilotModelMultipliers()[key]
+}
+
 export function appendTargetParam(url: string, targetUrl?: string): string {
   if (!targetUrl) return url
   if (typeof window === "undefined") return url

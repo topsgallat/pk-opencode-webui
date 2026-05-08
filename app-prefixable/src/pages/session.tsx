@@ -9,6 +9,7 @@ import {
   createMemo,
   on,
   untrack,
+  batch,
 } from "solid-js";
 import { useParams, useNavigate } from "@solidjs/router";
 import { generateUUID } from "../utils/uuid";
@@ -34,6 +35,7 @@ import { QuestionPrompt } from "../components/question-prompt";
 import { PermissionPrompt } from "../components/permission-prompt";
 import { SessionInfo } from "../components/session-info";
 import { SessionSidebar } from "../components/session-sidebar";
+import { MobileTodoTray } from "../components/mobile-todo-tray";
 import { ReviewPanel } from "../components/review-panel";
 import { Terminal } from "../components/terminal";
 import { SessionHeader } from "../components/session-header";
@@ -83,10 +85,50 @@ interface SessionDraft {
 }
 const drafts = new Map<string, SessionDraft>();
 
+interface SessionSelection {
+  agent: string;
+  model: { providerID: string; modelID: string };
+}
+
+const SESSION_SELECTIONS_KEY = "opencode.sessionSelections";
+
 // Composite key for the drafts Map so drafts are scoped to a directory+session
 // pair. Uses "__new__" as sentinel when there is no session id yet.
 function draftKey(serverKey: string, dir: string, id?: string) {
   return `${serverKey}:${dir}:${id ?? "__new__"}`;
+}
+
+function selectionKey(serverKey: string, dir: string) {
+  return `${SESSION_SELECTIONS_KEY}.${serverKey}.${dir}`;
+}
+
+function parseDraftKey(key: string) {
+  const first = key.indexOf(":");
+  const last = key.lastIndexOf(":");
+  if (first < 0 || last < 0 || last <= first) return null;
+  return {
+    serverKey: key.slice(0, first),
+    dir: key.slice(first + 1, last),
+    id: key.slice(last + 1),
+  };
+}
+
+function readSelections(serverKey: string, dir: string) {
+  try {
+    const raw = localStorage.getItem(selectionKey(serverKey, dir));
+    return raw ? (JSON.parse(raw) as Record<string, SessionSelection>) : {};
+  } catch (e) {
+    console.error("Failed to load session selections:", e);
+    return {};
+  }
+}
+
+function writeSelections(serverKey: string, dir: string, selections: Record<string, SessionSelection>) {
+  try {
+    localStorage.setItem(selectionKey(serverKey, dir), JSON.stringify(selections));
+  } catch (e) {
+    console.error("Failed to save session selections:", e);
+  }
 }
 
 export function Session() {
@@ -109,7 +151,13 @@ export function Session() {
   function normalizePreviewPath(raw: string) {
     const decoded = decodeURIComponent(raw.replace(/^file:\/\//, "")).trim();
     const withoutLine = decoded.replace(/:\d+(?::\d+)?$/, "");
-    const base = directory.replace(/\/$/, "");
+    const dir = directory;
+    if (!dir) {
+      if (withoutLine.startsWith("/")) return withoutLine;
+      return withoutLine.replace(/^\.\//, "");
+    }
+
+    const base = dir.replace(/\/$/, "");
     if (withoutLine.startsWith(base + "/")) return withoutLine.slice(base.length + 1);
     if (withoutLine === base) return "";
     if (withoutLine.startsWith("/")) return withoutLine;
@@ -264,6 +312,7 @@ export function Session() {
   const [showFilePicker, setShowFilePicker] = createSignal(false);
   const [showForkPicker, setShowForkPicker] = createSignal(false);
   const [showSavePrompt, setShowSavePrompt] = createSignal(false);
+  const [showTodoTray, setShowTodoTray] = createSignal(false);
   const [savePromptTitle, setSavePromptTitle] = createSignal("");
   const [savePromptBody, setSavePromptBody] = createSignal("");
 
@@ -370,6 +419,21 @@ export function Session() {
     // Save draft from the previous session before switching.
     // Read signals via untrack() so they aren't tracked dependencies.
     if (prevKey && prevKey !== key) {
+      const prevId = untrack(sessionId);
+      const prev = parseDraftKey(prevKey);
+      const prevDir = prev?.dir;
+      if (prevId && prevDir) {
+        const selections = readSelections(prev?.serverKey ?? server.serverKey(), prevDir);
+        const model = untrack(() => providers.selectedModel);
+        if (model) {
+          selections[prevId] = {
+            agent: untrack(() => providers.selectedAgent),
+            model: { providerID: model.providerID, modelID: model.modelID },
+          };
+          writeSelections(prev?.serverKey ?? server.serverKey(), prevDir, selections);
+        }
+      }
+
       const text = untrack(input);
       const files = untrack(fileContext);
       const images = untrack(imageAttachments);
@@ -440,6 +504,40 @@ export function Session() {
       setProcessing(false);
     }
   }));
+
+  createEffect(on(
+    () => draftKey(server.serverKey(), params.dir, sessionId()),
+    () => {
+      const id = sessionId();
+      const dir = params.dir;
+      if (!id || typeof dir !== "string" || !dir) return;
+
+      const selections = readSelections(server.serverKey(), dir);
+      const saved = selections[id];
+      if (!saved) return;
+
+      batch(() => {
+        providers.setSelectedAgent(saved.agent);
+        providers.setSelectedModel(saved.model);
+      });
+    },
+  ));
+
+  createEffect(() => {
+    const id = sessionId();
+    const dir = params.dir;
+    const serverKey = server.serverKey();
+    const agent = providers.selectedAgent;
+    const model = providers.selectedModel;
+    if (!id || !dir || !serverKey || !agent || !model) return;
+
+    const selections = readSelections(serverKey, dir);
+    selections[id] = {
+      agent,
+      model: { providerID: model.providerID, modelID: model.modelID },
+    };
+    writeSelections(serverKey, dir, selections);
+  });
 
   // Auto-send saved prompt stored in sessionStorage by layout's createSessionWithPrompt.
   // We read from sessionStorage instead of URL params to avoid browser URL length limits.
@@ -1012,6 +1110,44 @@ export function Session() {
     }
   });
 
+  createEffect(() => {
+    if (!device.isMobile()) {
+      setShowTodoTray(false);
+      return;
+    }
+
+    if (!sessionId()) {
+      setShowTodoTray(false);
+      return;
+    }
+
+    if (processing()) {
+      setShowTodoTray(false);
+    }
+  });
+
+  createEffect(() => {
+    sessionId();
+    setShowTodoTray(false)
+  });
+
+  createEffect(() => {
+    if (
+      showAtPopover() ||
+      showSlashPopover() ||
+      showMCPDialog() ||
+      showMCPAddDialog() ||
+      showModelPicker() ||
+      showAgentPicker() ||
+      showPromptPicker() ||
+      showFilePicker() ||
+      showForkPicker() ||
+      showSavePrompt()
+    ) {
+      setShowTodoTray(false)
+    }
+  });
+
   // Global keydown listener for double-Escape to abort
   function handleGlobalKeyDown(e: KeyboardEvent) {
     if (e.key !== "Escape") return;
@@ -1028,7 +1164,8 @@ export function Session() {
       showPromptPicker() ||
       showFilePicker() ||
       showForkPicker() ||
-      showSavePrompt()
+      showSavePrompt() ||
+      showTodoTray()
     ) return;
     if (!processing()) return;
 
@@ -1429,6 +1566,7 @@ export function Session() {
 
     setError(null);
     setLoading(true);
+    setShowTodoTray(false);
     setInput("");
     setDragHeight(0); // Reset manual resize after sending
     if (inputRef) inputRef.style.height = ""; // Reset textarea to default height
@@ -1976,6 +2114,14 @@ export function Session() {
           }}
           >
             <div class="relative w-full">
+            <Show when={device.isMobile()}>
+              <MobileTodoTray
+                sessionId={sessionId}
+                open={showTodoTray}
+                setOpen={setShowTodoTray}
+                processing={processing}
+              />
+            </Show>
             <Show when={showAtPopover()}>
               <div
                 class="absolute bottom-full left-0 mb-2 w-80 max-h-64 rounded-lg shadow-lg z-20 flex flex-col"
@@ -2260,6 +2406,7 @@ export function Session() {
                   value={input()}
                   disabled={inputBlocked()}
                   onPaste={handlePaste}
+                  onFocus={() => setShowTodoTray(false)}
                   onInput={(e) => {
                     handleInputChange(e.currentTarget.value);
                     clampInputHeight(e.currentTarget);
@@ -2448,12 +2595,19 @@ export function Session() {
               .flatMap((p) => {
                 const colonIdx = p.id.indexOf(":")
                 const accountName = colonIdx > 0 ? p.id.slice(colonIdx + 1) : null
-                return Object.values(p.models).map((m) => ({
-                  id: `${p.id}:${m.id}`,
-                  title: m.name || m.id,
-                  description: `${p.id}/${m.id}`,
-                  group: accountName ? `${p.name} (${accountName})` : p.name,
-                }))
+                return Object.values(p.models).map((m) => {
+                  let description = `${p.id}/${m.id}`
+                  if (m.cost) {
+                    const fmt = (n: number) => Number(n.toFixed(2)).toString()
+                    description += ` · $${fmt(m.cost.input)}/$${fmt(m.cost.output)}/M tokens`
+                  }
+                  return {
+                    id: `${p.id}:${m.id}`,
+                    title: m.name || m.id,
+                    description,
+                    group: accountName ? `${p.name} (${accountName})` : p.name,
+                  }
+                })
               })}
             onSelect={(item) => {
               const parts = item.id.split(":");

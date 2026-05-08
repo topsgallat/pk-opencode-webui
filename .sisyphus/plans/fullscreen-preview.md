@@ -84,7 +84,7 @@ Wave 3: Single task - Add ESC key handler and final styling
 > Implementation + Test = ONE task. Never separate.
 > EVERY task MUST have: Agent Profile + Parallelization + QA Scenarios.
 
-- [ ] 1. Add fullscreen state and Maximize2 button to file-viewer.tsx header
+- [x] 1. Add fullscreen state and Maximize2 button to file-viewer.tsx header
 
   **What to do**: 
   1. Import `Maximize2`, `Minimize2`, `X` from `lucide-solid`
@@ -143,7 +143,7 @@ Wave 3: Single task - Add ESC key handler and final styling
 
   **Commit**: YES/NO | Message: `feat: add fullscreen state and maximize button for preview` | Files: [app-prefixable/src/components/file-viewer.tsx]
 
-- [ ] 2. Implement fullscreen overlay with preview content
+- [x] 2. Implement fullscreen overlay with preview content
 
   **What to do**:
   1. After the main content div (before EditorDialog), add a Show when={fullscreenPreview()}:
@@ -237,7 +237,7 @@ Wave 3: Single task - Add ESC key handler and final styling
 
   **Commit**: YES/NO | Message: `feat: implement fullscreen overlay for preview modes` | Files: [app-prefixable/src/components/file-viewer.tsx]
 
-- [ ] 3. Add ESC key handler and final styling
+- [x] 3. Add ESC key handler and final styling
 
   **What to do**:
   1. Add ESC key handler using createEffect:
@@ -307,10 +307,10 @@ Wave 3: Single task - Add ESC key handler and final styling
 > 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
 > **Do NOT auto-proceed after verification. Wait for user's explicit approval before marking work complete.**
 > **Never mark F1-F4 as checked before getting user's okay.** Rejection or user feedback -> fix -> re-run -> present again -> wait for okay.
-- [ ] F1. Plan Compliance Audit — oracle
-- [ ] F2. Code Quality Review — unspecified-high
-- [ ] F3. Real Manual QA — unspecified-high (+ playwright if UI)
-- [ ] F4. Scope Fidelity Check — deep
+- [x] F1. Plan Compliance Audit — oracle
+- [x] F2. Code Quality Review — unspecified-high
+- [x] F3. Real Manual QA — unspecified-high (+ playwright if UI)
+- [x] F4. Scope Fidelity Check — deep
 ## Commit Strategy
 - Commit 1: `feat: add fullscreen state and maximize button for preview`
 - Commit 2: `feat: implement fullscreen overlay for preview modes`

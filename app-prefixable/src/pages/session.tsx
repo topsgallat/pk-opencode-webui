@@ -1111,11 +1111,6 @@ export function Session() {
   });
 
   createEffect(() => {
-    if (!device.isMobile()) {
-      setShowTodoTray(false);
-      return;
-    }
-
     if (!sessionId()) {
       setShowTodoTray(false);
       return;
@@ -2114,14 +2109,12 @@ export function Session() {
           }}
           >
             <div class="relative w-full">
-            <Show when={device.isMobile()}>
-              <MobileTodoTray
-                sessionId={sessionId}
-                open={showTodoTray}
-                setOpen={setShowTodoTray}
-                processing={processing}
-              />
-            </Show>
+            <MobileTodoTray
+              sessionId={sessionId}
+              open={showTodoTray}
+              setOpen={setShowTodoTray}
+              processing={processing}
+            />
             <Show when={showAtPopover()}>
               <div
                 class="absolute bottom-full left-0 mb-2 w-80 max-h-64 rounded-lg shadow-lg z-20 flex flex-col"
@@ -2406,7 +2399,7 @@ export function Session() {
                   value={input()}
                   disabled={inputBlocked()}
                   onPaste={handlePaste}
-                  onFocus={() => setShowTodoTray(false)}
+                  onFocus={() => device.isMobile() && setShowTodoTray(false)}
                   onInput={(e) => {
                     handleInputChange(e.currentTarget.value);
                     clampInputHeight(e.currentTarget);

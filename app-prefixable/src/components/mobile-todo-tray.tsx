@@ -13,9 +13,31 @@ interface MobileTodoTrayProps {
 export function MobileTodoTray(props: MobileTodoTrayProps) {
   const todos = useSessionTodos(props.sessionId)
   const summary = createMemo(() => todos.summary())
+  const [lastSession, setLastSession] = createSignal<string | undefined>(undefined)
+  const [suppressed, setSuppressed] = createSignal(false)
+
+  createEffect(() => {
+    const id = props.sessionId()
+    if (id === lastSession()) return
+    setLastSession(id)
+    setSuppressed(false)
+    props.setOpen(false)
+  })
+
+  createEffect(() => {
+    if (summary().total === 0) {
+      setSuppressed(false)
+      return
+    }
+
+    if (props.open() || suppressed()) return
+    setSuppressed(true)
+    props.setOpen(true)
+  })
 
   createEffect(() => {
     if (props.processing()) {
+      setSuppressed(true)
       props.setOpen(false)
     }
   })
@@ -40,7 +62,12 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
               background: "var(--background-base)",
               border: "1px solid var(--border-base)",
             }}
-            onClick={() => props.setOpen(!props.open())}
+            onClick={() => {
+              if (props.open()) {
+                setSuppressed(true)
+              }
+              props.setOpen(!props.open())
+            }}
           >
             <ListTodo class="w-4 h-4 shrink-0" style={{ color: "var(--text-interactive-base)" }} />
             <div class="min-w-0 flex-1">
@@ -81,7 +108,10 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
                   type="button"
                   class="p-1 rounded-md"
                   style={{ color: "var(--icon-weak)" }}
-                  onClick={() => props.setOpen(false)}
+                  onClick={() => {
+                    setSuppressed(true)
+                    props.setOpen(false)
+                  }}
                   aria-label="Collapse todo tray"
                 >
                   <ChevronUp class="w-4 h-4" />

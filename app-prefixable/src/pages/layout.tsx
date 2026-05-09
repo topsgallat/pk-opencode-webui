@@ -329,10 +329,6 @@ export function Layout(props: ParentProps) {
     setLoadError(null);
     setLoading(true);
     setSessions([]);
-    if (location.pathname.includes("/session")) {
-      navigate("/", { replace: true });
-      return;
-    }
     void loadSessions();
   }, { defer: true }));
 

@@ -15,18 +15,22 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
   const summary = createMemo(() => todos.summary())
   const [lastSession, setLastSession] = createSignal<string | undefined>(undefined)
   const [hydrated, setHydrated] = createSignal(false)
+  const [dismissedKey, setDismissedKey] = createSignal<string | undefined>(undefined)
+  const currentKey = createMemo(() => todos.todos().map((todo) => `${todo.id}:${todo.status}`).join("|"))
 
   createEffect(() => {
     const id = props.sessionId()
     if (id === lastSession()) return
     setLastSession(id)
     setHydrated(false)
+    setDismissedKey(undefined)
     props.setOpen(false)
   })
 
   createEffect(() => {
     if (summary().total === 0) {
       setHydrated(false)
+      setDismissedKey(undefined)
       return
     }
 
@@ -36,6 +40,7 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
     }
 
     if (summary().active > 0) {
+      if (dismissedKey() === currentKey()) return
       if (props.open()) return
       props.setOpen(true)
     }
@@ -69,7 +74,13 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
               border: "1px solid var(--border-base)",
             }}
             onClick={() => {
-              props.setOpen(!props.open())
+              if (props.open()) {
+                setDismissedKey(currentKey())
+                props.setOpen(false)
+                return
+              }
+
+              props.setOpen(true)
             }}
           >
             <ListTodo class="w-4 h-4 shrink-0" style={{ color: "var(--text-interactive-base)" }} />
@@ -98,11 +109,11 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
           <Show when={props.open()}>
             <div
               class="mobile-todo-sheet relative z-20 rounded-xl overflow-hidden shadow-2xl"
-              style={{
-                background: "var(--background-base)",
-                border: "1px solid var(--border-base)",
-                display: "flex",
-                "flex-direction": "column",
+                style={{
+                  background: "var(--background-base)",
+                  border: "1px solid var(--border-base)",
+                  display: "flex",
+                  "flex-direction": "column",
                 "max-height": "min(72dvh, calc(100dvh - 8rem))",
                 "min-height": 0,
               }}
@@ -116,6 +127,7 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
                   class="p-1 rounded-md"
                   style={{ color: "var(--icon-weak)" }}
                   onClick={() => {
+                    setDismissedKey(currentKey())
                     props.setOpen(false)
                   }}
                   aria-label="Collapse todo tray"

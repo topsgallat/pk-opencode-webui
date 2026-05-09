@@ -8,6 +8,63 @@ import { getContextTokens } from "../utils/tokens"
 import { CornerDownLeft, Square, Zap } from "lucide-solid"
 import { ConnectionBadge } from "./connection-badge"
 
+type TokenPricing = {
+  input: number
+  output: number
+  cache_read?: number
+  cache_write?: number
+  context_over_200k?: {
+    input: number
+    output: number
+    cache_read?: number
+    cache_write?: number
+  }
+}
+
+const usd = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+})
+
+function estimateTokenCost(tokens: {
+  contextTokens: number
+  input: number
+  cacheRead: number
+  cacheWrite: number
+  output: number
+  reasoning: number
+}, pricing?: TokenPricing): number | null {
+  if (!pricing) return null
+  const tier = tokens.contextTokens > 200_000 && pricing.context_over_200k ? pricing.context_over_200k : pricing
+  const cacheReadRate = tier.cache_read ?? tier.input
+  const cacheWriteRate = tier.cache_write ?? tier.input
+  return (
+    tokens.input * tier.input +
+    tokens.cacheRead * cacheReadRate +
+    tokens.cacheWrite * cacheWriteRate +
+    (tokens.output + tokens.reasoning) * tier.output
+  ) / 1_000_000
+}
+
+function estimateAssistantMessageCost(info: {
+  tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } }
+  modelID?: string
+  providerID?: string
+}, provider: { models: Record<string, { cost?: TokenPricing }> } | undefined): number | null {
+  const model = provider?.models[info.modelID ?? ""]
+  if (!model?.cost) return null
+  return estimateTokenCost({
+    contextTokens: getContextTokens(info.tokens),
+    input: info.tokens?.input || 0,
+    cacheRead: info.tokens?.cache?.read || 0,
+    cacheWrite: info.tokens?.cache?.write || 0,
+    output: info.tokens?.output || 0,
+    reasoning: info.tokens?.reasoning || 0,
+  }, model.cost)
+}
+
 interface SessionInfoProps {
   input: () => string
   loading: () => boolean
@@ -47,7 +104,20 @@ export function SessionInfo(props: SessionInfoProps) {
     let totalCost = 0
     for (const msg of msgs) {
       if (msg.info?.role === "assistant") {
-        totalCost += (msg.info as { cost?: number }).cost || 0
+        const info = msg.info as {
+          cost?: number
+          tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } }
+          modelID?: string
+          providerID?: string
+        }
+        const cost = info.cost || 0
+        if (cost > 0) {
+          totalCost += cost
+          continue
+        }
+        const provider = providers.providers.find((p: { id: string }) => p.id === info.providerID)
+        const estimate = estimateAssistantMessageCost(info, provider)
+        if (estimate !== null) totalCost += estimate
       }
     }
 
@@ -107,16 +177,12 @@ export function SessionInfo(props: SessionInfoProps) {
     const usage = limit && Number.isFinite(limit) && limit > 0
       ? Math.min(100, Math.max(0, Math.round((lastAssistant.contextTokens / limit) * 100)))
       : null
+    const estimatedCost = estimateTokenCost(lastAssistant, model?.cost)
 
     return {
       tokens: lastAssistant.contextTokens.toLocaleString(),
       usage,
-      cost: new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 4,
-      }).format(totalCost),
+      cost: usd.format(totalCost),
       // Breakdown fields for the popover
       contextTokens: lastAssistant.contextTokens,
       contextLimit: limit,
@@ -126,6 +192,7 @@ export function SessionInfo(props: SessionInfoProps) {
       cacheTotal: lastAssistant.cacheRead + lastAssistant.cacheWrite,
       output: lastAssistant.output,
       reasoning: lastAssistant.reasoning,
+      estimatedCost,
       totalCost,
     }
   })
@@ -380,6 +447,14 @@ export function SessionInfo(props: SessionInfoProps) {
                         <div class="flex justify-between">
                           <span>Reasoning:</span>
                           <span>{fmt(s().reasoning)}</span>
+                        </div>
+                      </Show>
+
+                      {/* Estimated cost */}
+                      <Show when={s().estimatedCost !== null}>
+                        <div class="flex justify-between pt-1.5 mt-1" style={{ "border-top": "1px solid var(--border-base)" }}>
+                          <span>Estimate:</span>
+                          <span>{usd.format(s().estimatedCost || 0)}</span>
                         </div>
                       </Show>
 

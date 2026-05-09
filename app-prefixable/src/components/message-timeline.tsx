@@ -690,10 +690,10 @@ function ProcessingIndicator(props: { sessionStatus?: SessionStatus }) {
       <Show
         when={props.sessionStatus?.type === "retry"}
         fallback={
-          <div class="flex items-center gap-3" style={{ color: "var(--text-interactive-base)" }}>
+          <div class="flex items-center gap-3 min-h-5" style={{ color: "var(--text-interactive-base)" }}>
             <Brain class="w-5 h-5 animate-pulse" />
             <div class="flex-1 overflow-hidden">
-              <span class="block text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+              <span class="block text-sm font-medium whitespace-nowrap leading-none" style={{ color: "var(--text-strong)" }}>
                 {THINKING_PHRASES[phraseIndex()].split("").map((ch, i) => (
                   <span
                     class="inline-block char-bounce"

@@ -123,6 +123,9 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
         setShowProjectHistory(false)
         setHistoryProjects([])
         setShowServerSheet(false)
+        if (location.pathname.includes("/session")) {
+            navigate("/", { replace: true })
+        }
     })
 
     onMount(() => {

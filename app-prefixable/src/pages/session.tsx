@@ -2096,7 +2096,7 @@ export function Session() {
         </div>
 
         <Show when={device.isMobile()}>
-          <div aria-hidden="true" class={showTodoTray() ? "h-8" : "h-2"} />
+          <div aria-hidden="true" class={showTodoTray() ? "h-[3.75rem]" : "h-4"} />
         </Show>
 
         {/* Input */}

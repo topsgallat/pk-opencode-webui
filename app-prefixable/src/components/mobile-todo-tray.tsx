@@ -83,18 +83,22 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
     <Show when={summary().total > 0 && hiddenKey() !== currentKey()}>
       <div class="absolute left-0 right-0 bottom-full z-20 mb-2">
         <Show when={props.open()}>
-          <button
-            type="button"
-            class="fixed inset-0 z-10 bg-transparent"
-            aria-label="Close todo tray"
-            style={{ "touch-action": "none", "overscroll-behavior": "none" }}
-            onPointerDown={(e) => {
-              e.preventDefault()
-              props.setOpen(false)
-            }}
-            onClick={() => props.setOpen(false)}
-          />
-        </Show>
+            <button
+              type="button"
+              class="fixed inset-0 z-10 bg-transparent"
+              aria-label="Close todo tray"
+              style={{ "touch-action": "none", "overscroll-behavior": "none" }}
+              onPointerDown={(e) => {
+                e.preventDefault()
+                setDismissedKey(currentKey())
+                props.setOpen(false)
+              }}
+              onClick={() => {
+                setDismissedKey(currentKey())
+                props.setOpen(false)
+              }}
+            />
+          </Show>
 
         <div class="relative z-20 flex flex-col gap-2">
           <button

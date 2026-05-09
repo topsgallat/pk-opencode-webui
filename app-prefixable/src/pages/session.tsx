@@ -316,6 +316,64 @@ export function Session() {
   const [showTodoTray, setShowTodoTray] = createSignal(false);
   const [savePromptTitle, setSavePromptTitle] = createSignal("");
   const [savePromptBody, setSavePromptBody] = createSignal("");
+  const [sessionSelection, setSessionSelection] = createSignal<SessionSelection | null>(null);
+  const [hydratingSelection, setHydratingSelection] = createSignal(false);
+
+  const defaultSelection = createMemo<SessionSelection | null>(() => {
+    const agentNames = providers.agents.map((a) => a.name);
+    const configAgent = appConfig.project.default_agent || appConfig.global.default_agent;
+    const agent = configAgent && agentNames.includes(configAgent) ? configAgent : "build";
+
+    const configModel = appConfig.project.model || appConfig.global.model;
+    if (configModel) {
+      const slash = configModel.indexOf("/");
+      if (slash > 0) {
+        const providerID = configModel.slice(0, slash);
+        const modelID = configModel.slice(slash + 1);
+        const provider = providers.providers.find((p) => p.id === providerID);
+        if (provider && providers.connected.includes(providerID) && provider.models[modelID]) {
+          return { agent, model: { providerID, modelID } };
+        }
+      }
+    }
+
+    const fallback = providers.providers.find((p) => p.id === "opencode") ?? providers.providers[0];
+    if (!fallback) return null;
+
+    const fallbackModelID = fallback.models["big-pickle"] ? "big-pickle" : Object.keys(fallback.models)[0];
+    if (!fallbackModelID) return null;
+
+    return { agent, model: { providerID: fallback.id, modelID: fallbackModelID } };
+  });
+
+  function applySelection(next: SessionSelection) {
+    batch(() => {
+      setSessionSelection(next);
+      providers.setSelectedAgent(next.agent);
+      providers.setSelectedModel({
+        providerID: next.model.providerID,
+        modelID: next.model.modelID,
+      });
+    });
+  }
+
+  function selectAgent(agent: string) {
+    providers.setSelectedAgent(agent);
+    const model = providers.selectedModel;
+    if (!model) return;
+    setSessionSelection({
+      agent,
+      model: { providerID: model.providerID, modelID: model.modelID },
+    });
+  }
+
+  function selectModel(model: { providerID: string; modelID: string }) {
+    providers.setSelectedModel(model);
+    setSessionSelection({
+      agent: providers.selectedAgent,
+      model: { providerID: model.providerID, modelID: model.modelID },
+    });
+  }
 
   const [fileContext, setFileContext] = createSignal<FileContext[]>([]);
   const [imageAttachments, setImageAttachments] = createSignal<
@@ -513,29 +571,31 @@ export function Session() {
       const dir = params.dir;
       if (!id || typeof dir !== "string" || !dir) return;
 
+      setHydratingSelection(true);
       const selections = readSelections(server.serverKey(), dir);
       const saved = selections[id];
-      if (!saved) return;
-
-      batch(() => {
-        providers.setSelectedAgent(saved.agent);
-        providers.setSelectedModel(saved.model);
-      });
+      const next = saved ?? defaultSelection();
+      if (next) {
+        applySelection(next);
+        setHydratingSelection(false);
+      }
     },
   ));
 
   createEffect(() => {
+    if (hydratingSelection()) return;
+    const selection = sessionSelection();
+    if (!selection) return;
+
     const id = sessionId();
     const dir = params.dir;
     const serverKey = server.serverKey();
-    const agent = providers.selectedAgent;
-    const model = providers.selectedModel;
-    if (!id || !dir || !serverKey || !agent || !model) return;
+    if (!id || !dir || !serverKey) return;
 
     const selections = readSelections(serverKey, dir);
     selections[id] = {
-      agent,
-      model: { providerID: model.providerID, modelID: model.modelID },
+      agent: selection.agent,
+      model: { providerID: selection.model.providerID, modelID: selection.model.modelID },
     };
     writeSelections(serverKey, dir, selections);
   });
@@ -2427,7 +2487,7 @@ export function Session() {
                         const nextIdx = e.shiftKey
                           ? (currentIdx - 1 + agents.length) % agents.length
                           : (currentIdx + 1) % agents.length;
-                        providers.setSelectedAgent(agents[nextIdx].name);
+                        selectAgent(agents[nextIdx].name);
                       }
                       return;
                     }
@@ -2615,7 +2675,7 @@ export function Session() {
               const parts = item.id.split(":");
               const providerID = parts[0];
               const modelID = parts.slice(1).join(":");
-              providers.setSelectedModel({ providerID, modelID });
+              selectModel({ providerID, modelID });
             }}
             onClose={() => setShowModelPicker(false)}
           />
@@ -2633,7 +2693,7 @@ export function Session() {
               description: `${a.mode} mode`,
             }))}
             onSelect={(item) => {
-              providers.setSelectedAgent(item.id);
+              selectAgent(item.id);
             }}
             onClose={() => setShowAgentPicker(false)}
           />

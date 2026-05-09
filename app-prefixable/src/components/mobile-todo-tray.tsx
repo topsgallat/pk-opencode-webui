@@ -1,5 +1,5 @@
 import { Show, createEffect, createMemo, createSignal } from "solid-js"
-import { ChevronUp, ChevronDown, ListTodo } from "lucide-solid"
+import { ChevronDown, ListTodo, X } from "lucide-solid"
 import { TodoListSections } from "./session-sidebar"
 import { useSessionTodos } from "../utils/session-todos"
 
@@ -16,6 +16,7 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
   const [lastSession, setLastSession] = createSignal<string | undefined>(undefined)
   const [hydrated, setHydrated] = createSignal(false)
   const [dismissedKey, setDismissedKey] = createSignal<string | undefined>(undefined)
+  const [hiddenKey, setHiddenKey] = createSignal<string | undefined>(undefined)
   const currentKey = createMemo(() => todos.todos().map((todo) => `${todo.id}:${todo.status}`).join("|"))
 
   createEffect(() => {
@@ -24,6 +25,7 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
     setLastSession(id)
     setHydrated(false)
     setDismissedKey(undefined)
+    setHiddenKey(undefined)
     props.setOpen(false)
   })
 
@@ -31,6 +33,7 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
     if (summary().total === 0) {
       setHydrated(false)
       setDismissedKey(undefined)
+      setHiddenKey(undefined)
       return
     }
 
@@ -54,7 +57,7 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
   })
 
   return (
-    <Show when={summary().total > 0}>
+    <Show when={summary().total > 0 && hiddenKey() !== currentKey()}>
       <div class="absolute left-0 right-0 bottom-full z-20 mb-2">
         <Show when={props.open()}>
           <button
@@ -127,12 +130,13 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
                   class="p-1 rounded-md"
                   style={{ color: "var(--icon-weak)" }}
                   onClick={() => {
+                    setHiddenKey(currentKey())
                     setDismissedKey(currentKey())
                     props.setOpen(false)
                   }}
                   aria-label="Collapse todo tray"
                 >
-                  <ChevronUp class="w-4 h-4" />
+                  <X class="w-4 h-4" />
                 </button>
               </div>
               <div class="mobile-todo-sheet-body">

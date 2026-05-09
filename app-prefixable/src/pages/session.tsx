@@ -2095,6 +2095,10 @@ export function Session() {
           </Show>
         </div>
 
+        <Show when={device.isMobile()}>
+          <div aria-hidden="true" class={showTodoTray() ? "h-8" : "h-2"} />
+        </Show>
+
         {/* Input */}
         <div
           data-panel="chat"

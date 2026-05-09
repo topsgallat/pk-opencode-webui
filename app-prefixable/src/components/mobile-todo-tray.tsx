@@ -101,6 +101,10 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
               style={{
                 background: "var(--background-base)",
                 border: "1px solid var(--border-base)",
+                display: "flex",
+                "flex-direction": "column",
+                "max-height": "min(72dvh, calc(100dvh - 8rem))",
+                "min-height": 0,
               }}
             >
               <div class="flex items-center justify-between px-3 py-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
@@ -119,7 +123,7 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
                   <ChevronUp class="w-4 h-4" />
                 </button>
               </div>
-              <div class="mobile-todo-sheet-body overflow-y-auto">
+              <div class="mobile-todo-sheet-body">
                 <TodoListSections todos={todos.todos} />
               </div>
             </div>

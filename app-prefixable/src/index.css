@@ -641,7 +641,11 @@
 }
 
 .mobile-todo-sheet-body {
-  max-height: min(42dvh, 18rem);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .mobile-overlay-header {

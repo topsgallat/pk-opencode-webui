@@ -356,7 +356,7 @@ export function MessageTimeline(props: {
       ref={(el) => { containerRef = el; autoScroll.scrollRef(el) }}
       onScroll={autoScroll.handleScroll}
       class="flex-1 overflow-y-auto p-6"
-      style={{ background: "var(--background-stronger)" }}
+      style={{ background: "var(--background-stronger)", "overflow-anchor": "none" }}
     >
       {/* Loading history indicator */}
       <Show when={props.loadingHistory}>

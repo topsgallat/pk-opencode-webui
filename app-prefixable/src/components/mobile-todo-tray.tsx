@@ -1,4 +1,4 @@
-import { Show, createEffect, createMemo, createSignal } from "solid-js"
+import { Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js"
 import { ChevronDown, ListTodo, X } from "lucide-solid"
 import { TodoListSections } from "./session-sidebar"
 import { useSessionTodos } from "../utils/session-todos"
@@ -56,6 +56,29 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
     }
   })
 
+  createEffect(() => {
+    if (!props.open() || summary().total === 0 || hiddenKey() === currentKey()) return
+
+    const body = document.body.style
+    const html = document.documentElement.style
+    const prevBodyOverflow = body.overflow
+    const prevHtmlOverflow = html.overflow
+    const prevBodyOverscroll = body.overscrollBehavior
+    const prevHtmlOverscroll = html.overscrollBehavior
+
+    body.overflow = "hidden"
+    html.overflow = "hidden"
+    body.overscrollBehavior = "none"
+    html.overscrollBehavior = "none"
+
+    onCleanup(() => {
+      body.overflow = prevBodyOverflow
+      html.overflow = prevHtmlOverflow
+      body.overscrollBehavior = prevBodyOverscroll
+      html.overscrollBehavior = prevHtmlOverscroll
+    })
+  })
+
   return (
     <Show when={summary().total > 0 && hiddenKey() !== currentKey()}>
       <div class="absolute left-0 right-0 bottom-full z-20 mb-2">
@@ -64,6 +87,11 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
             type="button"
             class="fixed inset-0 z-10 bg-transparent"
             aria-label="Close todo tray"
+            style={{ "touch-action": "none", "overscroll-behavior": "none" }}
+            onPointerDown={(e) => {
+              e.preventDefault()
+              props.setOpen(false)
+            }}
             onClick={() => props.setOpen(false)}
           />
         </Show>

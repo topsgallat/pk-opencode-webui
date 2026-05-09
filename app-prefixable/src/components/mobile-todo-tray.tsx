@@ -97,7 +97,7 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
 
           <Show when={props.open()}>
             <div
-              class="mobile-todo-sheet rounded-xl overflow-hidden shadow-2xl"
+              class="mobile-todo-sheet relative z-20 rounded-xl overflow-hidden shadow-2xl"
               style={{
                 background: "var(--background-base)",
                 border: "1px solid var(--border-base)",

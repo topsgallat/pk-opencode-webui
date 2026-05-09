@@ -2587,11 +2587,17 @@ export function Session() {
                 return Object.values(p.models).map((m) => {
                   let description = `${p.id}/${m.id}`
                   const fmt = (n: number) => Number(n.toFixed(2)).toString()
+                  const isOpenAI = p.id === "openai" || p.id.startsWith("openai:")
+                  const hasZeroCost = !!m.cost && m.cost.input === 0 && m.cost.output === 0
                   const multiplier = getCopilotMultiplier(p.id, m.id, m.name) ?? m.copilotMultiplier
                   if (multiplier !== undefined) {
                     description += ` · x${fmt(multiplier)}`
                   } else if (m.cost) {
-                    description += ` · $${fmt(m.cost.input)}/$${fmt(m.cost.output)}/M tokens`
+                    description += hasZeroCost && isOpenAI
+                      ? " · n/a"
+                      : ` · $${fmt(m.cost.input)}/$${fmt(m.cost.output)}/M tokens`
+                  } else if (isOpenAI) {
+                    description += " · n/a"
                   }
                   return {
                     id: `${p.id}:${m.id}`,

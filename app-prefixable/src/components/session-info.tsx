@@ -158,7 +158,27 @@ export function SessionInfo(props: SessionInfoProps) {
       )
     }
     const cost = model.cost
-    if (!cost) return null
+    const isOpenAI = provider?.id === "openai" || provider?.id?.startsWith("openai:")
+    if (!cost) {
+      return isOpenAI ? (
+        <span
+          class="text-[10px] px-1 py-0.5 rounded shrink-0 leading-none"
+          style={{ color: "var(--text-weak)", background: "var(--surface-inset)" }}
+        >
+          n/a
+        </span>
+      ) : null
+    }
+    if (isOpenAI && cost.input === 0 && cost.output === 0) {
+      return (
+        <span
+          class="text-[10px] px-1 py-0.5 rounded shrink-0 leading-none"
+          style={{ color: "var(--text-weak)", background: "var(--surface-inset)" }}
+        >
+          n/a
+        </span>
+      )
+    }
     return (
       <span
         class="text-[10px] px-1 py-0.5 rounded shrink-0 leading-none"

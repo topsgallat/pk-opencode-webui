@@ -525,6 +525,12 @@ function TaskToolDisplay(props: { part: ToolPart }) {
   const status = () => getStatus(state());
   const metadata = () => getMetadata(state());
   const title = () => getTitle(state()) || "Delegating work";
+  const taskInput = createMemo(() => getInput(state()) as {
+    description?: string;
+    prompt?: string;
+    agent?: string;
+    model?: { providerID?: string; modelID?: string };
+  } | undefined);
   const childId = () => getChildSessionId(state());
 
   // Get child session messages to show tool usage
@@ -548,6 +554,20 @@ function TaskToolDisplay(props: { part: ToolPart }) {
     if (!first) return undefined;
     const info = first.info as { agent: string; providerID: string; modelID: string };
     return { agent: info.agent, providerID: info.providerID, modelID: info.modelID };
+  });
+
+  const taskAgent = createMemo(() => taskInput()?.agent || childAgent()?.agent);
+
+  const taskModel = createMemo(() => {
+    const inputModel = taskInput()?.model;
+    if (inputModel?.providerID || inputModel?.modelID) return inputModel;
+
+    const child = childAgent();
+    if (child?.providerID || child?.modelID) {
+      return { providerID: child.providerID, modelID: child.modelID };
+    }
+
+    return undefined;
   });
 
   // Sync child session data when we have a child ID
@@ -607,9 +627,9 @@ function TaskToolDisplay(props: { part: ToolPart }) {
           >
             {title()}
           </span>
-          <Show when={childAgent()}>
-            {(ca) => {
-              const colors = () => getAgentColors(ca().agent);
+          <Show when={taskAgent()}>
+            {(agent) => {
+              const colors = () => getAgentColors(agent());
               return (
                 <>
                   <span style={{ color: "var(--text-weak)", "font-size": "0.7rem" }}>·</span>
@@ -625,7 +645,7 @@ function TaskToolDisplay(props: { part: ToolPart }) {
                       "flex-shrink": 0,
                     }}
                   >
-                    {ca().agent}
+                    {agent()}
                   </span>
                 </>
               );
@@ -663,9 +683,7 @@ function TaskToolDisplay(props: { part: ToolPart }) {
           }}
         >
           {/* Task prompt/description */}
-          <Show
-            when={(getInput(state()) as { description?: string })?.description}
-          >
+          <Show when={taskInput()?.description}>
             {(desc) => (
               <div class="mb-2">
                 <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
@@ -678,34 +696,37 @@ function TaskToolDisplay(props: { part: ToolPart }) {
             )}
           </Show>
 
-          {/* Agent + model info */}
-          <Show when={childAgent()}>
-            {(ca) => {
-              const colors = () => getAgentColors(ca().agent);
-              return (
-                <div class="flex items-center gap-1.5 flex-wrap mb-2">
-                  <span class="text-xs" style={{ color: "var(--text-weak)" }}>Agent:</span>
-                  <span
-                    style={{
-                      background: colors().bg,
-                      color: colors().fg,
-                      "border-radius": "9999px",
-                      padding: "1px 8px",
-                      "font-size": "0.7rem",
-                      "font-weight": 600,
-                    }}
-                  >
-                    {ca().agent}
-                  </span>
-                  <Show when={ca().providerID || ca().modelID}>
-                    <span style={{ color: "var(--text-weak)", "font-size": "0.7rem" }}>·</span>
-                    <span class="text-xs" style={{ color: "var(--text-weak)" }}>
-                      {[ca().providerID, ca().modelID].filter(Boolean).join(" / ")}
+          <Show when={taskAgent() || taskModel()}>
+            <div class="flex items-center gap-1.5 flex-wrap mb-2">
+              <span class="text-xs" style={{ color: "var(--text-weak)" }}>Sent to:</span>
+              <Show when={taskAgent()}>
+                {(agent) => {
+                  const colors = () => getAgentColors(agent());
+                  return (
+                    <span
+                      style={{
+                        background: colors().bg,
+                        color: colors().fg,
+                        "border-radius": "9999px",
+                        padding: "1px 8px",
+                        "font-size": "0.7rem",
+                        "font-weight": 600,
+                      }}
+                    >
+                      {agent()}
                     </span>
-                  </Show>
-                </div>
-              );
-            }}
+                  );
+                }}
+              </Show>
+              <Show when={taskAgent() && (taskModel()?.providerID || taskModel()?.modelID)}>
+                <span style={{ color: "var(--text-weak)", "font-size": "0.7rem" }}>·</span>
+              </Show>
+              <Show when={taskModel()?.providerID || taskModel()?.modelID}>
+                <span class="text-xs" style={{ color: "var(--text-weak)" }}>
+                  {[taskModel()?.providerID, taskModel()?.modelID].filter(Boolean).join("/")}
+                </span>
+              </Show>
+            </div>
           </Show>
 
           {/* Child session tools summary */}

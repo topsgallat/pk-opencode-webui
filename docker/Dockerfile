@@ -29,6 +29,7 @@ WORKDIR /app/app-prefixable
 RUN bun install && \
     bun add typescript typescript-language-server && \
     ln -sf ./node_modules/.bin/typescript-language-server /usr/local/bin/typescript-language-server
+RUN bun add @playwright/mcp@latest cloakbrowser@0.3.26
 RUN bun run build
 
 # -----------------------------------------------------------------------------
@@ -211,6 +212,9 @@ RUN cd /opt/opencode-ui && npm install playwright --legacy-peer-deps
 
 # Copy server script (from builder stage where git clone was done)
 COPY --from=builder /app/docker/serve-ui.ts /opt/opencode-ui/serve-ui.ts
+
+# Copy Playwright MCP wrapper used by solo-mode startup config
+COPY scripts/playwright-mcp-cloakbrowser.mjs /opt/opencode-ui/scripts/playwright-mcp-cloakbrowser.mjs
 
 # Copy shared modules (from builder stage where git clone was done)
 COPY --from=builder /app/shared /opt/shared

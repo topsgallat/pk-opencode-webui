@@ -204,6 +204,9 @@ Kubeflow-specific features:
 - **SSH key permission fixing** -- corrects permissions after PVC remount
 - **Rootless operation** -- runs as `jovyan` (UID 1000), no SUID/SGID bits
 - **Optional examples repo** -- clone a starter repo on first boot via `KF_EXAMPLES_REPO` build arg
+- **Automatic Playwright MCP CloakBrowser setup** -- merges `mcp.playwright` at startup and preserves mounted config
+
+Solo-mode Docker builds do the same merge automatically during `opencode serve` startup.
 
 See [docker/kubeflow/README.md](docker/kubeflow/README.md) for Kubeflow deployment details.
 

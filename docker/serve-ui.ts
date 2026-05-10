@@ -146,6 +146,20 @@ if (OPERATION_MODE === "solo") {
 
   console.log(`[solo] Using container directories: ${dirs.join(" and ")} (host-mounted directories left untouched)`)
 
+  const mcpConfigPath = `${homeDir}/.config/opencode/opencode.json`
+  const existingConfig = await Bun.file(mcpConfigPath).text().catch(() => "")
+  const config = existingConfig ? JSON.parse(existingConfig) : {}
+  config.mcp ??= {}
+  config.mcp.playwright = {
+    ...config.mcp.playwright,
+    type: "local",
+    command: ["bun", "/opt/opencode-ui/scripts/playwright-mcp-cloakbrowser.mjs"],
+    enabled: true,
+  }
+
+  await Bun.write(mcpConfigPath, `${JSON.stringify(config, null, 2)}\n`)
+  console.log(`[solo] Merged Playwright MCP CloakBrowser config: ${mcpConfigPath}`)
+
   console.log(`[solo] Refreshing OpenCode models cache...`)
   const modelsRefresh = Bun.spawn(["opencode", "models", "--refresh"], {
     stdout: "inherit",

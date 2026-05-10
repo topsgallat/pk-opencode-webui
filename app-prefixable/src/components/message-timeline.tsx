@@ -657,12 +657,6 @@ export function FlatMessageList(props: {
           }}
         </For>
 
-        <Show when={props.processing}>
-          <div class="mt-4">
-            <ProcessingIndicator sessionStatus={props.sessionStatus} />
-          </div>
-        </Show>
-
       </Show>
 
       <div ref={endRef} style={{ "overflow-anchor": "auto", height: "1px" }} />

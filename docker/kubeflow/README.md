@@ -17,6 +17,7 @@ The UI automatically adapts to any URL prefix set by Kubeflow's `NB_PREFIX` envi
 - **Kubeflow Integration**: Automatic `NB_PREFIX` handling
 - **Single Container**: Both API and UI run in one container
 - **Persistent Storage**: Configuration stored in `/home/jovyan`
+- **Automatic Playwright MCP CloakBrowser setup**: merges `mcp.playwright` on startup without overwriting existing config
 - **s6-overlay**: Proper process supervision and init
 
 ## Building

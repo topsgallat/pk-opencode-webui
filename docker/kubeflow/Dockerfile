@@ -90,6 +90,14 @@ COPY --from=builder /app/app-prefixable/dist /opt/opencode-ui/dist
 # Copy server script (path relative to repo root)
 COPY docker/serve-ui.ts /opt/opencode-ui/serve-ui.ts
 
+# Copy Playwright MCP wrapper and config merger
+COPY scripts/playwright-mcp-cloakbrowser.mjs /usr/local/bin/playwright-mcp-cloakbrowser.mjs
+COPY docker/kubeflow/merge-opencode-config.mjs /usr/local/bin/merge-opencode-config.mjs
+
+# Install runtime packages needed for the MCP wrapper
+WORKDIR /opt/opencode-ui
+RUN bun add @playwright/mcp@latest cloakbrowser@0.3.26
+
 # Copy shared modules (for serve-ui.ts imports)
 COPY shared /opt/shared
 

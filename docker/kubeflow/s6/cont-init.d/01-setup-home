@@ -40,6 +40,11 @@ echo "INFO: Setting up OpenCode config directories..."
 mkdir -p "$HOME/.config/opencode"
 mkdir -p "$HOME/.local/share/opencode"
 
+echo "INFO: Merging Playwright MCP CloakBrowser config..."
+bun /usr/local/bin/merge-opencode-config.mjs \
+  "$HOME/.config/opencode/opencode.json" \
+  "/usr/local/bin/playwright-mcp-cloakbrowser.mjs"
+
 echo "INFO: OpenCode home setup completed successfully"
 
 # Ensure we always exit with 0

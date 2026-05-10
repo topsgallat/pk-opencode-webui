@@ -150,6 +150,10 @@ bun install && bun run dev
 
 **3. Open** http://localhost:3000
 
+### CloakBrowser test mode
+
+If `cloakbrowser` is installed in `app-prefixable`, Playwright tests will use it automatically and download the binary on first run. If it is unavailable, the suite falls back to stock Chromium with no extra setup.
+
 ## Configuration
 
 | Variable | Default | Description |

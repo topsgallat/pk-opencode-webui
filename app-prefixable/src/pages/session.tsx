@@ -329,9 +329,8 @@ export function Session() {
   const [savePromptBody, setSavePromptBody] = createSignal("");
   const [sessionSelection, setSessionSelection] = createSignal<SessionSelection | null>(null);
   const [hydratingSelection, setHydratingSelection] = createSignal(false);
-  const activeSelection = createMemo(() => sessionSelection() ?? defaultSelection());
 
-  const defaultSelection = createMemo<SessionSelection | null>(() => {
+  function defaultSelection(): SessionSelection | null {
     const agentNames = providers.agents.map((a) => a.name);
     const configAgent = appConfig.project.default_agent || appConfig.global.default_agent;
     const agent = configAgent && agentNames.includes(configAgent) ? configAgent : "build";
@@ -356,7 +355,9 @@ export function Session() {
     if (!fallbackModelID) return null;
 
     return { agent, model: { providerID: fallback.id, modelID: fallbackModelID } };
-  });
+  }
+
+  const activeSelection = createMemo(() => sessionSelection() ?? defaultSelection());
 
   function applySelection(next: SessionSelection) {
     batch(() => {

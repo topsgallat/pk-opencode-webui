@@ -79,12 +79,14 @@ export function TodoListSections(props: { todos: () => Todo[] }) {
 
 interface SessionSidebarProps {
   sessionId: string | undefined
+  selectedModel?: () => { providerID: string; modelID: string } | null
 }
 
 export function SessionSidebar(props: SessionSidebarProps) {
   const { client, directory } = useSDK()
   const events = useEvents()
   const providers = useProviders()
+  const selectedModel = () => props.selectedModel?.() ?? providers.selectedModel
 
   const { todos } = useSessionTodos(() => props.sessionId)
   const [branch, setBranch] = createSignal<string | null>(null)
@@ -153,8 +155,8 @@ export function SessionSidebar(props: SessionSidebarProps) {
     if (contextTokens === 0) return null
 
     // Get model context limit from the message's model, not the currently selected one
-    const providerID = msgProviderID ?? providers.selectedModel?.providerID
-    const modelID = msgModelID ?? providers.selectedModel?.modelID
+    const providerID = msgProviderID ?? selectedModel()?.providerID
+    const modelID = msgModelID ?? selectedModel()?.modelID
     const provider = providers.providers.find((p) => p.id === providerID)
     const model = provider?.models[modelID ?? ""]
     const limit = model?.limit?.context

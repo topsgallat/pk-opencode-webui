@@ -72,6 +72,8 @@ interface SessionInfoProps {
   onAbort: () => void
   onAgentClick: () => void
   onModelClick: () => void
+  selectedAgent?: () => string | null
+  selectedModel?: () => { providerID: string; modelID: string } | null
   hasAttachments?: () => boolean
 }
 
@@ -79,6 +81,8 @@ export function SessionInfo(props: SessionInfoProps) {
   const params = useParams<{ dir: string; id?: string }>()
   const sync = useSync()
   const providers = useProviders()
+  const selectedAgent = () => props.selectedAgent?.() ?? providers.selectedAgent
+  const selectedModel = () => props.selectedModel?.() ?? providers.selectedModel
 
   // Sync session data when session ID changes
   createEffect(() => {
@@ -199,7 +203,7 @@ export function SessionInfo(props: SessionInfoProps) {
 
   // Resolve friendly model name from providers
   const modelLabel = createMemo(() => {
-    const selected = providers.selectedModel
+    const selected = selectedModel()
     if (!selected) return null
     const provider = providers.providers.find((p: { id: string }) => p.id === selected.providerID)
     const model = provider?.models[selected.modelID]
@@ -207,7 +211,7 @@ export function SessionInfo(props: SessionInfoProps) {
   })
 
   const modelBadge = createMemo(() => {
-    const selected = providers.selectedModel
+    const selected = selectedModel()
     if (!selected) return null
     const provider = providers.providers.find((p: { id: string }) => p.id === selected.providerID)
     const model = provider?.models[selected.modelID]
@@ -315,7 +319,7 @@ export function SessionInfo(props: SessionInfoProps) {
       {/* Left group - info text, wraps on mobile */}
       <div class="flex flex-1 flex-wrap items-center gap-3 min-w-0 [&_button:focus-visible]:outline-offset-[-2px] [&_a:focus-visible]:outline-offset-[-2px] pr-2">
         {/* Agent */}
-        <Show when={providers.selectedAgent}>
+        <Show when={selectedAgent()}>
           <button
             type="button"
             class="flex items-center gap-1 shrink-0 hover:opacity-80 cursor-pointer"
@@ -323,13 +327,13 @@ export function SessionInfo(props: SessionInfoProps) {
           >
             <span class="opacity-60">Agent:</span>
             <span class="capitalize" style={{ color: "var(--text-base)" }}>
-              {providers.selectedAgent}
+              {selectedAgent()}
             </span>
           </button>
         </Show>
 
         {/* Model */}
-        <Show when={providers.selectedModel}>
+        <Show when={selectedModel()}>
           <button
             type="button"
             class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer"
@@ -475,13 +479,13 @@ export function SessionInfo(props: SessionInfoProps) {
         </Show>
 
         {/* No provider warning */}
-        <Show when={!providers.selectedModel && providers.connected.length === 0}>
+        <Show when={!selectedModel() && providers.connected.length === 0}>
           <a href={`/${dirSlug()}/settings`} style={{ color: "var(--text-interactive-base)" }} class="hover:underline">
             Connect a provider to start
           </a>
         </Show>
 
-        <Show when={!providers.selectedModel && providers.connected.length > 0}>
+        <Show when={!selectedModel() && providers.connected.length > 0}>
           <span style={{ color: "var(--status-warning-text)" }}>No model selected</span>
         </Show>
       </div>

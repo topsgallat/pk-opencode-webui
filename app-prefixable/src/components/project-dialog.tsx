@@ -71,6 +71,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
   const [homeDirectory, setHomeDirectory] = createSignal<string | null>(null)
   const [filter, setFilter] = createSignal("")
   const [results, setResults] = createSignal<string[]>([])
+  const [visibleCount, setVisibleCount] = createSignal(50)
   const [loading, setLoading] = createSignal(false)
   const [selectedIndex, setSelectedIndex] = createSignal(0)
   const [newFolderName, setNewFolderName] = createSignal("")
@@ -316,6 +317,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
     props.onClose()
   }
 
+  const visibleResults = createMemo(() => results().slice(0, visibleCount()))
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === "Escape") {
       e.preventDefault()
@@ -328,7 +330,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
   }
 
   function handleInputKeyDown(e: KeyboardEvent) {
-    const items = results()
+    const items = visibleResults()
     
     if (e.key === "ArrowDown") {
       e.preventDefault()
@@ -551,20 +553,21 @@ export function ProjectDialog(props: ProjectDialogProps) {
               </div>
 
               {/* Results list - fixed height to prevent jumping */}
-              <div 
-                class="overflow-y-auto rounded-md" 
-                style={{ background: "var(--surface-inset)", height: "16rem" }}
-                role="listbox"
-                aria-label="Directory search results"
-              >
-                <Show when={loading()}>
-                  <div class="flex items-center justify-center h-full">
-                    <Spinner class="w-5 h-5" style={{ color: "var(--text-interactive-base)" }} />
-                  </div>
-                </Show>
+              <div class="rounded-md" style={{ background: "var(--surface-inset)" }}>
+                <div
+                  class="overflow-y-auto rounded-t-md"
+                  style={{ height: "16rem" }}
+                  role="listbox"
+                  aria-label="Directory search results"
+                >
+                  <Show when={loading()}>
+                    <div class="flex items-center justify-center h-full">
+                      <Spinner class="w-5 h-5" style={{ color: "var(--text-interactive-base)" }} />
+                    </div>
+                  </Show>
 
-                <Show when={!loading()}>
-                  <Show when={results().length === 0}>
+                  <Show when={!loading()}>
+                    <Show when={results().length === 0}>
                       <div class="flex items-center justify-center h-full text-sm" style={{ color: "var(--text-weak)" }}>
                         {filter()
                           ? isRemoteServer()
@@ -576,51 +579,70 @@ export function ProjectDialog(props: ProjectDialogProps) {
                       </div>
                     </Show>
 
-                  <For each={results()}>
-                    {(path, index) => {
-                      const display = displayPath(path, home())
-                      const dir = getDirectory(display)
-                      const name = getFilename(display)
-                      const isSelected = () => index() === selectedIndex()
-                      const totalResults = results().length
-                      
-                      return (
-                        <button
-                          data-result-index={index()}
-                          role="option"
-                          aria-selected={isSelected()}
-                          aria-posinset={index() + 1}
-                          aria-setsize={totalResults}
-                          onClick={() => setSelectedIndex(index())}
-                          onDblClick={() => selectProject(path)}
-                          class="w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition-colors"
-                          style={{
-                            background: isSelected() ? "color-mix(in srgb, var(--interactive-base) 15%, transparent)" : "transparent",
-                          }}
-                        >
-                          <Folder class="w-4 h-4 shrink-0" style={{ color: "var(--interactive-base)" }} />
-                          <div class="flex items-center min-w-0 overflow-hidden">
-                            <span class="truncate" style={{ color: "var(--text-weak)" }}>{dir}</span>
-                            <span style={{ color: "var(--text-strong)" }}>{name}</span>
-                            <span style={{ color: "var(--text-weak)" }}>/</span>
-                          </div>
-                        </button>
-                      )
-                    }}
-                  </For>
-                </Show>
+                  <For each={visibleResults()}>
+                      {(path, index) => {
+                        const display = displayPath(path, home())
+                        const dir = getDirectory(display)
+                        const name = getFilename(display)
+                        const isSelected = () => index() === selectedIndex()
+                        const totalResults = visibleResults().length
+
+                        return (
+                          <button
+                            data-result-index={index()}
+                            role="option"
+                            aria-selected={isSelected()}
+                            aria-posinset={index() + 1}
+                            aria-setsize={totalResults}
+                            onClick={() => setSelectedIndex(index())}
+                            onDblClick={() => selectProject(path)}
+                            class="w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition-colors"
+                            style={{
+                              background: isSelected() ? "color-mix(in srgb, var(--interactive-base) 15%, transparent)" : "transparent",
+                            }}
+                          >
+                            <Folder class="w-4 h-4 shrink-0" style={{ color: "var(--interactive-base)" }} />
+                            <div class="flex items-center min-w-0 overflow-hidden">
+                              <span class="truncate" style={{ color: "var(--text-weak)" }}>{dir}</span>
+                              <span style={{ color: "var(--text-strong)" }}>{name}</span>
+                              <span style={{ color: "var(--text-weak)" }}>/</span>
+                            </div>
+                          </button>
+                        )
+                      }}
+                    </For>
+
+                  </Show>
+                </div>
               </div>
+
+              <Show when={visibleResults().length < results().length}>
+                <div class="p-2 rounded-md" role="presentation" style={{ background: "var(--surface-inset)", "border": "1px solid var(--border-base)" }}>
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount(Math.min(visibleCount() + 50, results().length))}
+                    class="w-full px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                    style={{
+                      background: "var(--background-base)",
+                      color: "var(--text-interactive-base)",
+                      border: "1px solid var(--border-base)",
+                    }}
+                  >
+                    Show {Math.min(50, results().length - visibleResults().length)} more directories ({visibleResults().length} of {results().length} shown)
+                  </button>
+                </div>
+              </Show>
 
               {/* Open button for selected directory */}
               <div class="flex gap-2">
                 <Button
                   onClick={() => {
-                    const selected = results()[selectedIndex()]
+                    const selected = visibleResults()[selectedIndex()]
                     if (selected) selectProject(selected)
                   }}
                   variant="primary"
                   class="flex-1"
-                  disabled={results().length === 0}
+                  disabled={visibleResults().length === 0}
                 >
                   Open
                 </Button>

@@ -77,6 +77,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
   let settling = false
   let settleTimer: ReturnType<typeof setTimeout> | undefined
   let autoTimer: ReturnType<typeof setTimeout> | undefined
+  let scrollFrame: number | undefined
   let resizeObserver: ResizeObserver | undefined
   let observedContent: HTMLElement | undefined
   let auto: { top: number; time: number } | undefined
@@ -112,7 +113,23 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
 
   const scrollToBottomNow = (el: HTMLElement) => {
     markAuto(el)
-    el.scrollTop = el.scrollHeight
+    el.scrollTop = el.scrollHeight - el.clientHeight
+  }
+
+  const queueScrollToBottom = (el: HTMLElement) => {
+    if (scrollFrame !== undefined) return
+    scrollFrame = requestAnimationFrame(() => {
+      scrollFrame = undefined
+      if (!scroll) return
+      if (!active()) return
+      if (store.userScrolled) return
+      const distance = distanceFromBottom(scroll)
+      if (distance < 2) {
+        markAuto(scroll)
+        return
+      }
+      scrollToBottomNow(scroll)
+    })
   }
 
   const scrollToBottom = (force: boolean) => {
@@ -186,7 +203,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
       }
       if (!active()) return
       if (store.userScrolled) return
-      scrollToBottom(false)
+      queueScrollToBottom(el)
     })
     resizeObserver.observe(content)
   }
@@ -222,6 +239,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
   onCleanup(() => {
     if (settleTimer) clearTimeout(settleTimer)
     if (autoTimer) clearTimeout(autoTimer)
+    if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame)
     if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = undefined }
   })
 

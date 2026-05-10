@@ -329,6 +329,7 @@ export function Session() {
   const [savePromptBody, setSavePromptBody] = createSignal("");
   const [sessionSelection, setSessionSelection] = createSignal<SessionSelection | null>(null);
   const [hydratingSelection, setHydratingSelection] = createSignal(false);
+  const activeSelection = createMemo(() => sessionSelection() ?? defaultSelection());
 
   const defaultSelection = createMemo<SessionSelection | null>(() => {
     const agentNames = providers.agents.map((a) => a.name);
@@ -519,6 +520,7 @@ export function Session() {
       }
     }
 
+    setSessionSelection(null);
     setSessionId(id);
     setPendingUserMessageText(null); // Clear pending text on session change
 
@@ -589,7 +591,9 @@ export function Session() {
       if (next) {
         applySelection(next);
         setHydratingSelection(false);
+        return;
       }
+      setHydratingSelection(false);
     },
   ));
 
@@ -2616,6 +2620,8 @@ export function Session() {
                   {/* Session info row: Agent, Model, Token usage — always full width */}
                   <div class="w-full">
                     <SessionInfo
+                      selectedAgent={() => activeSelection()?.agent ?? null}
+                      selectedModel={() => activeSelection()?.model ?? null}
                       input={input}
                       loading={loading}
                       processing={processing}
@@ -2907,7 +2913,10 @@ export function Session() {
               class="shrink-0 overflow-hidden"
               style={{ width: `${layout.info.width()}px` }}
             >
-              <SessionSidebar sessionId={sessionId()} />
+            <SessionSidebar
+              sessionId={sessionId()}
+              selectedModel={() => activeSelection()?.model ?? null}
+            />
             </div>
           </aside>
         </Show>

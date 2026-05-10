@@ -2187,6 +2187,9 @@ export function Layout(props: ParentProps) {
                       {(s) => (
                         <button
                               onClick={() => {
+                                if (location.pathname.includes("/session/")) {
+                                  sessionStorage.setItem("opencode.serverSwitchHome", "1")
+                                }
                                 server.setSelectedServer(s.id)
                                 setServerDropdownOpen(false)
                                 navigate("/", { replace: true })

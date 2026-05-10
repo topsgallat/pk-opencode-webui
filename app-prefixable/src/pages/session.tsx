@@ -66,6 +66,7 @@ const ACCEPTED_TYPES = [
 ];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
 const SESSION_STATUS_TIMEOUT_MS = 8_000;
+const SERVER_SWITCH_HOME_KEY = "opencode.serverSwitchHome";
 
 interface Command {
   id: string;
@@ -124,13 +125,23 @@ function readSelections(serverKey: string, dir: string) {
   }
 }
 
-function writeSelections(serverKey: string, dir: string, selections: Record<string, SessionSelection>) {
-  try {
-    localStorage.setItem(selectionKey(serverKey, dir), JSON.stringify(selections));
-  } catch (e) {
-    console.error("Failed to save session selections:", e);
+  function writeSelections(serverKey: string, dir: string, selections: Record<string, SessionSelection>) {
+    try {
+      localStorage.setItem(selectionKey(serverKey, dir), JSON.stringify(selections));
+    } catch (e) {
+      console.error("Failed to save session selections:", e);
+    }
   }
-}
+
+  function consumeServerSwitchHome() {
+    try {
+      if (sessionStorage.getItem(SERVER_SWITCH_HOME_KEY) !== "1") return false;
+      sessionStorage.removeItem(SERVER_SWITCH_HOME_KEY);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
 export function Session() {
   const params = useParams<{ dir: string; id?: string }>();
@@ -1256,6 +1267,10 @@ export function Session() {
   createEffect(() => {
     const id = params.id;
     if (!id) return;
+    if (consumeServerSwitchHome()) {
+      navigate("/", { replace: true });
+      return;
+    }
     // loadingHistory() stays true when sync.session.sync() rejects,
     // so this effect only fires after a successful sync — not on transient failures.
     if (loadingHistory() || historyError()) return;

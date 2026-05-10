@@ -688,6 +688,9 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                                             setSearchQuery("")
                                             setShowArchived(false)
                                             setMenuSession(null)
+                                            if (location.pathname.includes("/session/")) {
+                                                sessionStorage.setItem("opencode.serverSwitchHome", "1")
+                                            }
                                             server.setSelectedServer(s.id)
                                             setShowServerSheet(false)
                                             navigate("/", { replace: true })

@@ -53,6 +53,10 @@ function resolveCloakbrowser() {
 const cloak = await import(pathToFileURL(resolveCloakbrowser()).href);
 await cloak.ensureBinary();
 
+const sandboxArgs = process.getuid && process.getuid() !== 0 && !fs.existsSync('/.dockerenv')
+  ? []
+  : ['--no-sandbox', '--disable-gpu'];
+
 const configPath = path.join(tmp, 'playwright-mcp.json');
 fs.writeFileSync(configPath, JSON.stringify({
   browser: {
@@ -60,6 +64,7 @@ fs.writeFileSync(configPath, JSON.stringify({
     launchOptions: {
       executablePath: cloak.binaryInfo().binaryPath,
       headless: true,
+      args: sandboxArgs,
     },
   },
 }, null, 2));

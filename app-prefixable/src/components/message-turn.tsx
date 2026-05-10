@@ -1,5 +1,5 @@
 import { type Accessor, createSignal, createEffect, Show, For, createMemo, onCleanup } from "solid-js"
-import { ChevronDown, ChevronRight, User, Bot, FileText, Copy, Check, Clock, RotateCcw } from "lucide-solid"
+import { ChevronDown, ChevronRight, User, Bot, FileText, Copy, Check, Clock, RotateCcw, Loader2 } from "lucide-solid"
 import { Markdown } from "./markdown"
 import { MessageParts } from "./tool-part"
 import { ImagePreview } from "./image-preview"
@@ -179,6 +179,7 @@ export function MessageTurn(props: {
   now: Accessor<number>
   defaultExpanded?: boolean
   isLast?: boolean
+  pendingStatus?: "waiting" | "thinking"
   onToggle?: (turnId: string, expanded: boolean) => void
   onRetry?: (messageId: string) => void
   onOpenFile?: (path: string) => void
@@ -691,21 +692,29 @@ export function MessageTurn(props: {
             }}
           </For>
 
-          {/* Show pending state if no assistant messages */}
-          <Show when={props.turn.assistantMessages.length === 0}>
-            <div class="flex gap-3">
-              <div
-                class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                style={{ background: "var(--surface-inset)" }}
-              >
-                <Bot class="w-3 h-3" style={{ color: "var(--text-strong)" }} />
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-xs font-medium mb-1" style={{ color: "var(--text-weak)" }}>
-                  ASSISTANT
+          <Show when={props.pendingStatus && props.turn.assistantMessages.length === 0}>
+            <div class="rounded-lg px-3 py-3 border" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}>
+              <div class="flex gap-3 min-h-12 items-center">
+                <div
+                  class="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background: "var(--surface-inset)" }}
+                >
+                  <Bot class="w-3 h-3" style={{ color: "var(--text-strong)" }} />
                 </div>
-                <div class="text-sm" style={{ color: "var(--text-weak)" }}>
-                  Waiting for response...
+                <div class="flex-1 min-w-0">
+                  <div class="text-xs font-medium mb-1" style={{ color: "var(--text-weak)" }}>
+                    ASSISTANT
+                  </div>
+                  <Show when={props.pendingStatus === "waiting"} fallback={
+                    <div class="inline-flex items-center gap-2 text-sm font-medium whitespace-nowrap leading-none" style={{ color: "var(--text-strong)" }}>
+                      Thinking
+                      <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                    </div>
+                  }>
+                    <div class="text-sm" style={{ color: "var(--text-weak)" }}>
+                      Waiting for response...
+                    </div>
+                  </Show>
                 </div>
               </div>
             </div>

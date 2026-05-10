@@ -2071,6 +2071,7 @@ export function Session() {
             loadingHistory={loadingHistory()}
             historyError={historyError()}
             sessionStatus={sessionId() ? events.status[sessionId()!] : undefined}
+            pendingPromptText={pendingUserMessageText()}
             onRetry={retryTurn}
             onOpenFile={openFilePreview}
             onRetryHistory={() => {

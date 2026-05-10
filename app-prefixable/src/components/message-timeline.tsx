@@ -116,7 +116,8 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     el.scrollTop = el.scrollHeight - el.clientHeight
   }
 
-  const queueScrollToBottom = (el: HTMLElement) => {
+  const queueScrollToBottom = (el?: HTMLElement) => {
+    if (!el) return
     if (scrollFrame !== undefined) return
     scrollFrame = requestAnimationFrame(() => {
       scrollFrame = undefined
@@ -203,6 +204,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
       }
       if (!active()) return
       if (store.userScrolled) return
+      if (!el) return
       queueScrollToBottom(el)
     })
     resizeObserver.observe(content)
@@ -265,6 +267,7 @@ export function MessageTimeline(props: {
   loadingHistory: boolean
   historyError?: string | null
   sessionStatus?: SessionStatus
+  pendingPromptText?: string | null
   onScroll?: (nearBottom: boolean) => void
   onRetry?: (turnId: string) => void
   onRetryHistory?: () => void
@@ -470,15 +473,16 @@ export function MessageTimeline(props: {
         <div ref={autoScroll.contentRef} class="space-y-4">
           <For each={renderedTurns()}>
             {(turn, index) => (
-              <MessageTurn
-                turn={turn}
-                now={now}
-                isLast={index() === renderedTurns().length - 1}
-                defaultExpanded={expanded()[turn.id] ?? index() === renderedTurns().length - 1}
-                onToggle={handleToggle}
-                onRetry={props.onRetry}
-                onOpenFile={props.onOpenFile}
-              />
+                <MessageTurn
+                  turn={turn}
+                  now={now}
+                  isLast={index() === renderedTurns().length - 1}
+                  defaultExpanded={expanded()[turn.id] ?? index() === renderedTurns().length - 1}
+                  pendingStatus={index() === renderedTurns().length - 1 && turn.assistantMessages.length === 0 ? (props.processing ? "thinking" : props.pendingPromptText ? "waiting" : undefined) : undefined}
+                  onToggle={handleToggle}
+                  onRetry={props.onRetry}
+                  onOpenFile={props.onOpenFile}
+                />
             )}
           </For>
         </div>
@@ -658,6 +662,7 @@ export function FlatMessageList(props: {
             <ProcessingIndicator sessionStatus={props.sessionStatus} />
           </div>
         </Show>
+
       </Show>
 
       <div ref={endRef} style={{ "overflow-anchor": "auto", height: "1px" }} />

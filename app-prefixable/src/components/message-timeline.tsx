@@ -5,7 +5,7 @@ import { MessageTurn } from "./message-turn"
 // Note: Markdown and MessageParts are used in the FlatMessageList component below
 import { Markdown } from "./markdown"
 import { MessageParts } from "./tool-part"
-import { ChevronUp, RefreshCw, Clock, Brain } from "lucide-solid"
+import { ChevronUp, RefreshCw, Clock, Brain, Loader2 } from "lucide-solid"
 import { errorText } from "../types/message"
 import type { DisplayMessage, Turn } from "../types/message"
 import { extractTextContent } from "../utils/message"
@@ -665,11 +665,8 @@ export function FlatMessageList(props: {
   )
 }
 
-const THINKING_PHRASES = ["Thinking...", "Working...", "Processing...", "Analyzing..."]
-
 function ProcessingIndicator(props: { sessionStatus?: SessionStatus }) {
   const [timeLeft, setTimeLeft] = createSignal<number>(0)
-  const [phraseIndex, setPhraseIndex] = createSignal<number>(0)
 
   // Use a reactive calculation for time left
   const calculateRemaining = () => {
@@ -689,11 +686,6 @@ function ProcessingIndicator(props: { sessionStatus?: SessionStatus }) {
         setTimeLeft(calculateRemaining())
       }, 1000)
       onCleanup(() => clearInterval(timer))
-    } else {
-      const phraseTimer = setInterval(() => {
-        setPhraseIndex((prev) => (prev + 1) % THINKING_PHRASES.length)
-      }, 2000)
-      onCleanup(() => clearInterval(phraseTimer))
     }
   })
 
@@ -709,17 +701,11 @@ function ProcessingIndicator(props: { sessionStatus?: SessionStatus }) {
         when={props.sessionStatus?.type === "retry"}
         fallback={
           <div class="flex items-center gap-3 min-h-5" style={{ color: "var(--text-interactive-base)" }}>
-            <Brain class="w-5 h-5 animate-pulse" />
+            <Brain class="w-5 h-5 shrink-0" />
             <div class="flex-1 overflow-hidden">
-              <span class="block text-sm font-medium whitespace-nowrap leading-none" style={{ color: "var(--text-strong)" }}>
-                {THINKING_PHRASES[phraseIndex()].split("").map((ch, i) => (
-                  <span
-                    class="inline-block char-bounce"
-                    style={{ "animation-delay": `${i * 70}ms`, display: "inline-block" }}
-                  >
-                    {ch === " " ? "\u00A0" : ch}
-                  </span>
-                ))}
+              <span class="inline-flex items-center gap-2 text-sm font-medium whitespace-nowrap leading-none" style={{ color: "var(--text-strong)" }}>
+                Thinking
+                <Loader2 class="w-3.5 h-3.5 animate-spin" />
               </span>
             </div>
           </div>

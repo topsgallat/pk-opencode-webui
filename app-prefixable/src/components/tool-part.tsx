@@ -1,6 +1,6 @@
 import { createSignal, createEffect, createMemo, Show, For, createRoot, JSX, onCleanup } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import type { Part, ToolPart as SDKToolPart, ToolState, ReasoningPart as SDKReasoningPart } from "../sdk/client";
+import type { Part, ToolPart as SDKToolPart, ToolState, ReasoningPart as SDKReasoningPart, SubtaskPart as SDKSubtaskPart } from "../sdk/client";
 import { ChevronDown, ExternalLink, Users, Sparkles, Brain } from "lucide-solid";
 import { ContentDiff } from "./diff/content-diff";
 import { ContentCode } from "./diff/content-code";
@@ -13,6 +13,7 @@ import { Markdown } from "./markdown";
 // Use the SDK's types
 type ToolPart = SDKToolPart;
 type ReasoningPart = SDKReasoningPart;
+type SubtaskPart = SDKSubtaskPart;
 
 // Limit how many tool part expansion states we keep to avoid unbounded growth.
 const MAX_EXPANDED_STATES = 1000;
@@ -512,7 +513,7 @@ function getChildToolSummary(
 }
 
 // Task tool display with child session visualization
-function TaskToolDisplay(props: { part: ToolPart }) {
+function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart }) {
   const sync = useSync();
   const params = useParams<{ dir: string }>();
   const navigate = useNavigate();
@@ -556,9 +557,12 @@ function TaskToolDisplay(props: { part: ToolPart }) {
     return { agent: info.agent, providerID: info.providerID, modelID: info.modelID };
   });
 
-  const taskAgent = createMemo(() => taskInput()?.agent || childAgent()?.agent);
+  const taskAgent = createMemo(() => props.subtask?.agent || taskInput()?.agent || childAgent()?.agent);
 
   const taskModel = createMemo(() => {
+    const subtaskModel = props.subtask?.model;
+    if (subtaskModel?.providerID || subtaskModel?.modelID) return subtaskModel;
+
     const inputModel = taskInput()?.model;
     if (inputModel?.providerID || inputModel?.modelID) return inputModel;
 
@@ -861,10 +865,10 @@ function ReasoningPartDisplay(props: { part: ReasoningPart }) {
   );
 }
 
-export function ToolPartDisplay(props: { part: ToolPart }) {
+export function ToolPartDisplay(props: { part: ToolPart; subtask?: SubtaskPart }) {
   // Use special rendering for task tool
   if (props.part.tool === "task") {
-    return <TaskToolDisplay part={props.part} />;
+    return <TaskToolDisplay part={props.part} subtask={props.subtask} />;
   }
 
   // Use the module-level store for expanded state to persist across re-renders
@@ -1191,15 +1195,19 @@ export function ToolPartDisplay(props: { part: ToolPart }) {
 // Render tool parts from a message
 export function MessageParts(props: { parts: Part[] }) {
   // Separate parts by type but keep order
-  const filteredParts = () => props.parts.filter(p => p.type === "tool" || p.type === "reasoning");
+  const filteredParts = () => props.parts.filter(p => p.type === "tool" || p.type === "reasoning" || p.type === "subtask");
 
   return (
     <Show when={filteredParts().length > 0}>
       <div class="space-y-2 mt-3">
         <For each={filteredParts()}>
-          {(part) => {
+          {(part, i) => {
             if (part.type === "reasoning") return <ReasoningPartDisplay part={part as ReasoningPart} />;
-            if (part.type === "tool") return <ToolPartDisplay part={part as ToolPart} />;
+            if (part.type === "subtask") return null;
+            if (part.type === "tool") {
+              const subtask = props.parts.find((p): p is SubtaskPart => p.type === "subtask");
+              return <ToolPartDisplay part={part as ToolPart} subtask={subtask} />;
+            }
             return null;
           }}
         </For>

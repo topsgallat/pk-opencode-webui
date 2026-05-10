@@ -332,17 +332,22 @@ export function Layout(props: ParentProps) {
     void loadSessions();
   }, { defer: true }));
 
-  // Load state from storage
-  onMount(() => {
-    // Load projects
+  createEffect(on(projectsStorageKey, (key) => {
     try {
-      const stored = localStorage.getItem(projectsStorageKey());
+      const stored = localStorage.getItem(key);
       if (stored) {
         setProjects(JSON.parse(stored));
+        return;
       }
+      setProjects([]);
     } catch (e) {
       console.error("Failed to load projects:", e);
+      setProjects([]);
     }
+  }));
+
+  // Load state from storage
+  onMount(() => {
 
     // Load sidebar state - default to open when a project is active
     try {

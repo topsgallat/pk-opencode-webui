@@ -25,7 +25,7 @@ The image supports two modes via the `OPERATION_MODE` environment variable:
 
 Starts the OpenCode API server on port 4096, waits for it to be ready, then starts the UI server. Both processes run in the same container supervised by s6-overlay. Use this mode for standalone deployments where you want a self-contained environment.
 
-During solo startup, the container also merges `mcp.playwright` into `~/.config/opencode/opencode.json` so Playwright MCP uses CloakBrowser automatically without replacing existing config.
+During solo startup, the container also merges `mcp.playwright` into `~/.config/opencode/opencode.json` so Playwright MCP uses CloakBrowser automatically without replacing existing config. The wrapper also sets `chromiumSandbox: false` so Playwright does not re-enable Chromium sandboxing during launch.
 
 #### UI-only mode
 

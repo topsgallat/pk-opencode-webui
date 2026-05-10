@@ -64,6 +64,7 @@ fs.writeFileSync(configPath, JSON.stringify({
     launchOptions: {
       executablePath: cloak.binaryInfo().binaryPath,
       headless: true,
+      chromiumSandbox: false,
       args: sandboxArgs,
     },
   },

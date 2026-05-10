@@ -204,23 +204,6 @@ export function ProjectDialog(props: ProjectDialogProps) {
     console.log("[searchDirectories] input:", JSON.stringify(input), "home:", home, "endsWithSlash:", endsWithSlash)
     
     try {
-      if (input.startsWith("/")) {
-        const target = input === "/" ? "/" : input.endsWith("/") ? input.slice(0, -1) : input
-        const dirs = await getDirs(target)
-        if (!isActive()) return
-
-        let filtered: string[]
-        if (endsWithSlash) {
-          filtered = dirs.slice(0, 50)
-        } else {
-          filtered = dirs.slice(0, 50)
-        }
-        setResults(filtered)
-        setSelectedIndex(0)
-        setLoading(false)
-        return
-      }
-
       let baseDir = home
       let query = input
 

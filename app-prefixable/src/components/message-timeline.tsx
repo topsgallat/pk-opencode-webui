@@ -77,6 +77,8 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
   let scrollFrame: number | undefined
   let resizeObserver: ResizeObserver | undefined
   let observedContent: HTMLElement | undefined
+  let anchorBottom = 0
+  let suppressScroll = false
 
   const threshold = options.bottomThreshold ?? 10
 
@@ -89,8 +91,19 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
 
   const canScroll = (el: HTMLElement) => el.scrollHeight - el.clientHeight > 1
 
+  const readAnchorBottom = (el: HTMLElement) => Math.max(0, distanceFromBottom(el))
+
+  const writeAnchorBottom = (el: HTMLElement, bottom: number) => {
+    suppressScroll = true
+    el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight - bottom)
+    queueMicrotask(() => {
+      suppressScroll = false
+    })
+  }
+
   const scrollToBottomNow = (el: HTMLElement) => {
-    el.scrollTop = el.scrollHeight - el.clientHeight
+    anchorBottom = 0
+    writeAnchorBottom(el, 0)
   }
 
   const queueScrollToBottom = () => {
@@ -100,7 +113,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
       const el = scroll
       if (!el) return
       if (!store.pinned) return
-      scrollToBottomNow(el)
+      writeAnchorBottom(el, anchorBottom)
     })
   }
 
@@ -108,7 +121,8 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     const el = scroll
     if (!el) return
     if (!force && !store.pinned) return
-    if (force && !store.pinned) setStore("pinned", true)
+    if (!store.pinned) setStore("pinned", true)
+    anchorBottom = 0
     queueScrollToBottom()
   }
 
@@ -124,18 +138,23 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
   const handleScroll = () => {
     const el = scroll
     if (!el) return
+    if (suppressScroll) return
 
     if (!canScroll(el)) {
       if (!store.pinned) setStore("pinned", true)
+      anchorBottom = 0
       return
     }
 
-    if (distanceFromBottom(el) <= threshold) {
+    const bottom = readAnchorBottom(el)
+    if (bottom <= threshold) {
       if (!store.pinned) setStore("pinned", true)
+      anchorBottom = 0
       return
     }
 
     if (store.pinned) setStore("pinned", false)
+    anchorBottom = bottom
   }
 
   const updateOverflowAnchor = (el: HTMLElement) => {
@@ -150,9 +169,11 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
       if (!el) return
       if (!canScroll(el)) {
         if (!store.pinned) setStore("pinned", true)
+        anchorBottom = 0
         return
       }
       if (!store.pinned) return
+      anchorBottom = Math.min(anchorBottom, threshold)
       queueScrollToBottom()
     })
     resizeObserver.observe(content)
@@ -167,7 +188,10 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
 
   createEffect(on(options.working, (working: boolean) => {
     if (working) {
-      if (store.pinned) queueScrollToBottom()
+      if (store.pinned) {
+        anchorBottom = 0
+        queueScrollToBottom()
+      }
       return
     }
   }))
@@ -189,6 +213,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
       if (scroll) scroll.removeEventListener("wheel", handleWheel)
       scroll = el
       if (!el) return
+      anchorBottom = readAnchorBottom(el)
       updateOverflowAnchor(el)
       el.addEventListener("wheel", handleWheel, { passive: true })
     },

@@ -666,12 +666,12 @@ export function ProjectDialog(props: ProjectDialogProps) {
               <div class="flex gap-2">
                   <Button
                     onClick={() => {
-                      const selected = visibleItems()[selectedIndex()]
-                      if (selected?.kind === "directory") selectProject(selected.path)
+                      const target = currentDirectory() || homeDirectory()
+                      if (target) selectProject(target)
                     }}
                     variant="primary"
                     class="flex-1"
-                    disabled={visibleItems().length === 0 || visibleItems()[selectedIndex()]?.kind !== "directory"}
+                    disabled={!currentDirectory() && !homeDirectory()}
                   >
                     Open
                   </Button>

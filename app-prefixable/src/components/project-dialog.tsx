@@ -234,7 +234,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
         const dirs = await getDirs(currentDir)
         
         // Find matching directory (exact match first, then fuzzy)
-        const exactMatch = dirs.find(d => getFilename(d).toLowerCase() === segment.toLowerCase())
+        const exactMatch = dirs.find((d) => getFilename(d) === segment)
         if (exactMatch) {
           currentDir = exactMatch
         } else {

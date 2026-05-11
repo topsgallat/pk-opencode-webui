@@ -4,6 +4,9 @@ import { X, FileText } from "lucide-solid"
 export interface FileContext {
   path: string
   key: string
+  comment?: string
+  selection?: { startLine: number; endLine: number }
+  preview?: string
 }
 
 interface Props {
@@ -40,6 +43,16 @@ export const ContextItems: Component<Props> = (props) => {
               <span class="text-xs font-medium whitespace-nowrap" style={{ color: "var(--text-strong)" }}>
                 {truncate(item.path, 16)}
               </span>
+              <Show when={item.selection}>
+                <span class="text-[10px] whitespace-nowrap" style={{ color: "var(--text-weak)" }}>
+                  {item.selection!.startLine}-{item.selection!.endLine}
+                </span>
+              </Show>
+              <Show when={item.comment}>
+                <span class="text-[10px] leading-none whitespace-nowrap max-w-[140px] truncate" style={{ color: "var(--text-weak)" }}>
+                  {item.comment}
+                </span>
+              </Show>
               <button
                 type="button"
                 onClick={() => props.onRemove(item.key)}

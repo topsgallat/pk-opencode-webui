@@ -1,10 +1,9 @@
-import { createSignal, createEffect, Show, Match, Switch, createMemo, onCleanup } from "solid-js"
+import { createSignal, createEffect, Show, Match, Switch, createMemo, onCleanup, For } from "solid-js"
 import { Portal } from "solid-js/web"
 import { useFile } from "../context/file"
 import { useSDK } from "../context/sdk"
 import { useBasePath } from "../context/base-path"
 import { useServer } from "../context/server"
-import { ContentCode } from "./diff/content-code"
 import { Spinner } from "./ui/spinner"
 import { FileCode, Pencil, Eye, Maximize2, X, MessageSquarePlus } from "lucide-solid"
 import { writeFile } from "../utils/extended-api"
@@ -362,25 +361,19 @@ export function FileViewer(props: FileViewerProps) {
                         when={isHtml() && htmlPreview()}
                       fallback={
                         <div class="p-4 overflow-auto">
-                          <div
-                            class="rounded overflow-hidden"
-                            style={{ border: "1px solid var(--border-base)" }}
-                          >
-                            <div class="font-mono text-xs leading-6">
+                          <div class="font-mono text-xs leading-6 whitespace-pre" style={{ color: "var(--text-base)" }}>
                               <For each={sourceLines()}>
                                 {(line, index) => {
                                   const num = () => index() + 1
                                   return (
-                                    <div class="group flex items-stretch border-b last:border-b-0" style={{ "border-color": "var(--border-base)" }}>
-                                      <div class="flex items-center gap-2 shrink-0 px-2 py-1 select-none" style={{ background: "var(--surface-inset)", color: "var(--text-weak)", minWidth: "4.5rem" }}>
-                                        <span class="text-right w-8 tabular-nums">{num()}</span>
-                                      </div>
-                                      <div class="relative flex-1 min-w-0 px-3 py-1 pr-12 whitespace-pre overflow-x-auto" style={{ color: "var(--text-base)", background: "var(--background-base)" }}>
+                                    <div class="group flex min-w-max rounded-sm px-1 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+                                      <div class="min-h-[1.5rem] flex-1 pr-3">
                                         {line || " "}
+                                      </div>
                                         <Show when={props.onMentionFileLine}>
                                           <button
                                             type="button"
-                                            class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 rounded min-h-[28px] min-w-[28px] flex items-center justify-center"
+                                            class="sticky right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 rounded min-h-[28px] min-w-[28px] flex items-center justify-center"
                                             style={{ color: "var(--text-weak)", background: "var(--surface-inset)" }}
                                             aria-label={`Add comment for ${props.path} line ${num()}`}
                                             title="Add comment"
@@ -389,12 +382,10 @@ export function FileViewer(props: FileViewerProps) {
                                             <MessageSquarePlus class="w-3.5 h-3.5" />
                                           </button>
                                         </Show>
-                                      </div>
                                     </div>
                                   )
                                 }}
                               </For>
-                            </div>
                           </div>
                         </div>
                       }

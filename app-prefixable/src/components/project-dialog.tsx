@@ -15,6 +15,10 @@ import fuzzysort from "fuzzysort"
 
 type DialogView = "browse" | "clone"
 
+type BrowseItem =
+  | { kind: "parent"; path: string }
+  | { kind: "directory"; path: string }
+
 interface ProjectDialogProps {
   open: boolean
   onClose: () => void
@@ -47,6 +51,15 @@ function getDirectory(path: string) {
   return p.slice(0, i + 1)
 }
 
+function getParentPath(path: string) {
+  const p = trimTrailing(path)
+  if (!p || p === "/") return ""
+  const i = p.lastIndexOf("/")
+  if (i < 0) return ""
+  if (i === 0) return "/"
+  return p.slice(0, i)
+}
+
 function tildeOf(absolute: string, home: string) {
   const full = trimTrailing(absolute)
   if (!home) return ""
@@ -74,6 +87,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
   const [visibleCount, setVisibleCount] = createSignal(50)
   const [loading, setLoading] = createSignal(false)
   const [selectedIndex, setSelectedIndex] = createSignal(0)
+  const [currentDirectory, setCurrentDirectory] = createSignal("")
   const [newFolderName, setNewFolderName] = createSignal("")
   const [creating, setCreating] = createSignal(false)
 
@@ -98,6 +112,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
     setResults([])
     setLoading(false)
     setSelectedIndex(0)
+    setCurrentDirectory("")
     setNewFolderName("")
     dirCache.clear()
   }
@@ -264,12 +279,12 @@ export function ProjectDialog(props: ProjectDialogProps) {
         filtered = matches.map(m => m.obj.path)
         
         // If there's an exact match for tail, also show its children (like shell completion)
-        const exactMatch = dirs.find(d => getFilename(d).toLowerCase() === tail.toLowerCase())
-        if (exactMatch && !endsWithSlash) {
-          const children = await getDirs(exactMatch)
-          if (isActive()) {
-            filtered = Array.from(new Set([...filtered, ...children.slice(0, 30)]))
-          }
+         const exactMatch = dirs.find(d => getFilename(d) === tail)
+         if (exactMatch && !endsWithSlash) {
+           const children = await getDirs(exactMatch)
+           if (isActive()) {
+             filtered = Array.from(new Set([...filtered, ...children.slice(0, 30)]))
+           }
         }
       } else {
         filtered = dirs.slice(0, 50)
@@ -285,10 +300,13 @@ export function ProjectDialog(props: ProjectDialogProps) {
         filtered = [home, ...filtered]
       }
 
+      const parent = getParentPath(currentDir)
+      setCurrentDirectory(currentDir)
       setResults(filtered)
-      setSelectedIndex(0)
+      setSelectedIndex(parent && filtered.length > 0 ? 1 : 0)
     } catch (e) {
       console.error("Search error:", e)
+      setCurrentDirectory("")
       setResults([])
     } finally {
       setLoading(false)
@@ -307,6 +325,22 @@ export function ProjectDialog(props: ProjectDialogProps) {
   }
 
   const visibleResults = createMemo(() => results().slice(0, visibleCount()))
+  const parentDirectory = createMemo(() => getParentPath(currentDirectory()))
+  const visibleItems = createMemo<BrowseItem[]>(() => {
+    const parent = parentDirectory()
+    const dirs = visibleResults().map((path) => ({ kind: "directory", path }) satisfies BrowseItem)
+    if (!parent) return dirs
+    return [{ kind: "parent", path: parent }, ...dirs]
+  })
+
+  function activateItem(item: BrowseItem) {
+    if (item.kind === "parent") {
+      drillInto(item.path)
+      return
+    }
+    selectProject(item.path)
+  }
+
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === "Escape") {
       e.preventDefault()
@@ -319,7 +353,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
   }
 
   function handleInputKeyDown(e: KeyboardEvent) {
-    const items = visibleResults()
+    const items = visibleItems()
     
     if (e.key === "ArrowDown") {
       e.preventDefault()
@@ -335,13 +369,13 @@ export function ProjectDialog(props: ProjectDialogProps) {
       e.preventDefault()
       const selected = items[selectedIndex()]
       if (selected) {
-        selectProject(selected)
+        activateItem(selected)
       }
     } else if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault()
       const selected = items[selectedIndex()]
       if (!selected) return
-      drillInto(selected)
+      drillInto(selected.path)
     }
   }
 
@@ -550,10 +584,10 @@ export function ProjectDialog(props: ProjectDialogProps) {
                   </Show>
 
                   <Show when={!loading()}>
-                    <Show when={results().length === 0}>
-                      <div class="flex items-center justify-center h-full text-sm" style={{ color: "var(--text-weak)" }}>
-                        {filter()
-                          ? isRemoteServer()
+                     <Show when={visibleItems().length === 0}>
+                       <div class="flex items-center justify-center h-full text-sm" style={{ color: "var(--text-weak)" }}>
+                         {filter()
+                           ? isRemoteServer()
                             ? "No matching directories or paths"
                             : "No matching directories"
                           : isRemoteServer()
@@ -562,34 +596,46 @@ export function ProjectDialog(props: ProjectDialogProps) {
                       </div>
                     </Show>
 
-                  <For each={visibleResults()}>
-                      {(path, index) => {
-                        const display = displayPath(path, home())
+                  <For each={visibleItems()}>
+                      {(item, index) => {
+                        const display = displayPath(item.path, home())
                         const dir = getDirectory(display)
                         const name = getFilename(display)
                         const isSelected = () => index() === selectedIndex()
-                        const totalResults = visibleResults().length
+                        const totalResults = visibleItems().length
 
                         return (
                           <button
+                            type="button"
                             data-result-index={index()}
                             role="option"
                             aria-selected={isSelected()}
                             aria-posinset={index() + 1}
                             aria-setsize={totalResults}
-                            onClick={() => drillInto(path)}
-                            onDblClick={() => drillInto(path)}
+                            aria-label={item.kind === "parent" ? `Go to parent directory ${display}` : undefined}
+                            onClick={() => drillInto(item.path)}
+                            onDblClick={() => drillInto(item.path)}
                             class="w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition-colors"
                             style={{
                               background: isSelected() ? "color-mix(in srgb, var(--interactive-base) 15%, transparent)" : "transparent",
                             }}
                           >
                             <Folder class="w-4 h-4 shrink-0" style={{ color: "var(--interactive-base)" }} />
-                            <div class="flex items-center min-w-0 overflow-hidden">
-                              <span class="truncate" style={{ color: "var(--text-weak)" }}>{dir}</span>
-                              <span style={{ color: "var(--text-strong)" }}>{name}</span>
-                              <span style={{ color: "var(--text-weak)" }}>/</span>
-                            </div>
+                            <Show
+                              when={item.kind === "parent"}
+                              fallback={
+                                <div class="flex items-center min-w-0 overflow-hidden">
+                                  <span class="truncate" style={{ color: "var(--text-weak)" }}>{dir}</span>
+                                  <span style={{ color: "var(--text-strong)" }}>{name}</span>
+                                  <span style={{ color: "var(--text-weak)" }}>/</span>
+                                </div>
+                              }
+                            >
+                              <div class="flex items-center gap-2 min-w-0 overflow-hidden">
+                                <span class="font-mono shrink-0" style={{ color: "var(--text-strong)" }}>../</span>
+                                <span class="truncate" style={{ color: "var(--text-weak)" }}>{display}</span>
+                              </div>
+                            </Show>
                           </button>
                         )
                       }}
@@ -618,17 +664,17 @@ export function ProjectDialog(props: ProjectDialogProps) {
 
               {/* Open button for selected directory */}
               <div class="flex gap-2">
-                <Button
-                  onClick={() => {
-                    const selected = visibleResults()[selectedIndex()]
-                    if (selected) selectProject(selected)
-                  }}
-                  variant="primary"
-                  class="flex-1"
-                  disabled={visibleResults().length === 0}
-                >
-                  Open
-                </Button>
+                  <Button
+                    onClick={() => {
+                      const selected = visibleItems()[selectedIndex()]
+                      if (selected?.kind === "directory") selectProject(selected.path)
+                    }}
+                    variant="primary"
+                    class="flex-1"
+                    disabled={visibleItems().length === 0 || visibleItems()[selectedIndex()]?.kind !== "directory"}
+                  >
+                    Open
+                  </Button>
               </div>
 
               <Show when={capabilities().canCreateDirectories}>

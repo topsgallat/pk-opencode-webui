@@ -48,6 +48,7 @@ import { Plus, Settings, Paperclip, Upload, Bookmark, BookOpen, X as XIcon, Squa
 import { Portal } from "solid-js/web";
 import { ContextItems, type FileContext } from "../components/context-items";
 import { FilePickerDialog } from "../components/file-picker-dialog";
+import { FileMentionDialog } from "../components/file-mention-dialog";
 import { useDevice } from "../context/device";
 import {
   ImageAttachments,
@@ -392,6 +393,7 @@ export function Session() {
   const [imageAttachments, setImageAttachments] = createSignal<
     ImageAttachment[]
   >([]);
+  const [mentionPath, setMentionPath] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [historyError, setHistoryError] = createSignal<string | null>(null);
   // Use session tree walk to find pending questions from this session or any descendant.
@@ -1473,11 +1475,27 @@ export function Session() {
     inputRef?.focus();
   });
 
-  function addFileToContext(path: string) {
-    const key = `file:${path}`;
-    const existing = fileContext().find((f) => f.key === key);
-    if (existing) return;
-    setFileContext((prev) => [...prev, { path, key }]);
+  function addFileToContext(path: string, comment?: string, selection?: { startLine: number; endLine: number }, preview?: string) {
+    if (!comment) {
+      const key = `file:${path}`;
+      const existing = fileContext().find((f) => f.key === key);
+      if (existing) return;
+      setFileContext((prev) => [...prev, { path, key, selection, preview }]);
+      return;
+    }
+
+    setFileContext((prev) => [...prev, { path, key: generateUUID(), comment, selection, preview }]);
+  }
+
+  function openFileMention(path: string) {
+    setMentionPath(path);
+  }
+
+  function submitFileMention(note: string, selection: { startLine: number; endLine: number }, preview: string) {
+    const path = mentionPath();
+    if (!path) return;
+    addFileToContext(path, note || undefined, selection, preview);
+    setMentionPath(null);
   }
 
   async function searchAtFiles(query: string) {
@@ -1689,6 +1707,12 @@ export function Session() {
 
       // Add file parts from file context
       for (const file of files) {
+        if (file.selection || file.comment) {
+          const selection = file.selection ? `\nLines: ${file.selection.startLine}-${file.selection.endLine}` : ""
+          const note = file.comment ? `\nNote: ${file.comment}` : ""
+          const body = file.preview ? `\n\n${file.preview}` : ""
+          parts.push({ type: "text", text: `File: ${file.path}${selection}${note}${body}` });
+        }
         // Construct absolute path, avoiding double slashes
         const dir = directory || "";
         const absolute = file.path.startsWith("/")
@@ -2401,6 +2425,13 @@ export function Session() {
               </div>
             </Show>
 
+            <FileMentionDialog
+              open={mentionPath() !== null}
+              path={mentionPath() ?? ""}
+              onSubmit={submitFileMention}
+              onClose={() => setMentionPath(null)}
+            />
+
             <form
               onSubmit={sendMessage}
               onDragEnter={handleDragEnter}
@@ -2886,13 +2917,13 @@ export function Session() {
                 class="shrink-0 overflow-hidden focus-visible:outline-2 focus-visible:outline-[var(--interactive-base)] focus-visible:outline-offset-[-2px]"
                 style={{ width: `${layout.review.width()}px` }}
               >
-                <ReviewPanel sessionId={sessionId()!} />
+                <ReviewPanel sessionId={sessionId()!} onMentionFile={openFileMention} />
               </div>
             </aside>
           }>
             <Portal>
               <div class="mobile-overlay" style={{ "z-index": 60 }}>
-                <ReviewPanel sessionId={sessionId()!} />
+                <ReviewPanel sessionId={sessionId()!} onMentionFile={openFileMention} />
               </div>
             </Portal>
           </Show>

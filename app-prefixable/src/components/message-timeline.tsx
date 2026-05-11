@@ -108,7 +108,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     const a = auto
     if (!a) return false
     if (Date.now() - a.time > 1500) { auto = undefined; return false }
-    return Math.abs(el.scrollTop - a.top) < 2
+    return Math.abs(el.scrollTop - a.top) < threshold
   }
 
   const scrollToBottomNow = (el: HTMLElement) => {
@@ -181,8 +181,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
       return
     }
 
-    if (!store.userScrolled && isAuto(el)) {
-      scrollToBottom(false)
+    if (isAuto(el)) {
       return
     }
 
@@ -223,7 +222,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     settleTimer = undefined
 
     if (working) {
-      if (!store.userScrolled) scrollToBottom(true)
+      if (!store.userScrolled) queueScrollToBottom(scroll)
       return
     }
 

@@ -149,7 +149,7 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
                   border: "1px solid var(--border-base)",
                   display: "flex",
                   "flex-direction": "column",
-                "max-height": "min(72dvh, calc(100dvh - 8rem))",
+                "max-height": "min(48dvh, calc(100dvh - 10rem))",
                 "min-height": 0,
               }}
             >

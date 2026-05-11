@@ -23,6 +23,7 @@ import {
     getFilename,
     type Project,
 } from "../components/shared"
+import { useRecentProjects } from "../context/recent-projects"
 import type { Session } from "../sdk/client"
 import { groupSessionsByDate } from "./layout"
 import {
@@ -48,17 +49,6 @@ import { sessionHasQuestion, buildChildMap } from "../utils/session-tree-request
 import { useServer } from "../context/server"
 import { getServerKey, type ServerConfig } from "../utils/servers"
 
-const PROJECTS_STORAGE_KEY = "opencode.projects"
-
-function getServerSwitchHref(server: ServerConfig, directory?: string) {
-    if (!directory) return "/"
-    const slug = base64Encode(directory)
-    const key = `opencode.lastSession.${getServerKey(server)}.${directory}`
-    const last = typeof window === "undefined" ? null : localStorage.getItem(key)
-    if (!last || last.includes("..") || /[\/\\]/.test(last)) return "/"
-    return `/${slug}/session/${last}`
-}
-
 export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }) {
     const { client, directory } = useSDK()
     const events = useEvents()
@@ -70,7 +60,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     const navigate = useNavigate()
     const branding = useBranding()
     const server = useServer()
-    const projectsStorageKey = createMemo(() => `${PROJECTS_STORAGE_KEY}.${server.serverKey()}`)
+    const recent = useRecentProjects()
     const selectedServerLabel = createMemo(() => server.selectedServer()?.name || server.selectedServer()?.url || "Server")
 
     
@@ -85,18 +75,11 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     const [showServerSheet, setShowServerSheet] = createSignal(false)
 
     function openProjectHistory() {
-      const stored = localStorage.getItem(projectsStorageKey())
-        if (stored) {
-            try {
-                const parsed = JSON.parse(stored) as Project[]
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    setHistoryProjects(parsed)
-                    setShowProjectHistory(true)
-                    return
-                }
-            } catch (e) {
-                console.error("[MobileLayout] Failed to parse projects history:", e)
-            }
+        const items = recent.projects().map((p) => ({ worktree: p.path, name: p.name }))
+        if (items.length > 0) {
+            setHistoryProjects(items)
+            setShowProjectHistory(true)
+            return
         }
         props.onOpenProject?.()
     }

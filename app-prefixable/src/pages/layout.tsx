@@ -59,6 +59,7 @@ import {
 import { useSync } from "../context/sync";
 import { usePermission } from "../context/permission";
 import { useGlobalEvents } from "../context/global-events";
+import { useRecentProjects } from "../context/recent-projects";
 import { useSavedPrompts } from "../context/saved-prompts";
 import { useCommand, isDialogOpen } from "../context/command";
 import { ResizeHandle } from "../components/resize-handle";
@@ -262,7 +263,8 @@ export function Layout(props: ParentProps) {
   const [sessions, setSessions] = createSignal<Session[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [loadError, setLoadError] = createSignal<string | null>(null);
-  const [projects, setProjects] = createSignal<Project[]>([]);
+  const recent = useRecentProjects();
+  const projects = recent.projects;
   const [sidebarExpanded, setSidebarExpanded] = createSignal(true);
   const [showArchived, setShowArchived] = createSignal(false);
   const [projectDialogOpen, setProjectDialogOpen] = createSignal(false);
@@ -283,7 +285,6 @@ export function Layout(props: ParentProps) {
   const [promptDropdownIndex, setPromptDropdownIndex] = createSignal(0);
   const [confirmArchiveSession, setConfirmArchiveSession] = createSignal<Session | null>(null);
   const [pinnedIds, setPinnedIds] = createSignal<string[]>([]);
-  const projectsStorageKey = createMemo(() => `${PROJECTS_STORAGE_KEY}.${server.serverKey()}`);
   const sidebarExpandedKey = createMemo(() => `${SIDEBAR_EXPANDED_KEY}.${server.serverKey()}`);
   const showArchivedKey = createMemo(() => `${SHOW_ARCHIVED_KEY}.${server.serverKey()}`);
   const pinnedSessionsKey = createMemo(() => `${PINNED_SESSIONS_PREFIX}${server.serverKey()}.${directory ?? "global"}`);
@@ -332,20 +333,6 @@ export function Layout(props: ParentProps) {
     void loadSessions();
   }, { defer: true }));
 
-  createEffect(on(projectsStorageKey, (key) => {
-    try {
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        setProjects(JSON.parse(stored));
-        return;
-      }
-      setProjects([]);
-    } catch (e) {
-      console.error("Failed to load projects:", e);
-      setProjects([]);
-    }
-  }));
-
   // Load state from storage
   onMount(() => {
 
@@ -392,18 +379,6 @@ export function Layout(props: ParentProps) {
     window.addEventListener("resize", handleResize);
     onCleanup(() => window.removeEventListener("resize", handleResize));
   });
-
-  function saveProjects(list: Project[]) {
-    setProjects(list);
-    const value = JSON.stringify(list);
-    try {
-      localStorage.setItem(projectsStorageKey(), value);
-    } catch (e) {
-      console.error("Failed to save projects:", e);
-      return;
-    }
-    dispatchStorageEvent(projectsStorageKey(), value);
-  }
 
   function toggleSidebar() {
     const next = !sidebarExpanded();
@@ -815,14 +790,11 @@ export function Layout(props: ParentProps) {
   }
 
   function addProject(worktree: string) {
-    const existing = projects().find((p) => p.worktree === worktree);
-    if (!existing) {
-      saveProjects([...projects(), { worktree }]);
-    }
+    recent.add(worktree);
   }
 
   function removeProject(worktree: string) {
-    saveProjects(projects().filter((p) => p.worktree !== worktree));
+    recent.remove(worktree);
   }
 
   function handleProjectSelect(worktree: string) {

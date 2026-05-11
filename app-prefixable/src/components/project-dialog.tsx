@@ -173,7 +173,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
           throwOnError: true,
         })
         console.log("[getDirs] remote: key:", key, "home:", home, "directory:", directory, "path: .")
-        const res = await client.file.list({ path: "." })
+        const res = await client.file.list({ path: ".", directory })
         console.log("[getDirs] remote: response data:", res.data?.length, "items")
         const dirs = (res.data ?? [])
           .filter((node) => node.type === "directory")

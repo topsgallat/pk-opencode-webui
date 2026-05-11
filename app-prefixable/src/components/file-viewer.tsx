@@ -6,7 +6,7 @@ import { useBasePath } from "../context/base-path"
 import { useServer } from "../context/server"
 import { ContentCode } from "./diff/content-code"
 import { Spinner } from "./ui/spinner"
-import { FileCode, Pencil, Eye, Maximize2, X } from "lucide-solid"
+import { FileCode, Pencil, Eye, Maximize2, X, MessageSquarePlus } from "lucide-solid"
 import { writeFile } from "../utils/extended-api"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { EditorDialog } from "./editor-dialog"
@@ -14,6 +14,7 @@ import { Markdown } from "./markdown"
 
 interface FileViewerProps {
   path: string
+  onMentionFile?: (path: string) => void
 }
 
 function getLanguage(path: string) {
@@ -335,6 +336,17 @@ export function FileViewer(props: FileViewerProps) {
                       style={{ color: "var(--text-base)" }}
                     >
                       <Pencil class="w-3.5 h-3.5" />
+                    </button>
+                      </Show>
+                  <Show when={props.onMentionFile}>
+                    <button
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
+                      onClick={() => props.onMentionFile?.(props.path)}
+                      title="Mention in prompt"
+                      aria-label="Mention in prompt"
+                      style={{ color: "var(--text-base)" }}
+                    >
+                      <MessageSquarePlus class="w-3.5 h-3.5" />
                     </button>
                   </Show>
                 </div>

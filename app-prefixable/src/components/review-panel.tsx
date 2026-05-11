@@ -39,6 +39,7 @@ function createPatch(filename: string, before: string, after: string): string {
 
 interface ReviewPanelProps {
   sessionId: string;
+  onMentionFile?: (path: string) => void;
 }
 
 export function ReviewPanel(props: ReviewPanelProps) {
@@ -440,11 +441,12 @@ export function ReviewPanel(props: ReviewPanelProps) {
                       <div class="p-2">
                         <FileTree
                           path=""
-                          allowed={diffFiles()}
-                          kinds={kinds()}
-                          active={selected() ?? undefined}
-                          onFileClick={(node) => handleDiffClick(node.path)}
-                        />
+                        allowed={diffFiles()}
+                        kinds={kinds()}
+                        active={selected() ?? undefined}
+                        onFileClick={(node) => handleDiffClick(node.path)}
+                        onMentionFile={props.onMentionFile}
+                      />
                       </div>
                     </Show>
                   </Show>
@@ -505,6 +507,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
                     kinds={kinds()}
                     active={selected() ?? undefined}
                     onFileClick={handleFileClick}
+                    onMentionFile={props.onMentionFile}
                   />
                 </div>
               </Tabs.Content>
@@ -526,7 +529,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
               <ChevronRight class="w-4 h-4" />
             </button>
           </div>
-          <FileViewer path={activeTab()!} />
+            <FileViewer path={activeTab()!} onMentionFile={props.onMentionFile} />
         </div>
       </Show>
     </div>

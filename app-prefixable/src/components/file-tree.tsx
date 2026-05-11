@@ -5,7 +5,7 @@ import type { FileNode } from "../sdk/client"
 import { useFile } from "../context/file"
 import { useServer } from "../context/server"
 import { getServerCapabilities } from "../utils/server-capabilities"
-import { ChevronDown, ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Trash2, Edit2 } from "lucide-solid"
+import { ChevronDown, ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Trash2, Edit2, MessageSquarePlus } from "lucide-solid"
 import { NewFileDialog } from "./new-file-dialog"
 
 type Kind = "add" | "del" | "mix"
@@ -41,6 +41,7 @@ interface FileTreeProps {
   kinds?: ReadonlyMap<string, Kind>
   active?: string
   onFileClick?: (node: FileNode) => void
+  onMentionFile?: (path: string) => void
 }
 
 export function FileTree(props: FileTreeProps) {
@@ -421,13 +422,28 @@ export function FileTree(props: FileTreeProps) {
                       setContextMenu(null)
                       props.onFileClick?.(m.node as FileNode)
                     }}
-                  >
-                    <Edit2 class="w-3.5 h-3.5" />
-                    Edit File
-                  </button>
+                    >
+                      <Edit2 class="w-3.5 h-3.5" />
+                      Edit File
+                    </button>
                   <Show when={canDelete()}>
                     <div class="h-px w-full my-1" style={{ background: "var(--border-base)" }} />
                   </Show>
+                </Show>
+
+                <Show when={menu().node.type === "file" && props.onMentionFile}>
+                  <button
+                    class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const m = menu()
+                      setContextMenu(null)
+                      props.onMentionFile?.((m.node as FileNode).path)
+                    }}
+                  >
+                    <MessageSquarePlus class="w-3.5 h-3.5" />
+                    Mention in Prompt
+                  </button>
                 </Show>
 
                 <Show when={menu().node.path !== "" && canDelete()}>

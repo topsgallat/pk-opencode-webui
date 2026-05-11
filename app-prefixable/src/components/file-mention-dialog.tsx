@@ -70,12 +70,12 @@ export function FileMentionDialog(props: Props) {
   return (
     <Show when={props.open}>
       <Portal>
-        <div class="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+        <div class="fixed inset-0 z-[1000] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="file-mention-dialog-title"
-            class="w-full max-w-lg rounded-lg shadow-xl overflow-hidden flex flex-col"
+            class="relative z-[1001] w-full max-w-lg rounded-lg shadow-xl overflow-hidden flex flex-col"
             style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}
           >
             <div class="px-4 py-3 flex items-center justify-between" style={{ "border-bottom": "1px solid var(--border-base)" }}>

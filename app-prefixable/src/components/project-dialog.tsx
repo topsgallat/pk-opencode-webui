@@ -5,7 +5,7 @@ import { useSDK } from "../context/sdk"
 import { useServer } from "../context/server"
 import { Spinner } from "./ui/spinner"
 import { Button } from "./ui/button"
-import { Folder, X, GitBranch, AlertCircle } from "lucide-solid"
+import { Folder, X, GitBranch, AlertCircle, ArrowLeft } from "lucide-solid"
 import { Terminal } from "./terminal"
 import { useEvents } from "../context/events"
 import { mkdir, listDirs } from "../utils/extended-api"
@@ -632,7 +632,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
                               }
                             >
                               <div class="flex items-center gap-2 min-w-0 overflow-hidden">
-                                <span class="font-mono shrink-0" style={{ color: "var(--text-strong)" }}>../</span>
+                                <ArrowLeft class="w-4 h-4 shrink-0" style={{ color: "var(--text-strong)" }} />
                                 <span class="truncate" style={{ color: "var(--text-weak)" }}>{display}</span>
                               </div>
                             </Show>

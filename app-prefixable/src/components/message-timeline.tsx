@@ -441,6 +441,7 @@ export function MessageTimeline(props: {
                   turn={turn}
                   now={now}
                   isLast={index() === renderedTurns().length - 1}
+                  streaming={props.processing && index() === renderedTurns().length - 1}
                   defaultExpanded={expanded()[turn.id] ?? index() === renderedTurns().length - 1}
                   pendingStatus={index() === renderedTurns().length - 1 && turn.assistantMessages.length === 0 ? (props.processing ? "thinking" : props.pendingPromptText ? "waiting" : undefined) : undefined}
                   onToggle={handleToggle}

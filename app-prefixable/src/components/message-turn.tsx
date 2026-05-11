@@ -179,6 +179,7 @@ export function MessageTurn(props: {
   now: Accessor<number>
   defaultExpanded?: boolean
   isLast?: boolean
+  streaming?: boolean
   pendingStatus?: "waiting" | "thinking"
   onToggle?: (turnId: string, expanded: boolean) => void
   onRetry?: (messageId: string) => void
@@ -651,10 +652,11 @@ export function MessageTurn(props: {
 
           {/* Assistant messages */}
           <For each={props.turn.assistantMessages}>
-            {(message) => {
+            {(message, index) => {
               const text = extractTextContent(message.parts).trim()
               const tools = hasTools(message)
               const colors = () => getAgentColors(message.agent)
+              const streamingText = () => props.streaming && index() === props.turn.assistantMessages.length - 1 && !message.error
 
               return (
                 <div class="flex gap-3">
@@ -707,7 +709,17 @@ export function MessageTurn(props: {
                     </Show>
                     {/* Text content */}
                     <Show when={text}>
-                      <Markdown content={text} class="text-sm" onFileClick={props.onOpenFile} linkifyFiles={!!props.onOpenFile} />
+                      <Show
+                        when={streamingText()}
+                        fallback={<Markdown content={text} class="text-sm" onFileClick={props.onOpenFile} linkifyFiles={!!props.onOpenFile} />}
+                      >
+                        <div
+                          class="text-sm whitespace-pre-wrap break-words"
+                          style={{ color: "var(--text-strong)" }}
+                        >
+                          {text}
+                        </div>
+                      </Show>
                     </Show>
                     {/* Tool calls */}
                     <Show when={tools}>

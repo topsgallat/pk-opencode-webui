@@ -42,6 +42,7 @@ interface FileTreeProps {
   active?: string
   onFileClick?: (node: FileNode) => void
   onMentionFile?: (path: string) => void
+  onMentionFileLine?: (path: string, selection: { startLine: number; endLine: number }) => void
 }
 
 export function FileTree(props: FileTreeProps) {

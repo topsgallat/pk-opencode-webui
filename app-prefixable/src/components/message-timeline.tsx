@@ -74,88 +74,42 @@ function hasVisibleContent(message: DisplayMessage): boolean {
 
 function createAutoScroll(options: { working: () => boolean; bottomThreshold?: number }) {
   let scroll: HTMLElement | undefined
-  let settling = false
-  let settleTimer: ReturnType<typeof setTimeout> | undefined
-  let autoTimer: ReturnType<typeof setTimeout> | undefined
   let scrollFrame: number | undefined
   let resizeObserver: ResizeObserver | undefined
   let observedContent: HTMLElement | undefined
-  let auto: { top: number; time: number } | undefined
 
   const threshold = options.bottomThreshold ?? 10
 
   const [store, setStore] = createStore({
     contentRef: undefined as HTMLElement | undefined,
-    userScrolled: false,
+    pinned: true,
   })
-
-  const active = () => options.working() || settling
 
   const distanceFromBottom = (el: HTMLElement) => el.scrollHeight - el.clientHeight - el.scrollTop
 
   const canScroll = (el: HTMLElement) => el.scrollHeight - el.clientHeight > 1
 
-  const markAuto = (el: HTMLElement) => {
-    auto = { top: Math.max(0, el.scrollHeight - el.clientHeight), time: Date.now() }
-    if (autoTimer) clearTimeout(autoTimer)
-    autoTimer = setTimeout(() => {
-      auto = undefined
-      autoTimer = undefined
-    }, 1500)
-  }
-
-  const isAuto = (el: HTMLElement) => {
-    const a = auto
-    if (!a) return false
-    if (Date.now() - a.time > 1500) { auto = undefined; return false }
-    return Math.abs(el.scrollTop - a.top) < threshold
-  }
-
   const scrollToBottomNow = (el: HTMLElement) => {
-    markAuto(el)
     el.scrollTop = el.scrollHeight - el.clientHeight
   }
 
-  const queueScrollToBottom = (el?: HTMLElement) => {
-    if (!el) return
+  const queueScrollToBottom = () => {
     if (scrollFrame !== undefined) return
     scrollFrame = requestAnimationFrame(() => {
       scrollFrame = undefined
-      if (!scroll) return
-      if (!active()) return
-      if (store.userScrolled) return
-      const distance = distanceFromBottom(scroll)
-      if (distance < 2) {
-        markAuto(scroll)
-        return
-      }
-      scrollToBottomNow(scroll)
+      const el = scroll
+      if (!el) return
+      if (!store.pinned) return
+      scrollToBottomNow(el)
     })
   }
 
   const scrollToBottom = (force: boolean) => {
-    if (!force && !active()) return
-    if (force && store.userScrolled) setStore("userScrolled", false)
-
     const el = scroll
     if (!el) return
-    if (!force && store.userScrolled) return
-
-    const distance = distanceFromBottom(el)
-    if (distance < 2) { markAuto(el); return }
-
-    scrollToBottomNow(el)
-  }
-
-  const stop = () => {
-    const el = scroll
-    if (!el) return
-    if (!canScroll(el)) {
-      if (store.userScrolled) setStore("userScrolled", false)
-      return
-    }
-    if (store.userScrolled) return
-    setStore("userScrolled", true)
+    if (!force && !store.pinned) return
+    if (force && !store.pinned) setStore("pinned", true)
+    queueScrollToBottom()
   }
 
   const handleWheel = (e: WheelEvent) => {
@@ -164,7 +118,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     const target = e.target instanceof Element ? e.target : undefined
     const nested = target?.closest("[data-scrollable]")
     if (el && nested && nested !== el) return
-    stop()
+    if (store.pinned) setStore("pinned", false)
   }
 
   const handleScroll = () => {
@@ -172,24 +126,20 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     if (!el) return
 
     if (!canScroll(el)) {
-      if (store.userScrolled) setStore("userScrolled", false)
+      if (!store.pinned) setStore("pinned", true)
       return
     }
 
-    if (distanceFromBottom(el) < threshold) {
-      if (store.userScrolled) setStore("userScrolled", false)
+    if (distanceFromBottom(el) <= threshold) {
+      if (!store.pinned) setStore("pinned", true)
       return
     }
 
-    if (isAuto(el)) {
-      return
-    }
-
-    stop()
+    if (store.pinned) setStore("pinned", false)
   }
 
   const updateOverflowAnchor = (el: HTMLElement) => {
-    el.style.overflowAnchor = store.userScrolled ? "auto" : "none"
+    el.style.overflowAnchor = store.pinned ? "none" : "auto"
   }
 
   const setupResizeObserver = (content: HTMLElement) => {
@@ -197,14 +147,13 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     observedContent = content
     resizeObserver = new ResizeObserver(() => {
       const el = scroll
-      if (el && !canScroll(el)) {
-        if (store.userScrolled) setStore("userScrolled", false)
+      if (!el) return
+      if (!canScroll(el)) {
+        if (!store.pinned) setStore("pinned", true)
         return
       }
-      if (!active()) return
-      if (store.userScrolled) return
-      if (!el) return
-      queueScrollToBottom(el)
+      if (!store.pinned) return
+      queueScrollToBottom()
     })
     resizeObserver.observe(content)
   }
@@ -217,29 +166,20 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
   })
 
   createEffect(on(options.working, (working: boolean) => {
-    settling = false
-    if (settleTimer) clearTimeout(settleTimer)
-    settleTimer = undefined
-
     if (working) {
-      if (!store.userScrolled) queueScrollToBottom(scroll)
+      if (store.pinned) queueScrollToBottom()
       return
     }
-
-    settling = true
-    settleTimer = setTimeout(() => { settling = false }, 300)
   }))
 
   createEffect(() => {
-    store.userScrolled
+    store.pinned
     const el = scroll
     if (!el) return
     updateOverflowAnchor(el)
   })
 
   onCleanup(() => {
-    if (settleTimer) clearTimeout(settleTimer)
-    if (autoTimer) clearTimeout(autoTimer)
     if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame)
     if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = undefined }
   })
@@ -256,7 +196,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     handleScroll,
     scrollToBottom: () => scrollToBottom(false),
     forceScrollToBottom: () => scrollToBottom(true),
-    userScrolled: () => store.userScrolled,
+    userScrolled: () => !store.pinned,
   }
 }
 

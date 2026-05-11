@@ -385,14 +385,6 @@ export function Layout(props: ParentProps) {
       }
     }
 
-    // Add current directory to projects if not present
-    if (directory) {
-      addProject(directory);
-      // Ensure sidebar is open when navigating to a project
-      setSidebarExpanded(true);
-      localStorage.setItem(sidebarExpandedKey(), "true");
-    }
-
     // Resize listener for responsive sidebar
     function handleResize() {
       setWindowWidth(window.innerWidth);

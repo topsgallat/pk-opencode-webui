@@ -6,6 +6,7 @@ import { useSDK } from "../context/sdk"
 interface Props {
   open: boolean
   path: string
+  initialSelection?: { startLine: number; endLine: number }
   onSubmit: (note: string, selection: { startLine: number; endLine: number }, preview: string) => void
   onClose: () => void
 }
@@ -36,8 +37,8 @@ export function FileMentionDialog(props: Props) {
       const next = res.data?.content ?? ""
       setContent(next)
       const lines = Math.max(1, next.split("\n").length)
-      setStartLine(1)
-      setEndLine(Math.min(20, lines))
+      setStartLine(Math.min(Math.max(1, props.initialSelection?.startLine ?? 1), lines))
+      setEndLine(Math.min(Math.max(props.initialSelection?.endLine ?? Math.min(20, lines), 1), lines))
       setLoading(false)
       setTimeout(() => inputRef?.focus(), 0)
     }).catch((e) => {

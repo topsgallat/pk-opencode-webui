@@ -394,6 +394,7 @@ export function Session() {
     ImageAttachment[]
   >([]);
   const [mentionPath, setMentionPath] = createSignal<string | null>(null);
+  const [mentionSelection, setMentionSelection] = createSignal<{ startLine: number; endLine: number } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [historyError, setHistoryError] = createSignal<string | null>(null);
   // Use session tree walk to find pending questions from this session or any descendant.
@@ -1488,6 +1489,12 @@ export function Session() {
   }
 
   function openFileMention(path: string) {
+    setMentionSelection(null);
+    setMentionPath(path);
+  }
+
+  function openFileLineMention(path: string, selection: { startLine: number; endLine: number }) {
+    setMentionSelection(selection);
     setMentionPath(path);
   }
 
@@ -1496,6 +1503,7 @@ export function Session() {
     if (!path) return;
     addFileToContext(path, note || undefined, selection, preview);
     setMentionPath(null);
+    setMentionSelection(null);
   }
 
   async function searchAtFiles(query: string) {
@@ -2428,8 +2436,12 @@ export function Session() {
             <FileMentionDialog
               open={mentionPath() !== null}
               path={mentionPath() ?? ""}
+              initialSelection={mentionSelection() ?? undefined}
               onSubmit={submitFileMention}
-              onClose={() => setMentionPath(null)}
+              onClose={() => {
+                setMentionPath(null)
+                setMentionSelection(null)
+              }}
             />
 
             <form
@@ -2917,13 +2929,13 @@ export function Session() {
                 class="shrink-0 overflow-hidden focus-visible:outline-2 focus-visible:outline-[var(--interactive-base)] focus-visible:outline-offset-[-2px]"
                 style={{ width: `${layout.review.width()}px` }}
               >
-                <ReviewPanel sessionId={sessionId()!} onMentionFile={openFileMention} />
+                <ReviewPanel sessionId={sessionId()!} onMentionFile={openFileMention} onMentionFileLine={openFileLineMention} />
               </div>
             </aside>
           }>
             <Portal>
               <div class="mobile-overlay" style={{ "z-index": 60 }}>
-                <ReviewPanel sessionId={sessionId()!} onMentionFile={openFileMention} />
+                <ReviewPanel sessionId={sessionId()!} onMentionFile={openFileMention} onMentionFileLine={openFileLineMention} />
               </div>
             </Portal>
           </Show>

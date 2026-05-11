@@ -300,6 +300,12 @@ export function ProjectDialog(props: ProjectDialogProps) {
     props.onClose()
   }
 
+  function drillInto(path: string) {
+    const home = homeDirectory()
+    const display = home ? displayPath(path, home) : path
+    setFilter(display.endsWith("/") ? display : display + "/")
+  }
+
   const visibleResults = createMemo(() => results().slice(0, visibleCount()))
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === "Escape") {
@@ -335,13 +341,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
       e.preventDefault()
       const selected = items[selectedIndex()]
       if (!selected) return
-      const home = homeDirectory()
-      const display = home ? displayPath(selected, home) : selected
-      if (isRemoteServer()) {
-        setFilter(display)
-        return
-      }
-      setFilter(display.endsWith("/") ? display : display + "/")
+      drillInto(selected)
     }
   }
 
@@ -577,8 +577,8 @@ export function ProjectDialog(props: ProjectDialogProps) {
                             aria-selected={isSelected()}
                             aria-posinset={index() + 1}
                             aria-setsize={totalResults}
-                            onClick={() => setSelectedIndex(index())}
-                            onDblClick={() => selectProject(path)}
+                            onClick={() => drillInto(path)}
+                            onDblClick={() => drillInto(path)}
                             class="w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition-colors"
                             style={{
                               background: isSelected() ? "color-mix(in srgb, var(--interactive-base) 15%, transparent)" : "transparent",

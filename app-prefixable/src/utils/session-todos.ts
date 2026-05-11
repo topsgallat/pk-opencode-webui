@@ -41,6 +41,7 @@ export function useSessionTodos(sessionId: () => string | undefined) {
     }
 
     let cancelled = false
+    setTodos([])
 
     void client.session
       .todo({ sessionID: id, directory })

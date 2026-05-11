@@ -16,8 +16,9 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
   const [lastSession, setLastSession] = createSignal<string | undefined>(undefined)
   const [hydrated, setHydrated] = createSignal(false)
   const [dismissedKey, setDismissedKey] = createSignal<string | undefined>(undefined)
-  const [hiddenKey, setHiddenKey] = createSignal<string | undefined>(undefined)
+  const [hiddenSession, setHiddenSession] = createSignal<string | undefined>(undefined)
   const currentKey = createMemo(() => todos.todos().map((todo) => `${todo.id}:${todo.status}`).join("|"))
+  const hiddenStorageKey = (id: string) => `opencode.todoTrayHidden.${id}`
 
   createEffect(() => {
     const id = props.sessionId()
@@ -25,7 +26,7 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
     setLastSession(id)
     setHydrated(false)
     setDismissedKey(undefined)
-    setHiddenKey(undefined)
+    setHiddenSession(id && localStorage.getItem(hiddenStorageKey(id)) === "1" ? id : undefined)
     props.setOpen(false)
   })
 
@@ -33,8 +34,18 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
     if (summary().total === 0) {
       setHydrated(false)
       setDismissedKey(undefined)
-      setHiddenKey(undefined)
+      const id = props.sessionId()
+      if (id) {
+        setHiddenSession(id)
+        localStorage.setItem(hiddenStorageKey(id), "1")
+      }
       return
+    }
+
+    const id = props.sessionId()
+    if (id && summary().active > 0 && hiddenSession() === id) {
+      setHiddenSession(undefined)
+      localStorage.removeItem(hiddenStorageKey(id))
     }
 
     if (!hydrated()) {
@@ -57,7 +68,7 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
   })
 
   createEffect(() => {
-    if (!props.open() || summary().total === 0 || hiddenKey() === currentKey()) return
+    if (!props.open() || summary().total === 0 || hiddenSession() === props.sessionId()) return
 
     const body = document.body.style
     const html = document.documentElement.style
@@ -80,7 +91,7 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
   })
 
   return (
-    <Show when={summary().total > 0 && hiddenKey() !== currentKey()}>
+    <Show when={summary().total > 0 && hiddenSession() !== props.sessionId()}>
       <div class="absolute left-0 right-0 bottom-full z-20 mb-2">
         <Show when={props.open()}>
             <button
@@ -91,10 +102,20 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
               onPointerDown={(e) => {
                 e.preventDefault()
                 setDismissedKey(currentKey())
+                const id = props.sessionId()
+                if (id && summary().active === 0) {
+                  setHiddenSession(id)
+                  localStorage.setItem(hiddenStorageKey(id), "1")
+                }
                 props.setOpen(false)
               }}
               onClick={() => {
                 setDismissedKey(currentKey())
+                const id = props.sessionId()
+                if (id && summary().active === 0) {
+                  setHiddenSession(id)
+                  localStorage.setItem(hiddenStorageKey(id), "1")
+                }
                 props.setOpen(false)
               }}
             />
@@ -162,8 +183,12 @@ export function MobileTodoTray(props: MobileTodoTrayProps) {
                   class="p-1 rounded-md"
                   style={{ color: "var(--icon-weak)" }}
                   onClick={() => {
-                    setHiddenKey(currentKey())
                     setDismissedKey(currentKey())
+                    const id = props.sessionId()
+                    if (id && summary().active === 0) {
+                      setHiddenSession(id)
+                      localStorage.setItem(hiddenStorageKey(id), "1")
+                    }
                     props.setOpen(false)
                   }}
                   aria-label="Collapse todo tray"

@@ -487,13 +487,6 @@ export function MessageTimeline(props: {
           </For>
         </div>
 
-        {/* Processing indicator - shown when processing but last turn has content */}
-        <Show when={props.processing && lastTurn() && lastTurn()!.assistantMessages.length > 0}>
-          <div class="mt-4">
-            <ProcessingIndicator sessionStatus={props.sessionStatus} />
-          </div>
-        </Show>
-
         {/* Empty state */}
         <Show when={turns().length === 0 && !props.processing}>
           <div class="flex flex-col items-center justify-center h-full text-center py-12">
@@ -523,12 +516,6 @@ export function MessageTimeline(props: {
           </div>
         </Show>
 
-        {/* Processing indicator when no turns yet */}
-        <Show when={props.processing && (!lastTurn() || lastTurn()!.assistantMessages.length === 0)}>
-          <div class="mt-4">
-            <ProcessingIndicator sessionStatus={props.sessionStatus} />
-          </div>
-        </Show>
       </Show>
     </div>
   )

@@ -4,6 +4,7 @@ import { useFile } from "../context/file"
 import { useSDK } from "../context/sdk"
 import { useBasePath } from "../context/base-path"
 import { useServer } from "../context/server"
+import { useDevice } from "../context/device"
 import { Spinner } from "./ui/spinner"
 import { FileCode, Pencil, Eye, Maximize2, X, MessageSquarePlus } from "lucide-solid"
 import { writeFile } from "../utils/extended-api"
@@ -113,6 +114,7 @@ export function FileViewer(props: FileViewerProps) {
   const sdk = useSDK()
   const basePath = useBasePath()
   const server = useServer()
+  const device = useDevice()
   const capabilities = () => getServerCapabilities(server.selectedServer())
 
   const [isEditing, setIsEditing] = createSignal(false)
@@ -142,6 +144,10 @@ export function FileViewer(props: FileViewerProps) {
     return url
   })
   const sourceLines = createMemo(() => fileContent().split("\n"))
+  const lineButtonClass = () =>
+    device.isTouchDevice()
+      ? "opacity-100 transition-opacity p-1 rounded min-h-[28px] min-w-[28px] flex items-center justify-center"
+      : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 rounded min-h-[28px] min-w-[28px] flex items-center justify-center"
   const SAFE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"])
 
   createEffect(() => {
@@ -317,7 +323,7 @@ export function FileViewer(props: FileViewerProps) {
                       </Show>
                     </button>
                   </Show>
-                  <Show when={(isMarkdown() && markdownPreview()) || (isHtml() && htmlPreview())}>
+                  <Show when={fileLoaded() && !isBinary() && !isImage()}>
                     <button
                       class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
                       onClick={() => setFullscreenPreview(true)}
@@ -373,8 +379,8 @@ export function FileViewer(props: FileViewerProps) {
                                         <Show when={props.onMentionFileLine}>
                                           <button
                                             type="button"
-                                            class="sticky right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 rounded min-h-[28px] min-w-[28px] flex items-center justify-center"
-                                            style={{ color: "var(--text-weak)", background: "var(--surface-inset)" }}
+                                            class={lineButtonClass()}
+                                            style={{ color: "var(--text-weak)", background: device.isTouchDevice() ? "var(--surface-inset)" : "transparent" }}
                                             aria-label={`Add comment for ${props.path} line ${num()}`}
                                             title="Add comment"
                                             onClick={() => props.onMentionFileLine?.(props.path, { startLine: num(), endLine: num() })}
@@ -458,7 +464,39 @@ export function FileViewer(props: FileViewerProps) {
                 <Show
                   when={isMarkdown() && markdownPreview()}
                   fallback={
-                    <Show when={isHtml() && htmlPreview()}>
+                    <Show
+                      when={isHtml() && htmlPreview()}
+                      fallback={
+                        <div class="p-8 max-w-4xl mx-auto">
+                          <div class="font-mono text-xs leading-6 whitespace-pre" style={{ color: "var(--text-base)" }}>
+                            <For each={sourceLines()}>
+                              {(line, index) => {
+                                const num = () => index() + 1
+                                return (
+                                  <div class="group flex min-w-max rounded-sm px-1 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+                                    <div class="min-h-[1.5rem] flex-1 pr-3">
+                                      {line || " "}
+                                    </div>
+                                    <Show when={props.onMentionFileLine}>
+                                      <button
+                                        type="button"
+                                        class={lineButtonClass()}
+                                        style={{ color: "var(--text-weak)", background: device.isTouchDevice() ? "var(--surface-inset)" : "transparent" }}
+                                        aria-label={`Add comment for ${props.path} line ${num()}`}
+                                        title="Add comment"
+                                        onClick={() => props.onMentionFileLine?.(props.path, { startLine: num(), endLine: num() })}
+                                      >
+                                        <MessageSquarePlus class="w-3.5 h-3.5" />
+                                      </button>
+                                    </Show>
+                                  </div>
+                                )
+                              }}
+                            </For>
+                          </div>
+                        </div>
+                      }
+                    >
                       <iframe
                         src={htmlBlobUrl()}
                         sandbox=""

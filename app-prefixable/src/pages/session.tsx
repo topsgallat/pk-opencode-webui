@@ -1498,12 +1498,16 @@ export function Session() {
     setMentionPath(path);
   }
 
+  function closeFileMention() {
+    setMentionPath(null);
+    setMentionSelection(null);
+  }
+
   function submitFileMention(note: string, selection: { startLine: number; endLine: number }, preview: string) {
     const path = mentionPath();
     if (!path) return;
     addFileToContext(path, note || undefined, selection, preview);
-    setMentionPath(null);
-    setMentionSelection(null);
+    closeFileMention();
   }
 
   async function searchAtFiles(query: string) {
@@ -2433,16 +2437,15 @@ export function Session() {
               </div>
             </Show>
 
-            <FileMentionDialog
-              open={mentionPath() !== null}
-              path={mentionPath() ?? ""}
-              initialSelection={mentionSelection() ?? undefined}
-              onSubmit={submitFileMention}
-              onClose={() => {
-                setMentionPath(null)
-                setMentionSelection(null)
-              }}
-            />
+            <Show when={!device.isMobile()}>
+              <FileMentionDialog
+                open={mentionPath() !== null}
+                path={mentionPath() ?? ""}
+                initialSelection={mentionSelection() ?? undefined}
+                onSubmit={submitFileMention}
+                onClose={closeFileMention}
+              />
+            </Show>
 
             <form
               onSubmit={sendMessage}
@@ -3063,6 +3066,24 @@ export function Session() {
                 </For>
               </div>
             </Show>
+          </div>
+        </Portal>
+      </Show>
+
+      <Show when={device.isMobile() && mentionPath() !== null}>
+        <Portal>
+          <div
+            class="mobile-overlay items-center justify-center p-4"
+            style={{ "z-index": 80, background: "rgba(0,0,0,0.5)" }}
+          >
+            <FileMentionDialog
+              open={true}
+              portal={false}
+              path={mentionPath() ?? ""}
+              initialSelection={mentionSelection() ?? undefined}
+              onSubmit={submitFileMention}
+              onClose={closeFileMention}
+            />
           </div>
         </Portal>
       </Show>

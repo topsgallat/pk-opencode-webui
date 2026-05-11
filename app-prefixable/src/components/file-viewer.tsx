@@ -15,6 +15,7 @@ import { Markdown } from "./markdown"
 interface FileViewerProps {
   path: string
   onMentionFile?: (path: string) => void
+  onMentionFileLine?: (path: string, selection: { startLine: number; endLine: number }) => void
 }
 
 function getLanguage(path: string) {
@@ -141,6 +142,7 @@ export function FileViewer(props: FileViewerProps) {
     onCleanup(() => URL.revokeObjectURL(url))
     return url
   })
+  const sourceLines = createMemo(() => fileContent().split("\n"))
   const SAFE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"])
 
   createEffect(() => {
@@ -358,7 +360,44 @@ export function FileViewer(props: FileViewerProps) {
                     fallback={
                       <Show
                         when={isHtml() && htmlPreview()}
-                        fallback={<ContentCode code={fileContent()} lang={lang()} />}
+                      fallback={
+                        <div class="p-4 overflow-auto">
+                          <div
+                            class="rounded overflow-hidden"
+                            style={{ border: "1px solid var(--border-base)" }}
+                          >
+                            <div class="font-mono text-xs leading-6">
+                              <For each={sourceLines()}>
+                                {(line, index) => {
+                                  const num = () => index() + 1
+                                  return (
+                                    <div class="group flex items-stretch border-b last:border-b-0" style={{ "border-color": "var(--border-base)" }}>
+                                      <div class="flex items-center gap-2 shrink-0 px-2 py-1 select-none" style={{ background: "var(--surface-inset)", color: "var(--text-weak)", minWidth: "4.5rem" }}>
+                                        <span class="text-right w-8 tabular-nums">{num()}</span>
+                                      </div>
+                                      <div class="relative flex-1 min-w-0 px-3 py-1 pr-12 whitespace-pre overflow-x-auto" style={{ color: "var(--text-base)", background: "var(--background-base)" }}>
+                                        {line || " "}
+                                        <Show when={props.onMentionFileLine}>
+                                          <button
+                                            type="button"
+                                            class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 rounded min-h-[28px] min-w-[28px] flex items-center justify-center"
+                                            style={{ color: "var(--text-weak)", background: "var(--surface-inset)" }}
+                                            aria-label={`Add comment for ${props.path} line ${num()}`}
+                                            title="Add comment"
+                                            onClick={() => props.onMentionFileLine?.(props.path, { startLine: num(), endLine: num() })}
+                                          >
+                                            <MessageSquarePlus class="w-3.5 h-3.5" />
+                                          </button>
+                                        </Show>
+                                      </div>
+                                    </div>
+                                  )
+                                }}
+                              </For>
+                            </div>
+                          </div>
+                        </div>
+                      }
                       >
                     <iframe
                       src={htmlBlobUrl()}

@@ -11,13 +11,16 @@ import type { FileDiff, FileNode } from "../sdk/client";
 import { useSDK } from "../context/sdk";
 import { useEvents } from "../context/events";
 import { useLayout } from "../context/layout";
+import { withTimeout } from "../utils/request-timeout";
 
 import { FileTree } from "./file-tree";
 import { FileViewer } from "./file-viewer";
 import { ContentDiff } from "./diff/content-diff";
 import { Tabs } from "./ui/tabs";
 import { Spinner } from "./ui/spinner";
-import { ChevronRight, FileCode, GitBranch, RefreshCw, X } from "lucide-solid";
+import { ChevronRight, FileCode, GitBranch, RefreshCw, Search, X } from "lucide-solid";
+
+const FILE_SEARCH_TIMEOUT_MS = 10_000;
 
 // Helper to create unified diff patch string
 function createPatch(filename: string, before: string, after: string): string {
@@ -53,9 +56,13 @@ export function ReviewPanel(props: ReviewPanelProps) {
   const [loading, setLoading] = createSignal(false);
   const [tab, setTab] = createSignal<"changes" | "all">("all");
   const [isGitRepo, setIsGitRepo] = createSignal<boolean | null>(null); // null = unknown
+  const [search, setSearch] = createSignal("");
+  const [searchResults, setSearchResults] = createSignal<string[]>([]);
+  const [searchLoading, setSearchLoading] = createSignal(false);
 
   // Track the latest request to prevent race conditions
   let version = 0;
+  let searchVersion = 0;
 
   async function checkGitRepo() {
     try {
@@ -197,6 +204,58 @@ export function ReviewPanel(props: ReviewPanelProps) {
 
   // List of changed file paths for filtering
   const diffFiles = createMemo(() => diffs().map((d) => d.file));
+
+  const searchQuery = createMemo(() => search().trim());
+
+  const filteredDiffFiles = createMemo(() => {
+    const q = searchQuery().toLowerCase();
+    const files = diffFiles();
+    if (!q) return files;
+    return files.filter((file) => file.toLowerCase().includes(q));
+  });
+
+  createEffect(() => {
+    const q = searchQuery();
+    if (tab() !== "all" || !q) {
+      setSearchLoading(false);
+      setSearchResults([]);
+      return;
+    }
+
+    const current = ++searchVersion;
+    setSearchLoading(true);
+
+    void (async () => {
+      try {
+        const res = await withTimeout(
+          () => client.find.files({ query: q, dirs: "false" }),
+          FILE_SEARCH_TIMEOUT_MS,
+          "find.files",
+        );
+        if (current !== searchVersion) return;
+        setSearchResults(res.data ?? []);
+      } catch (err) {
+        if (current !== searchVersion) return;
+        console.error("[ReviewPanel] File search failed:", err);
+        setSearchResults([]);
+      } finally {
+        if (current === searchVersion) setSearchLoading(false);
+      }
+    })();
+  });
+
+  createEffect(() => {
+    if (tab() !== "changes") return;
+    const files = filteredDiffFiles();
+    const sel = selected();
+    if (!files.length) {
+      if (sel !== null) setSelected(null);
+      return;
+    }
+    if (!sel || !files.includes(sel)) {
+      setSelected(files[0]);
+    }
+  });
 
   // Build kinds map for highlighting (mix = modified)
   const kinds = createMemo(() => {
@@ -350,18 +409,11 @@ export function ReviewPanel(props: ReviewPanelProps) {
             </div>
 
             {/* Tabs for Changed Files / All Files */}
-            <Tabs
+              <Tabs
               variant="pill"
               value={tab()}
               onChange={(value) => {
                 setTab(value as "changes" | "all");
-                // Clear selection when switching to changes tab if selected file has no changes
-                if (value === "changes") {
-                  const sel = selected();
-                  if (sel && !diffFiles().includes(sel)) {
-                    setSelected(null);
-                  }
-                }
               }}
               class="flex flex-col flex-1 min-h-0"
             >
@@ -369,12 +421,12 @@ export function ReviewPanel(props: ReviewPanelProps) {
                 class="px-2 py-2"
                 style={{ "border-bottom": "1px solid var(--border-base)" }}
               >
-                 <Tabs.List class="flex gap-1" style={{ color: "var(--text-strong)" }}>
-                  <Tabs.Trigger
-                    value="changes"
-                    class="flex-1"
-                    classes={{ button: "w-full text-xs py-1" }}
-                  >
+                <Tabs.List class="flex gap-1" style={{ color: "var(--text-strong)" }}>
+                    <Tabs.Trigger
+                      value="changes"
+                      class="flex-1"
+                      classes={{ button: "w-full text-xs py-1" }}
+                    >
                     {count()} {count() === 1 ? "Change" : "Changes"}
                   </Tabs.Trigger>
                   <Tabs.Trigger
@@ -383,8 +435,49 @@ export function ReviewPanel(props: ReviewPanelProps) {
                     classes={{ button: "w-full text-xs py-1" }}
                   >
                     All Files
-                  </Tabs.Trigger>
-                </Tabs.List>
+                    </Tabs.Trigger>
+                  </Tabs.List>
+              </div>
+
+              <div
+                class="px-2 py-2"
+                style={{ "border-bottom": "1px solid var(--border-base)" }}
+              >
+                <div
+                  class="flex items-center gap-2 px-3 py-2 rounded-lg"
+                  style={{
+                    background: "var(--surface-inset)",
+                    border: "1px solid var(--border-base)",
+                  }}
+                >
+                  <Search class="w-4 h-4 shrink-0" style={{ color: "var(--icon-weak)" }} />
+                  <input
+                    type="text"
+                    placeholder={tab() === "changes" ? "Filter changed files..." : "Search all files..."}
+                    value={search()}
+                    onInput={(e) => setSearch(e.currentTarget.value)}
+                    class="flex-1 bg-transparent border-none outline-none text-xs min-w-0"
+                    style={{ color: "var(--text-base)" }}
+                    spellcheck={false}
+                    autocomplete="off"
+                  />
+                  <Show when={searchQuery()}>
+                    <button
+                      type="button"
+                      aria-label="Clear search"
+                      class="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5"
+                      style={{ color: "var(--icon-weak)" }}
+                      onClick={() => setSearch("")}
+                    >
+                      <X class="w-3.5 h-3.5" />
+                    </button>
+                  </Show>
+                </div>
+                <Show when={tab() === "all" && searchQuery() && searchLoading()}>
+                  <div class="mt-1 text-[10px]" style={{ color: "var(--text-weak)" }}>
+                    Searching files...
+                  </div>
+                </Show>
               </div>
 
               {/* Changed Files Tab */}
@@ -442,13 +535,14 @@ export function ReviewPanel(props: ReviewPanelProps) {
                       <div class="p-2">
                         <FileTree
                           path=""
-                        allowed={diffFiles()}
-                        kinds={kinds()}
-                        active={selected() ?? undefined}
-                        onFileClick={(node) => handleDiffClick(node.path)}
-                        onMentionFile={props.onMentionFile}
-                        onMentionFileLine={props.onMentionFileLine}
-                      />
+                          allowed={searchQuery() ? filteredDiffFiles() : diffFiles()}
+                          kinds={kinds()}
+                          active={selected() ?? undefined}
+                          viewKey={searchQuery() ? `changes:${searchQuery()}` : undefined}
+                          onFileClick={(node) => handleDiffClick(node.path)}
+                          onMentionFile={props.onMentionFile}
+                          onMentionFileLine={props.onMentionFileLine}
+                        />
                       </div>
                     </Show>
                   </Show>
@@ -505,9 +599,11 @@ export function ReviewPanel(props: ReviewPanelProps) {
                 <div class="p-2">
                   <FileTree
                     path=""
+                    allowed={searchQuery() ? searchResults() : undefined}
                     modified={diffFiles()}
                     kinds={kinds()}
                     active={selected() ?? undefined}
+                    viewKey={searchQuery() ? `all:${searchQuery()}` : undefined}
                     onFileClick={handleFileClick}
                     onMentionFile={props.onMentionFile}
                     onMentionFileLine={props.onMentionFileLine}

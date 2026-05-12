@@ -40,6 +40,7 @@ interface FileTreeProps {
   modified?: readonly string[]
   kinds?: ReadonlyMap<string, Kind>
   active?: string
+  viewKey?: string
   onFileClick?: (node: FileNode) => void
   onMentionFile?: (path: string) => void
   onMentionFileLine?: (path: string, selection: { startLine: number; endLine: number }) => void
@@ -84,6 +85,7 @@ export function FileTree(props: FileTreeProps) {
 
   const scrollKey = createMemo(() => {
     if (level() !== 0) return undefined
+    if (props.viewKey) return `view:${props.viewKey}:${props.path}`
     if (props.allowed) return `allowed:${props.path}`
     if (props.modified) return `all:${props.path}`
     return `plain:${props.path}`
@@ -328,6 +330,7 @@ export function FileTree(props: FileTreeProps) {
                         modified={props.modified}
                         kinds={props.kinds}
                         active={props.active}
+                        viewKey={props.viewKey}
                         onFileClick={props.onFileClick}
                       />
                     </div>

@@ -423,9 +423,9 @@ export function ProjectDialog(props: ProjectDialogProps) {
   }
 
   async function cloneRepo() {
-    const home = homeDirectory()
+    const parent = currentDirectory() || homeDirectory()
     const url = repoUrl().trim()
-    if (!url || !home || cloning()) return
+    if (!url || !parent || cloning()) return
 
     const repoName = url.split("/").pop()?.replace(/\.git$/, "")
     if (!repoName) {
@@ -433,7 +433,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
       return
     }
 
-    const targetPath = `${home}/${repoName}`.replace(/\/+/g, "/")
+    const targetPath = `${parent}/${repoName}`.replace(/\/+/g, "/")
 
     setCloning(true)
     setCloneError(null)
@@ -444,7 +444,7 @@ export function ProjectDialog(props: ProjectDialogProps) {
       const res = await sdk.global.pty.create({
         command: "git",
         args: ["clone", url, targetPath],
-        cwd: home,
+        cwd: parent,
       })
 
       if (!res.data?.id) {
@@ -504,6 +504,17 @@ export function ProjectDialog(props: ProjectDialogProps) {
   }
 
   const home = createMemo(() => homeDirectory() || "")
+  const cloneParent = createMemo(() => currentDirectory() || homeDirectory() || "")
+  const cloneTarget = createMemo(() => {
+    const url = repoUrl().trim()
+    const parent = cloneParent()
+    if (!url || !parent) return ""
+
+    const repoName = url.split("/").pop()?.replace(/\.git$/, "")
+    if (!repoName) return ""
+
+    return `${parent}/${repoName}`.replace(/\/+/g, "/")
+  })
 
   const backdrop = createBackdropDismiss(props.onClose)
 
@@ -774,13 +785,9 @@ export function ProjectDialog(props: ProjectDialogProps) {
                 </Show>
 
                 {/* Clone target info */}
-                <Show when={repoUrl().trim() && homeDirectory() && !clonePtyId()}>
+                <Show when={repoUrl().trim() && cloneParent() && !clonePtyId()}>
                   <p class="text-xs" style={{ color: "var(--text-weak)" }}>
-                    Will clone to: {homeDirectory()}/
-                    {repoUrl()
-                      .split("/")
-                      .pop()
-                      ?.replace(/\.git$/, "") || "..."}
+                    Will clone to: {cloneTarget() || "..."}
                   </p>
                 </Show>
 

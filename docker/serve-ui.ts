@@ -473,6 +473,14 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       headers.delete("x-opencode-target")
       headers.delete("Accept-Encoding")
 
+      // Forward the original Host header and proxy metadata so the backend
+      // can construct correct public URLs (for OAuth callbacks/redirects)
+      // and validate CORS origins when accessed from remote machines.
+      headers.set("Host", url.host)
+      headers.set("X-Forwarded-Host", url.host)
+      headers.set("X-Forwarded-Proto", url.protocol.replace(":", ""))
+      headers.set("X-Forwarded-For", req.headers.get("X-Forwarded-For") || url.hostname)
+
       // SSE requests need special handling
       if (path.startsWith("/event")) {
         console.log("[Proxy] SSE request to:", target.toString())

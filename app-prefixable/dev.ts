@@ -109,6 +109,11 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       if (syncedAuth) headers.set("Authorization", syncedAuth)
       headers.delete("x-opencode-target")
 
+      headers.set("Host", url.host)
+      headers.set("X-Forwarded-Host", url.host)
+      headers.set("X-Forwarded-Proto", url.protocol.replace(":", ""))
+      headers.set("X-Forwarded-For", req.headers.get("X-Forwarded-For") || url.hostname)
+
       // SSE requests - just pass through the response body directly
       if (strippedPath.startsWith("/event")) {
         console.log("[Proxy] SSE request to:", target.toString())

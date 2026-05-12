@@ -5,7 +5,7 @@ import { MessageTurn } from "./message-turn"
 // Note: Markdown and MessageParts are used in the FlatMessageList component below
 import { Markdown } from "./markdown"
 import { MessageParts } from "./tool-part"
-import { ChevronUp, RefreshCw, Clock, Brain, Loader2 } from "lucide-solid"
+import { ChevronUp, RefreshCw, Clock, Brain, Loader2, ArrowDown } from "lucide-solid"
 import { errorText } from "../types/message"
 import type { DisplayMessage, Turn } from "../types/message"
 import { extractTextContent } from "../utils/message"
@@ -26,10 +26,12 @@ function hasVisibleContent(message: DisplayMessage): boolean {
 function createAutoScroll(options: { working: () => boolean; bottomThreshold?: number }) {
   let scroll: HTMLElement | undefined
   let scrollFrame: number | undefined
+  let smoothScrollFrame: number | undefined
   let resizeObserver: ResizeObserver | undefined
   let observedContent: HTMLElement | undefined
   let anchorBottom = 0
   let suppressScroll = false
+  let smoothScrolling = false
 
   const threshold = options.bottomThreshold ?? 10
 
@@ -56,9 +58,19 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     })
   }
 
-  const scrollToBottomNow = (el: HTMLElement) => {
+  const cancelSmoothScroll = () => {
+    smoothScrolling = false
+    if (smoothScrollFrame !== undefined) {
+      cancelAnimationFrame(smoothScrollFrame)
+      smoothScrollFrame = undefined
+    }
+  }
+
+  const finishSmoothScroll = () => {
+    cancelSmoothScroll()
     anchorBottom = 0
-    writeAnchorBottom(el, 0)
+    if (!store.pinned) setStore("pinned", true)
+    queueScrollToBottom()
   }
 
   const queueScrollToBottom = () => {
@@ -77,19 +89,55 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
   const scrollToBottom = (force: boolean) => {
     const el = scroll
     if (!el) return
+    cancelSmoothScroll()
     if (!force && !store.pinned) return
     if (!store.pinned) setStore("pinned", true)
     anchorBottom = 0
     queueScrollToBottom()
   }
 
+  const smoothScrollToBottom = () => {
+    const el = scroll
+    if (!el) return
+    cancelSmoothScroll()
+    if (!store.pinned) setStore("pinned", true)
+    anchorBottom = 0
+    const target = scrollTargetTop(el, 0)
+    if (Math.abs(el.scrollTop - target) < 1) return
+
+    smoothScrolling = true
+    el.scrollTo({ top: target, behavior: "smooth" })
+
+    const monitor = () => {
+      const active = scroll
+      if (!active || !smoothScrolling) return
+      if (readAnchorBottom(active) <= threshold) {
+        finishSmoothScroll()
+        return
+      }
+      smoothScrollFrame = requestAnimationFrame(monitor)
+    }
+
+    smoothScrollFrame = requestAnimationFrame(monitor)
+  }
+
   const handleWheel = (e: WheelEvent) => {
-    if (e.deltaY >= 0) return
     const el = scroll
     const target = e.target instanceof Element ? e.target : undefined
     const nested = target?.closest("[data-scrollable]")
     if (el && nested && nested !== el) return
-    if (store.pinned) setStore("pinned", false)
+    cancelSmoothScroll()
+  }
+
+  const handlePointerDown = () => {
+    cancelSmoothScroll()
+  }
+
+  const handleWindowKeyDown = (e: KeyboardEvent) => {
+    if (!smoothScrolling) return
+    if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " ", "Spacebar"].includes(e.key)) {
+      cancelSmoothScroll()
+    }
   }
 
   const handleScroll = () => {
@@ -98,12 +146,20 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     if (suppressScroll) return
 
     if (!canScroll(el)) {
+      cancelSmoothScroll()
       if (!store.pinned) setStore("pinned", true)
       anchorBottom = 0
       return
     }
 
     const bottom = readAnchorBottom(el)
+    if (smoothScrolling) {
+      if (bottom <= threshold) {
+        finishSmoothScroll()
+      }
+      return
+    }
+
     if (bottom <= threshold) {
       if (!store.pinned) setStore("pinned", true)
       anchorBottom = 0
@@ -162,22 +218,33 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
 
   onCleanup(() => {
     if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame)
+    if (smoothScrollFrame !== undefined) cancelAnimationFrame(smoothScrollFrame)
+    if (typeof window !== "undefined") window.removeEventListener("keydown", handleWindowKeyDown)
     if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = undefined }
   })
 
   return {
     scrollRef: (el: HTMLElement | undefined) => {
-      if (scroll) scroll.removeEventListener("wheel", handleWheel)
+      if (scroll) {
+        scroll.removeEventListener("wheel", handleWheel)
+        scroll.removeEventListener("pointerdown", handlePointerDown)
+      }
       scroll = el
       if (!el) return
       anchorBottom = readAnchorBottom(el)
       updateOverflowAnchor(el)
       el.addEventListener("wheel", handleWheel, { passive: true })
+      el.addEventListener("pointerdown", handlePointerDown, { passive: true })
+      if (typeof window !== "undefined") {
+        window.removeEventListener("keydown", handleWindowKeyDown)
+        window.addEventListener("keydown", handleWindowKeyDown)
+      }
     },
     contentRef: (el: HTMLElement | undefined) => setStore("contentRef", el),
     handleScroll,
     scrollToBottom: () => scrollToBottom(false),
     forceScrollToBottom: () => scrollToBottom(true),
+    smoothScrollToBottom,
     userScrolled: () => !store.pinned,
   }
 }
@@ -298,151 +365,180 @@ export function MessageTimeline(props: {
     props.onScroll?.(!autoScroll.userScrolled())
   })
 
-  return (
-    <div
-      ref={(el) => { containerRef = el; autoScroll.scrollRef(el) }}
-      onScroll={autoScroll.handleScroll}
-      class="flex-1 overflow-y-auto p-6"
-      style={{ background: "var(--background-stronger)", "overflow-anchor": "none" }}
-    >
-      {/* Loading history indicator */}
-      <Show when={props.loadingHistory}>
-        <div class="flex flex-col items-center justify-center h-full text-center">
-          <Spinner class="w-8 h-8 mb-4" />
-          <p class="text-lg" style={{ color: "var(--text-weak)" }}>
-            Loading chat history...
-          </p>
-        </div>
-      </Show>
+  const showScrollToBottom = createMemo(() => !props.loadingHistory && autoScroll.userScrolled())
 
-      {/* Main content */}
-      <Show when={!props.loadingHistory}>
-        <Show when={props.historyError && turns().length === 0}>
-          <div class="flex flex-col items-center justify-center h-full text-center gap-3 px-6">
-            <p class="text-lg" style={{ color: "var(--status-danger-text)" }}>
-              Failed to load chat history
+  return (
+    <div class="relative flex-1 min-h-0">
+      <div
+        ref={(el) => { containerRef = el; autoScroll.scrollRef(el) }}
+        onScroll={autoScroll.handleScroll}
+        class="h-full overflow-y-auto p-6"
+        style={{ background: "var(--background-stronger)", "overflow-anchor": "none" }}
+      >
+        {/* Loading history indicator */}
+        <Show when={props.loadingHistory}>
+          <div class="flex flex-col items-center justify-center h-full text-center">
+            <Spinner class="w-8 h-8 mb-4" />
+            <p class="text-lg" style={{ color: "var(--text-weak)" }}>
+              Loading chat history...
             </p>
-            <p class="text-sm max-w-xl" style={{ color: "var(--text-weak)" }}>
-              {props.historyError}
-            </p>
-            <Show when={props.onRetryHistory}>
+          </div>
+        </Show>
+
+        {/* Main content */}
+        <Show when={!props.loadingHistory}>
+          <Show when={props.historyError && turns().length === 0}>
+            <div class="flex flex-col items-center justify-center h-full text-center gap-3 px-6">
+              <p class="text-lg" style={{ color: "var(--status-danger-text)" }}>
+                Failed to load chat history
+              </p>
+              <p class="text-sm max-w-xl" style={{ color: "var(--text-weak)" }}>
+                {props.historyError}
+              </p>
+              <Show when={props.onRetryHistory}>
+                <button
+                  onClick={() => props.onRetryHistory?.()}
+                  class="px-4 py-2 rounded-lg text-sm transition-colors"
+                  style={{
+                    background: "var(--surface-inset)",
+                    color: "var(--text-strong)",
+                    border: "1px solid var(--border-base)",
+                  }}
+                >
+                  Retry
+                </button>
+              </Show>
+            </div>
+          </Show>
+
+          <Show when={props.historyError && turns().length > 0}>
+            <div
+              class="mb-4 px-4 py-3 rounded-lg flex items-center justify-between gap-3"
+              style={{
+                background: "var(--status-warning-dim)",
+                color: "var(--status-warning-text)",
+                border: "1px solid var(--status-warning-border)",
+              }}
+            >
+              <div class="min-w-0">
+                <div class="text-sm font-medium">Chat history may be incomplete</div>
+                <div class="text-xs opacity-90 break-words">{props.historyError}</div>
+              </div>
+              <Show when={props.onRetryHistory}>
+                <button
+                  onClick={() => props.onRetryHistory?.()}
+                  class="px-3 py-1.5 rounded-md text-xs shrink-0 transition-colors"
+                  style={{
+                    background: "rgba(0, 0, 0, 0.08)",
+                    color: "var(--status-warning-text)",
+                  }}
+                >
+                  Retry
+                </button>
+              </Show>
+            </div>
+          </Show>
+
+          {/* Load earlier button */}
+          <Show when={hasMore()}>
+            <div class="flex justify-center mb-4">
               <button
-                onClick={() => props.onRetryHistory?.()}
-                class="px-4 py-2 rounded-lg text-sm transition-colors"
+                onClick={loadMore}
+                class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-colors"
                 style={{
                   background: "var(--surface-inset)",
-                  color: "var(--text-strong)",
+                  color: "var(--text-weak)",
                   border: "1px solid var(--border-base)",
                 }}
-              >
-                Retry
-              </button>
-            </Show>
-          </div>
-        </Show>
-
-        <Show when={props.historyError && turns().length > 0}>
-          <div
-            class="mb-4 px-4 py-3 rounded-lg flex items-center justify-between gap-3"
-            style={{
-              background: "var(--status-warning-dim)",
-              color: "var(--status-warning-text)",
-              border: "1px solid var(--status-warning-border)",
-            }}
-          >
-            <div class="min-w-0">
-              <div class="text-sm font-medium">Chat history may be incomplete</div>
-              <div class="text-xs opacity-90 break-words">{props.historyError}</div>
-            </div>
-            <Show when={props.onRetryHistory}>
-              <button
-                onClick={() => props.onRetryHistory?.()}
-                class="px-3 py-1.5 rounded-md text-xs shrink-0 transition-colors"
-                style={{
-                  background: "rgba(0, 0, 0, 0.08)",
-                  color: "var(--status-warning-text)",
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--background-base)"
+                  e.currentTarget.style.color = "var(--text-strong)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "var(--surface-inset)"
+                  e.currentTarget.style.color = "var(--text-weak)"
                 }}
               >
-                Retry
+                <ChevronUp class="w-4 h-4" />
+                <span>Load {Math.min(TURNS_PER_BATCH, turns().length - renderCount())} earlier turns</span>
               </button>
-            </Show>
-          </div>
-        </Show>
-
-        {/* Load earlier button */}
-        <Show when={hasMore()}>
-          <div class="flex justify-center mb-4">
-            <button
-              onClick={loadMore}
-              class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-colors"
-              style={{
-                background: "var(--surface-inset)",
-                color: "var(--text-weak)",
-                border: "1px solid var(--border-base)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--background-base)"
-                e.currentTarget.style.color = "var(--text-strong)"
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "var(--surface-inset)"
-                e.currentTarget.style.color = "var(--text-weak)"
-              }}
-            >
-              <ChevronUp class="w-4 h-4" />
-              <span>Load {Math.min(TURNS_PER_BATCH, turns().length - renderCount())} earlier turns</span>
-            </button>
-          </div>
-        </Show>
-
-        {/* Turns */}
-        <div ref={autoScroll.contentRef} class="space-y-4">
-          <For each={renderedTurns()}>
-            {(turn, index) => (
-                <MessageTurn
-                  turn={turn}
-                  now={now}
-                  isLast={index() === renderedTurns().length - 1}
-                  streaming={props.processing && index() === renderedTurns().length - 1}
-                  defaultExpanded={expanded()[turn.id] ?? index() === renderedTurns().length - 1}
-                  pendingStatus={index() === renderedTurns().length - 1 && turn.assistantMessages.length === 0 ? (props.processing ? "thinking" : props.pendingPromptText ? "waiting" : undefined) : undefined}
-                  onToggle={handleToggle}
-                  onRetry={props.onRetry}
-                  onOpenFile={props.onOpenFile}
-                />
-            )}
-          </For>
-        </div>
-
-        {/* Empty state */}
-        <Show when={turns().length === 0 && !props.processing}>
-          <div class="flex flex-col items-center justify-center h-full text-center py-12">
-            <div
-              class="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-              style={{ background: "var(--surface-inset)" }}
-            >
-              <svg
-                class="w-8 h-8"
-                style={{ color: "var(--text-interactive-base)" }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                />
-              </svg>
             </div>
-            <p class="text-lg mb-2" style={{ color: "var(--text-weak)" }}>
-              Ready to chat
-            </p>
-            <p style={{ color: "var(--text-weak)", opacity: 0.7 }}>Type a message below to begin</p>
-          </div>
-        </Show>
+          </Show>
 
+          {/* Turns */}
+          <div ref={autoScroll.contentRef} class="space-y-4">
+            <For each={renderedTurns()}>
+              {(turn, index) => (
+                  <MessageTurn
+                    turn={turn}
+                    now={now}
+                    isLast={index() === renderedTurns().length - 1}
+                    streaming={props.processing && index() === renderedTurns().length - 1}
+                    defaultExpanded={expanded()[turn.id] ?? index() === renderedTurns().length - 1}
+                    pendingStatus={index() === renderedTurns().length - 1 && turn.assistantMessages.length === 0 ? (props.processing ? "thinking" : props.pendingPromptText ? "waiting" : undefined) : undefined}
+                    onToggle={handleToggle}
+                    onRetry={props.onRetry}
+                    onOpenFile={props.onOpenFile}
+                  />
+              )}
+            </For>
+          </div>
+
+          {/* Empty state */}
+          <Show when={turns().length === 0 && !props.processing}>
+            <div class="flex flex-col items-center justify-center h-full text-center py-12">
+              <div
+                class="w-16 h-16 rounded-full flex items-center justify-center mb-4"
+                style={{ background: "var(--surface-inset)" }}
+              >
+                <svg
+                  class="w-8 h-8"
+                  style={{ color: "var(--text-interactive-base)" }}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  />
+                </svg>
+              </div>
+              <p class="text-lg mb-2" style={{ color: "var(--text-weak)" }}>
+                Ready to chat
+              </p>
+              <p style={{ color: "var(--text-weak)", opacity: 0.7 }}>Type a message below to begin</p>
+            </div>
+          </Show>
+
+        </Show>
+      </div>
+
+      <Show when={showScrollToBottom()}>
+        <div class="pointer-events-none absolute bottom-6 right-6 z-10">
+          <button
+            type="button"
+            class="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all duration-200 hover:-translate-y-0.5 focus-visible:-translate-y-0.5"
+            style={{
+              background: "var(--interactive-base)",
+              color: "var(--text-on-interactive)",
+              border: "1px solid color-mix(in srgb, var(--interactive-hover) 55%, transparent)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--interactive-hover)"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "var(--interactive-base)"
+            }}
+            onClick={() => autoScroll.smoothScrollToBottom()}
+            aria-label="Scroll to bottom"
+            title="Scroll to bottom"
+          >
+            <ArrowDown class="w-5 h-5" />
+          </button>
+        </div>
       </Show>
     </div>
   )

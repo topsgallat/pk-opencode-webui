@@ -10,60 +10,11 @@ import { errorText } from "../types/message"
 import type { DisplayMessage, Turn } from "../types/message"
 import { extractTextContent } from "../utils/message"
 import type { SessionStatus } from "../sdk/client"
+import { reconcileTurns } from "../utils/message-reconcile"
 
 // Number of turns to render initially and on each "load more"
 const TURNS_PER_BATCH = 10
 const INITIAL_TURNS = 5
-
-// Compute turn-level timing from user and assistant message timestamps
-function computeTurnTime(user: DisplayMessage, assistants: DisplayMessage[]): Turn["time"] {
-  const started = user.time?.created
-  if (started == null || !Number.isFinite(started)) return undefined
-  // Find the latest completed timestamp among all assistant messages
-  const completed = assistants.reduce<number | undefined>((latest, msg) => {
-    const c = msg.time?.completed
-    if (c == null || !Number.isFinite(c)) return latest
-    if (latest == null) return c
-    return c > latest ? c : latest
-  }, undefined)
-  const duration = completed != null && Number.isFinite(completed) ? completed - started : undefined
-  return { started, completed, duration }
-}
-
-// Convert flat message list to turns (user + assistant groupings)
-function messagesToTurns(messages: DisplayMessage[]): Turn[] {
-  const turns: Turn[] = []
-  let current: Turn | null = null
-
-  for (const msg of messages) {
-    if (msg.role === "user") {
-      // Start a new turn
-      if (current) {
-        current.time = computeTurnTime(current.userMessage, current.assistantMessages)
-        turns.push(current)
-      }
-      current = {
-        id: msg.id,
-        userMessage: msg,
-        assistantMessages: [],
-      }
-    } else if (msg.role === "assistant" && current) {
-      // Add to current turn
-      current.assistantMessages.push(msg)
-    } else if (msg.role === "assistant" && !current) {
-      // Handle assistant messages before first user message
-      console.warn("MessageTimeline: Dropping assistant message before first user message", msg.id)
-    }
-  }
-
-  // Don't forget the last turn
-  if (current) {
-    current.time = computeTurnTime(current.userMessage, current.assistantMessages)
-    turns.push(current)
-  }
-
-  return turns
-}
 
 function hasVisibleContent(message: DisplayMessage): boolean {
   if (message.error) return true
@@ -262,7 +213,12 @@ export function MessageTimeline(props: {
   const [renderCount, setRenderCount] = createSignal(INITIAL_TURNS)
   const [prevTurnIds, setPrevTurnIds] = createSignal<Set<string>>(new Set())
 
-  const turns = createMemo(() => messagesToTurns(props.messages.filter(hasVisibleContent)))
+  let turnCache: Turn[] = []
+  const turns = createMemo(() => {
+    const visible = props.messages.filter(hasVisibleContent)
+    turnCache = reconcileTurns(turnCache, visible)
+    return turnCache
+  })
 
   const renderedTurns = createMemo(() => {
     const all = turns()

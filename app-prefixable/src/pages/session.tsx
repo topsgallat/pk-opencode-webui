@@ -57,6 +57,7 @@ import {
 import { readNotifyMap, writeNotifyMap } from "../utils/notify";
 import { sessionQuestionRequest } from "../utils/session-tree-request";
 import { errorMessage, withTimeout } from "../utils/request-timeout";
+import { mergeOptimisticMessage, projectDisplayMessages, type SyncMessageLike } from "../utils/message-reconcile";
 
 const ACCEPTED_TYPES = [
   "image/png",
@@ -87,6 +88,7 @@ interface SessionDraft {
   drag: number;
 }
 const drafts = new Map<string, SessionDraft>();
+const emptyMessages: DisplayMessage[] = [];
 
 interface SessionSelection {
   agent: string;
@@ -676,60 +678,27 @@ export function Session() {
 
   // Get messages from sync context - reactive, automatically updated via SSE
   // Cache the base messages array to avoid recreating on every call
+  let projectedMessages = emptyMessages;
   const syncMessages = createMemo(() => {
     const id = sessionId();
-    if (!id) return [];
-      return sync.messages(id).map((msg) => {
-        const info = msg.info;
-        if (info.role === "assistant") {
-          return {
-            id: info.id,
-            role: info.role,
-            parts: msg.parts,
-            error: info.error,
-            time: { created: info.time.created, completed: info.time.completed },
-            modelID: info.modelID,
-            providerID: info.providerID,
-            agent: info.agent,
-            tokens: info.tokens,
-          };
-        }
-      return {
-        id: info.id,
-        role: info.role,
-        parts: msg.parts,
-        time: { created: info.time.created },
-      };
-    });
+    if (!id) {
+      projectedMessages = emptyMessages;
+      return projectedMessages;
+    }
+    projectedMessages = projectDisplayMessages(projectedMessages, sync.messages(id) as SyncMessageLike[]);
+    return projectedMessages;
   });
 
   // Includes optimistic message if present and not yet in sync
+  let mergedMessages = emptyMessages;
   const messages = createMemo(() => {
     const syncMsgs = syncMessages();
-    if (syncMsgs.length === 0 && !optimisticMessage()) return syncMsgs;
-
-    // Add optimistic message if it exists and isn't already in sync
-    const opt = optimisticMessage();
-    if (opt) {
-      // Check if the pending user message text matches any message in sync
-      const pendingText = pendingUserMessageText();
-      if (pendingText) {
-        const alreadyInSync = syncMsgs.some((m) => {
-          if (m.role !== "user") return false;
-          // Check all text parts for a match
-          return m.parts
-            .filter((p) => p.type === "text")
-            .some(
-              (p) =>
-                (p as { text?: string }).text?.trim() === pendingText.trim(),
-            );
-        });
-        if (!alreadyInSync) {
-          return [...syncMsgs, opt];
-        }
-      }
+    if (syncMsgs.length === 0 && !optimisticMessage()) {
+      mergedMessages = syncMsgs;
+      return mergedMessages;
     }
-    return syncMsgs;
+    mergedMessages = mergeOptimisticMessage(mergedMessages, syncMsgs, optimisticMessage(), pendingUserMessageText());
+    return mergedMessages;
   });
   let inputRef: HTMLTextAreaElement | undefined;
   let slashPopoverRef: HTMLDivElement | undefined;

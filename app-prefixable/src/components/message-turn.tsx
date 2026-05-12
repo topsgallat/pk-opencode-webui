@@ -1,4 +1,4 @@
-import { type Accessor, createSignal, createEffect, Show, For, createMemo, onCleanup } from "solid-js"
+import { type Accessor, createSignal, createEffect, Show, For, createMemo, onCleanup, onMount } from "solid-js"
 import { ChevronDown, ChevronRight, User, Bot, FileText, Copy, Check, Clock, RotateCcw, Loader2 } from "lucide-solid"
 import { Markdown } from "./markdown"
 import { MessageParts } from "./tool-part"
@@ -209,11 +209,18 @@ export function MessageTurn(props: {
 
   // Ref for text overflow detection
   let textRef: HTMLDivElement | undefined
+  let textResizeObserver: ResizeObserver | undefined
   let copyTimeoutId: ReturnType<typeof setTimeout> | undefined
+
+  const updateCanExpand = () => {
+    if (!textRef) return
+    setCanExpand(textRef.scrollHeight > textRef.clientHeight + 2)
+  }
 
   // Cleanup timeout on unmount
   onCleanup(() => {
     if (copyTimeoutId) clearTimeout(copyTimeoutId)
+    if (textResizeObserver) textResizeObserver.disconnect()
   })
 
   // Extract image/PDF attachments from user message (single pass)
@@ -242,15 +249,18 @@ export function MessageTurn(props: {
   const systemBlocks = createMemo(() => parsedUser().systemBlocks)
   const [systemOpen, setSystemOpen] = createSignal(false)
 
-  // Detect text overflow for expand/collapse
+  onMount(() => {
+    if (!textRef) return
+    textResizeObserver = new ResizeObserver(() => updateCanExpand())
+    textResizeObserver.observe(textRef)
+    updateCanExpand()
+  })
+
+  // Detect text overflow for expand/collapse only when header text or expansion changes
   createEffect(() => {
     userText() // Track dependency
-    expanded() // Also track turn expansion state
-    // Check after render
-    requestAnimationFrame(() => {
-      if (!textRef) return
-      setCanExpand(textRef.scrollHeight > textRef.clientHeight + 2)
-    })
+    textExpanded()
+    queueMicrotask(() => updateCanExpand())
   })
 
   const copy = async () => {

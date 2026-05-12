@@ -41,7 +41,7 @@ const PORT = parseInt(process.env.PORT || "8080", 10)
 const API_PORT = parseInt(process.env.OPENCODE_API_PORT || process.env.API_PORT || "4096", 10)
 const API_URL = process.env.API_URL || `http://127.0.0.1:${API_PORT}`
 const OPERATION_MODE = process.env.OPERATION_MODE || "solo"
-const PROXY_REQUEST_TIMEOUT_MS = parseInt(process.env.PROXY_REQUEST_TIMEOUT_MS || "15000", 10)
+const PROXY_REQUEST_TIMEOUT_MS = parseInt(process.env.PROXY_REQUEST_TIMEOUT_MS || "120000", 10)
 const PROXY_SSE_CONNECT_TIMEOUT_MS = parseInt(process.env.PROXY_SSE_CONNECT_TIMEOUT_MS || "10000", 10)
 
 function isForbiddenHostPath(p: string): boolean {

@@ -44,10 +44,15 @@ import {
     MoreHorizontal,
     FolderOpen,
     Server,
+    Pin,
+    PinOff,
+    Sparkles,
+    Check,
 } from "lucide-solid"
 import { sessionHasQuestion, buildChildMap } from "../utils/session-tree-request"
 import { useServer } from "../context/server"
 import { getServerKey, type ServerConfig } from "../utils/servers"
+import { suggestSessionTitle } from "../utils/ai-rename"
 
 export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }) {
     const { client, directory } = useSDK()
@@ -73,6 +78,107 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     const [showProjectHistory, setShowProjectHistory] = createSignal(false)
     const [historyProjects, setHistoryProjects] = createSignal<Project[]>([])
     const [showServerSheet, setShowServerSheet] = createSignal(false)
+
+    const [renamingId, setRenamingId] = createSignal<string | null>(null)
+    const [editTitle, setEditTitle] = createSignal("")
+    const [aiRenamingId, setAiRenamingId] = createSignal<string | null>(null)
+    const [renameError, setRenameError] = createSignal<{ id: string; msg: string } | null>(null)
+    const renameErrorTimer = { id: undefined as ReturnType<typeof setTimeout> | undefined }
+
+    function loadStoredPinnedIds(storeKey: string): string[] {
+        try {
+            const stored = localStorage.getItem(storeKey)
+            if (stored) {
+                const parsed = JSON.parse(stored) as string[]
+                if (Array.isArray(parsed)) return parsed.slice(0, 10)
+            }
+        } catch { /* ignore */ }
+        return []
+    }
+    const pinnedStoreKey = () => `opencode.pinnedSessions.${server.serverKey()}.${directory ?? "global"}`
+    const [pinnedIds, setPinnedIds] = createSignal<string[]>(loadStoredPinnedIds(pinnedStoreKey()))
+
+    function savePinnedIds(ids: string[]) {
+        setPinnedIds(ids)
+        if (!directory) return
+        try {
+            localStorage.setItem(pinnedStoreKey(), JSON.stringify(ids))
+        } catch { /* ignore */ }
+    }
+
+    function pinSession(id: string) {
+        if (pinnedIds().includes(id) || pinnedIds().length >= 10) return
+        savePinnedIds([...pinnedIds(), id])
+    }
+
+    function unpinSession(id: string) {
+        if (!pinnedIds().includes(id)) return
+        savePinnedIds(pinnedIds().filter((pid) => pid !== id))
+    }
+
+    function renameSession(session: Session, title: string) {
+        const trimmed = title.trim()
+        if (!trimmed || trimmed === session.title) return
+        const prevTitle = session.title
+        setSessions((prev) =>
+            prev.map((s) => (s.id === session.id ? { ...s, title: trimmed } : s)),
+        )
+        client.session.update({ sessionID: session.id, title: trimmed })
+            .catch((err: unknown) => {
+                console.error("Failed to rename session:", err)
+                setSessions((prev) =>
+                    prev.map((s) =>
+                        s.id === session.id ? { ...s, title: prevTitle } : s,
+                    ),
+                )
+            })
+    }
+
+    function showRenameError(id: string, msg = "Rename failed") {
+        if (renameErrorTimer.id !== undefined) clearTimeout(renameErrorTimer.id)
+        setRenameError({ id, msg })
+        renameErrorTimer.id = setTimeout(() => {
+            setRenameError((prev) => prev?.id === id ? null : prev)
+            renameErrorTimer.id = undefined
+        }, 3000)
+    }
+
+    function startAiRename(session: Session) {
+        if (aiRenamingId()) return
+        setAiRenamingId(session.id)
+        setMenuSession(null)
+        setRenameError(null)
+
+        const cached = sync.messages(session.id)
+        const pending = cached.length > 0
+            ? Promise.resolve(cached)
+            : client.session.messages({ sessionID: session.id }).then((res) => res.data ?? [])
+
+        pending
+            .then((msgs) => {
+                if (!msgs.length) {
+                    showRenameError(session.id, "No messages to rename")
+                    setAiRenamingId(null)
+                    return
+                }
+                return suggestSessionTitle(client, session.id, msgs, providers.selectedModel, providers.selectedAgent)
+            })
+            .then((suggestion) => {
+                if (!suggestion) return
+                setEditTitle(suggestion)
+                setRenamingId(session.id)
+                setMenuSession(session)
+            })
+            .catch((err: unknown) => {
+                console.error("AI rename failed:", err)
+                showRenameError(session.id)
+            })
+            .finally(() => setAiRenamingId(null))
+    }
+
+    onCleanup(() => {
+        if (renameErrorTimer.id !== undefined) clearTimeout(renameErrorTimer.id)
+    })
 
     function openProjectHistory() {
         const items = recent.projects().map((p) => ({ worktree: p.path, name: p.name }))
@@ -106,6 +212,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
         setShowProjectHistory(false)
         setHistoryProjects([])
         setShowServerSheet(false)
+        setPinnedIds(loadStoredPinnedIds(pinnedStoreKey()))
     })
 
     onMount(() => {
@@ -412,18 +519,119 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                                 <div class="flex justify-center py-3">
                                     <div class="w-10 h-1 rounded-full" style={{ background: "var(--border-strong)" }} />
                                 </div>
-                                {/* Session title */}
-                                <div class="px-4 pb-3 text-sm font-medium truncate" style={{ color: "var(--text-strong)" }}>
-                                    {session().title || "Untitled"}
-                                </div>
-                                {/* Actions */}
+                                <Show when={renamingId() === session().id} fallback={
+                                    <div class="px-4 pb-3 text-sm font-medium truncate" style={{ color: "var(--text-strong)" }}>
+                                        {session().title || "Untitled"}
+                                    </div>
+                                }>
+                                    <div class="px-4 pb-3">
+                                        <div class="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                value={editTitle()}
+                                                onInput={(e) => setEditTitle(e.currentTarget.value)}
+                                                class="flex-1 px-3 py-2 text-sm rounded-lg outline-none"
+                                                style={{
+                                                    background: "var(--surface-inset)",
+                                                    color: "var(--text-base)",
+                                                    border: "1px solid var(--interactive-base)",
+                                                }}
+                                                placeholder="Session title"
+                                                ref={(el) => queueMicrotask(() => { el?.focus(); el?.select() })}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                        e.preventDefault()
+                                                        renameSession(session(), editTitle())
+                                                        setRenamingId(null)
+                                                    }
+                                                    if (e.key === "Escape") {
+                                                        e.preventDefault()
+                                                        setRenamingId(null)
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    renameSession(session(), editTitle())
+                                                    setRenamingId(null)
+                                                }}
+                                                class="p-2 rounded-lg shrink-0"
+                                                style={{ background: "var(--interactive-base)", color: "white" }}
+                                                aria-label="Save title"
+                                            >
+                                                <Check class="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        <Show when={renameError()?.id === session().id}>
+                                            <div class="text-xs mt-1" style={{ color: "var(--text-critical-base)" }}>
+                                                {renameError()?.msg}
+                                            </div>
+                                        </Show>
+                                    </div>
+                                </Show>
                                 <div style={{ "border-top": "1px solid var(--border-base)" }}>
+                                    <Show when={!showArchived()}>
+                                        <button
+                                            class="w-full flex items-center gap-3 px-4 py-3.5 text-sm"
+                                            style={{ color: "var(--text-base)" }}
+                                            onClick={() => {
+                                                if (pinnedIds().includes(session().id)) {
+                                                    unpinSession(session().id)
+                                                } else {
+                                                    pinSession(session().id)
+                                                }
+                                                setMenuSession(null)
+                                            }}
+                                        >
+                                            <Show when={pinnedIds().includes(session().id)} fallback={
+                                                <Pin class="w-5 h-5" style={{ color: "var(--icon-weak)" }} />
+                                            }>
+                                                <PinOff class="w-5 h-5" style={{ color: "var(--icon-weak)" }} />
+                                            </Show>
+                                            {pinnedIds().includes(session().id) ? "Unpin" : "Pin to top"}
+                                        </button>
+                                        <button
+                                            class="w-full flex items-center gap-3 px-4 py-3.5 text-sm"
+                                            style={{ color: "var(--text-base)" }}
+                                            onClick={() => {
+                                                setEditTitle(session().title || "")
+                                                setRenamingId(session().id)
+                                            }}
+                                        >
+                                            <Pencil class="w-5 h-5" style={{ color: "var(--icon-weak)" }} />
+                                            Rename
+                                        </button>
+                                        <button
+                                            class="w-full flex items-center gap-3 px-4 py-3.5 text-sm"
+                                            style={{
+                                                color: "var(--text-base)",
+                                                opacity: aiRenamingId() ? 0.6 : 1,
+                                            }}
+                                            disabled={!!aiRenamingId()}
+                                            onClick={() => startAiRename(session())}
+                                        >
+                                            <Show when={aiRenamingId() === session().id} fallback={
+                                                <Sparkles class="w-5 h-5" style={{ color: "var(--icon-weak)" }} />
+                                            }>
+                                                <Loader2 class="w-5 h-5 animate-spin" style={{ color: "var(--icon-weak)" }} />
+                                            </Show>
+                                            {aiRenamingId() === session().id ? "Suggesting title..." : "Rename with AI"}
+                                        </button>
+                                        <button
+                                            class="w-full flex items-center gap-3 px-4 py-3.5 text-sm"
+                                            style={{ color: "var(--text-base)" }}
+                                            onClick={() => archiveSession(session())}
+                                        >
+                                            <Archive class="w-5 h-5" style={{ color: "var(--icon-weak)" }} />
+                                            Archive
+                                        </button>
+                                        <div class="my-1" role="separator" style={{ "border-top": "1px solid var(--border-base)" }} />
+                                    </Show>
                                     <Show when={showArchived()}>
                                         <button
                                             class="w-full flex items-center gap-3 px-4 py-3.5 text-sm"
                                             style={{ color: "var(--text-base)" }}
                                             onClick={() => {
-                                                // Restore
                                                 client.session.update({
                                                     sessionID: session().id,
                                                     time: { archived: 0 },
@@ -432,16 +640,6 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                                         >
                                             <ArchiveRestore class="w-5 h-5" style={{ color: "var(--icon-weak)" }} />
                                             Restore from Archive
-                                        </button>
-                                    </Show>
-                                    <Show when={!showArchived()}>
-                                        <button
-                                            class="w-full flex items-center gap-3 px-4 py-3.5 text-sm"
-                                            style={{ color: "var(--text-base)" }}
-                                            onClick={() => archiveSession(session())}
-                                        >
-                                            <Archive class="w-5 h-5" style={{ color: "var(--icon-weak)" }} />
-                                            Archive
                                         </button>
                                     </Show>
                                     <button

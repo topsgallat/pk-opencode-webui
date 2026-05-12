@@ -2043,28 +2043,28 @@ export function Layout(props: ParentProps) {
                 {(project) => (
                   <div
                     data-hint-target
-                    onClick={() => navigateToProject(project.worktree)}
+                    onClick={() => navigateToProject(project.path)}
                     class="group relative cursor-pointer"
-                    title={project.name || getFilename(project.worktree)}
+                    title={project.name || getFilename(project.path)}
                   >
                     <ProjectAvatar
-                      project={project}
+                      project={{ worktree: project.path, name: project.name }}
                       size="large"
-                      selected={project.worktree === directory}
-                      badge={project.worktree !== directory ? globalEvents.badge(project.worktree) : undefined}
+                      selected={project.path === directory}
+                      badge={project.path !== directory ? globalEvents.badge(project.path) : undefined}
                     />
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        removeProject(project.worktree);
+                        removeProject(project.path);
                         if (
-                          project.worktree === directory &&
+                          project.path === directory &&
                           projects().length > 1
                         ) {
                           const next = projects().find(
-                            (p) => p.worktree !== project.worktree,
+                            (p) => p.path !== project.path,
                           );
-                          if (next) navigateToProject(next.worktree);
+                          if (next) navigateToProject(next.path);
                         }
                       }}
                       class="absolute -top-1 -right-1 w-4 h-4 rounded-full hidden group-hover:flex items-center justify-center"

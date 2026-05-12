@@ -757,7 +757,10 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                 </button>
                 <button
                     class={mobileTab() === "sessions" ? "active" : ""}
-                    onClick={() => setMobileTab("sessions")}
+                    onClick={() => {
+                        setMobileTab("sessions")
+                        void loadRootSessions()
+                    }}
                 >
                     <ChevronDown class="w-5 h-5" />
                     <span>Sessions</span>

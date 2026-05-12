@@ -10,6 +10,9 @@ import { base64Encode } from "../utils/path";
 import { useSDK } from "../context/sdk";
 import { Markdown } from "./markdown";
 import { getBashCommandColors } from "../utils/bash-command-colors";
+import { FancyAnsi } from "fancy-ansi";
+
+const fa = new FancyAnsi();
 
 // Use the SDK's types
 type ToolPart = SDKToolPart;
@@ -1027,9 +1030,8 @@ export function ToolPartDisplay(props: { part: ToolPart; subtask?: SubtaskPart; 
                   <pre
                     class="whitespace-pre-wrap max-h-64 overflow-y-auto mt-1"
                     style={{ color: "var(--text-base)" }}
-                  >
-                    {output()}
-                  </pre>
+                    innerHTML={fa.toHtml(output())}
+                  />
                 )}
               </Show>
               <Show when={getError(state())}>

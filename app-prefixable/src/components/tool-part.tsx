@@ -9,6 +9,7 @@ import { useParams, useNavigate } from "@solidjs/router";
 import { base64Encode } from "../utils/path";
 import { useSDK } from "../context/sdk";
 import { Markdown } from "./markdown";
+import { getBashCommandColors } from "../utils/bash-command-colors";
 
 // Use the SDK's types
 type ToolPart = SDKToolPart;
@@ -984,6 +985,7 @@ export function ToolPartDisplay(props: { part: ToolPart; subtask?: SubtaskPart; 
             }
           });
           const formatElapsed = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`);
+          const colors = getBashCommandColors(state());
 
           return (
             <div
@@ -995,10 +997,15 @@ export function ToolPartDisplay(props: { part: ToolPart; subtask?: SubtaskPart; 
             >
               <div class="flex items-start justify-between gap-1.5 mb-1">
                 <div class="flex items-start gap-1.5">
-                  <span style={{ color: "var(--status-success-text)", "flex-shrink": 0 }}>$</span>
+                  <span style={{ color: colors.color, "flex-shrink": 0 }}>$</span>
                   <pre
                     class="whitespace-pre-wrap"
-                    style={{ color: "var(--text-strong)" }}
+                    style={{
+                      background: colors.background,
+                      color: colors.color,
+                      padding: "0.125rem 0.375rem",
+                      "border-radius": "0.375rem",
+                    }}
                   >
                     {bashInput()}
                     <Show when={status() === "running" && !getOutput(state())}>

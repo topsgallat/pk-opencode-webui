@@ -93,9 +93,13 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
 
   const readAnchorBottom = (el: HTMLElement) => Math.max(0, distanceFromBottom(el))
 
+  const scrollTargetTop = (el: HTMLElement, bottom: number) => Math.max(0, el.scrollHeight - el.clientHeight - bottom)
+
   const writeAnchorBottom = (el: HTMLElement, bottom: number) => {
+    const next = scrollTargetTop(el, bottom)
+    if (Math.abs(el.scrollTop - next) < 1) return
     suppressScroll = true
-    el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight - bottom)
+    el.scrollTop = next
     queueMicrotask(() => {
       suppressScroll = false
     })
@@ -113,6 +117,8 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
       const el = scroll
       if (!el) return
       if (!store.pinned) return
+      const next = scrollTargetTop(el, anchorBottom)
+      if (Math.abs(el.scrollTop - next) < 1) return
       writeAnchorBottom(el, anchorBottom)
     })
   }

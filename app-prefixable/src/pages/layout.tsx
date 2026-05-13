@@ -18,6 +18,7 @@ import { useProviders } from "../context/providers";
 import { useTerminal } from "../context/terminal";
 import { useLayout, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } from "../context/layout";
 import { base64Encode } from "../utils/path";
+import { generateUUID } from "../utils/uuid";
 import { Spinner } from "../components/ui/spinner";
 import { Button } from "../components/ui/button";
 import { Terminal } from "../components/terminal";
@@ -803,7 +804,7 @@ export function Layout(props: ParentProps) {
   }
 
   const currentProject = createMemo(() =>
-    projects().find((p) => p.worktree === directory),
+    projects().find((p) => p.path === directory),
   );
 
   const projectName = createMemo(() => {
@@ -1807,7 +1808,20 @@ export function Layout(props: ParentProps) {
         setSessions((prev) => [res.data as Session, ...prev]);
         sessionStorage.setItem(
           `opencode.pendingPrompt.${res.data.id}`,
-          JSON.stringify({ text, ts: Date.now() }),
+          JSON.stringify({
+            items: [{
+              id: generateUUID(),
+              text,
+              ts: Date.now(),
+              agent: providers.selectedAgent || "build",
+              model: providers.selectedModel
+                ? {
+                    providerID: providers.selectedModel.providerID,
+                    modelID: providers.selectedModel.modelID,
+                  }
+                : undefined,
+            }],
+          }),
         );
         navigate(`/${dirSlug()}/session/${res.data.id}`);
       }
@@ -2254,7 +2268,7 @@ export function Layout(props: ParentProps) {
                 style={{ "border-bottom": "1px solid var(--border-base)" }}
               >
                 <Show when={currentProject()}>
-                  {(project) => <ProjectAvatar project={project()} size="small" />}
+                  {(project) => <ProjectAvatar project={{ worktree: project().path, name: project().name }} size="small" />}
                 </Show>
                 <div class="min-w-0 flex-1">
                   <div

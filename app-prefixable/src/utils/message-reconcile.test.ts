@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { Part } from "../sdk/client"
-import type { DisplayMessage, Turn } from "../types/message"
-import { mergeOptimisticMessage, projectDisplayMessages, reconcileTurns, type SyncMessageLike } from "./message-reconcile"
+import { findOptimisticMessageEcho, mergeOptimisticMessage, projectDisplayMessages, reconcileTurns, type OptimisticQueueMessage, type SyncMessageLike } from "./message-reconcile"
 
 function textPart(id: string, text: string): Part {
   return { id, type: "text", text } as Part
@@ -46,35 +45,81 @@ describe("projectDisplayMessages", () => {
 })
 
 describe("mergeOptimisticMessage", () => {
-  test("keeps optimistic tail stable until backend echo arrives", () => {
-    const sync = projectDisplayMessages([], [userMessage("u1", "hello")])
-    const optimistic: DisplayMessage = {
-      id: "temp-1",
-      role: "user",
-      parts: [textPart("temp-1-part", "pending")],
-      time: { created: 3 },
+  function optimistic(id: string, text: string, expectedUserMessageIndex: number): OptimisticQueueMessage {
+    return {
+      id,
+      expectedUserMessageIndex,
+      message: {
+        id,
+        role: "user",
+        parts: [textPart(`${id}-part`, text)],
+        time: { created: expectedUserMessageIndex },
+      },
     }
+  }
 
-    const first = mergeOptimisticMessage(sync, sync, optimistic, "pending")
-    const second = mergeOptimisticMessage(first, sync, optimistic, "pending")
+  test("keeps multiple optimistic queue items stable until backend echoes arrive", () => {
+    const sync = projectDisplayMessages([], [userMessage("u1", "hello")])
+    const optimisticItems = [
+      optimistic("temp-1", "pending one", 2),
+      optimistic("temp-2", "pending two", 3),
+    ]
 
-    expect(first[first.length - 1]).toBe(optimistic)
+    const first = mergeOptimisticMessage(sync, sync, optimisticItems)
+    const second = mergeOptimisticMessage(first, sync, optimisticItems)
+
+    expect(first.slice(-2).map((message) => message.id)).toEqual(["temp-1", "temp-2"])
     expect(second).toBe(first)
   })
 
-  test("drops optimistic tail when backend echo matches pending text", () => {
-    const optimistic: DisplayMessage = {
-      id: "temp-1",
-      role: "user",
-      parts: [textPart("temp-1-part", "pending")],
-      time: { created: 3 },
-    }
-    const sync = projectDisplayMessages([], [userMessage("u1", "pending")])
-    const merged = mergeOptimisticMessage([optimistic], sync, optimistic, "pending")
+  test("drops only the echoed optimistic item when queued prompts share duplicate text", () => {
+    const optimisticItems = [
+      optimistic("temp-1", "duplicate", 1),
+      optimistic("temp-2", "duplicate", 2),
+    ]
+    const firstSync = projectDisplayMessages([], [userMessage("u1", "duplicate")])
+    const merged = mergeOptimisticMessage([], firstSync, optimisticItems)
 
-    expect(merged).toBe(sync)
-    expect(merged).toHaveLength(1)
+    expect(merged).toHaveLength(2)
     expect(merged[0].id).toBe("u1")
+    expect(merged[1].id).toBe("temp-2")
+  })
+
+  test("drops dequeued optimistic items that are no longer pending", () => {
+    const sync = projectDisplayMessages([], [userMessage("u1", "hello")])
+    const optimisticItems = [
+      optimistic("temp-1", "pending one", 2),
+      optimistic("temp-2", "pending two", 3),
+    ]
+    const first = mergeOptimisticMessage(sync, sync, optimisticItems)
+    const second = mergeOptimisticMessage(first, sync, [optimisticItems[1]])
+
+    expect(first.slice(-2).map((message) => message.id)).toEqual(["temp-1", "temp-2"])
+    expect(second).toHaveLength(2)
+    expect(second[1].id).toBe("temp-2")
+  })
+
+  test("finds the backend echo for the accepted optimistic item", () => {
+    const optimisticItem = optimistic("temp-1", "pending one", 2)
+    const sync = projectDisplayMessages([], [
+      userMessage("u1", "hello"),
+      userMessage("u2", "pending one"),
+    ])
+
+    const echoed = findOptimisticMessageEcho(sync, optimisticItem)
+
+    expect(echoed?.id).toBe("u2")
+  })
+
+  test("does not match the wrong duplicate-text user turn", () => {
+    const optimisticItem = optimistic("temp-2", "duplicate", 2)
+    const sync = projectDisplayMessages([], [
+      userMessage("u1", "duplicate"),
+    ])
+
+    const echoed = findOptimisticMessageEcho(sync, optimisticItem)
+
+    expect(echoed).toBeNull()
   })
 })
 

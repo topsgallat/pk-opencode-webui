@@ -69,6 +69,8 @@ interface SessionInfoProps {
   input: () => string
   loading: () => boolean
   processing: () => boolean
+  queueCount?: () => number
+  pausedReason?: () => "paused_question" | "paused_permission" | null
   onAbort: () => void
   onAgentClick: () => void
   onModelClick: () => void
@@ -313,6 +315,14 @@ export function SessionInfo(props: SessionInfoProps) {
   const dirSlug = createMemo(() => params.dir)
 
   const fmt = (n: number) => n.toLocaleString()
+  const composerReady = createMemo(() => !!(props.input().trim() || props.hasAttachments?.()))
+  const queueCount = createMemo(() => props.queueCount?.() ?? 0)
+  const pausedLabel = createMemo(() => {
+    const reason = props.pausedReason?.()
+    if (reason === "paused_question") return "Paused: question"
+    if (reason === "paused_permission") return "Paused: permission"
+    return null
+  })
 
   return (
     <div class="flex flex-wrap items-center px-2 sm:px-4 py-1.5 text-xs gap-y-2" style={{ color: "var(--text-weak)" }}>
@@ -488,32 +498,74 @@ export function SessionInfo(props: SessionInfoProps) {
         <Show when={!selectedModel() && providers.connected.length > 0}>
           <span style={{ color: "var(--status-warning-text)" }}>No model selected</span>
         </Show>
+
+        <Show when={queueCount() > 0}>
+          <span
+            class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+            style={{
+              background: "var(--surface-inset)",
+              color: "var(--text-weak)",
+              border: "1px solid var(--border-base)",
+            }}
+          >
+            Queue {queueCount()}
+          </span>
+        </Show>
+
+        <Show when={pausedLabel()}>
+          {(label) => (
+            <span
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+              style={{
+                background: "var(--status-warning-dim)",
+                color: "var(--status-warning-text)",
+                border: "1px solid var(--status-warning-border)",
+              }}
+            >
+              {label()}
+            </span>
+          )}
+        </Show>
       </div>
 
       {/* Right group - action controls, always visible */}
-      <div class="ml-3 flex items-center shrink-0">
-        <Show
-          when={props.processing()}
-          fallback={
-            <Show when={(props.input().trim() || props.hasAttachments?.()) && !props.loading()}>
-              <button
-                type="submit"
-                class="flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg"
-                 style={{
-                   background: "var(--interactive-base)",
-                   color: "var(--text-on-interactive)"
-                 }}
-                title="Click or press Enter to send"
-                aria-label="Send message"
-              >
-                <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
-                  SEND
-                </div>
-                <CornerDownLeft class="w-4 h-4" />
-              </button>
-            </Show>
-          }
-        >
+      <div class="ml-3 flex items-center shrink-0 gap-2">
+        <Show when={composerReady() && !props.loading() && !props.processing()}>
+          <button
+            type="submit"
+            class="flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg"
+             style={{
+               background: "var(--interactive-base)",
+               color: "var(--text-on-interactive)"
+             }}
+            title="Click or press Enter to send"
+            aria-label="Send message"
+          >
+            <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
+              SEND
+            </div>
+            <CornerDownLeft class="w-4 h-4" />
+          </button>
+        </Show>
+
+        <Show when={composerReady() && !props.loading() && props.processing()}>
+          <button
+            type="submit"
+            class="flex items-center gap-1.5 px-2 py-1 rounded transition-colors"
+            style={{
+              color: "var(--text-strong)",
+              border: "1px solid var(--border-base)",
+              background: "var(--surface-inset)",
+            }}
+            title="Add this prompt to the queue"
+            aria-label="Add prompt to queue"
+          >
+            <CornerDownLeft class="w-3.5 h-3.5" />
+            <span>Add to queue</span>
+          </button>
+        </Show>
+
+        <Show when={props.processing()}>
           <button
             type="button"
             onClick={props.onAbort}

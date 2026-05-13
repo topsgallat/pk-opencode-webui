@@ -15,6 +15,12 @@ export interface SyncMessageLike {
   parts: Part[]
 }
 
+export interface OptimisticQueueMessage {
+  id: string
+  expectedUserMessageIndex: number
+  message: DisplayMessage
+}
+
 function sameTime(a: DisplayMessage["time"], b: SyncMessageLike["info"]["time"]) {
   return a?.created === b.created && a?.completed === b.completed
 }
@@ -72,33 +78,83 @@ export function projectDisplayMessages(prev: DisplayMessage[], messages: SyncMes
   return next
 }
 
-function hasPendingTextMatch(messages: DisplayMessage[], pendingText: string) {
-  return messages.some((message) => {
-    if (message.role !== "user") return false
-    return message.parts
-      .filter((part) => part.type === "text")
-      .some((part) => part.text?.trim() === pendingText.trim())
+function countUserMessages(messages: DisplayMessage[]) {
+  return messages.reduce((count, message) => count + (message.role === "user" ? 1 : 0), 0)
+}
+
+function getUserMessageAt(messages: DisplayMessage[], index: number) {
+  if (index < 1) return null
+
+  let count = 0
+  for (const message of messages) {
+    if (message.role !== "user") continue
+    count += 1
+    if (count === index) return message
+  }
+
+  return null
+}
+
+function comparableParts(parts: Part[]) {
+  return parts.map((part) => {
+    if (part.type === "text") {
+      return { type: part.type, text: part.text }
+    }
+
+    if (part.type === "file") {
+      return {
+        type: part.type,
+        mime: part.mime,
+        filename: part.filename,
+        url: part.url,
+      }
+    }
+
+    return { type: part.type }
   })
+}
+
+function sameUserParts(a: DisplayMessage, b: DisplayMessage) {
+  if (a.role !== "user" || b.role !== "user") return false
+  return JSON.stringify(comparableParts(a.parts)) === JSON.stringify(comparableParts(b.parts))
+}
+
+export function findOptimisticMessageEcho(
+  syncMessages: DisplayMessage[],
+  optimistic: OptimisticQueueMessage,
+) {
+  const userCount = countUserMessages(syncMessages)
+  if (userCount < optimistic.expectedUserMessageIndex) return null
+
+  const echoed = getUserMessageAt(syncMessages, optimistic.expectedUserMessageIndex)
+  if (!echoed) return null
+  return sameUserParts(echoed, optimistic.message) ? echoed : null
+}
+
+function hasQueuedMessageEcho(syncMessages: DisplayMessage[], optimistic: OptimisticQueueMessage) {
+  return !!findOptimisticMessageEcho(syncMessages, optimistic)
 }
 
 export function mergeOptimisticMessage(
   prev: DisplayMessage[],
   syncMessages: DisplayMessage[],
-  optimisticMessage: DisplayMessage | null,
-  pendingText: string | null,
+  optimisticMessages: OptimisticQueueMessage[],
 ) {
-  if (!optimisticMessage || !pendingText) return syncMessages
-  if (hasPendingTextMatch(syncMessages, pendingText)) return syncMessages
+  const unresolved = optimisticMessages
+    .filter((message) => !hasQueuedMessageEcho(syncMessages, message))
+    .map((message) => message.message)
+
+  if (unresolved.length === 0) return syncMessages
 
   if (
-    prev.length === syncMessages.length + 1 &&
-    prev[prev.length - 1] === optimisticMessage &&
-    syncMessages.every((message, index) => prev[index] === message)
+    prev.length === syncMessages.length + unresolved.length &&
+    syncMessages.every((message, index) => prev[index] === message) &&
+    unresolved.every((message, index) => prev[syncMessages.length + index] === message)
   ) {
     return prev
   }
 
-  return [...syncMessages, optimisticMessage]
+  return [...syncMessages, ...unresolved]
 }
 
 function computeTurnTime(user: DisplayMessage, assistants: DisplayMessage[]): Turn["time"] {

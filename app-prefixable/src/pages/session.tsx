@@ -1,6 +1,5 @@
 import {
   createSignal,
-  createResource,
   Show,
   For,
   onMount,
@@ -14,12 +13,10 @@ import {
 import { useParams, useNavigate } from "@solidjs/router";
 import { generateUUID } from "../utils/uuid";
 import { Button } from "../components/ui/button";
-import { Spinner } from "../components/ui/spinner";
 import { useSDK } from "../context/sdk";
 import { useEvents } from "../context/events";
 import { useSync } from "../context/sync";
 import { useProviders } from "../context/providers";
-import { useMCP } from "../context/mcp";
 import { usePermission } from "../context/permission";
 import { useLayout } from "../context/layout";
 import { useBranding } from "../context/branding";
@@ -42,8 +39,8 @@ import { Terminal } from "../components/terminal";
 import { SessionHeader } from "../components/session-header";
 import { ResizeHandle } from "../components/resize-handle";
 import { base64Encode, base64Decode } from "../utils/path";
-import type { Part, QuestionRequest, TextPart } from "../sdk/client";
-import type { DisplayMessage } from "../types/message";
+import type { Part, TextPart } from "../sdk/client";
+import type { DisplayMessage, QueueTurnState } from "../types/message";
 import { Plus, Settings, Paperclip, Upload, Bookmark, BookOpen, X as XIcon, SquareTerminal } from "lucide-solid";
 import { Portal } from "solid-js/web";
 import { ContextItems, type FileContext } from "../components/context-items";
@@ -57,7 +54,8 @@ import {
 import { readNotifyMap, writeNotifyMap } from "../utils/notify";
 import { sessionQuestionRequest } from "../utils/session-tree-request";
 import { errorMessage, withTimeout } from "../utils/request-timeout";
-import { mergeOptimisticMessage, projectDisplayMessages, type SyncMessageLike } from "../utils/message-reconcile";
+import { applyQueuedPromptSubmission } from "../utils/chat-queue";
+import { findOptimisticMessageEcho, mergeOptimisticMessage, projectDisplayMessages, type OptimisticQueueMessage, type SyncMessageLike } from "../utils/message-reconcile";
 
 const ACCEPTED_TYPES = [
   "image/png",
@@ -93,6 +91,29 @@ const emptyMessages: DisplayMessage[] = [];
 interface SessionSelection {
   agent: string;
   model: { providerID: string; modelID: string };
+}
+
+interface PendingPromptItem {
+  id: string;
+  createdAt: number;
+  text: string;
+  files: FileContext[];
+  images: ImageAttachment[];
+  agent: string;
+  model?: { providerID: string; modelID: string };
+  status?: "queued" | "running";
+}
+
+interface PendingPromptStorage {
+  items: Array<{
+    id: string;
+    text: string;
+    ts: number;
+    fileContext?: FileContext[];
+    imageAttachments?: ImageAttachment[];
+    agent?: string;
+    model?: { providerID: string; modelID: string };
+  }>;
 }
 
 const SESSION_SELECTIONS_KEY = "opencode.sessionSelections";
@@ -153,7 +174,6 @@ export function Session() {
   const events = useEvents();
   const sync = useSync();
   const providers = useProviders();
-  const mcp = useMCP();
   const permission = usePermission();
   const layout = useLayout();
   const branding = useBranding();
@@ -234,8 +254,8 @@ export function Session() {
 
   const [input, setInput] = createSignal("");
   const [dragHeight, setDragHeight] = createSignal(0);
-  const [optimisticMessage, setOptimisticMessage] =
-    createSignal<DisplayMessage | null>(null);
+  const [optimisticMessages, setOptimisticMessages] =
+    createSignal<OptimisticQueueMessage[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [processing, setProcessing] = createSignal(false);
   const [loadingHistory, setLoadingHistory] = createSignal(false);
@@ -250,6 +270,10 @@ export function Session() {
       if (count === n) return msgs[i];
     }
     return undefined;
+  }
+
+  function countUserMessages(msgs: DisplayMessage[]) {
+    return msgs.reduce((count, msg) => count + (msg.role === "user" ? 1 : 0), 0);
   }
 
   // Extract text content from message parts with optional separator and truncation
@@ -404,12 +428,16 @@ export function Session() {
   const pendingQuestion = createMemo(() =>
     sessionQuestionRequest(sync.sessions(), events.pendingQuestions, sessionId()) ?? null,
   );
-  const [pendingUserMessageText, setPendingUserMessageText] = createSignal<
-    string | null
-  >(null);
+  const [activePrompt, setActivePrompt] = createSignal<PendingPromptItem | null>(null);
+  const [pendingQueue, setPendingQueue] = createSignal<PendingPromptItem[]>([]);
 
   const pendingPermissions = createMemo(() => permission.pendingForSession(sessionId() ?? ""));
   const inputBlocked = createMemo(() => !!pendingQuestion() || pendingPermissions().length > 0);
+  const queuePausedReason = createMemo<QueueTurnState["status"] | null>(() => {
+    if (pendingQuestion()) return "paused_question";
+    if (pendingPermissions().length > 0) return "paused_permission";
+    return null;
+  });
 
   // Double-Escape to abort: track last Escape press timestamp
   const lastEsc = { ts: 0 };
@@ -528,7 +556,8 @@ export function Session() {
 
     setSessionSelection(null);
     setSessionId(id);
-    setPendingUserMessageText(null); // Clear pending text on session change
+    setActivePrompt(null);
+    setPendingQueue([]);
 
     // Restore draft for the new session (or clear if none saved)
     const saved = drafts.get(key);
@@ -623,7 +652,6 @@ export function Session() {
 
   // Auto-send saved prompt stored in sessionStorage by layout's createSessionWithPrompt.
   // We read from sessionStorage instead of URL params to avoid browser URL length limits.
-  // The stored value is JSON: { text: string, ts: number }.
   // Guard: the effect may re-run when reactive deps (e.g. providers.connected) update
   // after the prompt has already been sent. A local signal prevents double sends.
   const [promptSent, setPromptSent] = createSignal(false);
@@ -636,15 +664,19 @@ export function Session() {
     if (!raw) return;
     const EXPIRY_MS = 60_000; // 60 seconds
     const parsed = (() => {
-      try { return JSON.parse(raw) as { text: string; ts: number }; }
+      try { return JSON.parse(raw) as PendingPromptStorage | { text: string; ts: number }; }
       catch { return null; }
     })();
-    // Remove malformed or expired entries immediately
-    if (!parsed || !parsed.text || Date.now() - parsed.ts > EXPIRY_MS) {
+    const queued = Array.isArray((parsed as PendingPromptStorage | null)?.items)
+      ? (parsed as PendingPromptStorage).items
+      : parsed && "text" in parsed && typeof parsed.text === "string" && typeof parsed.ts === "number"
+        ? [{ id: generateUUID(), text: parsed.text, ts: parsed.ts }]
+        : [];
+    const valid = queued.filter((item) => item.text && Date.now() - item.ts <= EXPIRY_MS);
+    if (valid.length === 0) {
       sessionStorage.removeItem(key);
       return;
     }
-    const text = parsed.text;
     // Provider data may not be available yet — the resource fetch is async and
     // selectedModel is populated from localStorage in an onMount callback that
     // runs after createEffect. Skip without removing the sessionStorage item so
@@ -660,20 +692,22 @@ export function Session() {
       setError(`Provider "${providers.selectedModel.providerID}" is not connected. Please configure it in Settings.`);
       return;
     }
-    // All validation passed — mark as sent, clear storage, and send
+    // All validation passed — mark as sent, clear storage, and enqueue
     setPromptSent(true);
     sessionStorage.removeItem(key);
     setError(null);
-    startProcessing();
-    client.session.promptAsync({
-      sessionID: id,
-      parts: [{ type: "text", text }],
-      agent: providers.selectedAgent || "build",
-      model: providers.selectedModel,
-    }).catch((err: unknown) => {
-      setError(`Failed to send saved prompt: ${err instanceof Error ? err.message : String(err)}`);
-      setProcessing(false);
-    });
+    for (const item of valid) {
+      enqueuePrompt({
+        id: item.id,
+        createdAt: item.ts,
+        text: item.text,
+        files: item.fileContext ?? [],
+        images: item.imageAttachments ?? [],
+        agent: item.agent ? item.agent : (providers.selectedAgent || "build"),
+        model: item.model ?? providers.selectedModel,
+        status: "queued",
+      });
+    }
   });
 
   // Get messages from sync context - reactive, automatically updated via SSE
@@ -689,16 +723,135 @@ export function Session() {
     return projectedMessages;
   });
 
+  function previewPromptParts(item: PendingPromptItem) {
+    const sid = sessionId() || "";
+    const textParts = item.text
+      ? [{
+          id: `${item.id}-text`,
+          sessionID: sid,
+          messageID: "",
+          type: "text" as const,
+          text: item.text,
+        }]
+      : [];
+
+    const fileCommentParts = item.files.flatMap((file, index) => {
+      if (!file.selection && !file.comment) return [];
+      const selection = file.selection ? `\nLines: ${file.selection.startLine}-${file.selection.endLine}` : "";
+      const note = file.comment ? `\nNote: ${file.comment}` : "";
+      const body = file.preview ? `\n\n${file.preview}` : "";
+      return [{
+        id: `${item.id}-file-text-${index}`,
+        sessionID: sid,
+        messageID: "",
+        type: "text" as const,
+        text: `File: ${file.path}${selection}${note}${body}`,
+      }];
+    });
+
+    const fileParts = item.files.map((file, index) => {
+      const dir = directory || "";
+      const absolute = file.path.startsWith("/")
+        ? file.path
+        : `${dir.replace(/\/$/, "")}/${file.path.replace(/^\//, "")}`;
+      const filename = file.path.split("/").pop() || file.path;
+      const encoded = absolute
+        .split("/")
+        .map((segment) => encodeURIComponent(segment))
+        .join("/");
+      return {
+        id: `${item.id}-file-${index}`,
+        sessionID: sid,
+        messageID: "",
+        type: "file" as const,
+        mime: "text/plain",
+        url: `file://${encoded}`,
+        filename,
+      };
+    });
+
+    const imageParts = item.images.map((image, index) => ({
+      id: `${item.id}-image-${index}`,
+      sessionID: sid,
+      messageID: "",
+      type: "file" as const,
+      mime: image.mime,
+      url: image.dataUrl,
+      filename: image.name,
+    }));
+
+    const parts = [...textParts, ...fileCommentParts, ...fileParts, ...imageParts];
+    if (parts.length > 0) return parts as Part[];
+
+    return [{
+      id: `${item.id}-text`,
+      sessionID: sid,
+      messageID: "",
+      type: "text" as const,
+      text: "",
+    }] as Part[];
+  }
+
+  createEffect(() => {
+    const item = activePrompt();
+    if (!item) {
+      setOptimisticMessages([]);
+      return;
+    }
+
+    const userCount = countUserMessages(syncMessages());
+    setOptimisticMessages([{
+      id: item.id,
+      expectedUserMessageIndex: userCount + 1,
+      message: {
+        id: item.id,
+        role: "user",
+        parts: previewPromptParts(item),
+        time: { created: item.createdAt },
+      },
+    }]);
+  });
+
   // Includes optimistic message if present and not yet in sync
   let mergedMessages = emptyMessages;
   const messages = createMemo(() => {
     const syncMsgs = syncMessages();
-    if (syncMsgs.length === 0 && !optimisticMessage()) {
+    if (syncMsgs.length === 0 && optimisticMessages().length === 0) {
       mergedMessages = syncMsgs;
       return mergedMessages;
     }
-    mergedMessages = mergeOptimisticMessage(mergedMessages, syncMsgs, optimisticMessage(), pendingUserMessageText());
+    mergedMessages = mergeOptimisticMessage(mergedMessages, syncMsgs, optimisticMessages());
     return mergedMessages;
+  });
+  const queuedTurns = createMemo(() =>
+    pendingQueue().map((item) => ({
+      id: item.id,
+      userMessage: {
+        id: item.id,
+        role: "user" as const,
+        parts: previewPromptParts(item),
+        time: { created: item.createdAt },
+      },
+      assistantMessages: [],
+      queueState: { status: "queued", canDelete: true } satisfies QueueTurnState,
+    }))
+  );
+  const activeTurnId = createMemo(() => {
+    const active = activePrompt();
+    const optimistic = optimisticMessages()[0];
+    if (!active || !optimistic) return undefined;
+    return findOptimisticMessageEcho(messages(), optimistic)?.id ?? active.id;
+  });
+  const activeTurnState = createMemo<QueueTurnState | undefined>(() => {
+    if (!activePrompt()) return undefined;
+    const paused = queuePausedReason();
+    if (paused) return { status: paused };
+    return { status: "thinking" };
+  });
+  const sessionPausedReason = createMemo<"paused_question" | "paused_permission" | null>(() => {
+    const reason = queuePausedReason();
+    if (reason === "paused_question" || reason === "paused_permission") return reason;
+    return null;
   });
   let inputRef: HTMLTextAreaElement | undefined;
   let slashPopoverRef: HTMLDivElement | undefined;
@@ -1159,6 +1312,33 @@ export function Session() {
     }
   });
 
+  createEffect(on(
+    () => ({
+      processing: processing(),
+      blocked: inputBlocked(),
+      active: !!activePrompt(),
+      queueLength: pendingQueue().length,
+      loading: loading(),
+      session: sessionId(),
+    }),
+    (state, prev) => {
+      if (state.processing || state.blocked || state.loading || state.active || state.queueLength === 0) return;
+      if (!prev) {
+        void flushQueuedPrompt();
+        return;
+      }
+      const sameSession = prev.session === state.session;
+      if (
+        sameSession &&
+        !prev.processing &&
+        !prev.active &&
+        prev.queueLength === state.queueLength &&
+        prev.loading === state.loading
+      ) return;
+      void flushQueuedPrompt();
+    },
+  ));
+
   createEffect(() => {
     if (!sessionId()) {
       setShowTodoTray(false);
@@ -1317,27 +1497,6 @@ export function Session() {
         const id = sessionId();
         if (!id) return;
 
-        // Handle message part updates - clear optimistic message when user message is echoed
-        if (event.type === "message.part.updated") {
-          const part = event.properties.part as {
-            sessionID: string;
-            type: string;
-            text?: string;
-          };
-          if (part.sessionID !== id) return;
-
-          // Check if this is the backend echo of the user message we just sent
-          const pendingText = pendingUserMessageText();
-          if (
-            pendingText &&
-            part.type === "text" &&
-            part.text?.trim() === pendingText.trim()
-          ) {
-            setPendingUserMessageText(null);
-            setOptimisticMessage(null);
-          }
-        }
-
         // Handle status changes
         if (event.type === "session.status") {
           const props = event.properties as {
@@ -1345,11 +1504,7 @@ export function Session() {
             status: { type: string };
           };
           if (props.sessionID === id && props.status.type === "idle") {
-            // Only clear optimistic message if no pending text or it was already matched
-            if (!pendingUserMessageText()) {
-              setOptimisticMessage(null);
-            }
-            setPendingUserMessageText(null);
+            setActivePrompt(null);
 
             // Reset local processing tracker (notifications now handled globally in Layout)
             wasProcessing.value = false;
@@ -1400,8 +1555,6 @@ export function Session() {
     if (!q) return;
 
     try {
-      // Optimistically dismiss so the UI unblocks immediately
-      events.dismissQuestion(q.sessionID, q.id);
       await client.question.reply({ requestID: q.id, answers, directory });
     } catch (e) {
       console.error("[Session] Failed to reply to question:", e);
@@ -1413,8 +1566,6 @@ export function Session() {
     if (!q) return;
 
     try {
-      // Optimistically dismiss so the UI unblocks immediately
-      events.dismissQuestion(q.sessionID, q.id);
       await client.question.reject({ requestID: q.id, directory });
     } catch (e) {
       console.error("[Session] Failed to reject question:", e);
@@ -1427,11 +1578,6 @@ export function Session() {
 
     try {
       await client.session.abort({ sessionID: id, directory });
-      setProcessing(false);
-      // Only dismiss the question if it belongs to this session — aborting is
-      // scoped to the current session and does not affect descendant sessions.
-      const q = pendingQuestion();
-      if (q && q.sessionID === id) events.dismissQuestion(q.sessionID, q.id);
     } catch (e) {
       console.error("[Session] Failed to abort session:", e);
     }
@@ -1520,6 +1666,121 @@ export function Session() {
 
   function removeUpload(id: string) {
     setImageAttachments((prev) => prev.filter((a) => a.id !== id));
+  }
+
+  function resetComposer() {
+    setInput("");
+    setDragHeight(0);
+    if (inputRef) inputRef.style.height = "";
+    setFileContext([]);
+    setImageAttachments([]);
+    drafts.delete(draftKey(server.serverKey(), params.dir, sessionId()));
+  }
+
+  function enqueuePrompt(item: PendingPromptItem) {
+    setError(null);
+    setShowTodoTray(false);
+    setPendingQueue((prev) => [...prev, { ...item, status: "queued" }]);
+    resetComposer();
+  }
+
+  function queueActive() {
+    return !!activePrompt() || processing();
+  }
+
+  function deleteQueuedPrompt(id: string) {
+    setPendingQueue((prev) => prev.filter((item) => item.id !== id));
+  }
+
+  function buildPromptParts(item: PendingPromptItem) {
+    const parts: (
+      | { type: "text"; text: string }
+      | { type: "file"; mime: string; url: string; filename: string }
+    )[] = [{ type: "text", text: item.text || "" }];
+
+    for (const file of item.files) {
+      if (file.selection || file.comment) {
+        const selection = file.selection ? `\nLines: ${file.selection.startLine}-${file.selection.endLine}` : "";
+        const note = file.comment ? `\nNote: ${file.comment}` : "";
+        const body = file.preview ? `\n\n${file.preview}` : "";
+        parts.push({ type: "text", text: `File: ${file.path}${selection}${note}${body}` });
+      }
+
+      const dir = directory || "";
+      const absolute = file.path.startsWith("/")
+        ? file.path
+        : `${dir.replace(/\/$/, "")}/${file.path.replace(/^\//, "")}`;
+      const filename = file.path.split("/").pop() || file.path;
+      const encoded = absolute
+        .split("/")
+        .map((segment) => encodeURIComponent(segment))
+        .join("/");
+      parts.push({
+        type: "file",
+        mime: "text/plain",
+        url: `file://${encoded}`,
+        filename,
+      });
+    }
+
+    for (const img of item.images) {
+      parts.push({
+        type: "file",
+        mime: img.mime,
+        url: img.dataUrl,
+        filename: img.name,
+      });
+    }
+
+    return parts;
+  }
+
+  async function submitPrompt(item: PendingPromptItem) {
+    setError(null);
+    setLoading(true);
+    setShowTodoTray(false);
+    resetComposer();
+
+    try {
+      let id = sessionId();
+
+      if (!id) {
+        const createRes = await client.session.create({});
+        if (!createRes.data || !createRes.data.id) throw new Error("Failed to create session");
+
+        const newId = createRes.data.id;
+        id = newId;
+        setSessionId(id);
+        navigate(`/${dirSlug()}/session/${id}`, { replace: true });
+      }
+
+      await client.session.promptAsync({
+        sessionID: id,
+        parts: buildPromptParts(item),
+        agent: item.agent,
+        model: item.model,
+      });
+
+      setActivePrompt({ ...item, status: "running" });
+      startProcessing();
+      return true;
+    } catch (err) {
+      console.error("[Session] Error sending message:", err);
+      setError(
+        `Failed to send message: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      setActivePrompt(null);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function flushQueuedPrompt() {
+    const next = pendingQueue()[0];
+    if (!next || queueActive() || inputBlocked() || loading()) return;
+    const submitted = await submitPrompt(next);
+    setPendingQueue((prev) => applyQueuedPromptSubmission(prev, next.id, submitted));
   }
 
   function handleFileInputChange(e: Event) {
@@ -1615,7 +1876,7 @@ export function Session() {
 
     const files = fileContext();
     const images = imageAttachments();
-    if ((!text && files.length === 0 && images.length === 0) || loading() || inputBlocked())
+    if ((!text && files.length === 0 && images.length === 0) || inputBlocked())
       return;
 
     // Require explicit model selection to avoid OpenCode auto-selecting a broken provider
@@ -1634,123 +1895,40 @@ export function Session() {
       return;
     }
 
-    setError(null);
-    setLoading(true);
-    setShowTodoTray(false);
-    setInput("");
-    setDragHeight(0); // Reset manual resize after sending
-    if (inputRef) inputRef.style.height = ""; // Reset textarea to default height
-    setFileContext([]); // Clear file context after sending
-    setImageAttachments([]); // Clear image attachments after sending
-
-    // Clear saved draft for this session since the message was sent
-    // draftKey(serverKey, dir, id)
-    drafts.delete(draftKey(server.serverKey(), params.dir, sessionId()));
-
-    // Track pending user message text to match backend echoes
-    setPendingUserMessageText(text);
-
-    // Optimistic update - show user message immediately while waiting for server
-    const userMessage: DisplayMessage = {
-      id: generateUUID(),
-      role: "user",
-      parts: [
-        {
-          id: generateUUID(),
-          sessionID: sessionId() || "",
-          messageID: "",
-          type: "text",
-          text: text || "(files attached)",
-        },
-      ] as Part[],
-    };
-    setOptimisticMessage(userMessage);
-
-    try {
-      let id = sessionId();
-
-      if (!id) {
-        const createRes = await client.session.create({});
-        if (!createRes.data || !createRes.data.id) throw new Error("Failed to create session");
-
-        const newId = createRes.data.id;
-        id = newId;
-        setSessionId(id);
-        navigate(`/${dirSlug()}/session/${id}`, { replace: true });
-      }
-
-      // Build parts array with text and file attachments
-      // Always include a text part (even if empty) to ensure SSE reconciliation works
-      const parts: (
-        | { type: "text"; text: string }
-        | { type: "file"; mime: string; url: string; filename: string }
-      )[] = [{ type: "text", text: text || "" }];
-
-      // Add file parts from file context
-      for (const file of files) {
-        if (file.selection || file.comment) {
-          const selection = file.selection ? `\nLines: ${file.selection.startLine}-${file.selection.endLine}` : ""
-          const note = file.comment ? `\nNote: ${file.comment}` : ""
-          const body = file.preview ? `\n\n${file.preview}` : ""
-          parts.push({ type: "text", text: `File: ${file.path}${selection}${note}${body}` });
-        }
-        // Construct absolute path, avoiding double slashes
-        const dir = directory || "";
-        const absolute = file.path.startsWith("/")
-          ? file.path
-          : `${dir.replace(/\/$/, "")}/${file.path.replace(/^\//, "")}`;
-        const filename = file.path.split("/").pop() || file.path;
-        // Encode path segments individually to match SDK behavior
-        const encoded = absolute
-          .split("/")
-          .map((segment) => encodeURIComponent(segment))
-          .join("/");
-        parts.push({
-          type: "file",
-          mime: "text/plain",
-          url: `file://${encoded}`,
-          filename,
-        });
-      }
-
-      // Add image/PDF attachments from device uploads
-      for (const img of images) {
-        parts.push({
-          type: "file",
-          mime: img.mime,
-          url: img.dataUrl,
-          filename: img.name,
-        });
-      }
-
-      // Send message with agent and model
-      const promptPayload: {
-        sessionID: string;
-        parts: typeof parts;
-        agent: string;
-        model?: { providerID: string; modelID: string };
-      } = {
-        sessionID: id,
-        parts,
+    if (queueActive()) {
+      enqueuePrompt({
+        id: generateUUID(),
+        createdAt: Date.now(),
+        text,
+        files,
+        images,
         agent: providers.selectedAgent || "build",
-      };
-
-      if (providers.selectedModel) {
-        promptPayload.model = providers.selectedModel;
-      }
-
-      const promptRes = await client.session.promptAsync(promptPayload);
-
-      // Start processing - SSE events will handle updates and completion
-      startProcessing();
-    } catch (err) {
-      console.error("[Session] Error sending message:", err);
-      setError(
-        `Failed to send message: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    } finally {
-      setLoading(false);
+        model: providers.selectedModel
+          ? {
+              providerID: providers.selectedModel.providerID,
+              modelID: providers.selectedModel.modelID,
+            }
+          : undefined,
+        status: "queued",
+      });
+      return;
     }
+
+    await submitPrompt({
+      id: generateUUID(),
+      createdAt: Date.now(),
+      text,
+      files,
+      images,
+      agent: providers.selectedAgent || "build",
+      model: providers.selectedModel
+        ? {
+            providerID: providers.selectedModel.providerID,
+            modelID: providers.selectedModel.modelID,
+          }
+        : undefined,
+      status: "running",
+    });
   }
 
   async function createSessionAndSendPrompt(text: string) {
@@ -1769,12 +1947,18 @@ export function Session() {
       const sid = res.data.id;
       setSessionId(sid);
       navigate(`/${dirSlug()}/session/${sid}`, { replace: true });
-      await client.session.promptAsync({
-        sessionID: sid,
-        parts: [{ type: "text", text }],
-        agent: providers.selectedAgent || "build",
-        model: providers.selectedModel,
-      });
+      sessionStorage.setItem(
+        `opencode.pendingPrompt.${sid}`,
+        JSON.stringify({
+          items: [{
+            id: generateUUID(),
+            text,
+            ts: Date.now(),
+            agent: providers.selectedAgent || "build",
+            model: providers.selectedModel,
+          }],
+        } satisfies PendingPromptStorage),
+      );
     } catch (err) {
       setError(`Failed to send saved prompt: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -2076,7 +2260,10 @@ export function Session() {
             loadingHistory={loadingHistory()}
             historyError={historyError()}
             sessionStatus={sessionId() ? events.status[sessionId()!] : undefined}
-            pendingPromptText={pendingUserMessageText()}
+            activeTurnId={activeTurnId()}
+            activeTurnState={activeTurnState()}
+            queuedTurns={queuedTurns()}
+            onDeleteQueuedTurn={deleteQueuedPrompt}
             onRetry={retryTurn}
             onOpenFile={openFilePreview}
             onRetryHistory={() => {
@@ -2642,6 +2829,8 @@ export function Session() {
                       input={input}
                       loading={loading}
                       processing={processing}
+                      queueCount={() => pendingQueue().length}
+                      pausedReason={sessionPausedReason}
                       onAbort={handleAbort}
                       onAgentClick={() => setShowAgentPicker(true)}
                       onModelClick={() => setShowModelPicker(true)}

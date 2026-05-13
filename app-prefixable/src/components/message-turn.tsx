@@ -1,10 +1,10 @@
 import { type Accessor, createSignal, createEffect, Show, For, createMemo, onCleanup, onMount } from "solid-js"
-import { ChevronDown, ChevronRight, User, Bot, FileText, Copy, Check, Clock, RotateCcw, Loader2 } from "lucide-solid"
+import { ChevronDown, ChevronRight, Bot, FileText, Copy, Check, Clock, RotateCcw, Loader2, X } from "lucide-solid"
 import { Markdown } from "./markdown"
 import { MessageParts } from "./tool-part"
 import { ImagePreview } from "./image-preview"
 import { errorText } from "../types/message"
-import type { DisplayMessage, Turn } from "../types/message"
+import type { DisplayMessage, QueueTurnState, Turn } from "../types/message"
 import type { Part } from "../sdk/client"
 import { extractTextContent, parseUserText } from "../utils/message"
 import { formatRelativeTime, formatAbsoluteTime, formatDuration } from "../utils/time"
@@ -176,12 +176,13 @@ const getAgentColors = (agent?: string) => {
 
 export function MessageTurn(props: {
   turn: Turn
+  queueState?: QueueTurnState
   now: Accessor<number>
   defaultExpanded?: boolean
   isLast?: boolean
   streaming?: boolean
-  pendingStatus?: "waiting" | "thinking"
   onToggle?: (turnId: string, expanded: boolean) => void
+  onDeleteQueued?: (turnId: string) => void
   onRetry?: (messageId: string) => void
   onOpenFile?: (path: string) => void
 }) {
@@ -303,6 +304,49 @@ export function MessageTurn(props: {
     setExpanded(next)
     props.onToggle?.(props.turn.id, next)
   }
+
+  const queueBadge = createMemo(() => {
+    if (props.queueState?.status === "queued") {
+      return {
+        label: props.queueState.canDelete ? "Queued" : "Running soon",
+        background: "var(--surface-inset)",
+        color: "var(--text-weak)",
+        border: "1px solid var(--border-base)",
+      }
+    }
+    if (props.queueState?.status === "thinking") {
+      return {
+        label: "Running",
+        background: "var(--surface-brand-muted)",
+        color: "var(--text-interactive-base)",
+        border: "1px solid var(--interactive-base)",
+      }
+    }
+    if (props.queueState?.status === "paused_question") {
+      return {
+        label: "Paused · question",
+        background: "var(--status-warning-dim)",
+        color: "var(--status-warning-text)",
+        border: "1px solid var(--status-warning-border)",
+      }
+    }
+    if (props.queueState?.status === "paused_permission") {
+      return {
+        label: "Paused · permission",
+        background: "var(--status-warning-dim)",
+        color: "var(--status-warning-text)",
+        border: "1px solid var(--status-warning-border)",
+      }
+    }
+    return null
+  })
+  const statusText = createMemo(() => {
+    if (props.queueState?.status === "thinking") return "running"
+    if (props.queueState?.status === "paused_question") return "paused for question"
+    if (props.queueState?.status === "paused_permission") return "paused for permission"
+    if (props.queueState?.status === "queued") return "queued"
+    return props.turn.assistantMessages.length > 0 ? "completed" : "pending"
+  })
 
   return (
     <div
@@ -453,7 +497,27 @@ export function MessageTurn(props: {
                 </button>
                 <span>·</span>
               </Show>
-              <span>{props.turn.assistantMessages.length > 0 ? "completed" : "pending"}</span>
+              <Show when={queueBadge()}>
+                {(badge) => (
+                  <>
+                    <span
+                      class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      style={{
+                        background: badge().background,
+                        color: badge().color,
+                        border: badge().border,
+                      }}
+                    >
+                      <Show when={props.queueState?.status === "thinking"}>
+                        <Loader2 class="w-3 h-3 animate-spin" />
+                      </Show>
+                      {badge().label}
+                    </span>
+                    <span>·</span>
+                  </>
+                )}
+              </Show>
+              <span>{statusText()}</span>
             </div>
 
             <Show when={systemOpen() && systemBlocks().length > 0}>
@@ -541,6 +605,25 @@ export function MessageTurn(props: {
               <Show when={copied()} fallback={<Copy class="w-4 h-4" />}>
                 <Check class="w-4 h-4" />
               </Show>
+            </button>
+          </Show>
+
+          <Show when={props.queueState?.status === "queued" && props.queueState.canDelete}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                props.onDeleteQueued?.(props.turn.id)
+              }}
+              class="p-1.5 rounded transition-colors"
+              style={{
+                background: "var(--surface-inset)",
+                color: "var(--icon-weak)",
+              }}
+              title="Delete queued prompt"
+              aria-label="Delete queued prompt"
+            >
+              <X class="w-4 h-4" />
             </button>
           </Show>
         </div>
@@ -631,7 +714,7 @@ export function MessageTurn(props: {
             </div>
           </Show>
 
-          <Show when={props.pendingStatus && props.turn.assistantMessages.length === 0}>
+          <Show when={props.queueState && props.turn.assistantMessages.length === 0}>
             <div class="flex gap-3 rounded-lg border px-3 py-3" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}>
               <div
                 class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
@@ -643,17 +726,25 @@ export function MessageTurn(props: {
                 <div class="text-xs font-medium mb-1" style={{ color: "var(--text-weak)" }}>
                   ASSISTANT
                 </div>
-                <Show
-                  when={props.pendingStatus === "waiting"}
-                  fallback={
-                    <div class="inline-flex items-center gap-2 text-sm font-medium whitespace-nowrap leading-none" style={{ color: "var(--text-strong)" }}>
-                      Thinking
-                      <Loader2 class="w-3.5 h-3.5 animate-spin" />
-                    </div>
-                  }
-                >
+                <Show when={props.queueState?.status === "thinking"}>
+                  <div class="inline-flex items-center gap-2 text-sm font-medium whitespace-nowrap leading-none" style={{ color: "var(--text-strong)" }}>
+                    Thinking
+                    <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                  </div>
+                </Show>
+                <Show when={props.queueState?.status === "queued"}>
                   <div class="text-sm" style={{ color: "var(--text-weak)" }}>
-                    Waiting for response...
+                    Waiting in queue...
+                  </div>
+                </Show>
+                <Show when={props.queueState?.status === "paused_question"}>
+                  <div class="text-sm" style={{ color: "var(--status-warning-text)" }}>
+                    Waiting for a question response before this queued prompt can start.
+                  </div>
+                </Show>
+                <Show when={props.queueState?.status === "paused_permission"}>
+                  <div class="text-sm" style={{ color: "var(--status-warning-text)" }}>
+                    Waiting for permission approval before this queued prompt can continue.
                   </div>
                 </Show>
               </div>

@@ -29,3 +29,8 @@ export interface Turn {
     duration?: number
   }
 }
+
+export interface QueueTurnState {
+  status: "queued" | "thinking" | "paused_question" | "paused_permission"
+  canDelete?: boolean
+}

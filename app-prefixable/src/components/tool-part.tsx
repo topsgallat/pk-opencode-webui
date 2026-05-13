@@ -14,6 +14,28 @@ import { FancyAnsi } from "fancy-ansi";
 
 const fa = new FancyAnsi();
 
+function AnsiOutput(props: { text: string }) {
+  let el: HTMLPreElement | undefined;
+
+  createEffect(() => {
+    if (!el) return;
+    const top = el.scrollTop;
+    const left = el.scrollLeft;
+    el.innerHTML = fa.toHtml(props.text);
+    el.scrollTop = top;
+    el.scrollLeft = left;
+  });
+
+  return (
+    <pre
+      ref={(node) => (el = node)}
+      class="whitespace-pre-wrap max-h-64 overflow-y-auto mt-1"
+      data-scrollable
+      style={{ color: "var(--text-base)", "overflow-anchor": "none" }}
+    />
+  );
+}
+
 // Use the SDK's types
 type ToolPart = SDKToolPart;
 type ReasoningPart = SDKReasoningPart;
@@ -1027,17 +1049,14 @@ export function ToolPartDisplay(props: { part: ToolPart; subtask?: SubtaskPart; 
               </div>
               <Show when={getOutput(state())}>
                 {(output) => (
-                  <pre
-                    class="whitespace-pre-wrap max-h-64 overflow-y-auto mt-1"
-                    style={{ color: "var(--text-base)" }}
-                    innerHTML={fa.toHtml(output())}
-                  />
+                  <AnsiOutput text={output()} />
                 )}
               </Show>
               <Show when={getError(state())}>
                 {(err) => (
                   <pre
                     class="whitespace-pre-wrap mt-1"
+                    data-scrollable
                     style={{ color: "var(--icon-critical-base)" }}
                   >
                     {err()}

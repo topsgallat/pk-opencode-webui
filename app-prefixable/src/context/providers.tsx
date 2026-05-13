@@ -79,6 +79,20 @@ interface OAuthAuthorization {
   instructions: string
 }
 
+function getConnectedProviderIDs(data?: ProviderListData): string[] {
+  const connected = data?.connected ?? []
+  const accounts = getProviderAccounts()
+  const merged = [...connected]
+
+  for (const account of Object.values(accounts)) {
+    if (!connected.includes(account.providerType)) continue
+    if (merged.includes(account.id)) continue
+    merged.push(account.id)
+  }
+
+  return merged
+}
+
 interface ProviderContextValue {
   providers: Provider[]
   connected: string[]
@@ -373,7 +387,7 @@ export function ProviderProvider(props: ParentProps) {
       return providerData()?.all ?? []
     },
     get connected() {
-      return providerData()?.connected ?? []
+      return getConnectedProviderIDs(providerData())
     },
     get defaults() {
       return providerData()?.default ?? {}

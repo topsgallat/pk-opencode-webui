@@ -201,10 +201,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
 
   createEffect(on(options.working, (working: boolean) => {
     if (working) {
-      if (store.pinned) {
-        anchorBottom = 0
-        queueScrollToBottom()
-      }
+      scrollToBottom(true)
       return
     }
   }))

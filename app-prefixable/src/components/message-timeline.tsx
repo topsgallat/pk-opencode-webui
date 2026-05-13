@@ -7,7 +7,7 @@ import { Markdown } from "./markdown"
 import { MessageParts } from "./tool-part"
 import { ChevronUp, RefreshCw, Clock, Brain, Loader2, ArrowDown } from "lucide-solid"
 import { errorText } from "../types/message"
-import type { DisplayMessage, Turn } from "../types/message"
+import type { DisplayMessage, QueueTurnState, Turn } from "../types/message"
 import { extractTextContent } from "../utils/message"
 import type { SessionStatus } from "../sdk/client"
 import { reconcileTurns } from "../utils/message-reconcile"
@@ -93,7 +93,15 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     if (!force && !store.pinned) return
     if (!store.pinned) setStore("pinned", true)
     anchorBottom = 0
-    queueScrollToBottom()
+
+    // Delay scroll slightly to allow keyboard/viewport changes to settle on mobile
+    setTimeout(() => {
+      const activeEl = scroll
+      if (!activeEl) return
+      const next = scrollTargetTop(activeEl, anchorBottom)
+      if (Math.abs(activeEl.scrollTop - next) < 1) return
+      writeAnchorBottom(activeEl, anchorBottom)
+    }, 50)
   }
 
   const smoothScrollToBottom = () => {
@@ -252,7 +260,10 @@ export function MessageTimeline(props: {
   loadingHistory: boolean
   historyError?: string | null
   sessionStatus?: SessionStatus
-  pendingPromptText?: string | null
+  activeTurnId?: string
+  activeTurnState?: QueueTurnState
+  queuedTurns?: Array<Turn & { queueState?: QueueTurnState }>
+  onDeleteQueuedTurn?: (turnId: string) => void
   onScroll?: (nearBottom: boolean) => void
   onRetry?: (turnId: string) => void
   onRetryHistory?: () => void
@@ -295,6 +306,15 @@ export function MessageTimeline(props: {
   const lastTurn = createMemo(() => {
     const all = turns()
     return all.length > 0 ? all[all.length - 1] : null
+  })
+  const timelineTurns = createMemo(() => {
+    const activeTurnId = props.activeTurnId
+    const base = renderedTurns().map((turn, index, all) => ({
+      turn,
+      queueState: turn.id === activeTurnId ? props.activeTurnState : undefined,
+    }))
+    const queued = props.queuedTurns ?? []
+    return [...base, ...queued.map((turn) => ({ turn, queueState: turn.queueState }))]
   })
 
   let containerRef: HTMLDivElement | undefined
@@ -464,19 +484,27 @@ export function MessageTimeline(props: {
 
           {/* Turns */}
           <div ref={autoScroll.contentRef} class="space-y-4">
-            <For each={renderedTurns()}>
-              {(turn, index) => (
-                  <MessageTurn
-                    turn={turn}
-                    now={now}
-                    isLast={index() === renderedTurns().length - 1}
-                    streaming={props.processing && index() === renderedTurns().length - 1}
-                    defaultExpanded={expanded()[turn.id] ?? index() === renderedTurns().length - 1}
-                    pendingStatus={index() === renderedTurns().length - 1 && turn.assistantMessages.length === 0 ? (props.processing ? "thinking" : props.pendingPromptText ? "waiting" : undefined) : undefined}
-                    onToggle={handleToggle}
-                    onRetry={props.onRetry}
-                    onOpenFile={props.onOpenFile}
-                  />
+            <For each={timelineTurns()}>
+              {(entry, index) => (
+                (() => {
+                  const turn = entry.turn
+                  const isLastRealTurn = index() === renderedTurns().length - 1
+                  const isQueuedItem = index() >= renderedTurns().length
+                  return (
+                   <MessageTurn
+                     turn={turn}
+                     queueState={entry.queueState}
+                     now={now}
+                     isLast={index() === timelineTurns().length - 1}
+                     streaming={props.processing && isLastRealTurn}
+                     defaultExpanded={expanded()[turn.id] ?? (isLastRealTurn || isQueuedItem)}
+                     onToggle={handleToggle}
+                     onDeleteQueued={props.onDeleteQueuedTurn}
+                     onRetry={props.onRetry}
+                     onOpenFile={props.onOpenFile}
+                   />
+                  )
+                })()
               )}
             </For>
           </div>

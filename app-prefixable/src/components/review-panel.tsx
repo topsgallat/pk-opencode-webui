@@ -228,7 +228,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
     void (async () => {
       try {
         const res = await withTimeout(
-          () => client.find.files({ query: q, dirs: "false" }),
+          () => client.find.files({ query: q, dirs: "true" }),
           FILE_SEARCH_TIMEOUT_MS,
           "find.files",
         );

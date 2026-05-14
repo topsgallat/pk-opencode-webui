@@ -474,6 +474,16 @@ export function Terminal(props: TerminalProps) {
         <button
           type="button"
           class="flex items-center justify-center h-10 px-3 rounded text-xs font-mono font-bold transition-all select-none"
+          style={{ color: activeTheme().foreground, background: btnBg() }}
+          onTouchEnd={(e) => { e.preventDefault(); sendKey("\t") }}
+          onClick={() => sendKey("\t")}
+          aria-label="Tab"
+        >
+          Tab
+        </button>
+        <button
+          type="button"
+          class="flex items-center justify-center h-10 px-3 rounded text-xs font-mono font-bold transition-all select-none"
           style={{
             color: selMode() ? (activeTheme().background === "#ffffff" ? "#2563eb" : "#60a5fa") : activeTheme().foreground,
             background: selMode()

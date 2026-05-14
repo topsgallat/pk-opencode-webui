@@ -239,11 +239,19 @@ export function Terminal(props: TerminalProps) {
     term.open(container)
     console.log("[Terminal] Terminal opened in container")
 
-    // Let plain Ctrl+1-4 pass through to the browser for panel focus shortcuts
-    // Exclude AltGr (reports as Ctrl+Alt) to avoid breaking locale-specific input
+    // Let plain Ctrl+1-4 pass through to the browser for panel focus shortcuts.
+    // When text is selected, Ctrl+C copies instead of sending SIGINT.
+    // Exclude AltGr (reports as Ctrl+Alt) to avoid breaking locale-specific input.
     term.attachCustomKeyEventHandler((event) => {
       if (event.ctrlKey && !event.altKey && !event.metaKey && PANEL_FOCUS_KEYS.has(event.key))
         return false
+      if (event.type === "keydown" && event.ctrlKey && !event.altKey && !event.metaKey && (event.key === "c" || event.key === "C")) {
+        const sel = term?.getSelection()
+        if (sel) {
+          navigator.clipboard.writeText(sel).catch(() => {})
+          return false
+        }
+      }
       return true
     })
 

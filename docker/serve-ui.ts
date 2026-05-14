@@ -514,6 +514,10 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       // Regular API requests
       console.log("[Proxy] API:", req.method, path)
       try {
+        // Disable HTTP keep-alive for upstream connections to prevent
+        // Bun's connection pool from accumulating idle connections and
+        // deadlocking when the pool grows large (256+ connections).
+        headers.set("Connection", "close")
         const response = await fetchWithTimeout(target.toString(), {
           method: req.method,
           headers,

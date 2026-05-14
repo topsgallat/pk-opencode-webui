@@ -824,17 +824,19 @@ export function Session() {
     return mergedMessages;
   });
   const queuedTurns = createMemo(() =>
-    pendingQueue().map((item) => ({
-      id: item.id,
-      userMessage: {
+    pendingQueue()
+      .filter((item) => item.id !== activePrompt()?.id)
+      .map((item) => ({
         id: item.id,
-        role: "user" as const,
-        parts: previewPromptParts(item),
-        time: { created: item.createdAt },
-      },
-      assistantMessages: [],
-      queueState: { status: "queued", canDelete: true } satisfies QueueTurnState,
-    }))
+        userMessage: {
+          id: item.id,
+          role: "user" as const,
+          parts: previewPromptParts(item),
+          time: { created: item.createdAt },
+        },
+        assistantMessages: [],
+        queueState: { status: "queued", canDelete: true } satisfies QueueTurnState,
+      }))
   );
   const activeTurnId = createMemo(() => {
     const active = activePrompt();

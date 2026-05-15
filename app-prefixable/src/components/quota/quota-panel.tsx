@@ -5,12 +5,12 @@ import { QuotaProviderView } from '../../types/quota'
 import { QuotaProviderCard } from './quota-provider-card'
 
 export function QuotaContent() {
-  const { prefix } = useBasePath()
+  const { serverUrl } = useBasePath()
   const [refreshing, setRefreshing] = createSignal(false)
   const [selectedProvider, setSelectedProvider] = createSignal<string>('all')
 
   const [quotaResource, { refetch }] = createResource(
-    () => ({ serverUrl: prefix(''), refresh: false }),
+    () => ({ serverUrl, refresh: false }),
     async ({ serverUrl }) => {
       try {
         return await getQuota(serverUrl)
@@ -24,7 +24,6 @@ export function QuotaContent() {
   const handleRefresh = async () => {
     setRefreshing(true)
     try {
-      const serverUrl = prefix('')
       await getQuota(serverUrl, { refresh: true })
       refetch()
     } catch (error) {

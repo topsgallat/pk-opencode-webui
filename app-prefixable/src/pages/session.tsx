@@ -792,8 +792,7 @@ export function Session() {
     }] as Part[];
   }
 
-  createEffect(() => {
-    const item = activePrompt();
+  createEffect(on(activePrompt, (item) => {
     if (!item) {
       setOptimisticMessages([]);
       return;
@@ -810,7 +809,7 @@ export function Session() {
         time: { created: item.createdAt },
       },
     }]);
-  });
+  }));
 
   // Includes optimistic message if present and not yet in sync
   let mergedMessages = emptyMessages;

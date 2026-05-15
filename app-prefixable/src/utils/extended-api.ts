@@ -1,5 +1,6 @@
 import { appendTargetParam } from "./path"
 import { fetchWithTimeout } from "./request-timeout"
+import type { QuotaApiResponse } from "../../../shared/quota/types"
 
 const EXT_API_TIMEOUT_MS = 15_000
 
@@ -191,17 +192,29 @@ export async function listLogFiles(serverUrl: string): Promise<string[]> {
 }
 
 /**
- * Read a specific OpenCode log file by name
+ * Read content from an OpenCode log file
  */
 export async function readLogFile(serverUrl: string, name: string): Promise<string | null> {
   try {
-    const params = new URLSearchParams({ name })
-    const res = await fetch(`${serverUrl}/api/ext/log-file?${params}`)
+    const res = await fetch(`${serverUrl}/api/ext/log-file?name=${encodeURIComponent(name)}`)
     if (!res.ok) return null
-    const data = await res.json()
-    return data.content
+    return await res.text()
   } catch (e) {
     console.error("[extended-api] readLogFile failed:", e)
     return null
   }
+}
+
+/**
+ * Get quota data from all providers
+ */
+export async function getQuota(serverUrl: string, options?: { refresh?: boolean }): Promise<QuotaApiResponse> {
+  const params = new URLSearchParams()
+  if (options?.refresh) params.set("refresh", "true")
+
+  const res = await fetchWithTimeout(`${serverUrl}/api/ext/quota?${params}`, {}, EXT_API_TIMEOUT_MS, "extended getQuota")
+  if (!res.ok) {
+    throw new Error(`Failed to fetch quota: ${res.status}`)
+  }
+  return await res.json()
 }

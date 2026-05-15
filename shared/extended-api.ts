@@ -522,6 +522,18 @@ export async function handleExtendedEndpoint(
     }
   }
 
-  // Not an extended endpoint
-  return undefined
+  // GET /api/ext/quota - Get quota data for all providers
+  if (path === "/api/ext/quota" && method === "GET") {
+    const refresh = url.searchParams.get("refresh") === "true"
+    const providerFilter = url.searchParams.get("provider") || undefined
+
+    try {
+      const { getQuotaData } = await import("./quota/index")
+      const result = await getQuotaData({ refresh, providerFilter })
+      return Response.json(result)
+    } catch (error) {
+      console.error("[ExtAPI] quota error:", error)
+      return Response.json({ error: String(error) }, { status: 500 })
+    }
+  }
 }

@@ -56,6 +56,7 @@ import {
   ScrollText,
   Server,
   Check,
+  BarChart3,
 } from "lucide-solid";
 import { useSync } from "../context/sync";
 import { usePermission } from "../context/permission";
@@ -1383,6 +1384,12 @@ export function Layout(props: ParentProps) {
         onSelect: () => navigate(`/${dirSlug()}/settings`),
       },
       {
+        id: "quota.open",
+        title: "Open Quota View",
+        description: "View AI provider usage quotas",
+        onSelect: () => navigate(`/${dirSlug()}/settings#quota`),
+      },
+      {
         id: "terminal.toggle",
         title: "Toggle Terminal",
         keybind: "mod+shift+x",
@@ -1516,7 +1523,7 @@ export function Layout(props: ParentProps) {
         ...Array.from({ length: 9 }, (_, i) => `session.jump.${i + 1}`),
         "palette.projects",
         "settings.open",
-        "terminal.toggle",
+        "quota.open",
         "sidebar.toggle",
         "review.toggle",
         "info.toggle",
@@ -2211,6 +2218,22 @@ export function Layout(props: ParentProps) {
                 title="Settings"
               >
                 <Settings class="w-5 h-5" />
+              </button>
+              <button
+                data-hint-target
+                onClick={() => navigate(`/${dirSlug()}/settings#quota`)}
+                class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                style={{
+                  color: isSettingsActive() && location.hash === "#quota"
+                    ? "var(--text-interactive-base)"
+                    : "var(--icon-base)",
+                  background: isSettingsActive() && location.hash === "#quota"
+                    ? "var(--surface-inset)"
+                    : "transparent",
+                }}
+                title="Quota"
+              >
+                <BarChart3 class="w-5 h-5" />
               </button>
               <Show when={capabilities().canReadLocalLogs}>
                 <button

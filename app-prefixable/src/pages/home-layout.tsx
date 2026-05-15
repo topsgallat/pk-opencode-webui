@@ -14,7 +14,7 @@ import { ProjectDialog } from "../components/project-dialog"
 import { Terminal } from "../components/terminal"
 import { getFilename, OpenCodeLogo, ProjectAvatar, type Project } from "../components/shared"
 import { Spinner } from "../components/ui/spinner"
-import { Plus, X, Settings, SquareTerminal, ChevronDown, Server, Check } from "lucide-solid"
+import { Plus, X, Settings, SquareTerminal, ChevronDown, Server, Check, BarChart3 } from "lucide-solid"
 import { dispatchStorageEvent } from "../utils/storage"
 import { getTargetServerUrl } from "../utils/servers"
 
@@ -301,6 +301,16 @@ export function HomeLayout(props: ParentProps) {
                     title="Settings"
                   >
                     <Settings class="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => navigate("/settings#quota")}
+                    class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                    style={{ color: "var(--icon-base)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-inset)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    title="Quota"
+                  >
+                    <BarChart3 class="w-5 h-5" />
                   </button>
                 </div>
               </div>

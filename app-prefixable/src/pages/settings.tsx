@@ -6,6 +6,7 @@ import { useMCP } from "../context/mcp"
 import { useSDK } from "../context/sdk"
 import { useBasePath } from "../context/base-path"
 import { useConfig } from "../context/config"
+import type { Config, PermissionActionConfig, ProviderConfig } from "../sdk/client"
 import { MCPAddDialog } from "../components/mcp-add-dialog"
 import { ConfirmDialog } from "../components/confirm-dialog"
 import { Button } from "../components/ui/button"
@@ -32,7 +33,7 @@ import {
   removeServerAuth,
   clearServerAuthRevalidation,
 } from "../utils/server-auth"
-import type { Config, PermissionActionConfig, ProviderConfig } from "../sdk/client"
+import { QuotaContent } from "../components/quota/quota-panel"
 
 export function Settings() {
   const providers = useProviders()
@@ -51,7 +52,7 @@ export function Settings() {
   // Initialize tab from URL hash, default to "providers"
   const getInitialTab = () => {
     const hash = window.location.hash.slice(1)
-    const baseTabs = ["providers", "git", "mcp", "prompts", "instructions", "appearance", "sounds"]
+    const baseTabs = ["providers", "git", "mcp", "prompts", "instructions", "appearance", "sounds", "servers", "quota"]
     const validTabs = directory ? [...baseTabs, "config"] : baseTabs
     return validTabs.includes(hash) ? hash : "providers"
   }
@@ -817,6 +818,7 @@ Add your project-specific instructions here.
     base.push({ id: "appearance", label: "Appearance", icon: () => <Palette class="w-4 h-4" />, scope: null })
     base.push({ id: "sounds", label: "Sounds", icon: () => <Volume2 class="w-4 h-4" />, scope: null })
     base.push({ id: "servers", label: "Servers", icon: () => <Server class="w-4 h-4" />, scope: null })
+    base.push({ id: "quota", label: "Quota", icon: () => <Cpu class="w-4 h-4" />, scope: null })
     return base
   })
 
@@ -2599,6 +2601,12 @@ Add your project-specific instructions here.
                   Add multiple OpenCode backends to switch between them. Each backend maintains its own sessions, projects, and server-scoped UI state.
                 </p>
               </section>
+            </div>
+          </Show>
+
+          <Show when={activeTab() === "quota"}>
+            <div class="space-y-6">
+              <QuotaContent />
             </div>
           </Show>
         </div>

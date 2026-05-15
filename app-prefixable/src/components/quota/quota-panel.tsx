@@ -1,4 +1,4 @@
-import { createResource, createSignal } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { useBasePath } from '../../context/base-path'
 import { getQuota } from '../../utils/extended-api'
 import { QuotaProviderView } from '../../types/quota'
@@ -12,12 +12,7 @@ export function QuotaContent() {
   const [quotaResource, { refetch }] = createResource(
     () => ({ serverUrl, refresh: false }),
     async ({ serverUrl }) => {
-      try {
-        return await getQuota(serverUrl)
-      } catch (error) {
-        console.error('Failed to fetch quota:', error)
-        return null
-      }
+      return await getQuota(serverUrl)
     }
   )
 
@@ -33,86 +28,221 @@ export function QuotaContent() {
     }
   }
 
-  const filteredProviders = () => {
-    const data = quotaResource()
-    if (!data) return []
+  const providers = createMemo(() => quotaResource()?.providers ?? [])
 
-    if (selectedProvider() === 'all') return data.providers
-    return data.providers.filter((p: QuotaProviderView) => p.id === selectedProvider())
+  const filterOptions = createMemo(() => [
+    { id: 'all', label: 'All providers' },
+    ...providers().map(provider => ({ id: provider.id, label: provider.name })),
+  ])
+
+  const [visibleProviders, setVisibleProviders] = createSignal<QuotaProviderView[]>([])
+
+  const applyProviderFilter = (id: string) => {
+    if (typeof document === 'undefined') return
+
+    document.querySelectorAll<HTMLElement>('[data-quota-provider-id]').forEach((card) => {
+      card.hidden = id !== 'all' && card.dataset.quotaProviderId !== id
+    })
+
+    document.querySelectorAll<HTMLButtonElement>('[data-quota-filter-id]').forEach((button) => {
+      const active = button.dataset.quotaFilterId === id
+      button.setAttribute('aria-pressed', String(active))
+      button.style.background = active ? 'var(--background-base)' : 'transparent'
+      button.style.color = active ? 'var(--text-strong)' : 'var(--text-weak)'
+      button.style.border = active ? '1px solid var(--border-base)' : '1px solid transparent'
+    })
   }
+
+  createEffect(() => {
+    const data = providers()
+    if (selectedProvider() === 'all') {
+      setVisibleProviders(data)
+      applyProviderFilter('all')
+      return
+    }
+
+    const id = selectedProvider()
+    setVisibleProviders(data.filter((provider: QuotaProviderView) => provider.id === id))
+    applyProviderFilter(id)
+  })
+
+  const selectedProviderLabel = createMemo(() => {
+    const option = filterOptions().find(option => option.id === selectedProvider())
+    return option?.label ?? selectedProvider()
+  })
+
+  const fetchedLabel = createMemo(() => {
+    const timestamp = quotaResource()?.fetchedAt
+    if (!timestamp) return null
+    return new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  })
+
+  const availableCount = createMemo(() => providers().filter(provider => provider.available).length)
 
   return (
     <div class="space-y-6">
-      {/* Header */}
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-lg font-semibold">Quota Usage</h2>
-          <p class="text-sm text-gray-600 dark:text-gray-400">
-            View your usage across connected AI providers
-          </p>
-        </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing()}
-          class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-        >
-          {refreshing() ? 'Refreshing...' : 'Refresh'}
-        </button>
-      </div>
+      <header>
+        <h1 class="text-lg font-medium" style={{ color: 'var(--text-strong)' }}>
+          Quota
+        </h1>
+        <p class="mt-1 text-sm" style={{ color: 'var(--text-weak)' }}>
+          Review provider limits and recent quota windows without leaving Settings.
+        </p>
+      </header>
 
-      {/* Filter */}
-      <div class="flex gap-2">
-        <button
-          onClick={() => setSelectedProvider('all')}
-          class={`px-3 py-1 rounded ${selectedProvider() === 'all' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100'}`}
+      <section
+        class="rounded-lg overflow-hidden"
+        style={{
+          background: 'var(--background-base)',
+          border: '1px solid var(--border-base)',
+        }}
+      >
+        <div
+          class="flex flex-col gap-4 px-4 py-3 md:flex-row md:items-start md:justify-between"
+          style={{ 'border-bottom': '1px solid var(--border-base)' }}
         >
-          All
-        </button>
-        <button
-          onClick={() => setSelectedProvider('copilot')}
-          class={`px-3 py-1 rounded ${selectedProvider() === 'copilot' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100'}`}
-        >
-          Copilot
-        </button>
-        <button
-          onClick={() => setSelectedProvider('openai')}
-          class={`px-3 py-1 rounded ${selectedProvider() === 'openai' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100'}`}
-        >
-          OpenAI
-        </button>
-        <button
-          onClick={() => setSelectedProvider('gemini')}
-          class={`px-3 py-1 rounded ${selectedProvider() === 'gemini' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100'}`}
-        >
-          Gemini
-        </button>
-      </div>
-
-      {/* Content */}
-      <div class="space-y-4">
-        {quotaResource.loading && (
-          <div class="text-center py-8">Loading quota data...</div>
-        )}
-
-        {quotaResource.error && (
-          <div class="text-center py-8 text-red-600">
-            Failed to load quota data: {quotaResource.error.message}
+          <div class="min-w-0 space-y-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="text-sm font-medium" style={{ color: 'var(--text-strong)' }}>
+                Provider usage overview
+              </h2>
+              <Show when={providers().length > 0}>
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  style={{
+                    background: 'var(--surface-inset)',
+                    color: 'var(--text-weak)',
+                    border: '1px solid var(--border-base)',
+                  }}
+                >
+                  {availableCount()} of {providers().length} available
+                </span>
+              </Show>
+            </div>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--text-weak)' }}>
+              <span>{refreshing() ? 'Refreshing quota data…' : 'Live provider snapshots and account-level limits.'}</span>
+              <Show when={fetchedLabel()}>
+                {(label) => <span>Updated {label()}</span>}
+              </Show>
+            </div>
           </div>
-        )}
 
-        {quotaResource() && (
-          <>
-            {filteredProviders().map((provider: QuotaProviderView) => (
-              <QuotaProviderCard provider={provider} />
-            ))}
-            {filteredProviders().length === 0 && (
-              <div class="text-center py-8 text-gray-500">
-                No quota data available for selected provider
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing()}
+            class="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: 'var(--surface-inset)',
+              border: '1px solid var(--border-base)',
+              color: 'var(--text-base)',
+            }}
+            onMouseEnter={(e) => {
+              if (!refreshing()) e.currentTarget.style.background = 'var(--surface-raised)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--surface-inset)'
+            }}
+          >
+            {refreshing() ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+
+        <div class="space-y-4 p-4">
+        <div
+          class="flex flex-wrap items-center gap-2 rounded-lg px-3 py-2"
+          style={{
+            background: 'var(--surface-inset)',
+            border: '1px solid var(--border-base)',
+          }}
+        >
+          <span class="pr-1 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-weak)' }}>
+            Filter
+          </span>
+          <select
+            value={selectedProvider()}
+            onInput={(e) => setSelectedProvider(e.currentTarget.value)}
+            class="min-w-40 rounded-full px-3 py-1 text-xs font-medium"
+            style={{
+              background: 'var(--background-base)',
+              color: 'var(--text-strong)',
+              border: '1px solid var(--border-base)',
+            }}
+            aria-label="Filter quota providers"
+          >
+            <For each={filterOptions()}>
+              {(option) => <option value={option.id}>{option.label}</option>}
+            </For>
+          </select>
+        </div>
+
+          <div class="space-y-4">
+            <Show when={quotaResource.loading}>
+              <div
+                class="rounded-lg px-4 py-8 text-center"
+                style={{
+                  background: 'var(--surface-inset)',
+                  border: '1px solid var(--border-base)',
+                }}
+              >
+                <div class="text-sm font-medium" style={{ color: 'var(--text-strong)' }}>
+                  Loading quota data
+                </div>
+                <p class="mt-1 text-sm" style={{ color: 'var(--text-weak)' }}>
+                  Fetching the latest provider usage and reset windows.
+                </p>
               </div>
-            )}
-          </>
-        )}
-      </div>
+            </Show>
+
+            <Show when={quotaResource.error && !quotaResource.loading}>
+              <div
+                class="rounded-lg px-4 py-8 text-center"
+                style={{
+                  background: 'var(--surface-inset)',
+                  border: '1px solid var(--border-base)',
+                }}
+              >
+                <div class="text-sm font-medium" style={{ color: 'var(--text-critical-base)' }}>
+                  Unable to load quota data
+                </div>
+                <p class="mt-1 text-sm" style={{ color: 'var(--text-weak)' }}>
+                  {quotaResource.error.message}
+                </p>
+              </div>
+            </Show>
+
+            <Show when={quotaResource() && !quotaResource.loading && !quotaResource.error}>
+              <Show
+                when={visibleProviders().length > 0}
+                fallback={
+                  <div
+                    class="rounded-lg px-4 py-8 text-center"
+                    style={{
+                      background: 'var(--surface-inset)',
+                      border: '1px solid var(--border-base)',
+                    }}
+                  >
+                    <div class="text-sm font-medium" style={{ color: 'var(--text-strong)' }}>
+                      No quota entries for {selectedProviderLabel()}
+                    </div>
+                    <p class="mt-1 text-sm" style={{ color: 'var(--text-weak)' }}>
+                      Try another provider filter or refresh to pull a newer snapshot.
+                    </p>
+                  </div>
+                }
+              >
+                <For each={visibleProviders()}>
+                  {(provider) => (
+                    <div data-quota-provider-id={provider.id}>
+                      <QuotaProviderCard provider={provider} />
+                    </div>
+                  )}
+                </For>
+              </Show>
+            </Show>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

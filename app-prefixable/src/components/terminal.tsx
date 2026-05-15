@@ -246,9 +246,10 @@ export function Terminal(props: TerminalProps) {
       if (event.ctrlKey && !event.altKey && !event.metaKey && PANEL_FOCUS_KEYS.has(event.key))
         return false
       // Ctrl+Shift+C: always intercept — stops browser DevTools, copies if selection
-      if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.key === "C") {
+      if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.code === "KeyC") {
         const sel = term?.getSelection()
         if (sel) navigator.clipboard.writeText(sel).catch(() => {})
+        event.preventDefault()
         return false
       }
       // Ctrl+C (no Shift): copy if selection, otherwise send SIGINT
@@ -261,14 +262,6 @@ export function Terminal(props: TerminalProps) {
       }
       return true
     })
-    // Capture-phase listener to prevent browser DevTools on Ctrl+Shift+C
-    const preventDevTools = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.code === "KeyC") {
-        e.preventDefault()
-      }
-    }
-    container.addEventListener("keydown", preventDevTools, { capture: true })
-
     // Show initializing message
     writeStatus("Initializing terminal...", "info")
 
@@ -350,7 +343,6 @@ export function Terminal(props: TerminalProps) {
       if (reconnectTimer) clearTimeout(reconnectTimer)
       window.removeEventListener("resize", handleResize)
       resizeObserver.disconnect()
-      container.removeEventListener("keydown", preventDevTools, { capture: true })
       ws?.close()
       term?.dispose()
     })

@@ -4,6 +4,7 @@ import { useParams } from "@solidjs/router"
 import { useSync } from "../context/sync"
 import { useProviders } from "../context/providers"
 import { getCopilotMultiplier } from "../utils/path"
+import { isAnthropicProviderID } from "../../../shared/anthropic-models"
 import { getContextTokens } from "../utils/tokens"
 import { CornerDownLeft, Square, Zap } from "lucide-solid"
 import { ConnectionBadge } from "./connection-badge"
@@ -232,8 +233,9 @@ export function SessionInfo(props: SessionInfoProps) {
     }
     const cost = model.cost
     const isOpenAI = provider?.id === "openai" || provider?.id?.startsWith("openai:")
+    const isAnthropic = provider?.id ? isAnthropicProviderID(provider.id) : false
     if (!cost) {
-      return isOpenAI ? (
+      return (isOpenAI || isAnthropic) ? (
         <span
           class="text-[10px] px-1 py-0.5 rounded shrink-0 leading-none"
           style={{ color: "var(--text-weak)", background: "var(--surface-inset)" }}
@@ -242,7 +244,7 @@ export function SessionInfo(props: SessionInfoProps) {
         </span>
       ) : null
     }
-    if (isOpenAI && cost.input === 0 && cost.output === 0) {
+    if ((isOpenAI || isAnthropic) && cost.input === 0 && cost.output === 0) {
       return (
         <span
           class="text-[10px] px-1 py-0.5 rounded shrink-0 leading-none"
@@ -355,139 +357,6 @@ export function SessionInfo(props: SessionInfoProps) {
           </button>
         </Show>
 
-        {/* Token Usage */}
-        <Show when={stats()}>
-          {(s) => (
-            <div class="flex items-center gap-3">
-              <button
-                ref={triggerRef}
-                type="button"
-                class="flex items-center gap-3 hover:opacity-80 cursor-pointer"
-                onClick={togglePopover}
-                aria-haspopup="true"
-                aria-expanded={showTokenPopover()}
-              >
-                <span class="flex items-center gap-1.5 shrink-0">
-                  <Zap class="w-3 h-3" />
-                  <span style={{ color: "var(--text-base)" }}>{s().tokens}</span>
-                  <span class="opacity-60">tokens</span>
-                  <Show when={s().usage !== null}>
-                    <span
-                      class="px-1 py-0.5 rounded text-[10px] font-medium"
-                      style={{
-                        background: s().usage! > 80 ? "var(--surface-critical-subtle)" : "var(--surface-inset)",
-                        color: s().usage! > 80 ? "var(--text-critical-base)" : "var(--text-weak)",
-                      }}
-                    >
-                      {s().usage}%
-                    </span>
-                  </Show>
-                </span>
-                <span class="flex items-center gap-1.5 shrink-0">
-                  <span class="opacity-60">Cost:</span>
-                  <span style={{ color: "var(--text-base)" }}>{s().cost}</span>
-                  <ConnectionBadge />
-                </span>
-              </button>
-
-              {/* Token breakdown popover - portalled to escape overflow-hidden */}
-              <Show when={showTokenPopover()}>
-                <Portal>
-                  <div
-                    ref={popoverRef}
-                    class="w-64 rounded-lg shadow-lg text-xs"
-                    style={{
-                      position: "fixed",
-                      top: `${popoverPos().top}px`,
-                      left: `${popoverPos().left}px`,
-                      transform: "translateY(-100%)",
-                      "z-index": "9999",
-                      background: "var(--background-base)",
-                      border: "1px solid var(--border-base)",
-                    }}
-                  >
-                    <div
-                      class="px-3 py-2 font-medium"
-                      style={{
-                        color: "var(--text-strong)",
-                        "border-bottom": "1px solid var(--border-base)",
-                        background: "var(--surface-inset)",
-                        "border-radius": "0.5rem 0.5rem 0 0",
-                      }}
-                    >
-                      Token Breakdown
-                    </div>
-                    <div class="px-3 py-2 space-y-1.5 font-mono" style={{ color: "var(--text-base)" }}>
-                      {/* Context */}
-                      <div class="flex justify-between">
-                        <span>Context:</span>
-                        <span>
-                          {fmt(s().contextTokens)}
-                          <Show when={s().contextLimit > 0}>
-                            <span class="opacity-60"> / {fmt(s().contextLimit)}</span>
-                          </Show>
-                          <Show when={s().usage !== null}>
-                            <span class="opacity-60"> ({s().usage}%)</span>
-                          </Show>
-                        </span>
-                      </div>
-
-                      {/* Input */}
-                      <div class="flex justify-between pl-3" style={{ color: "var(--text-weak)" }}>
-                        <span>Input:</span>
-                        <span>{fmt(s().input)}</span>
-                      </div>
-
-                      {/* Cache */}
-                      <div class="flex justify-between pl-3" style={{ color: "var(--text-weak)" }}>
-                        <span>Cache:</span>
-                        <span>{fmt(s().cacheTotal)}</span>
-                      </div>
-                      <Show when={s().cacheRead > 0 || s().cacheWrite > 0}>
-                        <div class="flex justify-between pl-6" style={{ color: "var(--text-weak)", opacity: 0.8 }}>
-                          <span>read / write:</span>
-                          <span>{fmt(s().cacheRead)} / {fmt(s().cacheWrite)}</span>
-                        </div>
-                      </Show>
-
-                      {/* Output */}
-                      <div class="flex justify-between">
-                        <span>Output:</span>
-                        <span>{fmt(s().output)}</span>
-                      </div>
-
-                      {/* Reasoning */}
-                      <Show when={s().reasoning > 0}>
-                        <div class="flex justify-between">
-                          <span>Reasoning:</span>
-                          <span>{fmt(s().reasoning)}</span>
-                        </div>
-                      </Show>
-
-                      {/* Estimated cost */}
-                      <Show when={s().estimatedCost !== null}>
-                        <div class="flex justify-between pt-1.5 mt-1" style={{ "border-top": "1px solid var(--border-base)" }}>
-                          <span>Estimate:</span>
-                          <span>{usd.format(s().estimatedCost || 0)}</span>
-                        </div>
-                      </Show>
-
-                      {/* Cost */}
-                      <div
-                        class="flex justify-between pt-1.5 mt-1"
-                        style={{ "border-top": "1px solid var(--border-base)" }}
-                      >
-                        <span>Cost:</span>
-                        <span>{s().cost} <span class="opacity-60" style={{ "font-family": "inherit" }}>(session)</span></span>
-                      </div>
-                    </div>
-                  </div>
-                </Portal>
-              </Show>
-            </div>
-          )}
-        </Show>
-
         {/* No provider warning */}
         <Show when={!selectedModel() && providers.connected.length === 0}>
           <a href={`/${dirSlug()}/settings`} style={{ color: "var(--text-interactive-base)" }} class="hover:underline">
@@ -530,6 +399,138 @@ export function SessionInfo(props: SessionInfoProps) {
 
       {/* Right group - action controls, always visible */}
       <div class="ml-3 flex items-center shrink-0 gap-2">
+        <Show when={stats()}>
+          {(s) => (
+            <div class="relative">
+              <button
+                ref={triggerRef}
+                type="button"
+                class="flex items-center gap-2 rounded-lg px-2 py-1 transition-opacity hover:opacity-80"
+                style={{
+                  background: "var(--surface-inset)",
+                  border: "1px solid var(--border-base)",
+                  color: "var(--text-base)",
+                }}
+                onClick={togglePopover}
+                aria-haspopup="true"
+                aria-expanded={showTokenPopover()}
+                title="View token breakdown"
+                aria-label="View token breakdown"
+              >
+                <Zap class="w-3 h-3" />
+                <span class="flex items-center gap-1 shrink-0 text-[10px] font-medium uppercase tracking-wide">
+                  <span>{s().tokens}</span>
+                  <span class="opacity-60 normal-case tracking-normal">tokens</span>
+                </span>
+                <Show when={s().usage !== null}>
+                  <span
+                    class="px-1 py-0.5 rounded text-[10px] font-medium"
+                    style={{
+                      background: s().usage! > 80 ? "var(--surface-critical-subtle)" : "var(--surface-inset)",
+                      color: s().usage! > 80 ? "var(--text-critical-base)" : "var(--text-weak)",
+                    }}
+                  >
+                    {s().usage}%
+                  </span>
+                </Show>
+                <span class="flex items-center gap-1 shrink-0 text-[10px]">
+                  <span class="opacity-60">Cost</span>
+                  <span style={{ color: "var(--text-base)" }}>{s().cost}</span>
+                </span>
+                <ConnectionBadge />
+              </button>
+
+              {/* Token breakdown popover - portalled to escape overflow-hidden */}
+              <Show when={showTokenPopover()}>
+                <Portal>
+                  <div
+                    ref={popoverRef}
+                    class="w-64 rounded-lg shadow-lg text-xs"
+                    style={{
+                      position: "fixed",
+                      top: `${popoverPos().top}px`,
+                      left: `${popoverPos().left}px`,
+                      transform: "translateY(-100%)",
+                      "z-index": "9999",
+                      background: "var(--background-base)",
+                      border: "1px solid var(--border-base)",
+                    }}
+                  >
+                    <div
+                      class="px-3 py-2 font-medium"
+                      style={{
+                        color: "var(--text-strong)",
+                        "border-bottom": "1px solid var(--border-base)",
+                        background: "var(--surface-inset)",
+                        "border-radius": "0.5rem 0.5rem 0 0",
+                      }}
+                    >
+                      Token Breakdown
+                    </div>
+                    <div class="px-3 py-2 space-y-1.5 font-mono" style={{ color: "var(--text-base)" }}>
+                      <div class="flex justify-between">
+                        <span>Context:</span>
+                        <span>
+                          {fmt(s().contextTokens)}
+                          <Show when={s().contextLimit > 0}>
+                            <span class="opacity-60"> / {fmt(s().contextLimit)}</span>
+                          </Show>
+                          <Show when={s().usage !== null}>
+                            <span class="opacity-60"> ({s().usage}%)</span>
+                          </Show>
+                        </span>
+                      </div>
+
+                      <div class="flex justify-between pl-3" style={{ color: "var(--text-weak)" }}>
+                        <span>Input:</span>
+                        <span>{fmt(s().input)}</span>
+                      </div>
+
+                      <div class="flex justify-between pl-3" style={{ color: "var(--text-weak)" }}>
+                        <span>Cache:</span>
+                        <span>{fmt(s().cacheTotal)}</span>
+                      </div>
+                      <Show when={s().cacheRead > 0 || s().cacheWrite > 0}>
+                        <div class="flex justify-between pl-6" style={{ color: "var(--text-weak)", opacity: 0.8 }}>
+                          <span>read / write:</span>
+                          <span>{fmt(s().cacheRead)} / {fmt(s().cacheWrite)}</span>
+                        </div>
+                      </Show>
+
+                      <div class="flex justify-between">
+                        <span>Output:</span>
+                        <span>{fmt(s().output)}</span>
+                      </div>
+
+                      <Show when={s().reasoning > 0}>
+                        <div class="flex justify-between">
+                          <span>Reasoning:</span>
+                          <span>{fmt(s().reasoning)}</span>
+                        </div>
+                      </Show>
+
+                      <Show when={s().estimatedCost !== null}>
+                        <div class="flex justify-between pt-1.5 mt-1" style={{ "border-top": "1px solid var(--border-base)" }}>
+                          <span>Estimate:</span>
+                          <span>{usd.format(s().estimatedCost || 0)}</span>
+                        </div>
+                      </Show>
+
+                      <div
+                        class="flex justify-between pt-1.5 mt-1"
+                        style={{ "border-top": "1px solid var(--border-base)" }}
+                      >
+                        <span>Cost:</span>
+                        <span>{s().cost} <span class="opacity-60" style={{ "font-family": "inherit" }}>(session)</span></span>
+                      </div>
+                    </div>
+                  </div>
+                </Portal>
+              </Show>
+            </div>
+          )}
+        </Show>
+
         <Show when={composerReady() && !props.loading() && !props.processing()}>
           <button
             type="submit"

@@ -23,6 +23,7 @@
 
 import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
 import { loadCopilotModelMultipliers } from "../shared/copilot-model-multipliers"
+import { loadAnthropicPricing } from "../shared/anthropic-pricing"
 import { loadOpenAIPricing } from "../shared/openai-pricing"
 import { resolveProxyAuthHeader } from "../shared/proxy-auth-session"
 import nodePath from "path"
@@ -221,9 +222,10 @@ const BRANDING_NAME = process.env.BRANDING_NAME || ""
 const BRANDING_URL = process.env.BRANDING_URL || ""
 const BRANDING_ICON = process.env.BRANDING_ICON || ""
 const serverStartTime = Date.now()
-const [copilotModelMultipliers, openaiPricing] = await Promise.all([
+const [copilotModelMultipliers, openaiPricing, anthropicPricing] = await Promise.all([
   loadCopilotModelMultipliers(),
   loadOpenAIPricing(),
+  loadAnthropicPricing(),
 ])
 
 console.log(`OpenCode UI Server starting...`)
@@ -661,6 +663,7 @@ const server = Bun.serve<{ target: string; cookie: string }>({
           branding: brandingConfig,
           copilotModelMultipliers: copilotModelMultipliers.models,
           openaiPricing: openaiPricing.models,
+          anthropicPricing: anthropicPricing.models,
         }
         html = html.replace("window.__OPENCODE__ = window.__OPENCODE__ || {}", `window.__OPENCODE__ = ${JSON.stringify(opencodeConfig)}`)
         html = html.replace(/__BRANDING_CONFIG__/g, JSON.stringify(brandingConfig))

@@ -25,6 +25,7 @@ import { useTerminal } from "../context/terminal";
 import { useConfig } from "../context/config";
 import { useServer } from "../context/server";
 import { getCopilotMultiplier } from "../utils/path";
+import { isAnthropicProviderID } from "../../../shared/anthropic-models";
 import { MessageTimeline } from "../components/message-timeline";
 import { MCPDialog } from "../components/mcp-dialog";
 import { MCPAddDialog } from "../components/mcp-add-dialog";
@@ -2880,15 +2881,16 @@ export function Session() {
                   let description = `${p.id}/${m.id}`
                   const fmt = (n: number) => Number(n.toFixed(2)).toString()
                   const isOpenAI = p.id === "openai" || p.id.startsWith("openai:")
+                  const isAnthropic = isAnthropicProviderID(p.id)
                   const hasZeroCost = !!m.cost && m.cost.input === 0 && m.cost.output === 0
                   const multiplier = getCopilotMultiplier(p.id, m.id, m.name) ?? m.copilotMultiplier
                   if (multiplier !== undefined) {
                     description += ` · x${fmt(multiplier)}`
                   } else if (m.cost) {
-                    description += hasZeroCost && isOpenAI
+                    description += hasZeroCost && (isOpenAI || isAnthropic)
                       ? " · n/a"
                       : ` · $${fmt(m.cost.input)}/$${fmt(m.cost.output)}/M tokens`
-                  } else if (isOpenAI) {
+                  } else if (isOpenAI || isAnthropic) {
                     description += " · n/a"
                   }
                   return {

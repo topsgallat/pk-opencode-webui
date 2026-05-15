@@ -12,9 +12,9 @@ import { useServer } from "../context/server"
 import { useBasePath } from "../context/base-path"
 import { ProjectDialog } from "../components/project-dialog"
 import { Terminal } from "../components/terminal"
-import { getFilename, OpenCodeLogo, ProjectAvatar, type Project } from "../components/shared"
+import { getFilename, OpenCodeLogo, ProjectAvatar, ProjectIconItem, type Project } from "../components/shared"
 import { Spinner } from "../components/ui/spinner"
-import { Plus, X, Settings, SquareTerminal, ChevronDown, Server, Check, BarChart3 } from "lucide-solid"
+import { Plus, Settings, SquareTerminal, ChevronDown, Server, Check, BarChart3 } from "lucide-solid"
 import { dispatchStorageEvent } from "../utils/storage"
 import { getTargetServerUrl } from "../utils/servers"
 
@@ -190,23 +190,13 @@ export function HomeLayout(props: ParentProps) {
                 <div class="flex-1 flex flex-col items-center gap-2 overflow-y-auto w-full px-2 py-3">
                   <For each={projects()}>
                     {(project) => (
-                      <div
+                      <ProjectIconItem
                         onClick={() => navigateToProject(project.worktree)}
-                        class="group relative cursor-pointer"
+                        onRemove={() => removeProject(project.worktree)}
                         title={project.name || getFilename(project.worktree)}
                       >
                         <ProjectAvatar project={project} size="large" selected={false} badge={globalEvents.badge(project.worktree)} />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            removeProject(project.worktree)
-                          }}
-                          class="absolute -top-1 -right-1 w-4 h-4 rounded-full hidden group-hover:flex items-center justify-center"
-                          style={{ background: "var(--surface-strong)", color: "var(--text-base)" }}
-                        >
-                          <X class="w-3 h-3" />
-                        </button>
-                      </div>
+                      </ProjectIconItem>
                     )}
                   </For>
 

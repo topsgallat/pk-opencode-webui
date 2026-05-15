@@ -1,6 +1,7 @@
 import { watch } from "fs"
 import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
 import { loadCopilotModelMultipliers } from "../shared/copilot-model-multipliers"
+import { loadAnthropicPricing } from "../shared/anthropic-pricing"
 import { loadOpenAIPricing } from "../shared/openai-pricing"
 import { resolveProxyAuthHeader } from "../shared/proxy-auth-session"
 
@@ -19,9 +20,10 @@ if (BRANDING_NAME) console.log(`  BRANDING: ${BRANDING_NAME}`)
 
 // Initial build
 await import("./build")
-const [copilotModelMultipliers, openaiPricing] = await Promise.all([
+const [copilotModelMultipliers, openaiPricing, anthropicPricing] = await Promise.all([
   loadCopilotModelMultipliers(),
   loadOpenAIPricing(),
+  loadAnthropicPricing(),
 ])
 
 // Normalize and validate base path (must be a valid path-only prefix)
@@ -183,6 +185,7 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       branding: { name: BRANDING_NAME, url: BRANDING_URL, icon: BRANDING_ICON },
       copilotModelMultipliers: copilotModelMultipliers.models,
       openaiPricing: openaiPricing.models,
+      anthropicPricing: anthropicPricing.models,
     })
     // HTML-escape basePath for safe insertion into the <base href> attribute
     const escapedBasePath = basePathWithTrailing.replace(/[&<>"']/g, (ch) => {

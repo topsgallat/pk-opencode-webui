@@ -1,33 +1,24 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
+import { normalizeAnthropicModelKey } from "./anthropic-models"
 
-export interface OpenAIModelPricing {
+export { normalizeAnthropicModelKey } from "./anthropic-models"
+
+export interface AnthropicModelPricing {
   input: number
   output: number
   cachedInput?: number
+  cacheWrite?: number
 }
 
-export interface OpenAIPricing {
+export interface AnthropicPricing {
   sourceUrl: string
   fetchedAt: string
-  models: Record<string, OpenAIModelPricing>
+  models: Record<string, AnthropicModelPricing>
 }
 
-type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
-
-const DEFAULT_SOURCE_URL = "https://developers.openai.com/api/docs/pricing"
+const DEFAULT_SOURCE_URL = "https://docs.anthropic.com/en/docs/about-claude/pricing"
 const DEFAULT_TIMEOUT_MS = 12_000
-
-export function normalizeOpenAIModelKey(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\[\^.*?\]/g, "")
-    .replace(/\([^)]*\)/g, "")
-    .replace(/[^a-z0-9.]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-}
 
 function decodeHtmlEntities(value: string): string {
   return value
@@ -49,12 +40,6 @@ function stripHtml(value: string): string {
     .trim()
 }
 
-function parsePrice(value: string | undefined): number | undefined {
-  if (!value) return undefined
-  const parsed = Number(value.trim())
-  return Number.isFinite(parsed) ? parsed : undefined
-}
-
 function parsePriceCell(value: string): number | null | undefined {
   const normalized = stripHtml(value)
   if (!normalized) return undefined
@@ -63,28 +48,28 @@ function parsePriceCell(value: string): number | null | undefined {
   return parsed ? Number(parsed[1]) : undefined
 }
 
-function parseOpenAIPricingTables(html: string, models: Record<string, OpenAIModelPricing>): void {
+function parseAnthropicPricingTables(html: string, models: Record<string, AnthropicModelPricing>): void {
   const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
   for (const row of html.matchAll(rowRegex)) {
     const cells = Array.from(row[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi), (match) => stripHtml(match[1] || ""))
-    if (cells.length < 3) continue
+    if (cells.length < 6) continue
 
-    const key = normalizeOpenAIModelKey(cells[0] || "")
-    if (!key || models[key]) continue
+    const title = cells[0] || ""
+    const key = normalizeAnthropicModelKey(title)
+    if (!key || models[key] || !title.toLowerCase().startsWith("claude ")) continue
 
-    const prices = cells.slice(1).map((cell) => parsePriceCell(cell)).filter((value): value is number | null => value !== undefined)
-    if (prices.length < 2) continue
+    const input = parsePriceCell(cells[1])
+    const cacheWrite = parsePriceCell(cells[2])
+    const cacheRead = parsePriceCell(cells[4])
+    const output = parsePriceCell(cells[5])
 
-    const input = prices[0]
-    const output = prices.length >= 3 ? prices[2] : prices[1]
-    const cachedInput = prices.length >= 3 && prices[1] !== null ? prices[1] : undefined
-
-    if (input === null || output === null) continue
+    if (input === null || output === null || input === undefined || output === undefined) continue
 
     models[key] = {
       input,
       output,
-      ...(cachedInput !== undefined ? { cachedInput } : {}),
+      ...(cacheRead != null ? { cachedInput: cacheRead } : {}),
+      ...(cacheWrite != null ? { cacheWrite } : {}),
     }
   }
 }
@@ -92,37 +77,12 @@ function parseOpenAIPricingTables(html: string, models: Record<string, OpenAIMod
 function getCacheFilePath(): string {
   const home = process.env.HOME || "/tmp"
   const cacheRoot = process.env.XDG_CACHE_HOME || `${home}/.cache`
-  return `${cacheRoot}/opencode/openai-pricing.json`
+  return `${cacheRoot}/opencode/anthropic-pricing.json`
 }
 
-export function parseOpenAIPricingHtml(html: string): OpenAIPricing {
-  const models: Record<string, OpenAIModelPricing> = {}
-  const cardRegex = /<h2[^>]*class="text-h4"[^>]*>([^<]+)<\/h2>[\s\S]*?<h3[^>]*>Price<\/h3>\s*<p[^>]*>([\s\S]*?)<\/p>/gi
-
-  for (const match of html.matchAll(cardRegex)) {
-    const title = decodeHtmlEntities(match[1] || "").trim()
-    const priceText = decodeHtmlEntities((match[2] || "").replace(/<br\s*\/?>/gi, "\n"))
-    if (!priceText.includes("1M tokens")) continue
-
-    const key = normalizeOpenAIModelKey(title)
-    if (!key || models[key]) continue
-
-    const input = parsePrice(priceText.match(/Input:\$([0-9.]+)/)?.[1])
-    const output = parsePrice(priceText.match(/Output:\$([0-9.]+)/)?.[1])
-    const cachedInput = parsePrice(priceText.match(/Cached input:\$([0-9.]+)/)?.[1])
-
-    if (input === undefined || output === undefined) continue
-
-    models[key] = {
-      input,
-      output,
-      ...(cachedInput !== undefined ? { cachedInput } : {}),
-    }
-  }
-
-  if (Object.keys(models).length === 0) {
-    parseOpenAIPricingTables(html, models)
-  }
+export function parseAnthropicPricingHtml(html: string): AnthropicPricing {
+  const models: Record<string, AnthropicModelPricing> = {}
+  parseAnthropicPricingTables(html, models)
 
   return {
     sourceUrl: DEFAULT_SOURCE_URL,
@@ -131,10 +91,10 @@ export function parseOpenAIPricingHtml(html: string): OpenAIPricing {
   }
 }
 
-async function readCache(cacheFile: string): Promise<OpenAIPricing | undefined> {
+async function readCache(cacheFile: string): Promise<AnthropicPricing | undefined> {
   try {
     const raw = await readFile(cacheFile, "utf8")
-    const parsed = JSON.parse(raw) as Partial<OpenAIPricing>
+    const parsed = JSON.parse(raw) as Partial<AnthropicPricing>
     if (!parsed || typeof parsed !== "object") return undefined
     if (!parsed.models || typeof parsed.models !== "object") return undefined
     return {
@@ -147,6 +107,7 @@ async function readCache(cacheFile: string): Promise<OpenAIPricing | undefined> 
           input: value.input,
           output: value.output,
           ...(typeof value.cachedInput === "number" ? { cachedInput: value.cachedInput } : {}),
+          ...(typeof value.cacheWrite === "number" ? { cacheWrite: value.cacheWrite } : {}),
         }]),
       ),
     }
@@ -155,19 +116,21 @@ async function readCache(cacheFile: string): Promise<OpenAIPricing | undefined> 
   }
 }
 
-async function writeCache(cacheFile: string, data: OpenAIPricing): Promise<void> {
+async function writeCache(cacheFile: string, data: AnthropicPricing): Promise<void> {
   await mkdir(dirname(cacheFile), { recursive: true })
   const tmp = `${cacheFile}.${crypto.randomUUID()}.tmp`
   await writeFile(tmp, JSON.stringify(data), "utf8")
   await rename(tmp, cacheFile)
 }
 
-export async function loadOpenAIPricing(options?: {
+type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+
+export async function loadAnthropicPricing(options?: {
   cacheFile?: string
   sourceUrl?: string
   timeoutMs?: number
   fetcher?: Fetcher
-}): Promise<OpenAIPricing> {
+}): Promise<AnthropicPricing> {
   const sourceUrl = options?.sourceUrl || DEFAULT_SOURCE_URL
   const cacheFile = options?.cacheFile || getCacheFilePath()
   const timeoutMs = options?.timeoutMs || DEFAULT_TIMEOUT_MS
@@ -180,7 +143,7 @@ export async function loadOpenAIPricing(options?: {
       const response = await fetcher(sourceUrl, { signal: controller.signal })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const html = await response.text()
-      const data = parseOpenAIPricingHtml(html)
+      const data = parseAnthropicPricingHtml(html)
       if (Object.keys(data.models).length > 0) {
         await writeCache(cacheFile, data)
         return data
@@ -189,7 +152,7 @@ export async function loadOpenAIPricing(options?: {
       clearTimeout(timer)
     }
   } catch (error) {
-    console.warn(`[openai-pricing] refresh failed: ${error instanceof Error ? error.message : String(error)}`)
+    console.warn(`[anthropic-pricing] refresh failed: ${error instanceof Error ? error.message : String(error)}`)
   }
 
   const cached = await readCache(cacheFile)

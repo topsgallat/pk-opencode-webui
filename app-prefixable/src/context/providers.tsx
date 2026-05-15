@@ -3,7 +3,7 @@ import { createStore } from "solid-js/store"
 import { useSDK } from "./sdk"
 import { useConfig } from "./config"
 import { useServer } from "./server"
-import { getCopilotModelMultipliers, getOpenAIModelPricing, normalizeCopilotModelKey } from "../utils/path"
+import { getAnthropicModelPricing, getCopilotModelMultipliers, getOpenAIModelPricing, normalizeCopilotModelKey } from "../utils/path"
 import { getProviderAccounts, saveProviderAccounts, removeProviderAccount, type ProviderAccount } from "../utils/extended-api"
 import { withTimeout } from "../utils/request-timeout"
 
@@ -165,15 +165,20 @@ export function ProviderProvider(props: ParentProps) {
           Object.entries(provider.models).map(([k, m]) => {
             const key = normalizeCopilotModelKey(m.name || m.id)
             const openaiPricing = getOpenAIModelPricing(provider.id, m.id, m.name)
+            const anthropicPricing = getAnthropicModelPricing(provider.id, m.id, m.name)
+            const pricing = openaiPricing || anthropicPricing
+            const cachedInput = openaiPricing?.cachedInput ?? anthropicPricing?.cachedInput
+            const cacheWrite = anthropicPricing?.cacheWrite
             return [k, {
               ...m,
               providerID: provider.id,
               copilotMultiplier: provider.id === "github-copilot" ? multipliers[key] : undefined,
-              cost: openaiPricing && isZeroCost(m.cost)
+              cost: pricing && isZeroCost(m.cost)
                 ? {
-                    input: openaiPricing.input,
-                    output: openaiPricing.output,
-                    ...(openaiPricing.cachedInput !== undefined ? { cache_read: openaiPricing.cachedInput } : {}),
+                    input: pricing.input,
+                    output: pricing.output,
+                    ...(cachedInput !== undefined ? { cache_read: cachedInput } : {}),
+                    ...(cacheWrite !== undefined ? { cache_write: cacheWrite } : {}),
                   }
                 : m.cost,
             }]

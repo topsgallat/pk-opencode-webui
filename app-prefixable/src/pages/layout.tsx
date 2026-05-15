@@ -26,6 +26,7 @@ import { ProjectDialog } from "../components/project-dialog";
 import {
   getFilename,
   OpenCodeLogo,
+  ProjectIconItem,
   ProjectAvatar,
   type Project,
 } from "../components/shared";
@@ -2062,10 +2063,21 @@ export function Layout(props: ParentProps) {
             <div class="flex-1 flex flex-col items-center gap-2 overflow-y-auto w-full px-2 py-3">
               <For each={projects()}>
                 {(project) => (
-                  <div
-                    data-hint-target
+                  <ProjectIconItem
+                    hintTarget
                     onClick={() => navigateToProject(project.path)}
-                    class="group relative cursor-pointer"
+                    onRemove={() => {
+                      removeProject(project.path);
+                      if (
+                        project.path === directory &&
+                        projects().length > 1
+                      ) {
+                        const next = projects().find(
+                          (p) => p.path !== project.path,
+                        );
+                        if (next) navigateToProject(next.path);
+                      }
+                    }}
                     title={project.name || getFilename(project.path)}
                   >
                     <ProjectAvatar
@@ -2074,29 +2086,7 @@ export function Layout(props: ParentProps) {
                       selected={project.path === directory}
                       badge={project.path !== directory ? globalEvents.badge(project.path) : undefined}
                     />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeProject(project.path);
-                        if (
-                          project.path === directory &&
-                          projects().length > 1
-                        ) {
-                          const next = projects().find(
-                            (p) => p.path !== project.path,
-                          );
-                          if (next) navigateToProject(next.path);
-                        }
-                      }}
-                      class="absolute -top-1 -right-1 w-4 h-4 rounded-full hidden group-hover:flex items-center justify-center"
-                      style={{
-                        background: "var(--surface-strong)",
-                        color: "var(--text-base)",
-                      }}
-                    >
-                      <X class="w-3 h-3" />
-                    </button>
-                  </div>
+                  </ProjectIconItem>
                 )}
               </For>
 

@@ -1,5 +1,5 @@
 import { Show } from "solid-js"
-import { Folder, ShieldAlert, CircleHelp, Loader2 } from "lucide-solid"
+import { Folder, ShieldAlert, CircleHelp, Loader2, X } from "lucide-solid"
 import type { AlertKind } from "../context/global-events"
 
 export interface Project {
@@ -61,6 +61,36 @@ export function ProjectAvatar(props: {
       <Show when={props.badge}>
         {(b) => <AlertBadge kind={b().kind} count={b().count} />}
       </Show>
+    </div>
+  )
+}
+
+export function ProjectIconItem(props: {
+  title: string
+  onClick: () => void
+  onRemove: () => void
+  hintTarget?: boolean
+  children: import("solid-js").JSX.Element
+}) {
+  return (
+    <div
+      {...(props.hintTarget ? { "data-hint-target": "" } : {})}
+      onClick={props.onClick}
+      class="group relative cursor-pointer"
+      title={props.title}
+    >
+      {props.children}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          props.onRemove()
+        }}
+        class="absolute -top-1 -right-1 w-4 h-4 rounded-full hidden group-hover:flex items-center justify-center"
+        style={{ background: "var(--surface-strong)", color: "var(--text-base)" }}
+      >
+        <X class="w-3 h-3" />
+      </button>
     </div>
   )
 }

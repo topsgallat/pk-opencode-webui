@@ -1,3 +1,5 @@
+import { isAnthropicProviderID, normalizeAnthropicModelKey } from "../../../shared/anthropic-models"
+
 declare global {
   interface Window {
     __OPENCODE__?: {
@@ -8,6 +10,13 @@ declare global {
         input: number
         output: number
         cachedInput?: number
+        cacheWrite?: number
+      }>
+      anthropicPricing?: Record<string, {
+        input: number
+        output: number
+        cachedInput?: number
+        cacheWrite?: number
       }>
     }
   }
@@ -112,6 +121,12 @@ export function getOpenAIModelPricing(providerID: string, modelID: string, model
   if (!(providerID === "openai" || providerID.startsWith("openai:"))) return undefined
   const key = normalizeOpenAIModelKey(modelName || modelID)
   return window.__OPENCODE__?.openaiPricing?.[key]
+}
+
+export function getAnthropicModelPricing(providerID: string, modelID: string, modelName?: string): { input: number; output: number; cachedInput?: number; cacheWrite?: number } | undefined {
+  if (!isAnthropicProviderID(providerID)) return undefined
+  const key = normalizeAnthropicModelKey(modelName || modelID)
+  return window.__OPENCODE__?.anthropicPricing?.[key]
 }
 
 export function appendTargetParam(url: string, targetUrl?: string): string {

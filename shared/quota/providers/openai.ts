@@ -1,50 +1,87 @@
 import { QuotaProvider, QuotaProviderView, QuotaFetchOptions, QuotaEntryView } from '../types'
+import { fetchQuotaJson, resolveQuotaAuthHeader } from '../http'
+
+const OPENAI_USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
+
+function asNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+function percentToEntry(label: string, window: Record<string, unknown>, windowType: QuotaEntryView['window'], subtitle: string): QuotaEntryView | undefined {
+  const usedPercent = asNumber(window.used_percent ?? window.usedPercent)
+  const resetTimeIso = asString(window.reset_at ?? window.resetAt ?? window.resets_at ?? window.resetsAt)
+
+  if (usedPercent === undefined) return undefined
+
+  return {
+    id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    group: 'usage',
+    label,
+    subtitle,
+    percentUsed: usedPercent,
+    percentRemaining: Math.max(0, 100 - usedPercent),
+    window: windowType,
+    resetTimeIso,
+    unlimited: false,
+  }
+}
 
 export class OpenAIProvider implements QuotaProvider {
   id = 'openai'
   name = 'OpenAI'
 
-  async isAvailable(): Promise<boolean> {
-    // Check if OpenAI auth is available
-    // Adapt from opencode-quota ChatGPT logic
-    return true // TODO: Implement proper availability check
+  async isAvailable(options?: QuotaFetchOptions): Promise<boolean> {
+    return Boolean(resolveQuotaAuthHeader(options, OPENAI_USAGE_URL))
   }
 
   async fetch(options: QuotaFetchOptions): Promise<QuotaProviderView> {
-    const entries: QuotaEntryView[] = []
-
     try {
-      // Adapt OpenAI quota fetching from opencode-quota
-      // - Fetch from ChatGPT usage endpoint
-      // - Normalize windows: hourly, weekly, code review, credits
+      const auth = resolveQuotaAuthHeader(options, OPENAI_USAGE_URL)
+      if (!auth) {
+        return {
+          id: this.id,
+          name: this.name,
+          status: 'unavailable',
+          available: false,
+          fetchedAt: new Date().toISOString(),
+          entries: [],
+          warning: 'No OpenAI auth available for quota lookup',
+        }
+      }
 
-      // Placeholder implementation
-      entries.push({
-        id: 'hourly',
-        group: 'usage',
-        label: 'Hourly Limit',
-        used: 50,
-        total: 100,
-        remaining: 50,
-        percentRemaining: 50,
-        percentUsed: 50,
-        window: 'hourly',
-        resetTimeIso: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
-        unlimited: false
+      const data = await fetchQuotaJson<Record<string, unknown>>(OPENAI_USAGE_URL, { ...options, authHeader: auth }, {
+        method: 'GET',
       })
 
-      entries.push({
-        id: 'weekly',
-        group: 'usage',
-        label: 'Weekly Limit',
-        used: 200,
-        total: 500,
-        remaining: 300,
-        percentRemaining: 60,
-        percentUsed: 40,
-        window: 'weekly',
-        unlimited: false
-      })
+      const rateLimit = (data.rate_limit && typeof data.rate_limit === 'object' ? data.rate_limit : data) as Record<string, unknown>
+      const primary = (rateLimit.primary_window && typeof rateLimit.primary_window === 'object' ? rateLimit.primary_window : undefined) as Record<string, unknown> | undefined
+      const secondary = (rateLimit.secondary_window && typeof rateLimit.secondary_window === 'object' ? rateLimit.secondary_window : undefined) as Record<string, unknown> | undefined
+      const codeReviewRoot = (rateLimit.code_review_rate_limit && typeof rateLimit.code_review_rate_limit === 'object' ? rateLimit.code_review_rate_limit : undefined) as Record<string, unknown> | undefined
+      const codeReview = (codeReviewRoot?.primary_window && typeof codeReviewRoot.primary_window === 'object' ? codeReviewRoot.primary_window : undefined) as Record<string, unknown> | undefined
+
+      const entries: QuotaEntryView[] = []
+      const primaryEntry = primary ? percentToEntry('Primary Window', primary, 'hourly', '5h window') : undefined
+      const secondaryEntry = secondary ? percentToEntry('Secondary Window', secondary, 'weekly', 'Weekly window') : undefined
+      const codeReviewEntry = codeReview ? percentToEntry('Code Review', codeReview, 'daily', 'Code review window') : undefined
+      if (primaryEntry) entries.push(primaryEntry)
+      if (secondaryEntry) entries.push(secondaryEntry)
+      if (codeReviewEntry) entries.push(codeReviewEntry)
+
+      if (entries.length === 0) {
+        return {
+          id: this.id,
+          name: this.name,
+          status: 'error',
+          available: false,
+          fetchedAt: new Date().toISOString(),
+          entries: [],
+          error: 'OpenAI quota response did not include rate limit windows',
+        }
+      }
 
       return {
         id: this.id,
@@ -53,7 +90,7 @@ export class OpenAIProvider implements QuotaProvider {
         available: true,
         fetchedAt: new Date().toISOString(),
         entries,
-        matchedCurrentModel: true
+        matchedCurrentModel: true,
       }
     } catch (error) {
       return {
@@ -62,7 +99,7 @@ export class OpenAIProvider implements QuotaProvider {
         status: 'error',
         available: false,
         entries: [],
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       }
     }
   }

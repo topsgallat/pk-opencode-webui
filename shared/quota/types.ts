@@ -2,12 +2,13 @@ export interface QuotaFetchOptions {
   refresh?: boolean
   targetUrl?: string
   authHeader?: string
+  resolveAuthHeader?: (target: string) => string | undefined
 }
 
 export interface QuotaProvider {
   id: string
   name: string
-  isAvailable(): Promise<boolean>
+  isAvailable(options?: QuotaFetchOptions): Promise<boolean>
   fetch(options: QuotaFetchOptions): Promise<QuotaProviderView>
 }
 

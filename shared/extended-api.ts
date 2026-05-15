@@ -529,7 +529,11 @@ export async function handleExtendedEndpoint(
 
     try {
       const { getQuotaData } = await import("./quota/index")
-      const result = await getQuotaData({ refresh, providerFilter })
+      const result = await getQuotaData({
+        refresh,
+        providerFilter,
+        resolveAuthHeader: options?.resolveUpstreamAuthHeader,
+      })
       return Response.json(result)
     } catch (error) {
       console.error("[ExtAPI] quota error:", error)

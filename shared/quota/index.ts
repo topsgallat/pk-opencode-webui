@@ -1,4 +1,4 @@
-import { QuotaProvider, QuotaProviderView, QuotaApiResponse, QuotaFetchOptions } from './types'
+import { QuotaProvider, QuotaProviderView, QuotaApiResponse } from './types'
 import { CopilotProvider } from './providers/copilot'
 import { OpenAIProvider } from './providers/openai'
 import { GeminiProvider } from './providers/gemini-cli'
@@ -8,6 +8,7 @@ export async function getQuotaData(options: {
   providerFilter?: string
   targetUrl?: string
   authHeader?: string
+  resolveAuthHeader?: (target: string) => string | undefined
 }): Promise<QuotaApiResponse> {
   const providers: QuotaProvider[] = [
     new CopilotProvider(),
@@ -21,17 +22,23 @@ export async function getQuotaData(options: {
   const warnings: string[] = []
 
   for (const provider of providers) {
+    if (options.providerFilter && provider.id !== options.providerFilter) continue
+
     try {
-      const available = await provider.isAvailable()
-      if (available) {
+      const view = await provider.fetch(options)
+      providerViews.push(view)
+
+      if (view.status === 'ok' && view.available) {
         availableProviders.push(provider.id)
-        if (!options.providerFilter || provider.id === options.providerFilter) {
-          const view = await provider.fetch(options)
-          providerViews.push(view)
-        }
       } else {
-        unavailableProviders.push({ id: provider.id, reason: 'Provider not available' })
+        unavailableProviders.push({
+          id: provider.id,
+          reason: view.error || view.warning || 'Provider unavailable',
+        })
       }
+
+      if (view.warning) warnings.push(`${provider.name}: ${view.warning}`)
+      if (view.error) warnings.push(`${provider.name}: ${view.error}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       unavailableProviders.push({ id: provider.id, reason: message })
@@ -43,7 +50,7 @@ export async function getQuotaData(options: {
     ok: true,
     fetchedAt: new Date().toISOString(),
     refreshed: options.refresh || false,
-    source: options.refresh ? 'live' : 'cache',
+    source: 'live',
     providers: providerViews,
     summary: {
       availableProviders,

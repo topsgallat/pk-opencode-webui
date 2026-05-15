@@ -1,3 +1,16 @@
+export interface QuotaFetchOptions {
+  refresh?: boolean
+  targetUrl?: string
+  authHeader?: string
+}
+
+export interface QuotaProvider {
+  id: string
+  name: string
+  isAvailable(): Promise<boolean>
+  fetch(options: QuotaFetchOptions): Promise<QuotaProviderView>
+}
+
 export type QuotaApiResponse = {
   ok: boolean
   fetchedAt: string

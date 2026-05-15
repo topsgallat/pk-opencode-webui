@@ -24,13 +24,6 @@ ARG REPO_URL=https://github.com/topsgallat/pk-opencode-webui.git
 ARG BRANCH=dev
 RUN git clone --depth 1 --branch ${BRANCH} ${REPO_URL} .
 
-# Overlay local workspace additions that may not exist in the remote branch yet.
-# This keeps the image build aligned with the current checkout instead of the
-# cloned snapshot, which is important when the build depends on new source files.
-COPY app-prefixable/src/components/quota/ /app/app-prefixable/src/components/quota/
-COPY app-prefixable/src/types/quota.ts /app/app-prefixable/src/types/quota.ts
-COPY shared/quota/ /app/shared/quota/
-
 # Install dependencies and build
 WORKDIR /app/app-prefixable
 RUN bun install && \

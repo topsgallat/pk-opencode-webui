@@ -240,12 +240,19 @@ export function Terminal(props: TerminalProps) {
     console.log("[Terminal] Terminal opened in container")
 
     // Let plain Ctrl+1-4 pass through to the browser for panel focus shortcuts.
-    // When text is selected, Ctrl+C copies instead of sending SIGINT.
     // Exclude AltGr (reports as Ctrl+Alt) to avoid breaking locale-specific input.
     term.attachCustomKeyEventHandler((event) => {
+      if (event.type !== "keydown") return true
       if (event.ctrlKey && !event.altKey && !event.metaKey && PANEL_FOCUS_KEYS.has(event.key))
         return false
-      if (event.type === "keydown" && event.ctrlKey && !event.altKey && !event.metaKey && (event.key === "c" || event.key === "C")) {
+      // Ctrl+Shift+C: always intercept — stops browser DevTools, copies if selection
+      if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.key === "C") {
+        const sel = term?.getSelection()
+        if (sel) navigator.clipboard.writeText(sel).catch(() => {})
+        return false
+      }
+      // Ctrl+C (no Shift): copy if selection, otherwise send SIGINT
+      if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.key === "c") {
         const sel = term?.getSelection()
         if (sel) {
           navigator.clipboard.writeText(sel).catch(() => {})
@@ -254,6 +261,13 @@ export function Terminal(props: TerminalProps) {
       }
       return true
     })
+    // Capture-phase listener to prevent browser DevTools on Ctrl+Shift+C
+    const preventDevTools = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.code === "KeyC") {
+        e.preventDefault()
+      }
+    }
+    container.addEventListener("keydown", preventDevTools, { capture: true })
 
     // Show initializing message
     writeStatus("Initializing terminal...", "info")
@@ -336,6 +350,7 @@ export function Terminal(props: TerminalProps) {
       if (reconnectTimer) clearTimeout(reconnectTimer)
       window.removeEventListener("resize", handleResize)
       resizeObserver.disconnect()
+      container.removeEventListener("keydown", preventDevTools, { capture: true })
       ws?.close()
       term?.dispose()
     })

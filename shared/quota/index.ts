@@ -1,17 +1,7 @@
-import { QuotaProviderView, QuotaApiResponse } from './types'
-
-export interface QuotaProvider {
-  id: string
-  name: string
-  isAvailable(): Promise<boolean>
-  fetch(options: QuotaFetchOptions): Promise<QuotaProviderView>
-}
-
-export interface QuotaFetchOptions {
-  refresh?: boolean
-  targetUrl?: string
-  authHeader?: string
-}
+import { QuotaProvider, QuotaProviderView, QuotaApiResponse, QuotaFetchOptions } from './types'
+import { CopilotProvider } from './providers/copilot'
+import { OpenAIProvider } from './providers/openai'
+import { GeminiProvider } from './providers/gemini-cli'
 
 export async function getQuotaData(options: {
   refresh?: boolean
@@ -20,10 +10,9 @@ export async function getQuotaData(options: {
   authHeader?: string
 }): Promise<QuotaApiResponse> {
   const providers: QuotaProvider[] = [
-    // TODO: Import and instantiate actual providers
-    // new CopilotProvider(),
-    // new OpenAIProvider(),
-    // new GeminiProvider(),
+    new CopilotProvider(),
+    new OpenAIProvider(),
+    new GeminiProvider(),
   ]
 
   const providerViews: QuotaProviderView[] = []

@@ -11,6 +11,7 @@ import { getContextTokens } from "../utils/tokens"
 import { getQuota } from "../utils/extended-api"
 import { CornerDownLeft, Square, Zap } from "lucide-solid"
 import { ConnectionBadge } from "./connection-badge"
+import { findQuotaProviderBySelectedModel } from "./session-info-helpers"
 
 type TokenPricing = {
   input: number
@@ -228,11 +229,7 @@ export function SessionInfo(props: SessionInfoProps) {
     if (!data) return null
 
     const selected = selectedModel()
-    if (selected) {
-      return data.providers.find((p) => p.id === selected.providerID) ?? null
-    }
-
-    return data.providers[0] ?? null
+    return findQuotaProviderBySelectedModel(data.providers, selected?.providerID)
   })
 
   const quotaStatus = (status?: string) => {

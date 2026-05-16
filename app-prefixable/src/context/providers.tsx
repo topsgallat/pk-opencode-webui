@@ -4,7 +4,7 @@ import { useSDK } from "./sdk"
 import { useConfig } from "./config"
 import { useServer } from "./server"
 import { getAnthropicModelPricing, getCopilotModelMultipliers, getOpenAIModelPricing, normalizeCopilotModelKey } from "../utils/path"
-import { getProviderAccounts, saveProviderAccounts, removeProviderAccount, type ProviderAccount } from "../utils/extended-api"
+import { clearProviderAuth, getProviderAccounts, saveProviderAccounts, removeProviderAccount, syncProviderAuth, type ProviderAccount } from "../utils/extended-api"
 import { withTimeout } from "../utils/request-timeout"
 
 // Storage key
@@ -116,7 +116,7 @@ interface ProviderContextValue {
 const ProviderContext = createContext<ProviderContextValue>()
 
 export function ProviderProvider(props: ParentProps) {
-  const { client } = useSDK()
+  const { client, targetUrl, url: serverUrl } = useSDK()
   const cfg = useConfig()
   const server = useServer()
   const storageKey = () => `${MODELS_BY_AGENT_KEY}.${server.serverKey()}`
@@ -304,11 +304,13 @@ export function ProviderProvider(props: ParentProps) {
   async function connectProvider(providerID: string, apiKey: string, accountName?: string): Promise<boolean> {
     try {
       const effectiveProviderID = accountName ? `${providerID}:${accountName}` : providerID
-      
+
       await client.auth.set({
         providerID: effectiveProviderID,
         auth: { type: "api", key: apiKey },
       })
+
+      await syncProviderAuth(serverUrl, effectiveProviderID, `Bearer ${apiKey}`, targetUrl)
       
       if (accountName) {
         const accounts = getProviderAccounts()
@@ -344,6 +346,7 @@ export function ProviderProvider(props: ParentProps) {
 
       // Remove from OpenCode backend (provider-level or account-level)
       await client.auth.remove({ providerID })
+      await clearProviderAuth(serverUrl, providerID, targetUrl)
       refetch()
       return true
     } catch (e) {

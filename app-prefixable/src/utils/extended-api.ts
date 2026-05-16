@@ -177,6 +177,33 @@ export function removeProviderAccount(id: string): boolean {
   }
 }
 
+export async function syncProviderAuth(serverUrl: string, providerID: string, authHeader: string, targetUrl?: string): Promise<boolean> {
+  try {
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/provider-auth`, targetUrl), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ providerID, authHeader }),
+    }, EXT_API_TIMEOUT_MS, "extended syncProviderAuth")
+    return res.ok && (await res.json())?.ok === true
+  } catch (e) {
+    console.error("[extended-api] syncProviderAuth failed:", e)
+    return false
+  }
+}
+
+export async function clearProviderAuth(serverUrl: string, providerID: string, targetUrl?: string): Promise<boolean> {
+  try {
+    const params = new URLSearchParams({ providerID })
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/provider-auth?${params}`, targetUrl), {
+      method: "DELETE",
+    }, EXT_API_TIMEOUT_MS, "extended clearProviderAuth")
+    return res.ok && (await res.json())?.cleared !== false
+  } catch (e) {
+    console.error("[extended-api] clearProviderAuth failed:", e)
+    return false
+  }
+}
+
 /**
  * List available OpenCode log files
  */
@@ -208,9 +235,10 @@ export async function readLogFile(serverUrl: string, name: string): Promise<stri
 /**
  * Get quota data from all providers
  */
-export async function getQuota(serverUrl: string, options?: { refresh?: boolean }): Promise<QuotaApiResponse> {
+export async function getQuota(serverUrl: string, options?: { refresh?: boolean; targetUrl?: string }): Promise<QuotaApiResponse> {
   const params = new URLSearchParams()
   if (options?.refresh) params.set("refresh", "true")
+  if (options?.targetUrl) params.set("target", options.targetUrl)
 
   const res = await fetchWithTimeout(`${serverUrl}/api/ext/quota?${params}`, {}, EXT_API_TIMEOUT_MS, "extended getQuota")
   if (!res.ok) {

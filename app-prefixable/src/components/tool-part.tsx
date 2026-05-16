@@ -604,9 +604,16 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
   // Sync child session data when we have a child ID
   createEffect(() => {
     const id = childId();
-    if (id) {
-      sync.session.sync(id);
-    }
+    if (!id || status() === "completed" || status() === "error") return;
+
+    void sync.session.sync(id);
+    if (childMessages().length > 0) return;
+
+    const interval = setInterval(() => {
+      void sync.session.sync(id);
+    }, 5000);
+
+    onCleanup(() => clearInterval(interval));
   });
 
   const dirSlug = createMemo(() =>

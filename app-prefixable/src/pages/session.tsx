@@ -588,24 +588,7 @@ export function Session() {
       });
 
       // Check if this session is actually busy
-      withTimeout(
-        () => client.session.status({}),
-        SESSION_STATUS_TIMEOUT_MS,
-        "Loading session status",
-      )
-        .then((res: { data?: Record<string, { type: string }> }) => {
-          const statuses = res.data;
-          if (!statuses) return;
-          if (statuses[id]) {
-            const isBusy =
-              statuses[id].type === "busy" || statuses[id].type === "retry";
-            // DEBUG: initial status logged during development - removed for production
-            if (isBusy) wasProcessing.value = true;
-            setProcessing(isBusy);
-          }
-        }).catch(() => {
-          return;
-        });
+      void refreshProcessingState(id);
     } else {
       setLoadingHistory(false);
       setHistoryError(null);
@@ -1421,6 +1404,53 @@ export function Session() {
       setHistoryError(errorMessage(err, "Loading chat history failed"));
     }
   };
+
+  async function refreshProcessingState(sessionID: string) {
+    const wasBusy = processing();
+
+    try {
+      const res = await withTimeout(
+        () => client.session.status({}),
+        SESSION_STATUS_TIMEOUT_MS,
+        "Loading session status",
+      );
+      const statuses = res.data;
+      const status = statuses?.[sessionID];
+      const isBusy = status?.type === "busy" || status?.type === "retry";
+
+      if (isBusy) {
+        wasProcessing.value = true;
+        setProcessing(true);
+        return;
+      }
+
+      if (wasBusy) {
+        batch(() => {
+          setActivePrompt(null);
+          wasProcessing.value = false;
+          setProcessing(false);
+        });
+        void sync.session.sync(sessionID).catch(() => {});
+        return;
+      }
+
+      setProcessing(false);
+    } catch {
+      if (!wasBusy) return;
+    }
+  }
+
+  createEffect(() => {
+    const id = sessionId();
+    if (!id || !processing()) return;
+
+    void refreshProcessingState(id);
+    const interval = setInterval(() => {
+      void refreshProcessingState(id);
+    }, 15_000);
+
+    onCleanup(() => clearInterval(interval));
+  });
 
   // Clear stale localStorage key when sessions are loaded and ID is not found
   createEffect(() => {

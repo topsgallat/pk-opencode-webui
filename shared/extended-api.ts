@@ -10,7 +10,7 @@ import * as fs from "node:fs"
 import * as nodePath from "node:path"
 import * as os from "node:os"
 import { clearProxyAuthSession, syncProxyAuthSession } from "./proxy-auth-session"
-import { clearProviderAuthSession, resolveProviderAuthHeader, syncProviderAuthSession } from "./provider-auth-session"
+import { clearProviderAuthSession, getProviderIDCandidates, resolveProviderAuthHeader, syncProviderAuthSession } from "./provider-auth-session"
 
 type ExtendedEndpointOptions = {
   resolveUpstreamAuthHeader?: (target: string) => string | undefined
@@ -44,13 +44,15 @@ async function readAuthFile(): Promise<Record<string, unknown> | undefined> {
 }
 
 function getAuthEntry(data: Record<string, unknown>, providerID: string): unknown {
-  if (providerID in data) {
-    return data[providerID]
-  }
+  for (const id of getProviderIDCandidates(providerID)) {
+    if (id in data) {
+      return data[id]
+    }
 
-  const nested = data.providers
-  if (nested && typeof nested === "object" && providerID in nested) {
-    return (nested as Record<string, unknown>)[providerID]
+    const nested = data.providers
+    if (nested && typeof nested === "object" && id in nested) {
+      return (nested as Record<string, unknown>)[id]
+    }
   }
 
   return undefined

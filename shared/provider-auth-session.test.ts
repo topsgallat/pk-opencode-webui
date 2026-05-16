@@ -24,6 +24,17 @@ describe("provider-auth-session", () => {
     expect(resolveProviderAuthHeader(req, "https://example.com", "copilot")).toBeUndefined()
   })
 
+  it("aliases github copilot and copilot auth", async () => {
+    const res = syncProviderAuthSession(makeRequest(), "https://example.com", { providerID: "github-copilot", authHeader: "Bearer copilot-token" })
+    expect(res.status).toBe(200)
+
+    const cookie = res.headers.get("Set-Cookie")
+    const req = makeRequest(cookie || undefined)
+
+    expect(resolveProviderAuthHeader(req, "https://example.com", "copilot")).toBe("Bearer copilot-token")
+    expect(resolveProviderAuthHeader(req, "https://example.com", "github-copilot")).toBe("Bearer copilot-token")
+  })
+
   it("clears provider auth", async () => {
     const sync = syncProviderAuthSession(makeRequest(), "https://example.com", { providerID: "openai", authHeader: "Bearer abc" })
     const cookie = sync.headers.get("Set-Cookie")

@@ -2,6 +2,24 @@ const COOKIE_NAME = "opencode_proxy_session"
 
 const sessions = new Map<string, Map<string, string>>()
 
+function normalizeProviderID(providerID: string): string {
+  const id = providerID.trim()
+  if (id === "github-copilot") return "copilot"
+  return id
+}
+
+export function getProviderIDCandidates(providerID: string): string[] {
+  const id = providerID.trim()
+  if (!id) return []
+
+  const normalized = normalizeProviderID(id)
+  if (normalized === id) {
+    return id === "copilot" ? ["copilot", "github-copilot"] : [id]
+  }
+
+  return [normalized, id]
+}
+
 function parseCookies(raw: string | null): Map<string, string> {
   const out = new Map<string, string>()
   if (!raw) return out
@@ -65,21 +83,24 @@ function canonicalizeTarget(target: string): string | undefined {
 
 function buildStoreKey(target: string, providerID: string): string | undefined {
   const key = canonicalizeTarget(target)
-  if (!key || !providerID.trim()) return undefined
-  return `${key}::${providerID.trim()}`
+  const id = providerID.trim()
+  if (!key || !id) return undefined
+  return `${key}::${id}`
 }
 
 function resolveStoreKey(values: Map<string, string>, target: string, providerID: string): string | undefined {
-  const key = buildStoreKey(target, providerID)
-  if (!key) return undefined
-  if (values.has(key)) return key
+  for (const candidate of getProviderIDCandidates(providerID)) {
+    const key = buildStoreKey(target, candidate)
+    if (!key) continue
+    if (values.has(key)) return key
 
-  const prefix = `${key}:`
-  let match: string | undefined
-  for (const stored of values.keys()) {
-    if (stored === key || stored.startsWith(prefix)) match = stored
+    const prefix = `${key}:`
+    for (const stored of values.keys()) {
+      if (stored === key || stored.startsWith(prefix)) return stored
+    }
   }
-  return match
+
+  return undefined
 }
 
 export function syncProviderAuthSession(req: Request, target: string, body: unknown): Response {
@@ -92,7 +113,9 @@ export function syncProviderAuthSession(req: Request, target: string, body: unkn
   const authHeader = typeof raw.authHeader === "string" ? raw.authHeader.trim() : ""
 
   const key = buildStoreKey(target, providerID)
-  if (!key) {
+  const normalizedKey = buildStoreKey(target, normalizeProviderID(providerID))
+  const storeKey = normalizedKey || key
+  if (!storeKey) {
     return Response.json({ error: "target and providerID are required" }, { status: 400 })
   }
   if (!authHeader) {
@@ -100,13 +123,13 @@ export function syncProviderAuthSession(req: Request, target: string, body: unkn
   }
 
   const session = getOrCreateSession(req)
-  session.values.set(key, authHeader)
+  session.values.set(storeKey, authHeader)
 
   const headers = new Headers()
   if (session.created) {
     headers.set("Set-Cookie", buildSessionCookie(session.id))
   }
-  return new Response(JSON.stringify({ ok: true, target: canonicalizeTarget(target), providerID }), {
+  return new Response(JSON.stringify({ ok: true, target: canonicalizeTarget(target), providerID: normalizeProviderID(providerID) }), {
     status: 200,
     headers: {
       "Content-Type": "application/json",
@@ -117,8 +140,8 @@ export function syncProviderAuthSession(req: Request, target: string, body: unkn
 
 export function clearProviderAuthSession(req: Request, target: string, providerID: string): Response {
   const id = getSessionId(req)
-  const key = buildStoreKey(target, providerID)
-  if (!key) {
+  const candidates = getProviderIDCandidates(providerID)
+  if (candidates.length === 0) {
     return Response.json({ error: "target and providerID are required" }, { status: 400 })
   }
   if (!id) {
@@ -129,11 +152,15 @@ export function clearProviderAuthSession(req: Request, target: string, providerI
     return Response.json({ ok: true, target: canonicalizeTarget(target), providerID, cleared: false })
   }
   let existed = false
-  const prefix = `${key}:`
-  for (const stored of [...values.keys()]) {
-    if (stored !== key && !stored.startsWith(prefix)) continue
-    values.delete(stored)
-    existed = true
+  for (const candidate of candidates) {
+    const key = buildStoreKey(target, candidate)
+    if (!key) continue
+    const prefix = `${key}:`
+    for (const stored of [...values.keys()]) {
+      if (stored !== key && !stored.startsWith(prefix)) continue
+      values.delete(stored)
+      existed = true
+    }
   }
   if (values.size === 0) sessions.delete(id)
   return Response.json({ ok: true, target: canonicalizeTarget(target), providerID, cleared: existed })

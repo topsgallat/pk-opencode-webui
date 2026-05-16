@@ -191,6 +191,19 @@ export async function syncProviderAuth(serverUrl: string, providerID: string, au
   }
 }
 
+export async function syncProviderAuthFromBackend(serverUrl: string, providerID: string, targetUrl?: string): Promise<boolean> {
+  try {
+    const params = new URLSearchParams({ providerID })
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/provider-auth/from-backend?${params}`, targetUrl), {
+      method: "POST",
+    }, EXT_API_TIMEOUT_MS, "extended syncProviderAuthFromBackend")
+    return res.ok && (await res.json())?.ok === true
+  } catch (e) {
+    console.error("[extended-api] syncProviderAuthFromBackend failed:", e)
+    return false
+  }
+}
+
 export async function clearProviderAuth(serverUrl: string, providerID: string, targetUrl?: string): Promise<boolean> {
   try {
     const params = new URLSearchParams({ providerID })

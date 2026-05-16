@@ -4,7 +4,7 @@ import { useSDK } from "./sdk"
 import { useConfig } from "./config"
 import { useServer } from "./server"
 import { getAnthropicModelPricing, getCopilotModelMultipliers, getOpenAIModelPricing, normalizeCopilotModelKey } from "../utils/path"
-import { clearProviderAuth, getProviderAccounts, saveProviderAccounts, removeProviderAccount, syncProviderAuth, type ProviderAccount } from "../utils/extended-api"
+import { clearProviderAuth, getProviderAccounts, saveProviderAccounts, removeProviderAccount, syncProviderAuth, syncProviderAuthFromBackend, type ProviderAccount } from "../utils/extended-api"
 import { withTimeout } from "../utils/request-timeout"
 
 // Storage key
@@ -245,6 +245,15 @@ export function ProviderProvider(props: ParentProps) {
     }
   })
 
+  createEffect(() => {
+    const data = providerData()
+    if (!data) return
+
+    for (const providerID of getConnectedProviderIDs(data)) {
+      void syncProviderAuthFromBackend(serverUrl, providerID, targetUrl)
+    }
+  })
+
   // Fetch auth methods for all providers (returns { [providerID]: ProviderAuthMethod[] })
   const [authData] = createResource(async () => {
     try {
@@ -375,6 +384,7 @@ export function ProviderProvider(props: ParentProps) {
         method: methodIndex,
         code,
       })
+      await syncProviderAuthFromBackend(serverUrl, providerID, targetUrl)
       // Dispose instance to reload provider state, then refresh
       await client.instance.dispose()
       await refetchProviders()

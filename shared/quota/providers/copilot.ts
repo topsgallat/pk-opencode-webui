@@ -11,13 +11,43 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
-function buildEntry(label: string, quota: Record<string, unknown>): QuotaEntryView | undefined {
-  const used = asNumber(quota.used)
-  const total = asNumber(quota.limit ?? quota.total)
-  const remaining = asNumber(quota.remaining)
-  const percentRemaining = asNumber(quota.percent_remaining ?? quota.percentRemaining)
-  const percentUsed = asNumber(quota.percent_used ?? quota.percentUsed)
-  const resetTimeIso = asString(quota.reset_at ?? quota.resetAt)
+function asResetIso(value: unknown): string | undefined {
+  const text = asString(value)
+  if (!text) return undefined
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00.000Z` : text
+}
+
+function buildEntry(label: string, quota: Record<string, unknown>, resetTimeIso?: string): QuotaEntryView | undefined {
+  let used = asNumber(quota.used)
+  let total = asNumber(quota.limit ?? quota.total ?? quota.entitlement)
+  let remaining = asNumber(quota.remaining ?? quota.quota_remaining)
+  let percentRemaining = asNumber(quota.percent_remaining ?? quota.percentRemaining)
+  let percentUsed = asNumber(quota.percent_used ?? quota.percentUsed)
+  const reset = asResetIso(resetTimeIso ?? quota.reset_at ?? quota.resetAt ?? quota.reset_date ?? quota.resetDate)
+
+  if (total === undefined && used !== undefined && remaining !== undefined) {
+    total = used + remaining
+  }
+  if (used === undefined && total !== undefined) {
+    if (remaining !== undefined) {
+      used = Math.max(0, total - remaining)
+    } else if (percentRemaining !== undefined) {
+      used = Math.max(0, total * (1 - percentRemaining / 100))
+    }
+  }
+  if (remaining === undefined && total !== undefined) {
+    if (used !== undefined) {
+      remaining = Math.max(0, total - used)
+    } else if (percentRemaining !== undefined) {
+      remaining = Math.max(0, total * (percentRemaining / 100))
+    }
+  }
+  if (percentRemaining === undefined && total !== undefined && remaining !== undefined) {
+    percentRemaining = total === 0 ? undefined : (remaining / total) * 100
+  }
+  if (percentUsed === undefined && percentRemaining !== undefined) {
+    percentUsed = 100 - percentRemaining
+  }
 
   if (used === undefined && total === undefined && remaining === undefined && percentRemaining === undefined && percentUsed === undefined) {
     return undefined
@@ -32,10 +62,28 @@ function buildEntry(label: string, quota: Record<string, unknown>): QuotaEntryVi
     remaining,
     percentRemaining,
     percentUsed,
-    resetTimeIso,
+    resetTimeIso: reset,
     window: 'monthly',
     unlimited: false,
   }
+}
+
+function pickQuotaSnapshot(data: Record<string, unknown>): Record<string, unknown> | undefined {
+  const snapshots = data.quota_snapshots
+  if (snapshots && typeof snapshots === 'object') {
+    const record = snapshots as Record<string, unknown>
+    const premium = record.premium_interactions
+    if (premium && typeof premium === 'object') return premium as Record<string, unknown>
+
+    const chat = record.chat
+    if (chat && typeof chat === 'object') return chat as Record<string, unknown>
+
+    const completions = record.completions
+    if (completions && typeof completions === 'object') return completions as Record<string, unknown>
+  }
+
+  if (data.quota && typeof data.quota === 'object') return data.quota as Record<string, unknown>
+  return undefined
 }
 
 export class CopilotProvider implements QuotaProvider {
@@ -62,8 +110,8 @@ export class CopilotProvider implements QuotaProvider {
       }
 
       const data = await fetchQuotaJson<Record<string, unknown>>(COPILOT_QUOTA_URL, { ...options, authHeader: auth })
-      const quota = (data.quota && typeof data.quota === 'object' ? data.quota : data) as Record<string, unknown>
-      const entry = buildEntry('Personal Usage', quota)
+      const quota = pickQuotaSnapshot(data) || data
+      const entry = buildEntry('Personal Usage', quota, asResetIso(data.quota_reset_date_utc ?? data.quota_reset_date))
       const entries = entry ? [entry] : []
 
       if (entries.length === 0) {

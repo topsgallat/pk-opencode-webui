@@ -32,4 +32,38 @@ describe('CopilotProvider', () => {
       }
     })
   })
+
+  it('parses the live quota snapshot shape', async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (!url.includes('copilot_internal/user')) return new Response('not found', { status: 404 })
+      return new Response(JSON.stringify({
+        quota_reset_date_utc: '2026-06-01T00:00:00.000Z',
+        quota_snapshots: {
+          premium_interactions: {
+            entitlement: 300,
+            remaining: 25,
+            percent_remaining: 8.6,
+            overage_count: 0,
+            overage_permitted: false,
+            quota_id: 'premium_interactions',
+            unlimited: false,
+          },
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as typeof fetch
+
+    const provider = new CopilotProvider()
+    const result = await provider.fetch({ resolveAuthHeader: () => 'Bearer test' })
+
+    expect(result.status).toBe('ok')
+    expect(result.entries).toHaveLength(1)
+    expect(result.entries[0]?.total).toBe(300)
+    expect(result.entries[0]?.remaining).toBe(25)
+    expect(result.entries[0]?.percentRemaining).toBe(8.6)
+    expect(result.entries[0]?.resetTimeIso).toBe('2026-06-01T00:00:00.000Z')
+  })
 })

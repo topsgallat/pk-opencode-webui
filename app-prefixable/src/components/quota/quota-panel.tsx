@@ -1,25 +1,27 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { useBasePath } from '../../context/base-path'
+import { useSDK } from '../../context/sdk'
 import { getQuota } from '../../utils/extended-api'
 import { QuotaProviderView } from '../../types/quota'
 import { QuotaProviderCard } from './quota-provider-card'
 
 export function QuotaContent() {
   const { serverUrl } = useBasePath()
+  const { targetUrl } = useSDK()
   const [refreshing, setRefreshing] = createSignal(false)
   const [selectedProvider, setSelectedProvider] = createSignal<string>('all')
 
   const [quotaResource, { refetch }] = createResource(
     () => ({ serverUrl, refresh: false }),
     async ({ serverUrl }) => {
-      return await getQuota(serverUrl)
+      return await getQuota(serverUrl, { targetUrl })
     }
   )
 
   const handleRefresh = async () => {
     setRefreshing(true)
     try {
-      await getQuota(serverUrl, { refresh: true })
+      await getQuota(serverUrl, { refresh: true, targetUrl })
       refetch()
     } catch (error) {
       console.error('Failed to refresh quota:', error)

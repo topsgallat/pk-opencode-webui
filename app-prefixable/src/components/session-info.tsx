@@ -2,6 +2,7 @@ import { createMemo, createResource, createSignal, createEffect, For, Show, onCl
 import { Portal } from "solid-js/web"
 import { useParams } from "@solidjs/router"
 import { useBasePath } from "../context/base-path"
+import { useSDK } from "../context/sdk"
 import { useSync } from "../context/sync"
 import { useProviders } from "../context/providers"
 import { getCopilotMultiplier } from "../utils/path"
@@ -85,6 +86,7 @@ interface SessionInfoProps {
 export function SessionInfo(props: SessionInfoProps) {
   const params = useParams<{ dir: string; id?: string }>()
   const { serverUrl } = useBasePath()
+  const { targetUrl } = useSDK()
   const sync = useSync()
   const providers = useProviders()
   const selectedAgent = () => props.selectedAgent?.() ?? providers.selectedAgent
@@ -92,7 +94,7 @@ export function SessionInfo(props: SessionInfoProps) {
 
   const [quota] = createResource(
     () => serverUrl,
-    async (url) => await getQuota(url),
+    async (url) => await getQuota(url, { targetUrl }),
   )
 
   // Sync session data when session ID changes

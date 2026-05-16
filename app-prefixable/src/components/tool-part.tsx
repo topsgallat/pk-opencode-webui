@@ -542,7 +542,7 @@ function getChildToolSummary(
 // Task tool display with child session visualization
 function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPart?: AgentPart }) {
   const sync = useSync();
-  const params = useParams<{ dir: string }>();
+  const params = useParams<{ dir: string; id?: string }>();
   const navigate = useNavigate();
   const { directory } = useSDK();
 
@@ -612,6 +612,24 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
     const interval = setInterval(() => {
       void sync.session.sync(id);
     }, 5000);
+
+    onCleanup(() => clearInterval(interval));
+  });
+
+  // Safety net: periodically sync parent session to recover tool part
+  // status if the SSE message.part.updated event was missed (e.g. during
+  // a reconnect window). This ensures the "delegating..." state doesn't
+  // persist indefinitely.
+  createEffect(() => {
+    const id = childId();
+    if (!id || status() === "completed" || status() === "error") return;
+
+    const parentId = params.id;
+    if (!parentId) return;
+
+    const interval = setInterval(() => {
+      void sync.session.sync(parentId);
+    }, 15000);
 
     onCleanup(() => clearInterval(interval));
   });

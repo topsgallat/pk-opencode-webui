@@ -69,6 +69,18 @@ function sortParts(parts: Part[]): Part[] {
   return [...withId, ...withoutId]
 }
 
+function partStatusRank(part: Part) {
+  const state = (part as { state?: { status?: string } }).state
+  if (!state?.status) return 0
+  if (state.status === "completed" || state.status === "error") return 2
+  if (state.status === "running" || state.status === "pending") return 1
+  return 0
+}
+
+function messageStatusRank(message: MessageWithParts) {
+  return message.parts.reduce((rank, part) => Math.max(rank, partStatusRank(part)), 0)
+}
+
 function binarySearch<T>(arr: T[], id: string, getId: (item: T) => string): { found: boolean; index: number } {
   let low = 0
   let high = arr.length - 1
@@ -609,7 +621,12 @@ export function SyncProvider(props: ParentProps) {
                 const e = existing.find((m) => m.info.id === s.info.id)
                 if (!e) return s
                 if (s.info.role === "assistant" && s.info.time.completed) return s
-                return e.parts.length >= s.parts.length ? e : s
+
+                const syncedRank = messageStatusRank(s)
+                const existingRank = messageStatusRank(e)
+                if (syncedRank !== existingRank) return syncedRank > existingRank ? s : e
+
+                return e.parts.length > s.parts.length ? e : s
               })
 
               // Add any messages from existing that aren't in synced (new SSE messages)

@@ -41,12 +41,12 @@ export class GeminiProvider implements QuotaProvider {
   name = 'Google Gemini'
 
   async isAvailable(options?: QuotaFetchOptions): Promise<boolean> {
-    return Boolean(resolveQuotaAuthHeader(options, GEMINI_QUOTA_URL))
+    return Boolean(options?.resolveProviderAuthHeader?.(this.id) || resolveQuotaAuthHeader(options, GEMINI_QUOTA_URL))
   }
 
   async fetch(options: QuotaFetchOptions): Promise<QuotaProviderView> {
     try {
-      const auth = resolveQuotaAuthHeader(options, GEMINI_QUOTA_URL)
+      const auth = options?.resolveProviderAuthHeader?.(this.id) || resolveQuotaAuthHeader(options, GEMINI_QUOTA_URL)
       if (!auth) {
         return {
           id: this.id,

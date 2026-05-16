@@ -46,7 +46,7 @@ afterEach(() => {
 describe('getQuotaData', () => {
   it('returns quota data structure', async () => {
     installQuotaFetchMock()
-    const result = await getQuotaData({ resolveAuthHeader: () => 'Bearer test' })
+    const result = await getQuotaData({ resolveProviderAuthHeader: () => 'Bearer test' })
 
     expect(result).toHaveProperty('ok')
     expect(result).toHaveProperty('fetchedAt')
@@ -58,7 +58,7 @@ describe('getQuotaData', () => {
 
   it('handles provider filter', async () => {
     installQuotaFetchMock()
-    const result = await getQuotaData({ providerFilter: 'copilot', resolveAuthHeader: () => 'Bearer test' })
+    const result = await getQuotaData({ providerFilter: 'copilot', resolveProviderAuthHeader: () => 'Bearer test' })
 
     // Should only include copilot if available
     expect(result.providers.length).toBeLessThanOrEqual(1)
@@ -66,7 +66,7 @@ describe('getQuotaData', () => {
 
   it('handles refresh flag', async () => {
     installQuotaFetchMock()
-    const result = await getQuotaData({ refresh: true, resolveAuthHeader: () => 'Bearer test' })
+    const result = await getQuotaData({ refresh: true, resolveProviderAuthHeader: () => 'Bearer test' })
 
     expect(result.refreshed).toBe(true)
     expect(result.source).toBe('live')
@@ -82,14 +82,14 @@ describe('CopilotProvider', () => {
   })
 
   it('implements isAvailable', async () => {
-    const available = await provider.isAvailable({ resolveAuthHeader: () => 'Bearer test' })
+    const available = await provider.isAvailable({ resolveProviderAuthHeader: () => 'Bearer test' })
     expect(typeof available).toBe('boolean')
     expect(available).toBe(true)
   })
 
   it('returns quota view on fetch', async () => {
     installQuotaFetchMock()
-    const result = await provider.fetch({ resolveAuthHeader: () => 'Bearer test' })
+    const result = await provider.fetch({ resolveProviderAuthHeader: () => 'Bearer test' })
 
     expect(result.id).toBe('copilot')
     expect(result.status).toBe('ok')
@@ -108,7 +108,7 @@ describe('OpenAIProvider', () => {
 
   it('returns quota view on fetch', async () => {
     installQuotaFetchMock()
-    const result = await provider.fetch({ resolveAuthHeader: () => 'Bearer test' })
+    const result = await provider.fetch({ resolveProviderAuthHeader: () => 'Bearer test' })
 
     expect(result.id).toBe('openai')
     expect(Array.isArray(result.entries)).toBe(true)
@@ -126,7 +126,7 @@ describe('GeminiProvider', () => {
 
   it('returns quota view on fetch', async () => {
     installQuotaFetchMock()
-    const result = await provider.fetch({ resolveAuthHeader: () => 'Bearer test' })
+    const result = await provider.fetch({ resolveProviderAuthHeader: () => 'Bearer test' })
 
     expect(result.id).toBe('gemini')
     expect(Array.isArray(result.entries)).toBe(true)

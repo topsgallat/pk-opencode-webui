@@ -10,6 +10,7 @@ import * as fs from "node:fs"
 import * as nodePath from "node:path"
 import * as os from "node:os"
 import { clearProxyAuthSession, syncProxyAuthSession } from "./proxy-auth-session"
+import { clearProviderAuthSession, resolveProviderAuthHeader, syncProviderAuthSession } from "./provider-auth-session"
 
 type ExtendedEndpointOptions = {
   resolveUpstreamAuthHeader?: (target: string) => string | undefined
@@ -135,6 +136,23 @@ export async function handleExtendedEndpoint(
       return Response.json({ error: "target parameter is required" }, { status: 400 })
     }
     return clearProxyAuthSession(req, target)
+  }
+
+  // POST /api/ext/provider-auth - Sync provider auth for the current target
+  if (path === "/api/ext/provider-auth" && (method === "POST" || method === "PUT")) {
+    const body = await req.json().catch(() => null)
+    const target = url.searchParams.get("target") || ""
+    return syncProviderAuthSession(req, target, body)
+  }
+
+  // DELETE /api/ext/provider-auth?target=<url>&providerID=<id> - Clear provider auth
+  if (path === "/api/ext/provider-auth" && method === "DELETE") {
+    const target = url.searchParams.get("target") || ""
+    const providerID = url.searchParams.get("providerID") || ""
+    if (!target || !providerID) {
+      return Response.json({ error: "target and providerID parameters are required" }, { status: 400 })
+    }
+    return clearProviderAuthSession(req, target, providerID)
   }
 
   // POST /api/ext/mkdir - Create directory recursively
@@ -526,6 +544,7 @@ export async function handleExtendedEndpoint(
   if (path === "/api/ext/quota" && method === "GET") {
     const refresh = url.searchParams.get("refresh") === "true"
     const providerFilter = url.searchParams.get("provider") || undefined
+    const target = url.searchParams.get("target") || ""
 
     try {
       const { getQuotaData } = await import("./quota/index")
@@ -533,6 +552,7 @@ export async function handleExtendedEndpoint(
         refresh,
         providerFilter,
         resolveAuthHeader: options?.resolveUpstreamAuthHeader,
+        resolveProviderAuthHeader: (providerID) => resolveProviderAuthHeader(req, target, providerID),
       })
       return Response.json(result)
     } catch (error) {

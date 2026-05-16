@@ -43,12 +43,12 @@ export class CopilotProvider implements QuotaProvider {
   name = 'GitHub Copilot'
 
   async isAvailable(options?: QuotaFetchOptions): Promise<boolean> {
-    return Boolean(resolveQuotaAuthHeader(options, COPILOT_QUOTA_URL))
+    return Boolean(resolveQuotaAuthHeader(options, COPILOT_QUOTA_URL) || options?.resolveProviderAuthHeader?.(this.id))
   }
 
   async fetch(options: QuotaFetchOptions): Promise<QuotaProviderView> {
     try {
-      const auth = resolveQuotaAuthHeader(options, COPILOT_QUOTA_URL)
+      const auth = options?.resolveProviderAuthHeader?.(this.id) || resolveQuotaAuthHeader(options, COPILOT_QUOTA_URL)
       if (!auth) {
         return {
           id: this.id,

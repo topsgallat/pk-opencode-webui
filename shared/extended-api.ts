@@ -16,6 +16,92 @@ type ExtendedEndpointOptions = {
   resolveUpstreamAuthHeader?: (target: string) => string | undefined
 }
 
+function getAuthFileCandidates(): string[] {
+  const home = process.env.HOME || os.homedir()
+  const dataHome = process.env.XDG_DATA_HOME
+  const candidates = [
+    dataHome ? nodePath.join(dataHome, "opencode", "auth.json") : "",
+    nodePath.join(home, ".local", "share", "opencode", "auth.json"),
+    nodePath.join(home, ".config", "opencode", "auth.json"),
+    nodePath.join(home, "Library", "Application Support", "opencode", "auth.json"),
+  ]
+  return candidates.filter(Boolean)
+}
+
+async function readAuthFile(): Promise<Record<string, unknown> | undefined> {
+  for (const file of getAuthFileCandidates()) {
+    try {
+      const text = await fs.promises.readFile(file, "utf-8")
+      const parsed = JSON.parse(text)
+      if (parsed && typeof parsed === "object") {
+        return parsed as Record<string, unknown>
+      }
+    } catch {
+      continue
+    }
+  }
+  return undefined
+}
+
+function getAuthEntry(data: Record<string, unknown>, providerID: string): unknown {
+  if (providerID in data) {
+    return data[providerID]
+  }
+
+  const nested = data.providers
+  if (nested && typeof nested === "object" && providerID in nested) {
+    return (nested as Record<string, unknown>)[providerID]
+  }
+
+  return undefined
+}
+
+function toAuthHeader(entry: unknown): string | undefined {
+  if (!entry || typeof entry !== "object") return undefined
+  const raw = entry as Record<string, unknown>
+  const nested = raw.auth && typeof raw.auth === "object" ? raw.auth as Record<string, unknown> : undefined
+
+  const read = (obj?: Record<string, unknown>) => {
+    if (!obj) return ""
+    const header = typeof obj.authHeader === "string" ? obj.authHeader.trim() : ""
+    if (header) return header
+
+    const access = typeof obj.access === "string" ? obj.access.trim() : ""
+    if (access) return `Bearer ${access}`
+
+    const token = typeof obj.accessToken === "string" ? obj.accessToken.trim() : ""
+    if (token) return `Bearer ${token}`
+
+    const key = typeof obj.key === "string" ? obj.key.trim() : ""
+    if (key) return `Bearer ${key}`
+
+    const bearer = typeof obj.token === "string" ? obj.token.trim() : ""
+    if (bearer) return `Bearer ${bearer}`
+
+    return ""
+  }
+
+  const header = read(raw) || read(nested)
+  if (header) return header
+
+  return undefined
+}
+
+async function syncProviderAuthFromBackend(req: Request, target: string, providerID: string): Promise<Response> {
+  const auth = await readAuthFile()
+  if (!auth) {
+    return Response.json({ ok: false, error: "backend auth file not found" }, { status: 404 })
+  }
+
+  const entry = getAuthEntry(auth, providerID)
+  const authHeader = toAuthHeader(entry)
+  if (!authHeader) {
+    return Response.json({ ok: false, error: "provider auth not found" }, { status: 404 })
+  }
+
+  return syncProviderAuthSession(req, target, { providerID, authHeader })
+}
+
 /** Resolve the working directory from a query param, falling back to cwd */
 function resolveDir(url: URL): string {
   return url.searchParams.get("directory") || process.cwd()
@@ -143,6 +229,16 @@ export async function handleExtendedEndpoint(
     const body = await req.json().catch(() => null)
     const target = url.searchParams.get("target") || ""
     return syncProviderAuthSession(req, target, body)
+  }
+
+  // POST /api/ext/provider-auth/from-backend - Sync provider auth from the OpenCode backend auth store
+  if (path === "/api/ext/provider-auth/from-backend" && method === "POST") {
+    const providerID = url.searchParams.get("providerID") || ""
+    const target = url.searchParams.get("target") || ""
+    if (!providerID || !target) {
+      return Response.json({ error: "target and providerID parameters are required" }, { status: 400 })
+    }
+    return syncProviderAuthFromBackend(req, target, providerID)
   }
 
   // DELETE /api/ext/provider-auth?target=<url>&providerID=<id> - Clear provider auth

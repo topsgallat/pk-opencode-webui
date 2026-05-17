@@ -419,34 +419,38 @@ export function SessionInfo(props: SessionInfoProps) {
           </button>
         </Show>
 
-        <Show when={composerReady() && !props.loading() && !props.processing()}>
-          <button
-            type="submit"
-            class="flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg shrink-0"
-            style={{
-              background: "var(--interactive-base)",
-              color: "var(--text-on-interactive)",
-            }}
-            title="Click or press Enter to send"
-            aria-label="Send message"
-          >
-            <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
-              SEND
-            </div>
-            <CornerDownLeft class="w-4 h-4" />
-          </button>
-        </Show>
+        <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-none sm:justify-start sm:gap-3">
+          <div class="flex min-w-0 items-center gap-1">
+            {/* No provider warning */}
+            <Show when={!selectedModel() && providers.connected.length === 0}>
+              <a href={`/${dirSlug()}/settings`} style={{ color: "var(--text-interactive-base)" }} class="hover:underline">
+                Connect a provider to start
+              </a>
+            </Show>
 
-        {/* No provider warning */}
-        <Show when={!selectedModel() && providers.connected.length === 0}>
-          <a href={`/${dirSlug()}/settings`} style={{ color: "var(--text-interactive-base)" }} class="hover:underline">
-            Connect a provider to start
-          </a>
-        </Show>
+            <Show when={!selectedModel() && providers.connected.length > 0}>
+              <span style={{ color: "var(--status-warning-text)" }}>No model selected</span>
+            </Show>
+          </div>
 
-        <Show when={!selectedModel() && providers.connected.length > 0}>
-          <span style={{ color: "var(--status-warning-text)" }}>No model selected</span>
-        </Show>
+          <Show when={composerReady() && !props.loading() && !props.processing()}>
+            <button
+              type="submit"
+              class="flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg shrink-0"
+              style={{
+                background: "var(--interactive-base)",
+                color: "var(--text-on-interactive)",
+              }}
+              title="Click or press Enter to send"
+              aria-label="Send message"
+            >
+              <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
+                SEND
+              </div>
+              <CornerDownLeft class="w-4 h-4" />
+            </button>
+          </Show>
+        </div>
 
         <Show when={queueCount() > 0}>
           <span

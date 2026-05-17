@@ -433,21 +433,43 @@ export function SessionInfo(props: SessionInfoProps) {
             </Show>
           </div>
 
-          <Show when={composerReady() && !props.loading() && !props.processing()}>
+          <Show when={!props.loading() && !props.processing()}>
+            <Show when={composerReady()}>
+              <button
+                type="submit"
+                class="ml-auto flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg shrink-0"
+                style={{
+                  background: "var(--interactive-base)",
+                  color: "var(--text-on-interactive)",
+                }}
+                title="Click or press Enter to send"
+                aria-label="Send message"
+              >
+                <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
+                  SEND
+                </div>
+                <CornerDownLeft class="w-4 h-4" />
+              </button>
+            </Show>
+          </Show>
+
+          <Show when={props.processing()}>
             <button
-              type="submit"
+              type="button"
               class="ml-auto flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg shrink-0"
               style={{
-                background: "var(--interactive-base)",
-                color: "var(--text-on-interactive)",
+                background: "var(--status-danger-dim)",
+                color: "var(--status-danger-text)",
+                border: "1px solid var(--status-danger-border)",
               }}
-              title="Click or press Enter to send"
-              aria-label="Send message"
+              title="Stop generation"
+              aria-label="Stop generation"
+              onClick={() => props.onAbort()}
             >
               <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
-                SEND
+                STOP
               </div>
-              <CornerDownLeft class="w-4 h-4" />
+              <Square class="w-4 h-4" />
             </button>
           </Show>
         </div>

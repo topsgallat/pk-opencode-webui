@@ -1,4 +1,5 @@
-import { createMemo, createEffect, Show } from "solid-js"
+import { createMemo, createEffect, createSignal, Show, onCleanup } from "solid-js"
+import { Portal } from "solid-js/web"
 import { useParams } from "@solidjs/router"
 import { useSync } from "../context/sync"
 import { useProviders } from "../context/providers"
@@ -263,6 +264,57 @@ export function SessionInfo(props: SessionInfoProps) {
     )
   })
 
+  const [showTokenPopover, setShowTokenPopover] = createSignal(false)
+  const [popoverPos, setPopoverPos] = createSignal({ top: 0, left: 0 })
+  let triggerRef: HTMLButtonElement | undefined
+  let popoverRef: HTMLDivElement | undefined
+
+  createEffect(() => {
+    params.id
+    setShowTokenPopover(false)
+  })
+
+  createEffect(() => {
+    if (!showTokenPopover()) return
+
+    function handleClick(e: MouseEvent) {
+      if (popoverRef && !popoverRef.contains(e.target as Node) && triggerRef && !triggerRef.contains(e.target as Node)) {
+        setShowTokenPopover(false)
+      }
+    }
+
+    function handleKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return
+      e.preventDefault()
+      e.stopPropagation()
+      setShowTokenPopover(false)
+    }
+
+    document.addEventListener("mousedown", handleClick)
+    document.addEventListener("keydown", handleKey)
+
+    onCleanup(() => {
+      document.removeEventListener("mousedown", handleClick)
+      document.removeEventListener("keydown", handleKey)
+    })
+  })
+
+  function toggleTokenPopover() {
+    if (showTokenPopover()) {
+      setShowTokenPopover(false)
+      return
+    }
+
+    if (triggerRef) {
+      const rect = triggerRef.getBoundingClientRect()
+      const width = 256
+      const maxLeft = window.innerWidth - width - 16
+      setPopoverPos({ top: rect.top - 8, left: Math.max(0, Math.min(rect.left, maxLeft)) })
+    }
+
+    setShowTokenPopover(true)
+  }
+
   const dirSlug = createMemo(() => params.dir)
 
   const composerReady = createMemo(() => !!(props.input().trim() || props.hasAttachments?.()))
@@ -346,26 +398,75 @@ export function SessionInfo(props: SessionInfoProps) {
       </div>
 
       {/* Right group - action controls, always visible */}
-      <div class="ml-3 flex items-center shrink-0">
+      <div class="ml-3 flex w-full flex-wrap items-center justify-end gap-x-2 gap-y-1 shrink-0 sm:ml-3 sm:w-auto sm:flex-nowrap">
         <Show when={stats()}>
           {(s) => (
             <>
-              <span class="flex items-center gap-1.5 shrink-0">
-                <Zap class="w-3 h-3" />
-                <span style={{ color: "var(--text-base)" }}>{s().tokens}</span>
-                <span class="opacity-60">tokens</span>
-                <Show when={s().usage !== null}>
-                  <span
-                    class="px-1 py-0.5 rounded text-[10px] font-medium"
+              <button
+                ref={triggerRef}
+                type="button"
+                class="inline-flex items-center gap-1.5 shrink-0 cursor-pointer hover:opacity-80"
+                onClick={toggleTokenPopover}
+                aria-haspopup="true"
+                aria-expanded={showTokenPopover()}
+                title="Show token breakdown"
+              >
+                <span class="inline-flex items-center gap-1.5 min-h-7 px-1 py-0.5">
+                  <Zap class="w-3 h-3" />
+                  <span style={{ color: "var(--text-base)" }}>{s().tokens}</span>
+                  <span class="opacity-60">tokens</span>
+                  <Show when={s().usage !== null}>
+                    <span
+                      class="px-1 py-0.5 rounded text-[10px] font-medium"
+                      style={{
+                        background: s().usage! > 80 ? "var(--surface-critical-subtle)" : "var(--surface-inset)",
+                        color: s().usage! > 80 ? "var(--text-critical-base)" : "var(--text-weak)",
+                      }}
+                    >
+                      {s().usage}%
+                    </span>
+                  </Show>
+                </span>
+              </button>
+              <Show when={showTokenPopover()}>
+                <Portal>
+                  <div
+                    ref={popoverRef}
+                    class="w-64 rounded-lg shadow-lg text-xs"
                     style={{
-                      background: s().usage! > 80 ? "var(--surface-critical-subtle)" : "var(--surface-inset)",
-                      color: s().usage! > 80 ? "var(--text-critical-base)" : "var(--text-weak)",
+                      position: "fixed",
+                      top: `${popoverPos().top}px`,
+                      left: `${popoverPos().left}px`,
+                      transform: "translateY(-100%)",
+                      "z-index": "9999",
+                      background: "var(--background-base)",
+                      border: "1px solid var(--border-base)",
                     }}
                   >
-                    {s().usage}%
-                  </span>
-                </Show>
-              </span>
+                    <div
+                      class="px-3 py-2 font-medium"
+                      style={{
+                        color: "var(--text-strong)",
+                        "border-bottom": "1px solid var(--border-base)",
+                        background: "var(--surface-inset)",
+                        "border-radius": "0.5rem 0.5rem 0 0",
+                      }}
+                    >
+                      Token Breakdown
+                    </div>
+                    <div class="px-3 py-2 space-y-1.5 font-mono" style={{ color: "var(--text-base)" }}>
+                      <div class="flex justify-between">
+                        <span>Context:</span>
+                        <span>{s().tokens}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span>Cost:</span>
+                        <span>{s().cost} <span class="opacity-60" style={{ "font-family": "inherit" }}>(session)</span></span>
+                      </div>
+                    </div>
+                  </div>
+                </Portal>
+              </Show>
               <span class="flex items-center gap-1.5 shrink-0">
                 <span class="opacity-60">Cost:</span>
                 <span style={{ color: "var(--text-base)" }}>{s().cost}</span>

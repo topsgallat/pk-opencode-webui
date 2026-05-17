@@ -382,6 +382,12 @@ export function SessionInfo(props: SessionInfoProps) {
   const fmt = (n: number) => n.toLocaleString()
   const composerReady = createMemo(() => !!(props.input().trim() || props.hasAttachments?.()))
   const queueCount = createMemo(() => props.queueCount?.() ?? 0)
+  const actionMode = createMemo(() => {
+    if (composerReady() && props.queueActive?.()) return "queue"
+    if (props.processing()) return "stop"
+    if (composerReady()) return "send"
+    return null
+  })
   const pausedLabel = createMemo(() => {
     const reason = props.pausedReason?.()
     if (reason === "paused_question") return "Paused: question"
@@ -434,44 +440,33 @@ export function SessionInfo(props: SessionInfoProps) {
             </Show>
           </div>
 
-          <Show when={!props.loading() && !props.processing()}>
-            <Show when={composerReady()}>
+          <Show when={!props.loading()}>
+            <Show when={actionMode()}>
               <button
-                type="submit"
-                class="ml-auto flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg shrink-0"
-                style={{
-                  background: "var(--interactive-base)",
-                  color: "var(--text-on-interactive)",
-                }}
-                title={props.queueActive?.() ? "Add to queue" : "Click or press Enter to send"}
-                aria-label={props.queueActive?.() ? "Add to queue" : "Send message"}
+                type={actionMode() === "stop" ? "button" : "submit"}
+                class="ml-auto inline-flex items-center gap-1.5 cursor-pointer rounded-xl px-3 py-1.5 text-[11px] font-medium transition-opacity hover:opacity-100 shrink-0"
+                style={actionMode() === "stop"
+                  ? {
+                    background: "var(--status-danger-dim)",
+                    color: "var(--status-danger-text)",
+                    border: "1px solid var(--status-danger-border)",
+                  }
+                  : {
+                    background: "var(--interactive-base)",
+                    color: "var(--text-on-interactive)",
+                  }}
+                title={actionMode() === "queue" ? "Add to queue" : actionMode() === "stop" ? "Stop generation (Esc Esc)" : "Click or press Enter to send"}
+                aria-label={actionMode() === "queue" ? "Add to queue" : actionMode() === "stop" ? "Stop generation" : "Send message"}
+                onClick={() => (actionMode() === "stop" ? props.onAbort() : undefined)}
               >
-                <CornerDownLeft class="w-4 h-4" />
-                <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
-                  {props.queueActive?.() ? "ADD TO QUEUE" : "SEND"}
+                <div class="uppercase tracking-wide">
+                  {actionMode() === "queue" ? "ADD TO QUEUE" : actionMode() === "stop" ? "STOP" : "SEND"}
                 </div>
+                <Show when={actionMode() === "stop"} fallback={<CornerDownLeft class="w-4 h-4" />}>
+                  <Square class="w-4 h-4" />
+                </Show>
               </button>
             </Show>
-          </Show>
-
-          <Show when={props.processing()}>
-            <button
-              type="button"
-              class="ml-auto flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg shrink-0"
-              style={{
-                background: "var(--status-danger-dim)",
-                color: "var(--status-danger-text)",
-                border: "1px solid var(--status-danger-border)",
-              }}
-              title="Stop generation (Esc Esc)"
-              aria-label="Stop generation"
-              onClick={() => props.onAbort()}
-            >
-              <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
-                STOP
-              </div>
-              <Square class="w-4 h-4" />
-            </button>
           </Show>
         </div>
 

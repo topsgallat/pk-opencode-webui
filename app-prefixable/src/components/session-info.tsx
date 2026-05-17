@@ -389,9 +389,9 @@ export function SessionInfo(props: SessionInfoProps) {
   })
 
   return (
-    <div class="flex flex-wrap items-center px-2 sm:px-4 py-1.5 text-xs gap-y-2" style={{ color: "var(--text-weak)" }}>
-      {/* Left group - info text, wraps on mobile */}
-      <div class="flex flex-1 flex-wrap items-center gap-3 min-w-0 [&_button:focus-visible]:outline-offset-[-2px] [&_a:focus-visible]:outline-offset-[-2px] pr-2">
+    <div class="flex flex-col px-2 py-1.5 text-xs gap-y-2 sm:flex-row sm:flex-wrap sm:items-center sm:px-4" style={{ color: "var(--text-weak)" }}>
+      {/* Left group - info text, stacks on mobile */}
+      <div class="flex flex-1 flex-col min-w-0 gap-1 pr-2 [&_button:focus-visible]:outline-offset-[-2px] [&_a:focus-visible]:outline-offset-[-2px]">
         {/* Agent */}
         <Show when={selectedAgent()}>
           <button
@@ -406,20 +406,20 @@ export function SessionInfo(props: SessionInfoProps) {
           </button>
         </Show>
 
-        {/* Model */}
-        <Show when={selectedModel()}>
-          <button
-            type="button"
-            class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer"
-            onClick={() => props.onModelClick()}
-          >
-            <span class="opacity-60 shrink-0">Model:</span>
-            <span class="truncate" style={{ color: "var(--text-base)" }}>{modelLabel()}</span>
-            {modelBadge()}
-          </button>
-        </Show>
+        {/* Model + Send row */}
+        <div class="flex w-full items-center gap-2 min-w-0 sm:gap-3">
+          <Show when={selectedModel()}>
+            <button
+              type="button"
+              class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer"
+              onClick={() => props.onModelClick()}
+            >
+              <span class="opacity-60 shrink-0">Model:</span>
+              <span class="truncate" style={{ color: "var(--text-base)" }}>{modelLabel()}</span>
+              {modelBadge()}
+            </button>
+          </Show>
 
-        <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-none sm:justify-start sm:gap-3">
           <div class="flex min-w-0 items-center gap-1">
             {/* No provider warning */}
             <Show when={!selectedModel() && providers.connected.length === 0}>
@@ -436,7 +436,7 @@ export function SessionInfo(props: SessionInfoProps) {
           <Show when={composerReady() && !props.loading() && !props.processing()}>
             <button
               type="submit"
-              class="flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg shrink-0"
+              class="ml-auto flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg shrink-0"
               style={{
                 background: "var(--interactive-base)",
                 color: "var(--text-on-interactive)",

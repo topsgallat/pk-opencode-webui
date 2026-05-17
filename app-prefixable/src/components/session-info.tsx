@@ -460,225 +460,222 @@ export function SessionInfo(props: SessionInfoProps) {
       </div>
 
       {/* Right group - action controls, always visible */}
-      <div class="ml-3 flex items-center shrink-0 gap-2">
-        <Show when={stats()}>
-          {(s) => (
-            <>
-              <div class="relative">
-                <button
-                  ref={triggerRef}
-                  type="button"
-                  class="flex items-center gap-2 rounded-lg px-2 py-1 transition-opacity hover:opacity-80"
-                  style={{
-                    background: "var(--surface-inset)",
-                    border: "1px solid var(--border-base)",
-                    color: "var(--text-base)",
-                  }}
-                  onClick={toggleTokenPopover}
-                  aria-haspopup="true"
-                  aria-expanded={showTokenPopover()}
-                  title="Show token breakdown"
-                  aria-label="Show token breakdown"
-                >
-                  <Zap class="w-3 h-3" />
-                  <span class="flex items-center gap-1 shrink-0 text-[10px] font-medium uppercase tracking-wide">
-                    <span>{s().tokens}</span>
-                    <span class="opacity-60 normal-case tracking-normal">tokens</span>
+      <Show when={stats()}>
+        {(s) => (
+          <div class="ml-0 flex w-full flex-wrap items-center justify-start gap-x-2 gap-y-1 sm:ml-3 sm:w-auto sm:flex-nowrap sm:justify-end">
+            <div class="relative">
+              <button
+                ref={triggerRef}
+                type="button"
+                class="flex items-center gap-2 transition-opacity hover:opacity-80"
+                style={{ color: "var(--text-base)" }}
+                onClick={toggleTokenPopover}
+                aria-haspopup="true"
+                aria-expanded={showTokenPopover()}
+                title="Show token breakdown"
+                aria-label="Show token breakdown"
+              >
+                <Zap class="w-3 h-3" />
+                <span class="flex items-center gap-1 shrink-0 text-[10px] font-medium uppercase tracking-wide">
+                  <span>{s().tokens}</span>
+                  <span class="opacity-60 normal-case tracking-normal">tokens</span>
+                </span>
+                <Show when={s().usage !== null}>
+                  <span
+                    class="px-1 py-0.5 rounded text-[10px] font-medium"
+                    style={{
+                      background: s().usage! > 80 ? "var(--surface-critical-subtle)" : "var(--surface-inset)",
+                      color: s().usage! > 80 ? "var(--text-critical-base)" : "var(--text-weak)",
+                    }}
+                  >
+                    {s().usage}%
                   </span>
-                  <Show when={s().usage !== null}>
-                    <span
-                      class="px-1 py-0.5 rounded text-[10px] font-medium"
-                      style={{
-                        background: s().usage! > 80 ? "var(--surface-critical-subtle)" : "var(--surface-inset)",
-                        color: s().usage! > 80 ? "var(--text-critical-base)" : "var(--text-weak)",
-                      }}
-                    >
-                      {s().usage}%
-                    </span>
-                  </Show>
-                  <span class="flex items-center gap-1 shrink-0 text-[10px]">
-                    <span class="opacity-60">Cost</span>
-                    <span style={{ color: "var(--text-base)" }}>{s().cost}</span>
-                  </span>
-                  <ConnectionBadge />
-                </button>
-
-                {/* Token breakdown popover - portalled to escape overflow-hidden */}
-                <Show when={showTokenPopover()}>
-                  <Portal>
-                    <div
-                      ref={popoverRef}
-                      class="w-72 rounded-lg shadow-lg text-xs"
-                      style={{
-                        position: "fixed",
-                        top: `${popoverPos().top}px`,
-                        left: `${popoverPos().left}px`,
-                        transform: "translateY(-100%)",
-                        "z-index": "9999",
-                        background: "var(--background-base)",
-                        border: "1px solid var(--border-base)",
-                      }}
-                    >
-                      <div
-                        class="px-3 py-2 font-medium"
-                        style={{
-                          color: "var(--text-strong)",
-                          "border-bottom": "1px solid var(--border-base)",
-                          background: "var(--surface-inset)",
-                          "border-radius": "0.5rem 0.5rem 0 0",
-                        }}
-                      >
-                        Token Breakdown
-                      </div>
-                      <div class="px-3 py-2 space-y-1.5 font-mono" style={{ color: "var(--text-base)" }}>
-                        <div class="flex justify-between">
-                          <span>Context:</span>
-                          <span>
-                            {fmt(s().contextTokens)}
-                            <Show when={s().contextLimit > 0}>
-                              <span class="opacity-60"> / {fmt(s().contextLimit)}</span>
-                            </Show>
-                            <Show when={s().usage !== null}>
-                              <span class="opacity-60"> ({s().usage}%)</span>
-                            </Show>
-                          </span>
-                        </div>
-
-                        <div class="flex justify-between pl-3" style={{ color: "var(--text-weak)" }}>
-                          <span>Input:</span>
-                          <span>{fmt(s().input)}</span>
-                        </div>
-
-                        <div class="flex justify-between pl-3" style={{ color: "var(--text-weak)" }}>
-                          <span>Cache:</span>
-                          <span>{fmt(s().cacheTotal)}</span>
-                        </div>
-                        <Show when={s().cacheRead > 0 || s().cacheWrite > 0}>
-                          <div class="flex justify-between pl-6" style={{ color: "var(--text-weak)", opacity: 0.8 }}>
-                            <span>read / write:</span>
-                            <span>{fmt(s().cacheRead)} / {fmt(s().cacheWrite)}</span>
-                          </div>
-                        </Show>
-
-                        <div class="flex justify-between">
-                          <span>Output:</span>
-                          <span>{fmt(s().output)}</span>
-                        </div>
-
-                        <Show when={s().reasoning > 0}>
-                          <div class="flex justify-between">
-                            <span>Reasoning:</span>
-                            <span>{fmt(s().reasoning)}</span>
-                          </div>
-                        </Show>
-
-                        <Show when={s().estimatedCost !== null}>
-                          <div class="flex justify-between pt-1.5 mt-1" style={{ "border-top": "1px solid var(--border-base)" }}>
-                            <span>Estimate:</span>
-                            <span>{usd.format(s().estimatedCost || 0)}</span>
-                          </div>
-                        </Show>
-
-                        <div class="flex justify-between">
-                          <span>Cost:</span>
-                          <span>{s().cost} <span class="opacity-60" style={{ "font-family": "inherit" }}>(session)</span></span>
-                        </div>
-
-                        <Show when={quota.loading}>
-                          <div class="pt-1.5 mt-1 text-[11px]" style={{ "border-top": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
-                            Loading quota...
-                          </div>
-                        </Show>
-
-                        <Show when={quota.error && !quota.loading}>
-                          <div class="pt-1.5 mt-1 text-[11px]" style={{ "border-top": "1px solid var(--border-base)", color: "var(--text-critical-base)" }}>
-                            Quota unavailable
-                          </div>
-                        </Show>
-
-                        <Show when={quota() && !quota.loading && !quota.error}>
-                          <div class="pt-1.5 mt-1 space-y-2" style={{ "border-top": "1px solid var(--border-base)" }}>
-                            <div class="flex items-center justify-between gap-2 font-sans">
-                              <span class="font-medium" style={{ color: "var(--text-strong)" }}>Quota</span>
-                              <span class="text-[10px]" style={{ color: "var(--text-weak)" }}>
-                                {quota()!.summary.availableProviders.length} available / {quota()!.summary.unavailableProviders.length} unavailable
-                              </span>
-                            </div>
-
-                            <Show when={quotaProvider()} fallback={
-                              <div class="text-[11px] font-sans" style={{ color: "var(--text-weak)" }}>
-                                No quota provider matched this composer.
-                              </div>
-                            }>
-                              <div
-                                class="rounded-md px-2.5 py-2 space-y-2 font-sans"
-                                style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)" }}
-                              >
-                                <div class="flex items-center justify-between gap-2">
-                                  <span class="min-w-0 truncate font-medium" style={{ color: "var(--text-strong)" }}>
-                                    {quotaProvider()!.name}
-                                  </span>
-                                  <span
-                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
-                                    style={{
-                                      background: quotaStatus(quotaProvider()!.status).background,
-                                      color: quotaStatus(quotaProvider()!.status).color,
-                                      border: quotaStatus(quotaProvider()!.status).border,
-                                    }}
-                                  >
-                                    {quotaStatus(quotaProvider()!.status).label}
-                                  </span>
-                                </div>
-
-                                <Show when={quotaProvider()!.entries.length > 0} fallback={
-                                  <div class="text-[11px]" style={{ color: "var(--text-weak)" }}>
-                                    No quota limits reported.
-                                  </div>
-                                }>
-                                  <div class="space-y-1.5">
-                                    <For each={quotaProvider()!.entries.slice(0, 3)}>
-                                      {(entry) => {
-                                        const percent = quotaPercent(entry)
-                                        return (
-                                          <div class="space-y-1">
-                                            <div class="flex items-center justify-between gap-2 text-[11px]">
-                                              <span class="min-w-0 truncate" style={{ color: "var(--text-base)" }}>
-                                                {entry.label}
-                                              </span>
-                                              <span class="shrink-0" style={{ color: "var(--text-weak)" }}>
-                                                {entry.unlimited ? "Unlimited" : entry.used !== undefined && entry.total !== undefined
-                                                  ? `${entry.used.toLocaleString()} / ${entry.total.toLocaleString()}`
-                                                  : entry.remaining !== undefined
-                                                    ? `${entry.remaining.toLocaleString()} remaining`
-                                                    : "-"}
-                                              </span>
-                                            </div>
-                                            <Show when={percent !== null}>
-                                              <div class="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--background-base)" }}>
-                                                <div
-                                                  class="h-full rounded-full transition-all duration-300"
-                                                  style={{ width: `${percent}%`, background: quotaBarColor(percent) }}
-                                                />
-                                              </div>
-                                            </Show>
-                                          </div>
-                                        )
-                                      }}
-                                    </For>
-                                  </div>
-                                </Show>
-                              </div>
-                            </Show>
-                          </div>
-                        </Show>
-                      </div>
-                    </div>
-                  </Portal>
                 </Show>
-              </div>
-            </>
-          )}
-        </Show>
+              </button>
+
+              {/* Token breakdown popover - portalled to escape overflow-hidden */}
+              <Show when={showTokenPopover()}>
+                <Portal>
+                  <div
+                    ref={popoverRef}
+                    class="w-72 rounded-lg shadow-lg text-xs"
+                    style={{
+                      position: "fixed",
+                      top: `${popoverPos().top}px`,
+                      left: `${popoverPos().left}px`,
+                      transform: "translateY(-100%)",
+                      "z-index": "9999",
+                      background: "var(--background-base)",
+                      border: "1px solid var(--border-base)",
+                    }}
+                  >
+                    <div
+                      class="px-3 py-2 font-medium"
+                      style={{
+                        color: "var(--text-strong)",
+                        "border-bottom": "1px solid var(--border-base)",
+                        background: "var(--surface-inset)",
+                        "border-radius": "0.5rem 0.5rem 0 0",
+                      }}
+                    >
+                      Token Breakdown
+                    </div>
+                    <div class="px-3 py-2 space-y-1.5 font-mono" style={{ color: "var(--text-base)" }}>
+                      <div class="flex justify-between">
+                        <span>Context:</span>
+                        <span>
+                          {fmt(s().contextTokens)}
+                          <Show when={s().contextLimit > 0}>
+                            <span class="opacity-60"> / {fmt(s().contextLimit)}</span>
+                          </Show>
+                          <Show when={s().usage !== null}>
+                            <span class="opacity-60"> ({s().usage}%)</span>
+                          </Show>
+                        </span>
+                      </div>
+
+                      <div class="flex justify-between pl-3" style={{ color: "var(--text-weak)" }}>
+                        <span>Input:</span>
+                        <span>{fmt(s().input)}</span>
+                      </div>
+
+                      <div class="flex justify-between pl-3" style={{ color: "var(--text-weak)" }}>
+                        <span>Cache:</span>
+                        <span>{fmt(s().cacheTotal)}</span>
+                      </div>
+                      <Show when={s().cacheRead > 0 || s().cacheWrite > 0}>
+                        <div class="flex justify-between pl-6" style={{ color: "var(--text-weak)", opacity: 0.8 }}>
+                          <span>read / write:</span>
+                          <span>{fmt(s().cacheRead)} / {fmt(s().cacheWrite)}</span>
+                        </div>
+                      </Show>
+
+                      <div class="flex justify-between">
+                        <span>Output:</span>
+                        <span>{fmt(s().output)}</span>
+                      </div>
+
+                      <Show when={s().reasoning > 0}>
+                        <div class="flex justify-between">
+                          <span>Reasoning:</span>
+                          <span>{fmt(s().reasoning)}</span>
+                        </div>
+                      </Show>
+
+                      <Show when={s().estimatedCost !== null}>
+                        <div class="flex justify-between pt-1.5 mt-1" style={{ "border-top": "1px solid var(--border-base)" }}>
+                          <span>Estimate:</span>
+                          <span>{usd.format(s().estimatedCost || 0)}</span>
+                        </div>
+                      </Show>
+
+                      <div class="flex justify-between">
+                        <span>Cost:</span>
+                        <span>{s().cost} <span class="opacity-60" style={{ "font-family": "inherit" }}>(session)</span></span>
+                      </div>
+
+                      <Show when={quota.loading}>
+                        <div class="pt-1.5 mt-1 text-[11px]" style={{ "border-top": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
+                          Loading quota...
+                        </div>
+                      </Show>
+
+                      <Show when={quota.error && !quota.loading}>
+                        <div class="pt-1.5 mt-1 text-[11px]" style={{ "border-top": "1px solid var(--border-base)", color: "var(--text-critical-base)" }}>
+                          Quota unavailable
+                        </div>
+                      </Show>
+
+                      <Show when={quota() && !quota.loading && !quota.error}>
+                        <div class="pt-1.5 mt-1 space-y-2" style={{ "border-top": "1px solid var(--border-base)" }}>
+                          <div class="flex items-center justify-between gap-2 font-sans">
+                            <span class="font-medium" style={{ color: "var(--text-strong)" }}>Quota</span>
+                            <span class="text-[10px]" style={{ color: "var(--text-weak)" }}>
+                              {quota()!.summary.availableProviders.length} available / {quota()!.summary.unavailableProviders.length} unavailable
+                            </span>
+                          </div>
+
+                          <Show when={quotaProvider()} fallback={
+                            <div class="text-[11px] font-sans" style={{ color: "var(--text-weak)" }}>
+                              No quota provider matched this composer.
+                            </div>
+                          }>
+                            <div
+                              class="rounded-md px-2.5 py-2 space-y-2 font-sans"
+                              style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)" }}
+                            >
+                              <div class="flex items-center justify-between gap-2">
+                                <span class="min-w-0 truncate font-medium" style={{ color: "var(--text-strong)" }}>
+                                  {quotaProvider()!.name}
+                                </span>
+                                <span
+                                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+                                  style={{
+                                    background: quotaStatus(quotaProvider()!.status).background,
+                                    color: quotaStatus(quotaProvider()!.status).color,
+                                    border: quotaStatus(quotaProvider()!.status).border,
+                                  }}
+                                >
+                                  {quotaStatus(quotaProvider()!.status).label}
+                                </span>
+                              </div>
+
+                              <Show when={quotaProvider()!.entries.length > 0} fallback={
+                                <div class="text-[11px]" style={{ color: "var(--text-weak)" }}>
+                                  No quota limits reported.
+                                </div>
+                              }>
+                                <div class="space-y-1.5">
+                                  <For each={quotaProvider()!.entries.slice(0, 3)}>
+                                    {(entry) => {
+                                      const percent = quotaPercent(entry)
+                                      return (
+                                        <div class="space-y-1">
+                                          <div class="flex items-center justify-between gap-2 text-[11px]">
+                                            <span class="min-w-0 truncate" style={{ color: "var(--text-base)" }}>
+                                              {entry.label}
+                                            </span>
+                                            <span class="shrink-0" style={{ color: "var(--text-weak)" }}>
+                                              {entry.unlimited ? "Unlimited" : entry.used !== undefined && entry.total !== undefined
+                                                ? `${entry.used.toLocaleString()} / ${entry.total.toLocaleString()}`
+                                                : entry.remaining !== undefined
+                                                  ? `${entry.remaining.toLocaleString()} remaining`
+                                                  : "-"}
+                                            </span>
+                                          </div>
+                                          <Show when={percent !== null}>
+                                            <div class="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--background-base)" }}>
+                                              <div
+                                                class="h-full rounded-full transition-all duration-300"
+                                                style={{ width: `${percent}%`, background: quotaBarColor(percent) }}
+                                              />
+                                            </div>
+                                          </Show>
+                                        </div>
+                                      )
+                                    }}
+                                  </For>
+                                </div>
+                              </Show>
+                            </div>
+                          </Show>
+                        </div>
+                      </Show>
+                    </div>
+                  </div>
+                </Portal>
+              </Show>
+            </div>
+
+            <span class="flex items-center gap-1 shrink-0 text-[10px]">
+              <span class="opacity-60">Cost</span>
+              <span style={{ color: "var(--text-base)" }}>{s().cost}</span>
+            </span>
+
+            <ConnectionBadge />
+          </div>
+        )}
+      </Show>
 
         <Show when={composerReady() && !props.loading() && !props.processing()}>
           <button
@@ -732,7 +729,6 @@ export function SessionInfo(props: SessionInfoProps) {
             <span>Stop</span>
           </button>
         </Show>
-      </div>
     </div>
   )
 }

@@ -78,6 +78,7 @@ interface SessionInfoProps {
   queueCount?: () => number
   pausedReason?: () => "paused_question" | "paused_permission" | null
   onAbort: () => void
+  onAction: () => void
   onAgentClick: () => void
   onModelClick: () => void
   selectedAgent?: () => string | null
@@ -443,7 +444,7 @@ export function SessionInfo(props: SessionInfoProps) {
           <Show when={!props.loading()}>
             <Show when={actionMode()}>
               <button
-                type={actionMode() === "stop" ? "button" : "submit"}
+                type="button"
                 class="ml-auto inline-flex items-center gap-1.5 cursor-pointer rounded-xl px-3 py-1.5 text-[11px] font-medium transition-opacity hover:opacity-100 shrink-0"
                 style={actionMode() === "stop"
                   ? {
@@ -454,10 +455,10 @@ export function SessionInfo(props: SessionInfoProps) {
                   : {
                     background: "var(--interactive-base)",
                     color: "var(--text-on-interactive)",
-                  }}
+                }}
                 title={actionMode() === "queue" ? "Add to queue" : actionMode() === "stop" ? "Stop generation (Esc Esc)" : "Click or press Enter to send"}
                 aria-label={actionMode() === "queue" ? "Add to queue" : actionMode() === "stop" ? "Stop generation" : "Send message"}
-                onClick={() => (actionMode() === "stop" ? props.onAbort() : undefined)}
+                onClick={() => (actionMode() === "stop" ? props.onAbort() : props.onAction())}
               >
                 <div class="uppercase tracking-wide">
                   {actionMode() === "queue" ? "ADD TO QUEUE" : actionMode() === "stop" ? "STOP" : "SEND"}

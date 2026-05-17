@@ -1893,6 +1893,10 @@ export function Session() {
 
   async function sendMessage(e: SubmitEvent) {
     e.preventDefault();
+    await submitComposerAction();
+  }
+
+  async function submitComposerAction() {
     const text = input().trim();
 
     // Intercept `/undo N` — revert N user turns at once (explicit submit only)
@@ -2865,6 +2869,7 @@ export function Session() {
                       queueCount={() => pendingQueue().length}
                       pausedReason={sessionPausedReason}
                       onAbort={handleAbort}
+                      onAction={submitComposerAction}
                       onAgentClick={() => setShowAgentPicker(true)}
                       onModelClick={() => setShowModelPicker(true)}
                       hasAttachments={() => fileContext().length > 0 || imageAttachments().length > 0}

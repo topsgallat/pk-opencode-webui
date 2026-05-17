@@ -74,6 +74,7 @@ interface SessionInfoProps {
   input: () => string
   loading: () => boolean
   processing: () => boolean
+  queueActive?: () => boolean
   queueCount?: () => number
   pausedReason?: () => "paused_question" | "paused_permission" | null
   onAbort: () => void
@@ -442,13 +443,13 @@ export function SessionInfo(props: SessionInfoProps) {
                   background: "var(--interactive-base)",
                   color: "var(--text-on-interactive)",
                 }}
-                title="Click or press Enter to send"
-                aria-label="Send message"
+                title={props.queueActive?.() ? "Add to queue" : "Click or press Enter to send"}
+                aria-label={props.queueActive?.() ? "Add to queue" : "Send message"}
               >
-                <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
-                  SEND
-                </div>
                 <CornerDownLeft class="w-4 h-4" />
+                <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
+                  {props.queueActive?.() ? "ADD TO QUEUE" : "SEND"}
+                </div>
               </button>
             </Show>
           </Show>
@@ -462,7 +463,7 @@ export function SessionInfo(props: SessionInfoProps) {
                 color: "var(--status-danger-text)",
                 border: "1px solid var(--status-danger-border)",
               }}
-              title="Stop generation"
+              title="Stop generation (Esc Esc)"
               aria-label="Stop generation"
               onClick={() => props.onAbort()}
             >

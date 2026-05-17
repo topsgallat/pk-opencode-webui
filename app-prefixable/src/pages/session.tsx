@@ -2861,6 +2861,7 @@ export function Session() {
                       input={input}
                       loading={loading}
                       processing={processing}
+                      queueActive={queueActive}
                       queueCount={() => pendingQueue().length}
                       pausedReason={sessionPausedReason}
                       onAbort={handleAbort}

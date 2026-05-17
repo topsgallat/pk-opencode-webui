@@ -677,58 +677,60 @@ export function SessionInfo(props: SessionInfoProps) {
         )}
       </Show>
 
-        <Show when={composerReady() && !props.loading() && !props.processing()}>
-          <button
-            type="submit"
-            class="flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg"
-             style={{
-               background: "var(--interactive-base)",
-               color: "var(--text-on-interactive)"
-             }}
-            title="Click or press Enter to send"
-            aria-label="Send message"
-          >
-            <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
-              SEND
-            </div>
-            <CornerDownLeft class="w-4 h-4" />
-          </button>
-        </Show>
+        <div class="ml-auto flex items-center gap-2">
+          <Show when={composerReady() && !props.loading() && !props.processing()}>
+            <button
+              type="submit"
+              class="flex items-center gap-1 opacity-80 cursor-pointer transition-opacity hover:opacity-100 p-1.5 rounded-lg"
+              style={{
+                background: "var(--interactive-base)",
+                color: "var(--text-on-interactive)"
+              }}
+              title="Click or press Enter to send"
+              aria-label="Send message"
+            >
+              <div class="hidden sm:inline-block font-mono text-[10px] px-1 py-0.5 opacity-80 uppercase tracking-widest bg-black/20 rounded">
+                SEND
+              </div>
+              <CornerDownLeft class="w-4 h-4" />
+            </button>
+          </Show>
 
-        <Show when={composerReady() && !props.loading() && props.processing()}>
-          <button
-            type="submit"
-            class="flex items-center gap-1.5 px-2 py-1 rounded transition-colors"
-            style={{
-              color: "var(--text-strong)",
-              border: "1px solid var(--border-base)",
-              background: "var(--surface-inset)",
-            }}
-            title="Add this prompt to the queue"
-            aria-label="Add prompt to queue"
-          >
-            <CornerDownLeft class="w-3.5 h-3.5" />
-            <span>Add to queue</span>
-          </button>
-        </Show>
+          <Show when={composerReady() && !props.loading() && props.processing()}>
+            <button
+              type="submit"
+              class="flex items-center gap-1.5 px-2 py-1 rounded transition-colors"
+              style={{
+                color: "var(--text-strong)",
+                border: "1px solid var(--border-base)",
+                background: "var(--surface-inset)",
+              }}
+              title="Add this prompt to the queue"
+              aria-label="Add prompt to queue"
+            >
+              <CornerDownLeft class="w-3.5 h-3.5" />
+              <span>Add to queue</span>
+            </button>
+          </Show>
 
-        <Show when={props.processing()}>
-          <button
-            type="button"
-            onClick={props.onAbort}
-            class="flex items-center gap-1.5 px-2 py-1 rounded transition-colors"
-            style={{
-              color: "var(--text-critical-base)",
-              border: "1px solid var(--border-critical-base)",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-critical-subtle)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            title="Stop generation (Esc Esc)"
-          >
-            <Square class="w-3 h-3" />
-            <span>Stop</span>
-          </button>
-        </Show>
-    </div>
+          <Show when={props.processing()}>
+            <button
+              type="button"
+              onClick={props.onAbort}
+              class="flex items-center gap-1.5 px-2 py-1 rounded transition-colors"
+              style={{
+                color: "var(--text-critical-base)",
+                border: "1px solid var(--border-critical-base)",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-critical-subtle)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              title="Stop generation (Esc Esc)"
+            >
+              <Square class="w-3 h-3" />
+              <span>Stop</span>
+            </button>
+          </Show>
+        </div>
+      </div>
   )
 }

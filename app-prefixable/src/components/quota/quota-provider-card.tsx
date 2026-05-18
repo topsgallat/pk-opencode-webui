@@ -7,6 +7,8 @@ interface QuotaProviderCardProps {
 }
 
 export function QuotaProviderCard(props: QuotaProviderCardProps) {
+  const hasAccounts = () => Boolean(props.provider.accounts?.length)
+
   const statusTheme = () => {
     switch (props.provider.status) {
       case 'ok':
@@ -103,8 +105,10 @@ export function QuotaProviderCard(props: QuotaProviderCardProps) {
           </div>
 
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--text-weak)' }}>
-            <span>{props.provider.entries.length} provider entr{props.provider.entries.length === 1 ? 'y' : 'ies'}</span>
-            <Show when={props.provider.accounts?.length}>
+            <Show when={!hasAccounts()}>
+              <span>{props.provider.entries.length} provider entr{props.provider.entries.length === 1 ? 'y' : 'ies'}</span>
+            </Show>
+            <Show when={hasAccounts()}>
               <span>{props.provider.accounts?.length} account{props.provider.accounts?.length === 1 ? '' : 's'}</span>
             </Show>
           </div>
@@ -153,31 +157,33 @@ export function QuotaProviderCard(props: QuotaProviderCardProps) {
           )}
         </Show>
 
-        <div
-          class="rounded-lg px-3 py-3 space-y-2.5"
-          style={{
-            background: 'var(--surface-inset)',
-            border: '1px solid var(--border-base)',
-          }}
-        >
-          <div class="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-weak)' }}>
-            Provider limits
-          </div>
-          <Show
-            when={props.provider.entries.length > 0}
-            fallback={
-              <p class="text-sm" style={{ color: 'var(--text-weak)' }}>
-                No provider-level quota details reported.
-              </p>
-            }
+        <Show when={!hasAccounts()}>
+          <div
+            class="rounded-lg px-3 py-3 space-y-2.5"
+            style={{
+              background: 'var(--surface-inset)',
+              border: '1px solid var(--border-base)',
+            }}
           >
-            <div class="space-y-2.5">
-              <For each={props.provider.entries}>
-                {(entry) => <QuotaEntryBar entry={entry} />}
-              </For>
+            <div class="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-weak)' }}>
+              Provider limits
             </div>
-          </Show>
-        </div>
+            <Show
+              when={props.provider.entries.length > 0}
+              fallback={
+                <p class="text-sm" style={{ color: 'var(--text-weak)' }}>
+                  No provider-level quota details reported.
+                </p>
+              }
+            >
+              <div class="space-y-2.5">
+                <For each={props.provider.entries}>
+                  {(entry) => <QuotaEntryBar entry={entry} />}
+                </For>
+              </div>
+            </Show>
+          </div>
+        </Show>
 
         <Show when={props.provider.accounts && props.provider.accounts.length > 0}>
           <div class="space-y-3" style={{ 'border-top': '1px solid var(--border-base)', padding: '0.75rem 0 0' }}>

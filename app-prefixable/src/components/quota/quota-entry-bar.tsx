@@ -25,6 +25,30 @@ export function QuotaEntryBar(props: QuotaEntryBarProps) {
     return `${percent.toFixed(0)}% used`
   }
 
+  const formatResetTime = () => {
+    if (!props.entry.resetTimeIso) return null
+
+    const date = new Date(props.entry.resetTimeIso)
+    const diffMs = date.getTime() - Date.now()
+
+    if (diffMs <= 0) return 'Resets now'
+
+    const totalMinutes = Math.floor(diffMs / (1000 * 60))
+    const weeks = Math.floor(totalMinutes / (60 * 24 * 7))
+    const days = Math.floor((totalMinutes % (60 * 24 * 7)) / (60 * 24))
+    const hours = Math.floor((totalMinutes % (60 * 24)) / 60)
+    const minutes = totalMinutes % 60
+
+    const parts = [
+      weeks > 0 ? `${weeks}w` : '',
+      days > 0 ? `${days}d` : '',
+      hours > 0 ? `${hours}h` : '',
+      minutes > 0 ? `${minutes}m` : '',
+    ].filter(Boolean)
+
+    return `Resets in ${parts.join(' ') || '0m'}`
+  }
+
   const progressWidth = () => {
     const percent = percentUsed()
     if (percent === null) return '0%'
@@ -37,22 +61,6 @@ export function QuotaEntryBar(props: QuotaEntryBarProps) {
     if (percent >= 90) return 'var(--text-critical-base)'
     if (percent >= 75) return 'var(--status-warning-text)'
     return 'var(--icon-success-base)'
-  }
-
-  const resetTime = () => {
-    if (!props.entry.resetTimeIso) return null
-    const date = new Date(props.entry.resetTimeIso)
-    const now = new Date()
-    const diffMs = date.getTime() - now.getTime()
-
-    if (diffMs <= 0) return 'Reset pending'
-
-    const hours = Math.floor(diffMs / (1000 * 60 * 60))
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
-
-    if (hours > 0) return `Resets in ${hours}h ${minutes}m`
-    if (minutes > 0) return `Resets in ${minutes}m`
-    return 'Resets soon'
   }
 
   const windowLabel = () => {
@@ -142,7 +150,7 @@ export function QuotaEntryBar(props: QuotaEntryBarProps) {
                     </div>
                   )}
                 </Show>
-                <Show when={resetTime()}>
+                <Show when={formatResetTime()}>
                   {(label) => (
                     <div class="text-xs" style={{ color: 'var(--text-weak)' }}>
                       {label()}

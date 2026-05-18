@@ -276,6 +276,30 @@ export function SessionInfo(props: SessionInfoProps) {
     return "var(--icon-success-base)"
   }
 
+  const quotaResetLabel = (entry: { resetTimeIso?: string }) => {
+    if (!entry.resetTimeIso) return null
+
+    const date = new Date(entry.resetTimeIso)
+    const diffMs = date.getTime() - Date.now()
+
+    if (diffMs <= 0) return "Resets now"
+
+    const totalMinutes = Math.floor(diffMs / (1000 * 60))
+    const weeks = Math.floor(totalMinutes / (60 * 24 * 7))
+    const days = Math.floor((totalMinutes % (60 * 24 * 7)) / (60 * 24))
+    const hours = Math.floor((totalMinutes % (60 * 24)) / 60)
+    const minutes = totalMinutes % 60
+
+    const parts = [
+      weeks > 0 ? `${weeks}w` : "",
+      days > 0 ? `${days}d` : "",
+      hours > 0 ? `${hours}h` : "",
+      minutes > 0 ? `${minutes}m` : "",
+    ].filter(Boolean)
+
+    return `Resets in ${parts.join(" ") || "0m"}`
+  }
+
   const modelBadge = createMemo(() => {
     const selected = selectedModel()
     if (!selected) return null
@@ -679,11 +703,20 @@ export function SessionInfo(props: SessionInfoProps) {
                                             <span class="shrink-0" style={{ color: "var(--text-weak)" }}>
                                               {entry.unlimited ? "Unlimited" : entry.used !== undefined && entry.total !== undefined
                                                 ? `${entry.used.toLocaleString()} / ${entry.total.toLocaleString()}`
+                                                : entry.percentUsed !== undefined
+                                                  ? `${Math.round(entry.percentUsed)}% used`
                                                 : entry.remaining !== undefined
                                                   ? `${entry.remaining.toLocaleString()} remaining`
                                                   : "-"}
                                             </span>
                                           </div>
+                                          <Show when={quotaResetLabel(entry)}>
+                                            {(label) => (
+                                              <div class="text-[10px]" style={{ color: "var(--text-weak)" }}>
+                                                {label()}
+                                              </div>
+                                            )}
+                                          </Show>
                                           <Show when={percent !== null}>
                                             <div class="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--background-base)" }}>
                                               <div

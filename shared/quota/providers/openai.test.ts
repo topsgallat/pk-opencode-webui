@@ -16,6 +16,11 @@ function mockFetch() {
   }) as typeof fetch
 }
 
+function makeJwt(payload: Record<string, unknown>) {
+  const encode = (value: string) => Buffer.from(value).toString('base64url')
+  return `${encode(JSON.stringify({ alg: 'none', typ: 'JWT' }))}.${encode(JSON.stringify(payload))}.signature`
+}
+
 afterEach(() => {
   globalThis.fetch = originalFetch
 })
@@ -41,5 +46,21 @@ describe('OpenAIProvider', () => {
         expect(entry.percentUsed + entry.percentRemaining).toBeCloseTo(100, 1)
       }
     })
+  })
+
+  it('surfaces account identity from jwt claims', async () => {
+    mockFetch()
+    const provider = new OpenAIProvider()
+    const token = makeJwt({
+      'https://api.openai.com/profile': { email: 'dev@example.com' },
+      'https://api.openai.com/auth': { chatgpt_account_id: 'acct_123' },
+    })
+    const result = await provider.fetch({ resolveAuthHeader: () => `Bearer ${token}` })
+
+    expect(result.accounts).toHaveLength(1)
+    expect(result.accounts?.[0]?.id).toBe('acct_123')
+    expect(result.accounts?.[0]?.label).toBe('dev@example.com')
+    expect(result.accounts?.[0]?.email).toBe('dev@example.com')
+    expect(result.accounts?.[0]?.entries).toHaveLength(result.entries.length)
   })
 })

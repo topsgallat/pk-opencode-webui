@@ -11,6 +11,48 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
+type OpenAIAccountIdentity = {
+  id: string
+  label: string
+  email?: string
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | undefined {
+  const parts = token.split('.')
+  if (parts.length < 2) return undefined
+
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+    const payload = Buffer.from(padded, 'base64').toString('utf8')
+    const parsed = JSON.parse(payload)
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function extractOpenAIIdentity(authHeader: string, accountId?: string): OpenAIAccountIdentity | undefined {
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+  if (!token) return undefined
+
+  const payload = decodeJwtPayload(token)
+  const profile = payload?.['https://api.openai.com/profile']
+  const auth = payload?.['https://api.openai.com/auth']
+  const profileRecord = profile && typeof profile === 'object' ? profile as Record<string, unknown> : undefined
+  const authRecord = auth && typeof auth === 'object' ? auth as Record<string, unknown> : undefined
+  const email = asString(profileRecord?.email)
+  const resolvedAccountId = accountId || asString(authRecord?.chatgpt_account_id ?? authRecord?.chatgptAccountId ?? authRecord?.accountId)
+
+  if (!email && !resolvedAccountId) return undefined
+
+  return {
+    id: resolvedAccountId || email || 'openai',
+    label: email || resolvedAccountId || 'OpenAI account',
+    email,
+  }
+}
+
 function percentToEntry(label: string, window: Record<string, unknown>, windowType: QuotaEntryView['window'], subtitle: string): QuotaEntryView | undefined {
   const usedPercent = asNumber(window.used_percent ?? window.usedPercent)
   const resetTimeIso = asString(window.reset_at ?? window.resetAt ?? window.resets_at ?? window.resetsAt)
@@ -53,8 +95,14 @@ export class OpenAIProvider implements QuotaProvider {
         }
       }
 
+      const accountId = options?.resolveProviderAuthAccountId?.(this.id)
+      const identity = extractOpenAIIdentity(auth, accountId)
+      const requestHeaders: Record<string, string> = {}
+      if (identity?.id) requestHeaders['ChatGPT-Account-Id'] = identity.id
+
       const data = await fetchQuotaJson<Record<string, unknown>>(OPENAI_USAGE_URL, { ...options, authHeader: auth }, {
         method: 'GET',
+        headers: requestHeaders,
       })
 
       const rateLimit = (data.rate_limit && typeof data.rate_limit === 'object' ? data.rate_limit : data) as Record<string, unknown>
@@ -90,6 +138,7 @@ export class OpenAIProvider implements QuotaProvider {
         available: true,
         fetchedAt: new Date().toISOString(),
         entries,
+        accounts: identity ? [{ ...identity, entries }] : undefined,
         matchedCurrentModel: true,
       }
     } catch (error) {

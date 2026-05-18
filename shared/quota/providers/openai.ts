@@ -11,6 +11,18 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
+function asResetIso(value: unknown): string | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const ms = value > 1e12 ? value : value * 1000
+    return new Date(ms).toISOString()
+  }
+
+  const text = asString(value)
+  if (text) return text
+
+  return undefined
+}
+
 function pickResetIso(window: Record<string, unknown>): string | undefined {
   const keys = [
     'reset_at',
@@ -28,14 +40,14 @@ function pickResetIso(window: Record<string, unknown>): string | undefined {
   ]
 
   for (const key of keys) {
-    const text = asString(window[key])
+    const text = asResetIso(window[key])
     if (text) return text
   }
 
   for (const [key, value] of Object.entries(window)) {
     const lower = key.toLowerCase()
     if (!lower.includes('reset') && !lower.includes('expire') && !lower.includes('end')) continue
-    const text = asString(value)
+    const text = asResetIso(value)
     if (text) return text
   }
 

@@ -80,4 +80,21 @@ describe('OpenAIProvider', () => {
 
     expect(result.entries[0]?.resetTimeIso).toBe('2026-05-15T10:00:00.000Z')
   })
+
+  it('converts numeric reset timestamps', async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (!url.includes('chatgpt.com/backend-api/wham/usage')) return new Response('not found', { status: 404 })
+      return new Response(JSON.stringify({
+        rate_limit: {
+          primary_window: { used_percent: 40, reset_at: 1768471200 },
+        },
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }) as typeof fetch
+
+    const provider = new OpenAIProvider()
+    const result = await provider.fetch({ resolveAuthHeader: () => 'Bearer test' })
+
+    expect(result.entries[0]?.resetTimeIso).toBe('2026-01-15T10:00:00.000Z')
+  })
 })

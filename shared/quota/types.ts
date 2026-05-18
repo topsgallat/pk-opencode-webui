@@ -4,6 +4,7 @@ export interface QuotaFetchOptions {
   authHeader?: string
   resolveAuthHeader?: (target: string) => string | undefined
   resolveProviderAuthHeader?: (providerID: string) => string | undefined
+  resolveProviderAuthAccountId?: (providerID: string) => string | undefined
 }
 
 export interface QuotaProvider {

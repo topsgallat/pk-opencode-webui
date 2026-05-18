@@ -10,6 +10,7 @@ export async function getQuotaData(options: {
   authHeader?: string
   resolveAuthHeader?: (target: string) => string | undefined
   resolveProviderAuthHeader?: (providerID: string) => string | undefined
+  resolveProviderAuthAccountId?: (providerID: string) => string | undefined
 }): Promise<QuotaApiResponse> {
   const providers: QuotaProvider[] = [
     new CopilotProvider(),

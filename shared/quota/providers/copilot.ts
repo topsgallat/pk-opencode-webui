@@ -17,6 +17,10 @@ function asResetIso(value: unknown): string | undefined {
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00.000Z` : text
 }
 
+function asObject(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : undefined
+}
+
 function buildEntry(label: string, quota: Record<string, unknown>, resetTimeIso?: string): QuotaEntryView | undefined {
   let used = asNumber(quota.used)
   let total = asNumber(quota.limit ?? quota.total ?? quota.entitlement)
@@ -69,9 +73,9 @@ function buildEntry(label: string, quota: Record<string, unknown>, resetTimeIso?
 }
 
 function pickQuotaSnapshot(data: Record<string, unknown>): Record<string, unknown> | undefined {
-  const snapshots = data.quota_snapshots
-  if (snapshots && typeof snapshots === 'object') {
-    const record = snapshots as Record<string, unknown>
+  const snapshots = asObject(data.quota_snapshots)
+  if (snapshots) {
+    const record = snapshots
     const premium = record.premium_interactions
     if (premium && typeof premium === 'object') return premium as Record<string, unknown>
 
@@ -82,8 +86,36 @@ function pickQuotaSnapshot(data: Record<string, unknown>): Record<string, unknow
     if (completions && typeof completions === 'object') return completions as Record<string, unknown>
   }
 
-  if (data.quota && typeof data.quota === 'object') return data.quota as Record<string, unknown>
+  const quota = asObject(data.quota)
+  if (quota) return quota
   return undefined
+}
+
+async function fetchGitHubIdentity(authHeader: string): Promise<{ id: string; label: string; email?: string } | undefined> {
+  try {
+    const data = await fetchQuotaJson<Record<string, unknown>>('https://api.github.com/user', {
+      authHeader,
+    }, {
+      headers: {
+        'User-Agent': 'pk-opencode-webui',
+      },
+    })
+
+    const login = asString(data.login)
+    const name = asString(data.name)
+    const email = asString(data.email)
+    const id = typeof data.id === 'number' && Number.isFinite(data.id) ? String(data.id) : asString(data.id)
+
+    if (!id && !login && !name && !email) return undefined
+
+    return {
+      id: id || login || name || email || 'copilot',
+      label: name || login || 'GitHub Copilot',
+      email,
+    }
+  } catch {
+    return undefined
+  }
 }
 
 export class CopilotProvider implements QuotaProvider {
@@ -113,6 +145,7 @@ export class CopilotProvider implements QuotaProvider {
       const quota = pickQuotaSnapshot(data) || data
       const entry = buildEntry('Personal Usage', quota, asResetIso(data.quota_reset_date_utc ?? data.quota_reset_date))
       const entries = entry ? [entry] : []
+      const identity = await fetchGitHubIdentity(auth)
 
       if (entries.length === 0) {
         return {
@@ -133,6 +166,7 @@ export class CopilotProvider implements QuotaProvider {
         available: true,
         fetchedAt: new Date().toISOString(),
         entries,
+        accounts: identity ? [{ ...identity, entries }] : undefined,
         matchedCurrentModel: true,
       }
     } catch (error) {

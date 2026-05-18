@@ -90,18 +90,6 @@ export function QuotaProviderCard(props: QuotaProviderCardProps) {
             >
               {statusTheme().label}
             </span>
-            <Show when={props.provider.matchedCurrentModel}>
-              <span
-                class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
-                style={{
-                  background: 'var(--surface-inset)',
-                  color: 'var(--text-base)',
-                  border: '1px solid var(--border-base)',
-                }}
-              >
-                Current model
-              </span>
-            </Show>
           </div>
 
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--text-weak)' }}>

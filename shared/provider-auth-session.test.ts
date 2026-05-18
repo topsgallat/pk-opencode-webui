@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { __resetProviderAuthSessionsForTests, clearProviderAuthSession, resolveProviderAuthHeader, syncProviderAuthSession } from "./provider-auth-session"
+import { __resetProviderAuthSessionsForTests, clearProviderAuthSession, resolveProviderAuthAccountId, resolveProviderAuthHeader, syncProviderAuthSession } from "./provider-auth-session"
 
 function makeRequest(cookie?: string) {
   return new Request("http://localhost/api/ext/provider-auth", {
@@ -13,7 +13,7 @@ afterEach(() => {
 
 describe("provider-auth-session", () => {
   it("stores provider auth per target and provider", async () => {
-    const res = syncProviderAuthSession(makeRequest(), "https://example.com", { providerID: "openai", authHeader: "Bearer abc" })
+    const res = syncProviderAuthSession(makeRequest(), "https://example.com", { providerID: "openai", authHeader: "Bearer abc", accountId: "acct_1" })
     expect(res.status).toBe(200)
 
     const cookie = res.headers.get("Set-Cookie")
@@ -21,6 +21,7 @@ describe("provider-auth-session", () => {
 
     const req = makeRequest(cookie || undefined)
     expect(resolveProviderAuthHeader(req, "https://example.com", "openai")).toBe("Bearer abc")
+    expect(resolveProviderAuthAccountId(req, "https://example.com", "openai")).toBe("acct_1")
     expect(resolveProviderAuthHeader(req, "https://example.com", "copilot")).toBeUndefined()
   })
 

@@ -1,6 +1,11 @@
 const COOKIE_NAME = "opencode_proxy_session"
 
-const sessions = new Map<string, Map<string, string>>()
+type ProviderAuthValue = {
+  authHeader: string
+  accountId?: string
+}
+
+const sessions = new Map<string, Map<string, ProviderAuthValue>>()
 
 function normalizeProviderID(providerID: string): string {
   const id = providerID.trim()
@@ -47,16 +52,16 @@ function makeSessionId(): string {
     .join("")
 }
 
-function getOrCreateSession(req: Request): { id: string; values: Map<string, string>; created: boolean } {
+function getOrCreateSession(req: Request): { id: string; values: Map<string, ProviderAuthValue>; created: boolean } {
   const existing = getSessionId(req)
   if (existing) {
-    const values = sessions.get(existing) || new Map<string, string>()
+    const values = sessions.get(existing) || new Map<string, ProviderAuthValue>()
     sessions.set(existing, values)
     return { id: existing, values, created: false }
   }
 
   const id = makeSessionId()
-  const values = new Map<string, string>()
+  const values = new Map<string, ProviderAuthValue>()
   sessions.set(id, values)
   return { id, values, created: true }
 }
@@ -88,7 +93,7 @@ function buildStoreKey(target: string, providerID: string): string | undefined {
   return `${key}::${id}`
 }
 
-function resolveStoreKey(values: Map<string, string>, target: string, providerID: string): string | undefined {
+function resolveStoreKey(values: Map<string, ProviderAuthValue>, target: string, providerID: string): string | undefined {
   for (const candidate of getProviderIDCandidates(providerID)) {
     const key = buildStoreKey(target, candidate)
     if (!key) continue
@@ -111,6 +116,7 @@ export function syncProviderAuthSession(req: Request, target: string, body: unkn
   const raw = body as Record<string, unknown>
   const providerID = typeof raw.providerID === "string" ? raw.providerID.trim() : ""
   const authHeader = typeof raw.authHeader === "string" ? raw.authHeader.trim() : ""
+  const accountId = typeof raw.accountId === "string" ? raw.accountId.trim() : ""
 
   const key = buildStoreKey(target, providerID)
   const normalizedKey = buildStoreKey(target, normalizeProviderID(providerID))
@@ -123,7 +129,7 @@ export function syncProviderAuthSession(req: Request, target: string, body: unkn
   }
 
   const session = getOrCreateSession(req)
-  session.values.set(storeKey, authHeader)
+  session.values.set(storeKey, { authHeader, accountId: accountId || undefined })
 
   const headers = new Headers()
   if (session.created) {
@@ -173,7 +179,17 @@ export function resolveProviderAuthHeader(req: Request, target: string, provider
   if (!values) return undefined
   const key = resolveStoreKey(values, target, providerID)
   if (!key) return undefined
-  return values.get(key)
+  return values.get(key)?.authHeader
+}
+
+export function resolveProviderAuthAccountId(req: Request, target: string, providerID: string): string | undefined {
+  const id = getSessionId(req)
+  if (!id) return undefined
+  const values = sessions.get(id)
+  if (!values) return undefined
+  const key = resolveStoreKey(values, target, providerID)
+  if (!key) return undefined
+  return values.get(key)?.accountId
 }
 
 export function __resetProviderAuthSessionsForTests() {

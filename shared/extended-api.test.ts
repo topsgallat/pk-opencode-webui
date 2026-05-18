@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises"
 import * as os from "node:os"
 import * as nodePath from "node:path"
 import { handleExtendedEndpoint } from "./extended-api"
-import { __resetProviderAuthSessionsForTests, resolveProviderAuthHeader } from "./provider-auth-session"
+import { __resetProviderAuthSessionsForTests, resolveProviderAuthAccountId, resolveProviderAuthHeader } from "./provider-auth-session"
 
 const env = {
   HOME: process.env.HOME,
@@ -22,7 +22,7 @@ test("syncs oauth provider auth from backend auth file", async () => {
 
   const dir = nodePath.join(root, "opencode")
   await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(nodePath.join(dir, "auth.json"), JSON.stringify({ openai: { type: "oauth", access: "oauth-access-token" } }), "utf-8")
+  await fs.writeFile(nodePath.join(dir, "auth.json"), JSON.stringify({ openai: { type: "oauth", access: "oauth-access-token", accountId: "acct_openai" } }), "utf-8")
 
   const target = "http://127.0.0.1:4096"
   const req = new Request(`http://localhost/api/ext/provider-auth/from-backend?providerID=openai&target=${encodeURIComponent(target)}`, {
@@ -44,6 +44,7 @@ test("syncs oauth provider auth from backend auth file", async () => {
   })
 
   expect(resolveProviderAuthHeader(lookup, target, "openai")).toBe("Bearer oauth-access-token")
+  expect(resolveProviderAuthAccountId(lookup, target, "openai")).toBe("acct_openai")
 })
 
 test("syncs copilot auth from backend auth file using github alias", async () => {

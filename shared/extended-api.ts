@@ -10,7 +10,7 @@ import * as fs from "node:fs"
 import * as nodePath from "node:path"
 import * as os from "node:os"
 import { clearProxyAuthSession, syncProxyAuthSession } from "./proxy-auth-session"
-import { clearProviderAuthSession, getProviderIDCandidates, resolveProviderAuthHeader, syncProviderAuthSession } from "./provider-auth-session"
+import { clearProviderAuthSession, getProviderIDCandidates, resolveProviderAuthAccountId, resolveProviderAuthHeader, syncProviderAuthSession } from "./provider-auth-session"
 
 type ExtendedEndpointOptions = {
   resolveUpstreamAuthHeader?: (target: string) => string | undefined
@@ -89,6 +89,20 @@ function toAuthHeader(entry: unknown): string | undefined {
   return undefined
 }
 
+function toAccountId(entry: unknown): string | undefined {
+  if (!entry || typeof entry !== "object") return undefined
+  const raw = entry as Record<string, unknown>
+  const nested = raw.auth && typeof raw.auth === "object" ? raw.auth as Record<string, unknown> : undefined
+
+  const read = (obj?: Record<string, unknown>) => {
+    if (!obj) return ""
+    return typeof obj.accountId === "string" ? obj.accountId.trim() : ""
+  }
+
+  const accountId = read(raw) || read(nested)
+  return accountId || undefined
+}
+
 async function syncProviderAuthFromBackend(req: Request, target: string, providerID: string): Promise<Response> {
   const auth = await readAuthFile()
   if (!auth) {
@@ -100,8 +114,9 @@ async function syncProviderAuthFromBackend(req: Request, target: string, provide
   if (!authHeader) {
     return Response.json({ ok: false, error: "provider auth not found" }, { status: 404 })
   }
+  const accountId = toAccountId(entry)
 
-  return syncProviderAuthSession(req, target, { providerID, authHeader })
+  return syncProviderAuthSession(req, target, { providerID, authHeader, accountId })
 }
 
 /** Resolve the working directory from a query param, falling back to cwd */
@@ -650,8 +665,9 @@ export async function handleExtendedEndpoint(
         refresh,
         providerFilter,
         resolveAuthHeader: options?.resolveUpstreamAuthHeader,
-        resolveProviderAuthHeader: (providerID) => resolveProviderAuthHeader(req, target, providerID),
-      })
+      resolveProviderAuthHeader: (providerID) => resolveProviderAuthHeader(req, target, providerID),
+      resolveProviderAuthAccountId: (providerID) => resolveProviderAuthAccountId(req, target, providerID),
+    })
       return Response.json(result)
     } catch (error) {
       console.error("[ExtAPI] quota error:", error)

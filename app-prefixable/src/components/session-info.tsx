@@ -445,7 +445,7 @@ export function SessionInfo(props: SessionInfoProps) {
             <Show when={actionMode()}>
               <button
                 type="button"
-                class="ml-auto inline-flex items-center gap-1.5 cursor-pointer rounded-xl px-3 py-1.5 text-[11px] font-medium transition-opacity hover:opacity-100 shrink-0"
+                class="ml-auto inline-flex items-center gap-1.5 cursor-pointer rounded-xl px-4 py-2 text-[11px] font-medium transition-opacity hover:opacity-100 shrink-0 touch-manipulation whitespace-nowrap min-h-11"
                 style={actionMode() === "stop"
                   ? {
                     background: "var(--status-danger-dim)",

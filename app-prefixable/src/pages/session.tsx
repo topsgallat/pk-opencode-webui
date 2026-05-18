@@ -2411,7 +2411,7 @@ export function Session() {
         {/* Input */}
         <div
           data-panel="chat"
-          class="p-4"
+          class="relative z-20 p-4"
           style={{
             background: "var(--background-base)",
             "border-top": "1px solid var(--border-base)",

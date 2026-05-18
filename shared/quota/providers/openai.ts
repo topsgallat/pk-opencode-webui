@@ -11,6 +11,37 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
+function pickResetIso(window: Record<string, unknown>): string | undefined {
+  const keys = [
+    'reset_at',
+    'resetAt',
+    'reset_time',
+    'resetTime',
+    'reset_time_iso',
+    'resetTimeIso',
+    'resets_at',
+    'resetsAt',
+    'window_ends_at',
+    'windowEndsAt',
+    'expires_at',
+    'expiresAt',
+  ]
+
+  for (const key of keys) {
+    const text = asString(window[key])
+    if (text) return text
+  }
+
+  for (const [key, value] of Object.entries(window)) {
+    const lower = key.toLowerCase()
+    if (!lower.includes('reset') && !lower.includes('expire') && !lower.includes('end')) continue
+    const text = asString(value)
+    if (text) return text
+  }
+
+  return undefined
+}
+
 type OpenAIAccountIdentity = {
   id: string
   label: string
@@ -55,7 +86,7 @@ function extractOpenAIIdentity(authHeader: string, accountId?: string): OpenAIAc
 
 function percentToEntry(label: string, window: Record<string, unknown>, windowType: QuotaEntryView['window'], subtitle: string): QuotaEntryView | undefined {
   const usedPercent = asNumber(window.used_percent ?? window.usedPercent)
-  const resetTimeIso = asString(window.reset_at ?? window.resetAt ?? window.resets_at ?? window.resetsAt)
+  const resetTimeIso = pickResetIso(window)
 
   if (usedPercent === undefined) return undefined
 

@@ -63,4 +63,21 @@ describe('OpenAIProvider', () => {
     expect(result.accounts?.[0]?.email).toBe('dev@example.com')
     expect(result.accounts?.[0]?.entries).toHaveLength(result.entries.length)
   })
+
+  it('accepts alternate reset field names', async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (!url.includes('chatgpt.com/backend-api/wham/usage')) return new Response('not found', { status: 404 })
+      return new Response(JSON.stringify({
+        rate_limit: {
+          primary_window: { used_percent: 40, reset_time: '2026-05-15T10:00:00.000Z' },
+        },
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }) as typeof fetch
+
+    const provider = new OpenAIProvider()
+    const result = await provider.fetch({ resolveAuthHeader: () => 'Bearer test' })
+
+    expect(result.entries[0]?.resetTimeIso).toBe('2026-05-15T10:00:00.000Z')
+  })
 })

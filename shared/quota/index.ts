@@ -1,4 +1,5 @@
 import { QuotaProvider, QuotaProviderView, QuotaApiResponse } from './types'
+import { AnthropicProvider } from './providers/anthropic'
 import { CopilotProvider } from './providers/copilot'
 import { OpenAIProvider } from './providers/openai'
 import { GeminiProvider } from './providers/gemini-cli'
@@ -15,6 +16,7 @@ export async function getQuotaData(options: {
   const providers: QuotaProvider[] = [
     new CopilotProvider(),
     new OpenAIProvider(),
+    new AnthropicProvider(),
     new GeminiProvider(),
   ]
 

@@ -664,10 +664,11 @@ export async function handleExtendedEndpoint(
       const result = await getQuotaData({
         refresh,
         providerFilter,
+        targetUrl: target,
         resolveAuthHeader: options?.resolveUpstreamAuthHeader,
-      resolveProviderAuthHeader: (providerID) => resolveProviderAuthHeader(req, target, providerID),
-      resolveProviderAuthAccountId: (providerID) => resolveProviderAuthAccountId(req, target, providerID),
-    })
+        resolveProviderAuthHeader: (providerID) => resolveProviderAuthHeader(req, target, providerID),
+        resolveProviderAuthAccountId: (providerID) => resolveProviderAuthAccountId(req, target, providerID),
+      })
       return Response.json(result)
     } catch (error) {
       console.error("[ExtAPI] quota error:", error)

@@ -1,12 +1,18 @@
 import { describe, expect, it } from "bun:test"
 import { findQuotaProviderBySelectedModel } from "./session-info-helpers"
+import type { QuotaProviderView } from "../../../shared/quota/types"
 
 describe("session-info quota matching", () => {
   const providers = [
-    { id: "copilot" },
-    { id: "openai" },
-    { id: "gemini" },
+    { id: "copilot" } as QuotaProviderView,
+    { id: "openai" } as QuotaProviderView,
+    { id: "gemini" } as QuotaProviderView,
+    { id: "anthropic" } as QuotaProviderView,
   ]
+
+  it("matches anthropic family ids to anthropic quota", () => {
+    expect(findQuotaProviderBySelectedModel(providers, "anthropic:claude-sonnet-4-5")?.id).toBe("anthropic")
+  })
 
   it("matches github copilot to copilot quota", () => {
     expect(findQuotaProviderBySelectedModel(providers, "github-copilot")?.id).toBe("copilot")

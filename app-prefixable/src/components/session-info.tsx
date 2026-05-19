@@ -685,6 +685,14 @@ export function SessionInfo(props: SessionInfoProps) {
                                 </span>
                               </div>
 
+                              <Show when={quotaProvider()!.warning}>
+                                {(message) => (
+                                  <div class="text-[10px] leading-snug" style={{ color: "var(--status-warning-text)" }}>
+                                    {message()}
+                                  </div>
+                                )}
+                              </Show>
+
                               <Show when={quotaProvider()!.entries.length > 0} fallback={
                                 <div class="text-[11px]" style={{ color: "var(--text-weak)" }}>
                                   No quota limits reported.

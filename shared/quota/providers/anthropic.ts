@@ -20,28 +20,40 @@ export class AnthropicProvider implements QuotaProvider {
   }
 
   async fetch(options: QuotaFetchOptions): Promise<QuotaProviderView> {
-    const quota = await loadAnthropicQuota({ targetUrl: options?.targetUrl, refresh: options?.refresh, ops: this.ops })
+    try {
+      const quota = await loadAnthropicQuota({ targetUrl: options?.targetUrl, refresh: options?.refresh, ops: this.ops })
 
-    if (quota.entries.length === 0) {
+      if (quota.entries.length === 0) {
+        return {
+          id: this.id,
+          name: this.name,
+          status: quota.warning ? "unavailable" : "error",
+          available: false,
+          fetchedAt: new Date().toISOString(),
+          entries: [],
+          warning: quota.warning || "Claude.ai quota data was not available",
+        }
+      }
+
       return {
         id: this.id,
         name: this.name,
-        status: quota.warning ? "unavailable" : "error",
+        status: "ok",
+        available: true,
+        fetchedAt: new Date().toISOString(),
+        entries: quota.entries,
+        warning: quota.warning,
+      }
+    } catch (error) {
+      return {
+        id: this.id,
+        name: this.name,
+        status: "error",
         available: false,
         fetchedAt: new Date().toISOString(),
         entries: [],
-        warning: quota.warning || "Claude.ai quota data was not available",
+        error: error instanceof Error ? error.message : String(error),
       }
-    }
-
-    return {
-      id: this.id,
-      name: this.name,
-      status: "ok",
-      available: true,
-      fetchedAt: new Date().toISOString(),
-      entries: quota.entries,
-      warning: quota.warning,
     }
   }
 }

@@ -1,7 +1,9 @@
-import { afterAll, describe, expect, it } from "bun:test"
+import { afterAll, beforeEach, describe, expect, it } from "bun:test"
 import { AnthropicProvider } from "./anthropic"
+import { __clearAnthropicQuotaCacheForTests } from "../../anthropic-quota"
 
 const env = {
+  HOME: process.env.HOME,
   CLAUDE_CODE_OAUTH_TOKEN: process.env.CLAUDE_CODE_OAUTH_TOKEN,
 }
 
@@ -10,6 +12,11 @@ function clearEnv() {
 }
 
 clearEnv()
+
+beforeEach(() => {
+  clearEnv()
+  __clearAnthropicQuotaCacheForTests()
+})
 
 function mockCliStatus(payload: unknown) {
   return async (args: string[]) => {
@@ -64,8 +71,25 @@ describe("AnthropicProvider", () => {
     expect(result.entries[0]?.resetTimeIso).toBe("2026-01-15T10:00:00.000Z")
     expect(result.warning).toContain("remote target")
   })
+
+  it("surfaces provider errors without disappearing", async () => {
+    clearEnv()
+    const home = `/tmp/anthropic-home-${crypto.randomUUID()}`
+    process.env.HOME = home
+    const provider = new AnthropicProvider({
+      run: async () => { throw new Error("claude missing") },
+    })
+
+    const result = await provider.fetch({})
+
+    expect(result.status).toBe("error")
+    expect(result.available).toBe(false)
+    expect(result.entries).toHaveLength(0)
+    expect(result.error).toContain("claude missing")
+  })
 })
 
 afterAll(() => {
+  process.env.HOME = env.HOME
   process.env.CLAUDE_CODE_OAUTH_TOKEN = env.CLAUDE_CODE_OAUTH_TOKEN
 })

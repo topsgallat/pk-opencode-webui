@@ -87,6 +87,25 @@ describe("AnthropicProvider", () => {
     expect(result.entries).toHaveLength(0)
     expect(result.warning).toContain("Claude CLI not found")
   })
+
+  it("retries after an unavailable probe", async () => {
+    clearEnv()
+    let calls = 0
+    const provider = new AnthropicProvider({
+      run: async () => {
+        calls += 1
+        if (calls === 1) return null
+        return { code: 0, stdout: JSON.stringify({ quota: { five_hour: { used_percentage: 12, resets_at: "2026-05-15T10:00:00.000Z" } } }), stderr: "" }
+      },
+    })
+
+    const first = await provider.fetch({})
+    const second = await provider.fetch({})
+
+    expect(first.status).toBe("unavailable")
+    expect(second.status).toBe("ok")
+    expect(second.entries).toHaveLength(1)
+  })
 })
 
 afterAll(() => {

@@ -270,6 +270,13 @@ export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh
   const age = cached ? nowMs(options?.ops) - cached.at : Infinity
   if (cached && age < CACHE_MS) return cached.value
 
+  const maybeCache = (value: AnthropicQuotaSource) => {
+    if (value.entries.length > 0) {
+      cache.set(key, { at: nowMs(options?.ops), value })
+    }
+    return value
+  }
+
   const ops = options?.ops
   const result: AnthropicQuotaSource = { entries: [] }
 
@@ -283,8 +290,7 @@ export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh
         result.warning = isRemoteTarget(options?.targetUrl)
           ? "Claude.ai quota is read from the UI server host, not the selected remote target"
           : undefined
-        cache.set(key, { at: nowMs(ops), value: result })
-        return result
+        return maybeCache(result)
       }
 
       const token = extractToken(parsed)
@@ -293,8 +299,7 @@ export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh
         usage.warning = isRemoteTarget(options?.targetUrl)
           ? "Claude.ai quota is read from the UI server host, not the selected remote target"
           : undefined
-        cache.set(key, { at: nowMs(ops), value: usage })
-        return usage
+        return maybeCache(usage)
       }
     } catch {
       // fall through to plain text / credentials fallback
@@ -308,7 +313,6 @@ export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh
       ? "Claude.ai quota is read from the UI server host, not the selected remote target"
       : "Claude CLI not found or not signed in. Install Claude CLI and sign in to view Claude.ai subscription usage."
     result.warning = warning
-    cache.set(key, { at: nowMs(ops), value: result })
     return result
   }
 
@@ -316,8 +320,7 @@ export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh
   usage.warning = isRemoteTarget(options?.targetUrl)
     ? "Claude.ai quota is read from the UI server host, not the selected remote target"
     : undefined
-  cache.set(key, { at: nowMs(ops), value: usage })
-  return usage
+  return maybeCache(usage)
 }
 
 export function __clearAnthropicQuotaCacheForTests() {

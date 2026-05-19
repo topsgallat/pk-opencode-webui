@@ -868,12 +868,7 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
                 <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
                   Result:
                 </div>
-                <pre
-                  class="whitespace-pre-wrap text-xs max-h-32 overflow-y-auto"
-                  style={{ color: "var(--text-base)" }}
-                >
-                  {output()}
-                </pre>
+                <Markdown content={output()} class="text-xs" />
               </div>
             )}
           </Show>

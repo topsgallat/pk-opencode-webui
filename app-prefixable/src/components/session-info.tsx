@@ -6,6 +6,7 @@ import { useSDK } from "../context/sdk"
 import { useSync } from "../context/sync"
 import { useProviders } from "../context/providers"
 import { getCopilotMultiplier } from "../utils/path"
+import { shouldLoadQuotaOnOpen } from "../utils/quota-refresh"
 import { isAnthropicProviderID } from "../../../shared/anthropic-models"
 import { getContextTokens } from "../utils/tokens"
 import { getQuota } from "../utils/extended-api"
@@ -94,10 +95,12 @@ export function SessionInfo(props: SessionInfoProps) {
   const providers = useProviders()
   const selectedAgent = () => props.selectedAgent?.() ?? providers.selectedAgent
   const selectedModel = () => props.selectedModel?.() ?? providers.selectedModel
+  const [quotaRequested, setQuotaRequested] = createSignal(false)
+  const [quotaTick, setQuotaTick] = createSignal(0)
 
   const [quota] = createResource(
-    () => serverUrl,
-    async (url) => await getQuota(url, { targetUrl }),
+    () => quotaRequested() ? ({ serverUrl, targetUrl, tick: quotaTick() }) : null,
+    async ({ serverUrl, targetUrl }) => await getQuota(serverUrl, { refresh: true, targetUrl }),
   )
 
   // Sync session data when session ID changes
@@ -390,6 +393,19 @@ export function SessionInfo(props: SessionInfoProps) {
     if (showTokenPopover()) {
       setShowTokenPopover(false)
       return
+    }
+
+    const shouldLoad = shouldLoadQuotaOnOpen({
+      requested: quotaRequested(),
+      loading: quota.loading,
+      quota: quota(),
+      hasError: Boolean(quota.error),
+    })
+
+    if (!quotaRequested()) {
+      setQuotaRequested(true)
+    } else if (shouldLoad) {
+      setQuotaTick((value) => value + 1)
     }
 
     if (triggerRef) {

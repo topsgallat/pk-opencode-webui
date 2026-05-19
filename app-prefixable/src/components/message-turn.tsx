@@ -528,9 +528,15 @@ export function MessageTurn(props: {
                       <div class="px-2 py-1 font-medium" style={{ background: "var(--surface-inset)", "border-bottom": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
                         {block.label}
                       </div>
-                      <pre class="p-2 overflow-x-auto whitespace-pre-wrap break-words m-0 font-mono" style={{ background: "var(--surface-base)", color: "var(--text-base)", "font-size": "11px" }}>
-                        {block.content}
-                      </pre>
+                      <Show when={block.label === "system-reminder"} fallback={
+                        <pre class="p-2 overflow-x-auto whitespace-pre-wrap break-words m-0 font-mono" style={{ background: "var(--surface-base)", color: "var(--text-base)", "font-size": "11px" }}>
+                          {block.content}
+                        </pre>
+                      }>
+                        <div class="p-2" style={{ background: "var(--surface-base)" }}>
+                          <Markdown content={block.content} class="text-xs" />
+                        </div>
+                      </Show>
                     </div>
                   )}
                 </For>
@@ -705,9 +711,15 @@ export function MessageTurn(props: {
                     <div class="px-2 py-1 font-medium" style={{ background: "var(--surface-inset)", "border-bottom": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
                       {block.label}
                     </div>
-                    <pre class="p-2 overflow-x-auto whitespace-pre-wrap break-words m-0 font-mono" style={{ background: "var(--surface-base)", color: "var(--text-base)", "font-size": "11px" }}>
-                      {block.content}
-                    </pre>
+                    <Show when={block.label === "system-reminder"} fallback={
+                      <pre class="p-2 overflow-x-auto whitespace-pre-wrap break-words m-0 font-mono" style={{ background: "var(--surface-base)", color: "var(--text-base)", "font-size": "11px" }}>
+                        {block.content}
+                      </pre>
+                    }>
+                      <div class="p-2" style={{ background: "var(--surface-base)" }}>
+                        <Markdown content={block.content} class="text-xs" />
+                      </div>
+                    </Show>
                   </div>
                 )}
               </For>

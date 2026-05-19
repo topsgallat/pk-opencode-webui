@@ -13,8 +13,8 @@ export function parseUserText(parts: Part[]): { text: string; systemBlocks: Syst
 
   const systemBlocks: SystemBlock[] = []
 
-  const step1 = initialText.replace(/<system-reminder>([\s\S]*?)<\/system-reminder>/g, (match) => {
-    systemBlocks.push({ label: "system-reminder", content: match })
+  const step1 = initialText.replace(/<system-reminder>([\s\S]*?)<\/system-reminder>/g, (_, inner) => {
+    systemBlocks.push({ label: "system-reminder", content: inner.trim() })
     return ""
   })
 

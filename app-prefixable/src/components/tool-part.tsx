@@ -539,6 +539,14 @@ function getChildToolSummary(
     .join(", ");
 }
 
+function getTaskStatusLabel(status: string): string {
+  if (status === "running") return "running";
+  if (status === "pending") return "pending";
+  if (status === "error") return "error";
+  if (status === "completed") return "completed";
+  return "";
+}
+
 // Task tool display with child session visualization
 function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPart?: AgentPart }) {
   const sync = useSync();
@@ -585,6 +593,17 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
   });
 
   const taskAgent = createMemo(() => props.agentPart?.name || props.subtask?.agent || taskInput()?.agent || childAgent()?.agent);
+
+  const taskSummary = createMemo(() => {
+    const agent = taskAgent();
+    const statusLabel = getTaskStatusLabel(status());
+    const activity = taskInput()?.description?.trim()
+      || taskInput()?.prompt?.trim()
+      || getChildToolSummary(childTools())
+      || title();
+
+    return [agent, activity, statusLabel].filter(Boolean).join(" · ");
+  });
 
   const taskModel = createMemo(() => {
     const subtaskModel = props.subtask?.model;
@@ -676,36 +695,48 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
         />
 
         {/* Title + optional agent badge */}
-        <span class="flex items-center gap-1.5 flex-1 min-w-0">
-          <span
-            class="font-mono text-sm truncate"
-            style={{ color: "var(--text-strong)" }}
-          >
-            {title()}
+        <span class="flex flex-col flex-1 min-w-0">
+          <span class="flex items-center gap-1.5 min-w-0">
+            <span
+              class="font-mono text-sm truncate"
+              style={{ color: "var(--text-strong)" }}
+            >
+              {title()}
+            </span>
+            <Show when={taskAgent()}>
+              {(agent) => {
+                const colors = () => getAgentColors(agent());
+                return (
+                  <>
+                    <span style={{ color: "var(--text-weak)", "font-size": "0.7rem" }}>·</span>
+                    <span
+                      style={{
+                        background: colors().bg,
+                        color: colors().fg,
+                        "border-radius": "9999px",
+                        padding: "1px 7px",
+                        "font-size": "0.7rem",
+                        "font-weight": 600,
+                        "white-space": "nowrap",
+                        "flex-shrink": 0,
+                      }}
+                    >
+                      {agent()}
+                    </span>
+                  </>
+                );
+              }}
+            </Show>
           </span>
-          <Show when={taskAgent()}>
-            {(agent) => {
-              const colors = () => getAgentColors(agent());
-              return (
-                <>
-                  <span style={{ color: "var(--text-weak)", "font-size": "0.7rem" }}>·</span>
-                  <span
-                    style={{
-                      background: colors().bg,
-                      color: colors().fg,
-                      "border-radius": "9999px",
-                      padding: "1px 7px",
-                      "font-size": "0.7rem",
-                      "font-weight": 600,
-                      "white-space": "nowrap",
-                      "flex-shrink": 0,
-                    }}
-                  >
-                    {agent()}
-                  </span>
-                </>
-              );
-            }}
+          <Show when={taskSummary()}>
+            {(summary) => (
+              <span
+                class="mt-0.5 font-mono text-xs truncate"
+                style={{ color: "var(--text-weak)" }}
+              >
+                {summary()}
+              </span>
+            )}
           </Show>
         </span>
 
@@ -714,9 +745,9 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
           class="text-xs shrink-0"
           style={{ color: getStatusColor(status()) }}
         >
-          {status() === "running" && "delegating..."}
-          {status() === "pending" && "pending"}
-          {status() === "error" && "error"}
+          {!taskSummary() && status() === "running" && "delegating..."}
+          {!taskSummary() && status() === "pending" && "pending"}
+          {!taskSummary() && status() === "error" && "error"}
         </span>
 
         {/* Expand arrow */}

@@ -1,5 +1,5 @@
 import { QuotaFetchOptions, QuotaProvider, QuotaProviderView } from "../types"
-import { loadAnthropicQuota } from "../../anthropic-quota"
+import { loadAnthropicQuota, type AnthropicQuotaOps } from "../../anthropic-quota"
 
 type AnthropicOps = {
   run?: (args: string[]) => Promise<{ code: number; stdout: string; stderr: string } | null>

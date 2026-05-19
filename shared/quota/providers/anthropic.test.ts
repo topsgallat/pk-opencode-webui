@@ -72,20 +72,20 @@ describe("AnthropicProvider", () => {
     expect(result.warning).toContain("remote target")
   })
 
-  it("surfaces provider errors without disappearing", async () => {
+  it("warns when Claude CLI is missing", async () => {
     clearEnv()
     const home = `/tmp/anthropic-home-${crypto.randomUUID()}`
     process.env.HOME = home
     const provider = new AnthropicProvider({
-      run: async () => { throw new Error("claude missing") },
+      run: async () => null,
     })
 
     const result = await provider.fetch({})
 
-    expect(result.status).toBe("error")
+    expect(result.status).toBe("unavailable")
     expect(result.available).toBe(false)
     expect(result.entries).toHaveLength(0)
-    expect(result.error).toContain("claude missing")
+    expect(result.warning).toContain("Claude CLI not found")
   })
 })
 

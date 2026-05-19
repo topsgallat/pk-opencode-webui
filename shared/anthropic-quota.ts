@@ -306,7 +306,7 @@ export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh
   if (!token) {
     const warning = isRemoteTarget(options?.targetUrl)
       ? "Claude.ai quota is read from the UI server host, not the selected remote target"
-      : "Claude CLI auth or OAuth credentials were not found"
+      : "Claude CLI not found or not signed in. Install Claude CLI and sign in to view Claude.ai subscription usage."
     result.warning = warning
     cache.set(key, { at: nowMs(ops), value: result })
     return result

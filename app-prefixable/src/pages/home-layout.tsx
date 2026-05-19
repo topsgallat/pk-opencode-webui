@@ -193,7 +193,7 @@ export function HomeLayout(props: ParentProps) {
                       <ProjectIconItem
                         onClick={() => navigateToProject(project.worktree)}
                         onRemove={() => removeProject(project.worktree)}
-                        title={project.name || getFilename(project.worktree)}
+                        label={project.name || getFilename(project.worktree)}
                       >
                         <ProjectAvatar project={project} size="large" selected={false} badge={globalEvents.badge(project.worktree)} />
                       </ProjectIconItem>

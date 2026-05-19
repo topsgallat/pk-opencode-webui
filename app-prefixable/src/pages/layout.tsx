@@ -2078,7 +2078,8 @@ export function Layout(props: ParentProps) {
                         if (next) navigateToProject(next.path);
                       }
                     }}
-                    title={project.name || getFilename(project.path)}
+                    label={project.name || getFilename(project.path)}
+                    active={project.path === directory}
                   >
                     <ProjectAvatar
                       project={{ worktree: project.path, name: project.name }}

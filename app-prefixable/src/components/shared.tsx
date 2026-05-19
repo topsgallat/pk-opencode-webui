@@ -1,6 +1,7 @@
-import { Show } from "solid-js"
+import { Show, createSignal } from "solid-js"
 import { Folder, ShieldAlert, CircleHelp, Loader2, X } from "lucide-solid"
 import type { AlertKind } from "../context/global-events"
+import type { JSX } from "solid-js"
 
 export interface Project {
   worktree: string
@@ -66,20 +67,68 @@ export function ProjectAvatar(props: {
 }
 
 export function ProjectIconItem(props: {
-  title: string
+  label: string
   onClick: () => void
   onRemove: () => void
   hintTarget?: boolean
-  children: import("solid-js").JSX.Element
+  active?: boolean
+  children: JSX.Element
 }) {
+  const [flyout, setFlyout] = createSignal<{
+    left: number
+    top: number
+  } | null>(null)
+
+  function show(el: HTMLElement) {
+    const rect = el.getBoundingClientRect()
+    setFlyout({
+      left: rect.right + 8,
+      top: rect.top + rect.height / 2,
+    })
+  }
+
+  function hide(el: HTMLElement, next?: EventTarget | null) {
+    if (next instanceof Node && el.contains(next)) return
+    if (el.matches(":hover") || el.matches(":focus-within")) return
+    setFlyout(null)
+  }
+
   return (
     <div
-      {...(props.hintTarget ? { "data-hint-target": "" } : {})}
-      onClick={props.onClick}
       class="group relative cursor-pointer"
-      title={props.title}
+      onMouseEnter={(e) => show(e.currentTarget)}
+      onMouseLeave={(e) => hide(e.currentTarget, e.relatedTarget)}
+      onFocusIn={(e) => show(e.currentTarget)}
+      onFocusOut={(e) => hide(e.currentTarget, e.relatedTarget)}
     >
-      {props.children}
+      <button
+        type="button"
+        {...(props.hintTarget ? { "data-hint-target": "" } : {})}
+        onClick={props.onClick}
+        class="block rounded-xl"
+        aria-label={props.label}
+        aria-current={props.active ? "page" : undefined}
+      >
+        {props.children}
+      </button>
+      <Show when={flyout()}>
+        {(f) => (
+          <div
+            class="pointer-events-none fixed z-50 -translate-y-1/2 rounded-md border px-3 py-1.5 text-xs font-medium whitespace-nowrap"
+            aria-hidden="true"
+            style={{
+              left: `${f().left}px`,
+              top: `${f().top}px`,
+              background: "var(--background-base)",
+              color: "var(--text-strong)",
+              border: "1px solid var(--border-base)",
+              "box-shadow": "0 12px 32px rgba(0, 0, 0, 0.16)",
+            }}
+          >
+            {props.label}
+          </div>
+        )}
+      </Show>
       <button
         type="button"
         onClick={(e) => {

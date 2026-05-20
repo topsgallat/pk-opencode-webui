@@ -459,6 +459,8 @@
   .markdown-content {
     color: var(--text-base);
     @apply leading-relaxed;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .markdown-content p {
@@ -560,6 +562,8 @@
 
   .markdown-content strong {
     @apply font-semibold;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .markdown-content em {

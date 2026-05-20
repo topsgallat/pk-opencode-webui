@@ -515,7 +515,7 @@ export function Terminal(props: TerminalProps) {
             type="button"
             class="flex items-center justify-center w-10 h-10 rounded opacity-70 active:opacity-100 active:scale-95 transition-all select-none"
             style={{ color: activeTheme().foreground, background: btnBg() }}
-            onTouchStart={(e) => { e.preventDefault(); sendKey(seq) }}
+            onTouchEnd={(e) => { e.preventDefault(); sendKey(seq) }}
             onClick={() => sendKey(seq)}
             aria-label={label}
           >

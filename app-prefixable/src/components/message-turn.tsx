@@ -534,7 +534,7 @@ export function MessageTurn(props: {
                         </pre>
                       }>
                         <div class="p-2" style={{ background: "var(--surface-base)" }}>
-                          <Markdown content={block.content} class="text-xs" />
+                          <Markdown content={block.content} class="text-xs" copyCodeBlocks={true} />
                         </div>
                       </Show>
                     </div>
@@ -717,7 +717,7 @@ export function MessageTurn(props: {
                       </pre>
                     }>
                       <div class="p-2" style={{ background: "var(--surface-base)" }}>
-                        <Markdown content={block.content} class="text-xs" />
+                          <Markdown content={block.content} class="text-xs" copyCodeBlocks={true} />
                       </div>
                     </Show>
                   </div>
@@ -824,7 +824,7 @@ export function MessageTurn(props: {
                     <Show when={text}>
                       <Show
                         when={streamingText()}
-                        fallback={<Markdown content={text} class="text-sm" onFileClick={props.onOpenFile} linkifyFiles={!!props.onOpenFile} />}
+                        fallback={<Markdown content={text} class="text-sm" onFileClick={props.onOpenFile} linkifyFiles={!!props.onOpenFile} copyCodeBlocks={true} />}
                       >
                         <div
                           class="text-sm whitespace-pre-wrap break-words"

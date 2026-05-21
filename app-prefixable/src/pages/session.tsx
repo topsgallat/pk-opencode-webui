@@ -376,7 +376,8 @@ export function Session() {
       }
     }
 
-    const fallback = providers.providers.find((p) => p.id === "opencode") ?? providers.providers[0];
+    const fallback = providers.providers.find((p) => p.id === "opencode" && providers.connected.includes(p.id))
+      ?? providers.providers.find((p) => providers.connected.includes(p.id));
     if (!fallback) return null;
 
     const fallbackModelID = fallback.models["big-pickle"] ? "big-pickle" : Object.keys(fallback.models)[0];

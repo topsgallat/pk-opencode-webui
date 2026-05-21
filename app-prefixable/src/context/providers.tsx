@@ -1,4 +1,4 @@
-import { createContext, useContext, createResource, createEffect, type ParentProps, onMount } from "solid-js"
+import { createContext, useContext, createResource, createEffect, createMemo, type ParentProps, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useSDK } from "./sdk"
 import { useConfig } from "./config"
@@ -95,7 +95,9 @@ function getConnectedProviderIDs(data?: ProviderListData): string[] {
 
 interface ProviderContextValue {
   providers: Provider[]
+  rawProviders: Provider[]
   connected: string[]
+  rawConnected: string[]
   defaults: Record<string, string>
   authMethods: Record<string, ProviderAuthMethod[]>
   agents: Agent[]
@@ -192,64 +194,95 @@ export function ProviderProvider(props: ParentProps) {
     }
   })
 
+  const rawProviders = createMemo(() => providerData()?.all ?? [])
+  const rawConnected = createMemo(() => getConnectedProviderIDs(providerData()))
+
+  function providerBaseID(providerID: string) {
+    const idx = providerID.indexOf(":")
+    return idx > 0 ? providerID.slice(0, idx) : providerID
+  }
+
+  function providerAllowed(providerID: string) {
+    const base = providerBaseID(providerID)
+    if (cfg.project.enabled_providers) return cfg.project.enabled_providers.includes(base)
+    if (cfg.project.disabled_providers) return !cfg.project.disabled_providers.includes(base)
+    return true
+  }
+
+  const providersView = createMemo(() => rawProviders().filter((provider) => providerAllowed(provider.id)))
+  const connectedView = createMemo(() => rawConnected().filter((providerID) => providerAllowed(providerID)))
+
+  function providerFor(model: ModelKey | null, list = providersView()) {
+    if (!model) return null
+    return list.find((provider) => provider.id === model.providerID) ?? null
+  }
+
+  function modelAllowed(model: ModelKey | null) {
+    const provider = providerFor(model)
+    if (!provider || !model) return false
+    if (!connectedView().includes(model.providerID)) return false
+    return !!provider.models[model.modelID]
+  }
+
+  function fallbackModel() {
+    const configModel = cfg.project.model || cfg.global.model
+    const slashIdx = configModel ? configModel.indexOf("/") : -1
+    const parsedProvider = slashIdx > 0 ? configModel.slice(0, slashIdx) : ""
+    const parsedModel = slashIdx > 0 ? configModel.slice(slashIdx + 1) : ""
+
+    if (parsedProvider && parsedModel) {
+      const configured = { providerID: parsedProvider, modelID: parsedModel }
+      if (modelAllowed(configured)) return configured
+    }
+
+    const fallback = { providerID: FALLBACK_PROVIDER, modelID: FALLBACK_MODEL }
+    if (modelAllowed(fallback)) return fallback
+
+    for (const provider of providersView()) {
+      if (!connectedView().includes(provider.id)) continue
+      const modelID = Object.keys(provider.models)[0]
+      if (modelID) return { providerID: provider.id, modelID }
+    }
+
+    return null
+  }
+
+  function resolveSelection(agent: string) {
+    const stored = store.modelsByAgent[agent]
+    if (modelAllowed(stored)) return stored
+    return fallbackModel()
+  }
+
   // Auto-select default model/agent from project config, falling back to hardcoded defaults.
   // localStorage selections take priority (user's runtime choice wins).
   createEffect(() => {
     const data = providerData()
     if (!data) return
 
-    // Resolve default agent from config (project overrides global) or fallback,
-    // validating against known agents
     const configAgent = cfg.project.default_agent || cfg.global.default_agent
     const agents = agentsData()
     const agentNames = agents ? agents.map((a) => a.name) : []
     const validConfigAgent = configAgent && agentNames.length > 0 && agentNames.includes(configAgent)
     const defaultAgent = validConfigAgent ? configAgent : FALLBACK_AGENT
 
-    // Set selected agent if config specifies a valid agent, we're still on fallback,
-    // and the user hasn't manually chosen an agent
     if (validConfigAgent && !userChangedAgent && store.selectedAgent === FALLBACK_AGENT && configAgent !== FALLBACK_AGENT) {
       setStore("selectedAgent", configAgent)
     }
 
-    // Resolve default model from config (project overrides global). Config format is "provider/model".
-    const configModel = cfg.project.model || cfg.global.model
-    const slashIdx = configModel ? configModel.indexOf("/") : -1
-    const parsedProvider = slashIdx > 0 ? configModel!.slice(0, slashIdx) : ""
-    const parsedModel = slashIdx > 0 ? configModel!.slice(slashIdx + 1) : ""
-    const hasValidConfigModel = !!(parsedProvider && parsedModel)
-    const targetProvider = hasValidConfigModel ? parsedProvider : FALLBACK_PROVIDER
-    const targetModel = hasValidConfigModel ? parsedModel : FALLBACK_MODEL
+    for (const [agent, model] of Object.entries(store.modelsByAgent)) {
+      if (modelAllowed(model)) continue
+      const resolved = fallbackModel()
+      if (resolved) setStore("modelsByAgent", agent, resolved)
+    }
 
-    // Only auto-set model when there is no existing selection for this agent
-    // (localStorage or previous user choice). This prevents overriding user selections.
     if (!store.modelsByAgent[defaultAgent]) {
-      let modelSet = false
-      if (data.connected.includes(targetProvider)) {
-        const provider = data.all.find((p) => p.id === targetProvider)
-        if (provider && provider.models[targetModel]) {
-          setStore("modelsByAgent", defaultAgent, { providerID: targetProvider, modelID: targetModel })
-          modelSet = true
-        }
-      }
-
-      // Fallback: if config model's provider isn't connected or model doesn't exist
-      if (!modelSet && hasValidConfigModel) {
-        if (data.connected.includes(FALLBACK_PROVIDER)) {
-          const provider = data.all.find((p) => p.id === FALLBACK_PROVIDER)
-          if (provider && provider.models[FALLBACK_MODEL]) {
-            setStore("modelsByAgent", defaultAgent, { providerID: FALLBACK_PROVIDER, modelID: FALLBACK_MODEL })
-          }
-        }
-      }
+      const resolved = fallbackModel()
+      if (resolved) setStore("modelsByAgent", defaultAgent, resolved)
     }
   })
 
   createEffect(() => {
-    const data = providerData()
-    if (!data) return
-
-    for (const providerID of getConnectedProviderIDs(data)) {
+    for (const providerID of rawConnected()) {
       void syncProviderAuthFromBackend(serverUrl, providerID, targetUrl)
     }
   })
@@ -283,28 +316,15 @@ export function ProviderProvider(props: ParentProps) {
   })
 
   function setSelectedModel(model: ModelKey | null) {
-    if (model) {
+    if (model && modelAllowed(model)) {
       setStore("modelsByAgent", store.selectedAgent, model)
     }
   }
 
   function setSelectedAgent(agent: string) {
     if (!store.modelsByAgent[agent]) {
-      // Resolve effective default agent consistently: project -> global -> fallback
-      const configAgent = cfg.project.default_agent || cfg.global.default_agent
-      const agents = agentsData()
-      const agentNames = agents ? agents.map((a) => a.name) : []
-      const effectiveDefault = configAgent && agentNames.includes(configAgent) ? configAgent : FALLBACK_AGENT
-
-      const source = store.modelsByAgent[store.selectedAgent]
-        ? store.selectedAgent
-        : store.modelsByAgent[effectiveDefault]
-          ? effectiveDefault
-          : null
-
-      if (source) {
-        setStore("modelsByAgent", agent, store.modelsByAgent[source])
-      }
+      const source = resolveSelection(store.selectedAgent) ?? resolveSelection(FALLBACK_AGENT)
+      if (source) setStore("modelsByAgent", agent, source)
     }
     userChangedAgent = true
     setStore("selectedAgent", agent)
@@ -402,10 +422,16 @@ export function ProviderProvider(props: ParentProps) {
 
   const value: ProviderContextValue = {
     get providers() {
-      return providerData()?.all ?? []
+      return providersView()
+    },
+    get rawProviders() {
+      return rawProviders()
     },
     get connected() {
-      return getConnectedProviderIDs(providerData())
+      return connectedView()
+    },
+    get rawConnected() {
+      return rawConnected()
     },
     get defaults() {
       return providerData()?.default ?? {}
@@ -421,8 +447,7 @@ export function ProviderProvider(props: ParentProps) {
       return providerData.loading || agentsData.loading
     },
     get selectedModel() {
-      // Return the model for the currently selected agent
-      return store.modelsByAgent[store.selectedAgent] ?? null
+      return resolveSelection(store.selectedAgent)
     },
     get selectedAgent() {
       return store.selectedAgent

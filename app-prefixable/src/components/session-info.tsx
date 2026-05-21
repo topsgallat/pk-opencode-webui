@@ -186,7 +186,7 @@ export function SessionInfo(props: SessionInfoProps) {
     if (!lastAssistant) return null
 
     // Get model context limit for usage percentage (use lastAssistant's model, not selectedModel)
-    const provider = providers.providers.find((p: { id: string }) => p.id === lastAssistant!.providerID)
+    const provider = providers.rawProviders.find((p: { id: string }) => p.id === lastAssistant!.providerID)
     if (!provider && providers.providers.length > 0 && import.meta.env.DEV) {
       console.warn("[session-info] provider not found:", lastAssistant!.providerID,
         "available:", providers.providers.map(p => p.id))
@@ -224,7 +224,7 @@ export function SessionInfo(props: SessionInfoProps) {
   const modelLabel = createMemo(() => {
     const selected = selectedModel()
     if (!selected) return null
-    const provider = providers.providers.find((p: { id: string }) => p.id === selected.providerID)
+    const provider = providers.rawProviders.find((p: { id: string }) => p.id === selected.providerID)
     const model = provider?.models[selected.modelID]
     return model?.name || selected.modelID
   })
@@ -306,7 +306,7 @@ export function SessionInfo(props: SessionInfoProps) {
   const modelBadge = createMemo(() => {
     const selected = selectedModel()
     if (!selected) return null
-    const provider = providers.providers.find((p: { id: string }) => p.id === selected.providerID)
+    const provider = providers.rawProviders.find((p: { id: string }) => p.id === selected.providerID)
     const model = provider?.models[selected.modelID]
     if (!model) return null
     const fmt = (n: number) => Number(n.toFixed(2)).toString()

@@ -157,7 +157,7 @@ export function SessionSidebar(props: SessionSidebarProps) {
     // Get model context limit from the message's model, not the currently selected one
     const providerID = msgProviderID ?? selectedModel()?.providerID
     const modelID = msgModelID ?? selectedModel()?.modelID
-    const provider = providers.providers.find((p) => p.id === providerID)
+    const provider = providers.rawProviders.find((p) => p.id === providerID)
     const model = provider?.models[modelID ?? ""]
     const limit = model?.limit?.context
 

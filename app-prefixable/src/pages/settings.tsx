@@ -1435,7 +1435,7 @@ Add your project-specific instructions here.
                 </div>
               </section>
 
-              {directory && <ProjectProvidersTab />}
+              <ProjectProvidersTab />
             </div>
           </Show>
 
@@ -3576,14 +3576,14 @@ function ProjectProvidersTab() {
 
   async function setDefaultModel(model: string) {
     setSaving(true)
-    const result = await config.updateProject({ model: model || undefined })
+    const result = await config.updateGlobal({ model: model || undefined })
     setSaving(false)
     if (result) showSaved()
   }
 
   async function setDefaultAgent(agent: string) {
     setSaving(true)
-    const result = await config.updateProject({ default_agent: agent || undefined })
+    const result = await config.updateGlobal({ default_agent: agent || undefined })
     setSaving(false)
     if (result) showSaved()
   }
@@ -3827,7 +3827,7 @@ function ProjectProvidersTab() {
               Default Model
             </label>
             <select
-              value={config.project.model ?? ""}
+              value={config.global.model ?? ""}
               onChange={(e) => setDefaultModel(e.currentTarget.value)}
               disabled={saving()}
               class="w-full px-3 py-2 rounded-md text-sm disabled:opacity-50"
@@ -3856,7 +3856,7 @@ function ProjectProvidersTab() {
               Default Agent
             </label>
             <select
-              value={config.project.default_agent ?? ""}
+              value={config.global.default_agent ?? ""}
               onChange={(e) => setDefaultAgent(e.currentTarget.value)}
               disabled={saving()}
               class="w-full px-3 py-2 rounded-md text-sm disabled:opacity-50"

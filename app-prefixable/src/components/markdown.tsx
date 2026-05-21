@@ -125,12 +125,12 @@ function enhanceCodeBlocks(root: HTMLElement) {
 
     const wrapper = document.createElement("div")
     wrapper.dataset.codeBlock = "true"
-    wrapper.className = "relative mb-4 overflow-hidden rounded-lg border"
+    wrapper.className = "mb-4 overflow-hidden rounded-lg border"
     wrapper.style.background = "var(--background-strongest)"
     wrapper.style.borderColor = "var(--border-base)"
 
     const toolbar = document.createElement("div")
-    toolbar.className = "absolute right-2 top-2 z-10"
+    toolbar.className = "flex justify-end p-2 pb-0"
 
     const button = document.createElement("button")
     button.type = "button"
@@ -161,7 +161,7 @@ function enhanceCodeBlocks(root: HTMLElement) {
     body.className = "overflow-x-auto"
 
     pre.style.margin = "0"
-    pre.style.padding = "2.25rem 1rem 1rem"
+    pre.style.padding = "1rem"
     pre.style.background = "transparent"
     pre.style.border = "0"
 

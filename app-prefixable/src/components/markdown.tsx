@@ -167,7 +167,12 @@ function enhanceCodeBlocks(root: HTMLElement) {
 
     body.append(pre)
     wrapper.append(toolbar, body)
-    pre.parentNode?.replaceChild(wrapper, pre)
+
+    const parent = pre.parentNode
+    if (parent) {
+      parent.insertBefore(wrapper, pre)
+      parent.removeChild(pre)
+    }
   }
 }
 

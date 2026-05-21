@@ -3508,6 +3508,7 @@ function ProjectProvidersTab() {
   const [newProviderEnv, setNewProviderEnv] = createSignal<string>("")
   const [editingProviderId, setEditingProviderId] = createSignal<string | null>(null)
   const [providerToRemove, setProviderToRemove] = createSignal<string | null>(null)
+  const [providerSearch, setProviderSearch] = createSignal("")
   const providerConfigMap = createMemo<Record<string, ProviderConfig>>(() => config.project.provider ?? {})
 
   const availableModels = createMemo(() => {
@@ -3551,6 +3552,14 @@ function ProjectProvidersTab() {
     }
 
     return result.sort((a, b) => a.name.localeCompare(b.name))
+  })
+
+  const filteredProviderOptions = createMemo(() => {
+    const q = providerSearch().toLowerCase()
+    if (!q) return providerOptions()
+    return providerOptions().filter(
+      (p) => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q),
+    )
   })
 
   function resetProviderEditor() {
@@ -3893,7 +3902,17 @@ function ProjectProvidersTab() {
             </p>
           </div>
           <div class="space-y-2">
-            <For each={providerOptions()}>
+            <div class="relative">
+              <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-weak)" }} />
+              <input
+                value={providerSearch()}
+                onInput={(e) => setProviderSearch(e.currentTarget.value)}
+                placeholder="Search providers..."
+                class="w-full pl-9 pr-3 py-2 rounded-md text-sm"
+                style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }}
+              />
+            </div>
+            <For each={filteredProviderOptions()}>
               {(provider) => (
                 <div class="rounded-md p-3 flex items-center justify-between gap-3" style={{ background: "var(--surface-inset)" }}>
                   <div class="min-w-0">

@@ -165,13 +165,10 @@ function enhanceCodeBlocks(root: HTMLElement) {
     pre.style.background = "transparent"
     pre.style.border = "0"
 
-    body.append(pre)
-    wrapper.append(toolbar, body)
-
     const parent = pre.parentNode
     if (parent) {
       parent.insertBefore(wrapper, pre)
-      parent.removeChild(pre)
+      body.append(pre)
     }
   }
 }

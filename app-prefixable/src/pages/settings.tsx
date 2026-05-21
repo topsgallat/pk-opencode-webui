@@ -3733,10 +3733,10 @@ function ProjectProvidersTab() {
         <div class="flex items-center justify-between">
           <div>
             <h1 class="text-lg font-medium" style={{ color: "var(--text-strong)" }}>
-              Global Providers
+              Project Providers
             </h1>
             <p class="text-sm mt-1" style={{ color: "var(--text-weak)" }}>
-              Manage global provider entries, enabled providers, and default models
+              Manage project provider entries, enabled providers, and default models
             </p>
           </div>
           <div class="flex items-center gap-2">
@@ -3790,7 +3790,7 @@ function ProjectProvidersTab() {
         <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
           <Settings2 class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
               <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-                Global Model Defaults
+                Project Model Defaults
               </h2>
         </div>
         <div class="p-4 space-y-4">
@@ -3986,7 +3986,7 @@ function ProjectProvidersTab() {
         <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
           <Settings2 class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
           <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-            Global Custom Providers
+            Project Custom Providers
           </h2>
         </div>
         <div class="p-4">

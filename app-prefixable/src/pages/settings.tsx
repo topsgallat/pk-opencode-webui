@@ -3510,7 +3510,8 @@ function ProjectProvidersTab() {
   const [providerToRemove, setProviderToRemove] = createSignal<string | null>(null)
   const [providerSearch, setProviderSearch] = createSignal("")
   const [expandedModelProviders, setExpandedModelProviders] = createSignal<Record<string, boolean>>({})
-  const providerConfigMap = createMemo<Record<string, ProviderConfig>>(() => config.project.provider ?? {})
+  const projectProviderConfigMap = createMemo<Record<string, ProviderConfig>>(() => config.project.provider ?? {})
+  const globalProviderConfigMap = createMemo<Record<string, ProviderConfig>>(() => config.global.provider ?? {})
 
   const availableModels = createMemo(() => {
     const seen = new Set<string>()
@@ -3529,30 +3530,14 @@ function ProjectProvidersTab() {
   })
 
   const providerOptions = createMemo(() => {
-    const seen = new Set<string>()
-    const result: Array<{ id: string; name: string; connected: boolean; modelIDs: string[] }> = []
-
-    for (const provider of providers.rawProviders) {
-      seen.add(provider.id)
-      result.push({
+    return providers.rawProviders
+      .map((provider) => ({
         id: provider.id,
         name: provider.name || provider.id,
         connected: providers.rawConnected.includes(provider.id),
         modelIDs: Object.keys(provider.models),
-      })
-    }
-
-    for (const [id, provider] of Object.entries(providerConfigMap())) {
-      if (seen.has(id)) continue
-      result.push({
-        id,
-        name: provider.name || id,
-        connected: providers.rawConnected.includes(id),
-        modelIDs: Object.keys(provider.models ?? {}),
-      })
-    }
-
-    return result.sort((a, b) => a.name.localeCompare(b.name))
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
   })
 
   const filteredProviderOptions = createMemo(() => {
@@ -3573,17 +3558,19 @@ function ProjectProvidersTab() {
     setNewProviderEnv("")
   }
 
-  function projectProviderEnabled(providerID: string) {
+  function globalProviderEnabled(providerID: string) {
+    if (config.global.enabled_providers) return config.global.enabled_providers.includes(providerID)
+    if (config.global.disabled_providers) return !config.global.disabled_providers.includes(providerID)
     if (config.project.enabled_providers) return config.project.enabled_providers.includes(providerID)
     if (config.project.disabled_providers) return !config.project.disabled_providers.includes(providerID)
     return true
   }
 
-  function projectModelListExpanded(providerID: string) {
+  function globalModelListExpanded(providerID: string) {
     return expandedModelProviders()[providerID] === true
   }
 
-  function toggleProjectModelList(providerID: string) {
+  function toggleGlobalModelList(providerID: string) {
     setExpandedModelProviders((current) => ({ ...current, [providerID]: !current[providerID] }))
   }
 
@@ -3601,41 +3588,41 @@ function ProjectProvidersTab() {
     if (result) showSaved()
   }
 
-  async function toggleProjectProvider(providerID: string) {
+  async function toggleGlobalProvider(providerID: string) {
     setSaving(true)
-    if (config.project.enabled_providers) {
-      const next = config.project.enabled_providers.includes(providerID)
-        ? config.project.enabled_providers.filter((item) => item !== providerID)
-        : [...config.project.enabled_providers, providerID]
-      const result = await config.updateProject({ enabled_providers: next })
+    if (config.global.enabled_providers) {
+      const next = config.global.enabled_providers.includes(providerID)
+        ? config.global.enabled_providers.filter((item) => item !== providerID)
+        : [...config.global.enabled_providers, providerID]
+      const result = await config.updateGlobal({ enabled_providers: next })
       setSaving(false)
       if (result) showSaved()
       return
     }
 
-    const disabled = config.project.disabled_providers ?? []
+    const disabled = config.global.disabled_providers ?? []
     const next = disabled.includes(providerID)
       ? disabled.filter((item) => item !== providerID)
       : [...disabled, providerID]
-    const result = await config.updateProject({ disabled_providers: next })
+    const result = await config.updateGlobal({ disabled_providers: next })
     setSaving(false)
     if (result) showSaved()
   }
 
-  function projectProviderModelConfig(providerID: string) {
-    return providerConfigMap()[providerID] ?? {}
+  function globalProviderModelConfig(providerID: string) {
+    return globalProviderConfigMap()[providerID] ?? {}
   }
 
-  function projectModelEnabled(providerID: string, modelID: string) {
-    const provider = projectProviderModelConfig(providerID)
+  function globalModelEnabled(providerID: string, modelID: string) {
+    const provider = globalProviderModelConfig(providerID)
     if (provider.whitelist) return provider.whitelist.includes(modelID)
     if (provider.blacklist) return !provider.blacklist.includes(modelID)
     return true
   }
 
-  async function toggleProjectModel(providerID: string, modelID: string) {
+  async function toggleGlobalModel(providerID: string, modelID: string) {
     setSaving(true)
-    const current = projectProviderModelConfig(providerID)
+    const current = globalProviderModelConfig(providerID)
     const nextProvider: ProviderConfig = { ...current }
 
     if (nextProvider.whitelist) {
@@ -3649,9 +3636,9 @@ function ProjectProvidersTab() {
         : [...blacklist, modelID]
     }
 
-    const result = await config.updateProject({
+    const result = await config.updateGlobal({
       provider: {
-        ...providerConfigMap(),
+        ...globalProviderConfigMap(),
         [providerID]: nextProvider,
       },
     })
@@ -3659,8 +3646,8 @@ function ProjectProvidersTab() {
     if (result) showSaved()
   }
 
-  function editProjectProvider(providerID: string) {
-    const provider = providerConfigMap()[providerID]
+  function editGlobalProvider(providerID: string) {
+    const provider = globalProviderConfigMap()[providerID]
     setEditingProviderId(providerID)
     setNewProviderId(providerID)
     setNewProviderName(provider?.name ?? providerID)
@@ -3669,7 +3656,7 @@ function ProjectProvidersTab() {
     setNewProviderEnv((provider?.env ?? []).join("\n"))
   }
 
-  async function saveProjectProvider() {
+  async function saveGlobalProvider() {
     const id = newProviderId().trim()
     if (!id) {
       setSaveError("Provider ID is required")
@@ -3682,17 +3669,17 @@ function ProjectProvidersTab() {
       .filter(Boolean)
 
     const existingID = editingProviderId()
-    const existing = existingID ? providerConfigMap()[existingID] : undefined
-    if (!existingID && providerConfigMap()[id]) {
-      setSaveError(`Provider '${id}' already exists in project config`)
+    const existing = existingID ? globalProviderConfigMap()[existingID] : undefined
+    if (!existingID && globalProviderConfigMap()[id]) {
+      setSaveError(`Provider '${id}' already exists in global config`)
       return
     }
-    if (existingID && existingID !== id && providerConfigMap()[id]) {
-      setSaveError(`Provider '${id}' already exists in project config`)
+    if (existingID && existingID !== id && globalProviderConfigMap()[id]) {
+      setSaveError(`Provider '${id}' already exists in global config`)
       return
     }
 
-    const nextMap = { ...providerConfigMap() }
+    const nextMap = { ...globalProviderConfigMap() }
     if (existingID && existingID !== id) delete nextMap[existingID]
 
     nextMap[id] = {
@@ -3705,7 +3692,7 @@ function ProjectProvidersTab() {
     }
 
     setSaving(true)
-    const result = await config.updateProject({ provider: nextMap })
+    const result = await config.updateGlobal({ provider: nextMap })
     setSaving(false)
     if (result) {
       resetProviderEditor()
@@ -3713,17 +3700,18 @@ function ProjectProvidersTab() {
     }
   }
 
-  async function removeProjectProvider() {
+  async function removeGlobalProvider() {
     const providerID = providerToRemove()
     if (!providerID) return
 
-    const full = JSON.parse(JSON.stringify(config.project)) as Config
+    const full = JSON.parse(JSON.stringify(config.global)) as Config
     if (full.provider) {
       delete full.provider[providerID]
       if (Object.keys(full.provider).length === 0) delete full.provider
     }
 
-    await writeConfigFile(JSON.stringify(full, null, 2))
+    const result = await config.updateGlobal({ provider: full.provider ?? undefined })
+    if (!result) return
     setProviderToRemove(null)
     if (editingProviderId() === providerID) resetProviderEditor()
   }
@@ -3829,9 +3817,9 @@ function ProjectProvidersTab() {
       >
         <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
           <Settings2 class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
-          <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-            Project Model Defaults
-          </h2>
+              <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                Global Model Defaults
+              </h2>
         </div>
         <div class="p-4 space-y-4">
           <div>
@@ -3898,17 +3886,17 @@ function ProjectProvidersTab() {
       >
         <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
           <Cpu class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
-          <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-            Project Provider Access
-          </h2>
-        </div>
+            <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+              Global Provider Access
+            </h2>
+          </div>
         <div class="p-4 space-y-4">
           <div>
             <h3 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
               Enabled Providers
             </h3>
             <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
-              Control which providers are available for this project.
+              Control which providers are available globally.
             </p>
           </div>
           <div class="space-y-2 pr-1" style={{ "max-height": "min(40vh, 24rem)", overflow: "auto" }}>
@@ -3934,19 +3922,19 @@ function ProjectProvidersTab() {
                     </div>
                   </div>
                   <button
-                    onClick={() => toggleProjectProvider(provider.id)}
+                    onClick={() => toggleGlobalProvider(provider.id)}
                     disabled={saving()}
                     class="relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 shrink-0"
                     role="switch"
-                    aria-checked={projectProviderEnabled(provider.id)}
+                    aria-checked={globalProviderEnabled(provider.id)}
                     aria-label={`Toggle ${provider.name} provider access`}
-                    style={{ background: projectProviderEnabled(provider.id) ? "var(--interactive-base)" : "var(--surface-inset)" }}
+                    style={{ background: globalProviderEnabled(provider.id) ? "var(--interactive-base)" : "var(--surface-inset)" }}
                   >
                     <div
                       class="absolute top-0.5 w-4 h-4 rounded-full transition-all"
                       style={{
                         background: "var(--background-base)",
-                        left: projectProviderEnabled(provider.id) ? "calc(100% - 18px)" : "2px",
+                        left: globalProviderEnabled(provider.id) ? "calc(100% - 18px)" : "2px",
                       }}
                     />
                   </button>
@@ -3966,13 +3954,13 @@ function ProjectProvidersTab() {
       >
         <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
           <Cpu class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
-          <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-            Project Model Access
-          </h2>
-        </div>
+            <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+              Global Model Access
+            </h2>
+          </div>
         <div class="p-4 space-y-4">
           <p class="text-xs" style={{ color: "var(--text-weak)" }}>
-            Model toggles use provider whitelist or blacklist config. If neither exists yet, this UI starts a blacklist for the selected provider.
+            Model toggles use global whitelist or blacklist config. If neither exists yet, this UI starts a blacklist for the selected provider.
           </p>
           <div class="space-y-3 pr-1" style={{ "max-height": "min(50vh, 28rem)", overflow: "auto" }}>
             <For each={providerOptions().filter((provider) => provider.connected && provider.modelIDs.length > 0)}>
@@ -3980,7 +3968,7 @@ function ProjectProvidersTab() {
                 <div class="rounded-md p-3" style={{ background: "var(--surface-inset)" }}>
                   <button
                     type="button"
-                    onClick={() => toggleProjectModelList(provider.id)}
+                    onClick={() => toggleGlobalModelList(provider.id)}
                     class="w-full flex items-center justify-between gap-3 text-left"
                   >
                     <div class="min-w-0">
@@ -3989,36 +3977,36 @@ function ProjectProvidersTab() {
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                       <span class="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}>
-                        {projectProviderModelConfig(provider.id).whitelist ? "Whitelist" : "Blacklist"}
+                        {globalProviderModelConfig(provider.id).whitelist ? "Whitelist" : "Blacklist"}
                       </span>
                       <span class="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}>
                         {provider.modelIDs.length} models
                       </span>
-                      <Show when={projectModelListExpanded(provider.id)} fallback={<ChevronRight class="w-4 h-4" style={{ color: "var(--text-weak)" }} />}>
+                      <Show when={globalModelListExpanded(provider.id)} fallback={<ChevronRight class="w-4 h-4" style={{ color: "var(--text-weak)" }} />}>
                         <ChevronDown class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
                       </Show>
                     </div>
                   </button>
-                  <Show when={projectModelListExpanded(provider.id)}>
+                  <Show when={globalModelListExpanded(provider.id)}>
                     <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                       <For each={provider.modelIDs.sort((a, b) => a.localeCompare(b))}>
                         {(modelID) => (
                           <div class="flex items-center justify-between gap-3 rounded-md px-3 py-2" style={{ background: "var(--background-base)" }}>
                             <span class="text-sm truncate" style={{ color: "var(--text-base)" }}>{modelID}</span>
                             <button
-                              onClick={() => toggleProjectModel(provider.id, modelID)}
+                              onClick={() => toggleGlobalModel(provider.id, modelID)}
                               disabled={saving()}
                               class="relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 shrink-0"
                               role="switch"
-                              aria-checked={projectModelEnabled(provider.id, modelID)}
+                              aria-checked={globalModelEnabled(provider.id, modelID)}
                               aria-label={`Toggle ${modelID} for ${provider.name}`}
-                              style={{ background: projectModelEnabled(provider.id, modelID) ? "var(--interactive-base)" : "var(--surface-inset)" }}
+                              style={{ background: globalModelEnabled(provider.id, modelID) ? "var(--interactive-base)" : "var(--surface-inset)" }}
                             >
                               <div
                                 class="absolute top-0.5 w-4 h-4 rounded-full transition-all"
                                 style={{
                                   background: "var(--background-base)",
-                                  left: projectModelEnabled(provider.id, modelID) ? "calc(100% - 18px)" : "2px",
+                                  left: globalModelEnabled(provider.id, modelID) ? "calc(100% - 18px)" : "2px",
                                 }}
                               />
                             </button>
@@ -4044,7 +4032,7 @@ function ProjectProvidersTab() {
         <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
           <Settings2 class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
           <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-            Custom Providers
+            Global Custom Providers
           </h2>
         </div>
         <div class="p-4">
@@ -4071,7 +4059,7 @@ function ProjectProvidersTab() {
                 <input value={newProviderNpm()} onInput={(e) => setNewProviderNpm(e.currentTarget.value)} placeholder="NPM package" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
                 <textarea value={newProviderEnv()} onInput={(e) => setNewProviderEnv(e.currentTarget.value)} rows={4} placeholder="Environment variables, one per line" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
                 <div class="flex items-center gap-2 flex-wrap">
-                  <Button onClick={saveProjectProvider} variant="primary" size="sm" disabled={saving() || !newProviderId().trim()}>
+                    <Button onClick={saveGlobalProvider} variant="primary" size="sm" disabled={saving() || !newProviderId().trim()}>
                     <Save class="w-3.5 h-3.5" />
                     {editingProviderId() ? "Save Provider" : "Add Provider"}
                   </Button>
@@ -4085,11 +4073,11 @@ function ProjectProvidersTab() {
             </div>
             <div class="rounded-md p-3" style={{ background: "var(--surface-inset)" }}>
               <div class="text-sm font-medium mb-3" style={{ color: "var(--text-strong)" }}>
-                Configured provider entries ({Object.keys(providerConfigMap()).length})
+                Global provider entries ({Object.keys(globalProviderConfigMap()).length})
               </div>
-              <Show when={Object.keys(providerConfigMap()).length > 0} fallback={<p class="text-sm" style={{ color: "var(--text-weak)" }}>No custom provider config entries yet.</p>}>
+              <Show when={Object.keys(globalProviderConfigMap()).length > 0} fallback={<p class="text-sm" style={{ color: "var(--text-weak)" }}>No global provider config entries yet.</p>}>
                 <div class="space-y-2">
-                  <For each={Object.entries(providerConfigMap()).sort((a, b) => a[0].localeCompare(b[0]))}>
+                  <For each={Object.entries(globalProviderConfigMap()).sort((a, b) => a[0].localeCompare(b[0]))}>
                     {([providerID, provider]) => (
                       <div class="rounded-md px-3 py-2" style={{ background: "var(--background-base)" }}>
                         <div class="flex items-start justify-between gap-3">
@@ -4100,7 +4088,7 @@ function ProjectProvidersTab() {
                             <div class="text-xs truncate" style={{ color: "var(--text-weak)" }}>{providerID}</div>
                           </div>
                           <div class="flex items-center gap-2 shrink-0">
-                            <button onClick={() => editProjectProvider(providerID)} class="text-xs px-2 py-1 rounded" style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}>
+                            <button onClick={() => editGlobalProvider(providerID)} class="text-xs px-2 py-1 rounded" style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}>
                               Edit
                             </button>
                             <button onClick={() => setProviderToRemove(providerID)} class="text-xs px-2 py-1 rounded" style={{ background: "var(--surface-inset)", color: "var(--interactive-critical)" }}>
@@ -4120,11 +4108,11 @@ function ProjectProvidersTab() {
 
       <ConfirmDialog
         open={!!providerToRemove()}
-        title="Remove Custom Provider"
-        message={`Remove provider '${providerToRemove() ?? ""}' from this project's opencode.json?`}
+        title="Remove Global Provider"
+        message={`Remove provider '${providerToRemove() ?? ""}' from global opencode.json?`}
         confirmLabel="Remove"
         variant="danger"
-        onConfirm={removeProjectProvider}
+        onConfirm={removeGlobalProvider}
         onCancel={() => setProviderToRemove(null)}
       />
 

@@ -3509,6 +3509,7 @@ function ProjectProvidersTab() {
   const [editingProviderId, setEditingProviderId] = createSignal<string | null>(null)
   const [providerToRemove, setProviderToRemove] = createSignal<string | null>(null)
   const [providerSearch, setProviderSearch] = createSignal("")
+  const [expandedModelProviders, setExpandedModelProviders] = createSignal<Record<string, boolean>>({})
   const providerConfigMap = createMemo<Record<string, ProviderConfig>>(() => config.project.provider ?? {})
 
   const availableModels = createMemo(() => {
@@ -3575,6 +3576,14 @@ function ProjectProvidersTab() {
     if (config.project.enabled_providers) return config.project.enabled_providers.includes(providerID)
     if (config.project.disabled_providers) return !config.project.disabled_providers.includes(providerID)
     return true
+  }
+
+  function projectModelListExpanded(providerID: string) {
+    return expandedModelProviders()[providerID] === true
+  }
+
+  function toggleProjectModelList(providerID: string) {
+    setExpandedModelProviders((current) => ({ ...current, [providerID]: !current[providerID] }))
   }
 
   async function setDefaultModel(model: string) {
@@ -3968,41 +3977,55 @@ function ProjectProvidersTab() {
             <For each={providerOptions().filter((provider) => provider.modelIDs.length > 0)}>
               {(provider) => (
                 <div class="rounded-md p-3" style={{ background: "var(--surface-inset)" }}>
-                  <div class="flex items-center justify-between gap-3 mb-2">
-                    <div>
-                      <div class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>{provider.name}</div>
-                      <div class="text-xs" style={{ color: "var(--text-weak)" }}>{provider.id}</div>
+                  <button
+                    type="button"
+                    onClick={() => toggleProjectModelList(provider.id)}
+                    class="w-full flex items-center justify-between gap-3 text-left"
+                  >
+                    <div class="min-w-0">
+                      <div class="text-sm font-medium truncate" style={{ color: "var(--text-strong)" }}>{provider.name}</div>
+                      <div class="text-xs truncate" style={{ color: "var(--text-weak)" }}>{provider.id}</div>
                     </div>
-                    <span class="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}>
-                      {projectProviderModelConfig(provider.id).whitelist ? "Whitelist" : "Blacklist"}
-                    </span>
-                  </div>
-                  <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    <For each={provider.modelIDs.sort((a, b) => a.localeCompare(b))}>
-                      {(modelID) => (
-                        <div class="flex items-center justify-between gap-3 rounded-md px-3 py-2" style={{ background: "var(--background-base)" }}>
-                          <span class="text-sm truncate" style={{ color: "var(--text-base)" }}>{modelID}</span>
-                          <button
-                            onClick={() => toggleProjectModel(provider.id, modelID)}
-                            disabled={saving()}
-                            class="relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 shrink-0"
-                            role="switch"
-                            aria-checked={projectModelEnabled(provider.id, modelID)}
-                            aria-label={`Toggle ${modelID} for ${provider.name}`}
-                            style={{ background: projectModelEnabled(provider.id, modelID) ? "var(--interactive-base)" : "var(--surface-inset)" }}
-                          >
-                            <div
-                              class="absolute top-0.5 w-4 h-4 rounded-full transition-all"
-                              style={{
-                                background: "var(--background-base)",
-                                left: projectModelEnabled(provider.id, modelID) ? "calc(100% - 18px)" : "2px",
-                              }}
-                            />
-                          </button>
-                        </div>
-                      )}
-                    </For>
-                  </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <span class="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}>
+                        {projectProviderModelConfig(provider.id).whitelist ? "Whitelist" : "Blacklist"}
+                      </span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}>
+                        {provider.modelIDs.length} models
+                      </span>
+                      <Show when={projectModelListExpanded(provider.id)} fallback={<ChevronRight class="w-4 h-4" style={{ color: "var(--text-weak)" }} />}>
+                        <ChevronDown class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
+                      </Show>
+                    </div>
+                  </button>
+                  <Show when={projectModelListExpanded(provider.id)}>
+                    <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                      <For each={provider.modelIDs.sort((a, b) => a.localeCompare(b))}>
+                        {(modelID) => (
+                          <div class="flex items-center justify-between gap-3 rounded-md px-3 py-2" style={{ background: "var(--background-base)" }}>
+                            <span class="text-sm truncate" style={{ color: "var(--text-base)" }}>{modelID}</span>
+                            <button
+                              onClick={() => toggleProjectModel(provider.id, modelID)}
+                              disabled={saving()}
+                              class="relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 shrink-0"
+                              role="switch"
+                              aria-checked={projectModelEnabled(provider.id, modelID)}
+                              aria-label={`Toggle ${modelID} for ${provider.name}`}
+                              style={{ background: projectModelEnabled(provider.id, modelID) ? "var(--interactive-base)" : "var(--surface-inset)" }}
+                            >
+                              <div
+                                class="absolute top-0.5 w-4 h-4 rounded-full transition-all"
+                                style={{
+                                  background: "var(--background-base)",
+                                  left: projectModelEnabled(provider.id, modelID) ? "calc(100% - 18px)" : "2px",
+                                }}
+                              />
+                            </button>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
                 </div>
               )}
             </For>

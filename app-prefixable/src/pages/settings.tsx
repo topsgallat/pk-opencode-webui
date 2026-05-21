@@ -3955,26 +3955,16 @@ function ProjectProvidersTab() {
               )}
             </For>
           </div>
-        </div>
-      </section>
 
-      <section
-        class="rounded-lg overflow-hidden"
-        style={{
-          background: "var(--background-base)",
-          border: "1px solid var(--border-base)",
-        }}
-      >
-        <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
-          <Cpu class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
-            <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-            Project Model Access
-            </h2>
+          <div class="pt-2 border-t" style={{ "border-color": "var(--border-base)" }}>
+            <h3 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+              Model Access
+            </h3>
+            <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
+              Model toggles use project whitelist or blacklist config. If neither exists yet, this UI starts a blacklist for the selected provider.
+            </p>
           </div>
-        <div class="p-4 space-y-4">
-          <p class="text-xs" style={{ color: "var(--text-weak)" }}>
-            Model toggles use project whitelist or blacklist config. If neither exists yet, this UI starts a blacklist for the selected provider.
-          </p>
+
           <div class="space-y-3 pr-1" style={{ "max-height": "min(50vh, 28rem)", overflow: "auto" }}>
             <For each={providerOptions().filter((provider) => provider.connected && provider.modelIDs.length > 0)}>
               {(provider) => (

@@ -269,7 +269,7 @@ export function Settings() {
 
   const filteredProviders = createMemo(() => {
     const search = providerSearch().toLowerCase().trim()
-    const all = providers.providers
+    const all = providers.rawProviders
 
     // Filter by search
     const filtered = search
@@ -740,7 +740,7 @@ Add your project-specific instructions here.
   }
 
   function getProviderDisplayName(id: string): string {
-    const provider = providers.providers.find((p) => p.id === id)
+    const provider = providers.rawProviders.find((p) => p.id === id)
     return provider?.name ?? id
   }
 
@@ -970,15 +970,15 @@ Add your project-specific instructions here.
                     </div>
                   </Show>
 
-                  <Show when={!providers.loading && providers.connected.length === 0}>
+                    <Show when={!providers.loading && providers.rawConnected.length === 0}>
                     <p class="text-sm" style={{ color: "var(--text-weak)" }}>
                       No providers connected yet.
                     </p>
                   </Show>
 
-                  <Show when={!providers.loading && providers.connected.length > 0}>
+                    <Show when={!providers.loading && providers.rawConnected.length > 0}>
                     <div class="space-y-2">
-                      <For each={providers.connected}>
+                      <For each={providers.rawConnected}>
                         {(providerID) => {
                           const colonIdx = providerID.indexOf(":")
                           const baseProvider = colonIdx > 0 ? providerID.slice(0, colonIdx) : providerID
@@ -3515,7 +3515,7 @@ function ProjectProvidersTab() {
     const seen = new Set<string>()
     const result: Array<{ id: string; provider: string; name: string }> = []
 
-    for (const provider of providers.providers) {
+    for (const provider of providers.rawProviders) {
       for (const model of Object.keys(provider.models)) {
         const id = `${provider.id}/${model}`
         if (seen.has(id)) continue
@@ -3531,12 +3531,12 @@ function ProjectProvidersTab() {
     const seen = new Set<string>()
     const result: Array<{ id: string; name: string; connected: boolean; modelIDs: string[] }> = []
 
-    for (const provider of providers.providers) {
+    for (const provider of providers.rawProviders) {
       seen.add(provider.id)
       result.push({
         id: provider.id,
         name: provider.name || provider.id,
-        connected: providers.connected.includes(provider.id),
+        connected: providers.rawConnected.includes(provider.id),
         modelIDs: Object.keys(provider.models),
       })
     }
@@ -3546,7 +3546,7 @@ function ProjectProvidersTab() {
       result.push({
         id,
         name: provider.name || id,
-        connected: providers.connected.includes(id),
+        connected: providers.rawConnected.includes(id),
         modelIDs: Object.keys(provider.models ?? {}),
       })
     }

@@ -8,11 +8,13 @@ import { __resetProviderAuthSessionsForTests, resolveProviderAuthAccountId, reso
 const env = {
   HOME: process.env.HOME,
   XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+  OPENCODE_WORKSPACE_ROOT: process.env.OPENCODE_WORKSPACE_ROOT,
 }
 
 afterEach(() => {
   process.env.HOME = env.HOME
   process.env.XDG_DATA_HOME = env.XDG_DATA_HOME
+  process.env.OPENCODE_WORKSPACE_ROOT = env.OPENCODE_WORKSPACE_ROOT
   __resetProviderAuthSessionsForTests()
 })
 
@@ -74,4 +76,47 @@ test("syncs copilot auth from backend auth file using github alias", async () =>
 
   expect(resolveProviderAuthHeader(lookup, target, "copilot")).toBe("Bearer copilot-access-token")
   expect(resolveProviderAuthHeader(lookup, target, "github-copilot")).toBe("Bearer copilot-access-token")
+})
+
+test("uploads text files through the extended API", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-upload-"))
+  process.env.OPENCODE_WORKSPACE_ROOT = root
+
+  const form = new FormData()
+  form.set("path", "notes/demo.txt")
+  form.set("file", new File(["hello world"], "demo.txt", { type: "text/plain" }))
+
+  const req = new Request("http://localhost/api/ext/file", {
+    method: "POST",
+    body: form,
+  })
+
+  const res = await handleExtendedEndpoint("/api/ext/file", "POST", new URL(req.url), req)
+  expect(res).toBeDefined()
+  expect(res!.status).toBe(200)
+
+  const saved = await fs.readFile(nodePath.join(root, "notes", "demo.txt"), "utf-8")
+  expect(saved).toBe("hello world")
+})
+
+test("uploads nested binary files through the extended API", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-upload-"))
+  process.env.OPENCODE_WORKSPACE_ROOT = root
+
+  const bytes = new Uint8Array([0, 1, 2, 3, 255])
+  const form = new FormData()
+  form.set("path", "a/b/c.bin")
+  form.set("file", new File([bytes], "c.bin", { type: "application/octet-stream" }))
+
+  const req = new Request("http://localhost/api/ext/file", {
+    method: "POST",
+    body: form,
+  })
+
+  const res = await handleExtendedEndpoint("/api/ext/file", "POST", new URL(req.url), req)
+  expect(res).toBeDefined()
+  expect(res!.status).toBe(200)
+
+  const saved = await fs.readFile(nodePath.join(root, "a", "b", "c.bin"))
+  expect(Array.from(saved)).toEqual(Array.from(bytes))
 })

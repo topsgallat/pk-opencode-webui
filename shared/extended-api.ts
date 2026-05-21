@@ -119,11 +119,6 @@ async function syncProviderAuthFromBackend(req: Request, target: string, provide
   return syncProviderAuthSession(req, target, { providerID, authHeader, accountId })
 }
 
-/** Resolve the working directory from a query param, falling back to cwd */
-function resolveDir(url: URL): string {
-  return url.searchParams.get("directory") || process.cwd()
-}
-
 /**
  * Validate that a path is safe (within allowed root, no traversal attacks).
  * Returns the normalized absolute path if valid, or null if invalid.
@@ -291,6 +286,42 @@ export async function handleExtendedEndpoint(
     } catch (e) {
       console.error("[ExtAPI] mkdir error:", e)
       return Response.json(false)
+    }
+  }
+
+  // POST /api/ext/file - Upload file content (multipart form)
+  if (path === "/api/ext/file" && method === "POST") {
+    const form = await req.formData().catch(() => null)
+    if (!form) {
+      return Response.json({ error: "multipart form data is required" }, { status: 400 })
+    }
+
+    const filePath = form.get("path")
+    const fileEntry = form.get("file")
+    if (typeof filePath !== "string" || !filePath) {
+      return Response.json({ error: "path is required" }, { status: 400 })
+    }
+    if (!(fileEntry instanceof File)) {
+      return Response.json({ error: "file is required" }, { status: 400 })
+    }
+
+    const allowedRoot = getAllowedRoot()
+    const validatedPath = validatePath(filePath, allowedRoot)
+    if (!validatedPath) {
+      console.warn("[ExtAPI] file upload: path outside allowed root:", filePath)
+      return Response.json({ error: "path must be within allowed directory" }, { status: 403 })
+    }
+
+    console.log("[ExtAPI] file upload:", validatedPath)
+
+    try {
+      const parentDir = nodePath.dirname(validatedPath)
+      await fs.promises.mkdir(parentDir, { recursive: true })
+      await fs.promises.writeFile(validatedPath, Buffer.from(await fileEntry.arrayBuffer()))
+      return Response.json({ success: true })
+    } catch (e) {
+      console.error("[ExtAPI] file upload error:", e)
+      return Response.json({ error: String(e) }, { status: 500 })
     }
   }
 

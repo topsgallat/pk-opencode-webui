@@ -3513,6 +3513,11 @@ function ProjectProvidersTab() {
   const projectProviderConfigMap = createMemo<Record<string, ProviderConfig>>(() => config.project.provider ?? {})
   const globalProviderConfigMap = createMemo<Record<string, ProviderConfig>>(() => config.global.provider ?? {})
 
+  function providerBaseID(providerID: string) {
+    const idx = providerID.indexOf(":")
+    return idx > 0 ? providerID.slice(0, idx) : providerID
+  }
+
   const availableModels = createMemo(() => {
     const seen = new Set<string>()
     const result: Array<{ id: string; provider: string; name: string }> = []
@@ -3534,19 +3539,17 @@ function ProjectProvidersTab() {
       .map((provider) => ({
         id: provider.id,
         name: provider.name || provider.id,
-        connected: providers.rawConnected.includes(provider.id),
+        connected: providers.rawConnected.some((connectedID) => providerBaseID(connectedID) === provider.id),
         modelIDs: Object.keys(provider.models),
       }))
       .sort((a, b) => a.name.localeCompare(b.name))
   })
 
   const filteredProviderOptions = createMemo(() => {
-    const q = providerSearch().toLowerCase()
-    const connected = providerOptions().filter((p) => p.connected)
-    if (!q) return connected
-    return connected.filter(
-      (p) => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q),
-    )
+    const q = providerSearch().toLowerCase().trim()
+    const all = providerOptions()
+    if (!q) return all
+    return all.filter((p) => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q))
   })
 
   function resetProviderEditor() {
@@ -3561,8 +3564,6 @@ function ProjectProvidersTab() {
   function globalProviderEnabled(providerID: string) {
     if (config.global.enabled_providers) return config.global.enabled_providers.includes(providerID)
     if (config.global.disabled_providers) return !config.global.disabled_providers.includes(providerID)
-    if (config.project.enabled_providers) return config.project.enabled_providers.includes(providerID)
-    if (config.project.disabled_providers) return !config.project.disabled_providers.includes(providerID)
     return true
   }
 
@@ -3896,7 +3897,7 @@ function ProjectProvidersTab() {
               Enabled Providers
             </h3>
             <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
-              Control which providers are available globally.
+              Control which providers are available globally. Disconnected providers stay visible so they can be re-enabled.
             </p>
           </div>
           <div class="space-y-2 pr-1" style={{ "max-height": "min(40vh, 24rem)", overflow: "auto" }}>
@@ -3917,8 +3918,20 @@ function ProjectProvidersTab() {
                     <div class="text-sm font-medium truncate" style={{ color: "var(--text-strong)" }}>
                       {provider.name}
                     </div>
-                    <div class="text-xs truncate" style={{ color: "var(--text-weak)" }}>
-                      {provider.id}
+                    <div class="flex items-center gap-1 text-xs truncate" style={{ color: "var(--text-weak)" }}>
+                      <span class="truncate">{provider.id}</span>
+                      <Show
+                        when={provider.connected}
+                        fallback={
+                          <span class="px-1.5 py-0.5 rounded text-[10px] leading-none" style={{ background: "var(--surface-raised)" }}>
+                            Disconnected
+                          </span>
+                        }
+                      >
+                        <span class="px-1.5 py-0.5 rounded text-[10px] leading-none" style={{ background: "var(--surface-raised)" }}>
+                          Connected
+                        </span>
+                      </Show>
                     </div>
                   </div>
                   <button

@@ -3562,8 +3562,8 @@ function ProjectProvidersTab() {
   }
 
   function globalProviderEnabled(providerID: string) {
-    if (config.global.enabled_providers) return config.global.enabled_providers.includes(providerID)
-    if (config.global.disabled_providers) return !config.global.disabled_providers.includes(providerID)
+    if (config.project.enabled_providers) return config.project.enabled_providers.includes(providerID)
+    if (config.project.disabled_providers) return !config.project.disabled_providers.includes(providerID)
     return true
   }
 
@@ -3591,27 +3591,27 @@ function ProjectProvidersTab() {
 
   async function toggleGlobalProvider(providerID: string) {
     setSaving(true)
-    if (config.global.enabled_providers) {
-      const next = config.global.enabled_providers.includes(providerID)
-        ? config.global.enabled_providers.filter((item) => item !== providerID)
-        : [...config.global.enabled_providers, providerID]
-      const result = await config.updateGlobal({ enabled_providers: next })
+    if (config.project.enabled_providers) {
+      const next = config.project.enabled_providers.includes(providerID)
+        ? config.project.enabled_providers.filter((item) => item !== providerID)
+        : [...config.project.enabled_providers, providerID]
+      const result = await config.updateProject({ enabled_providers: next })
       setSaving(false)
       if (result) showSaved()
       return
     }
 
-    const disabled = config.global.disabled_providers ?? []
+    const disabled = config.project.disabled_providers ?? []
     const next = disabled.includes(providerID)
       ? disabled.filter((item) => item !== providerID)
       : [...disabled, providerID]
-    const result = await config.updateGlobal({ disabled_providers: next })
+    const result = await config.updateProject({ disabled_providers: next })
     setSaving(false)
     if (result) showSaved()
   }
 
   function globalProviderModelConfig(providerID: string) {
-    return globalProviderConfigMap()[providerID] ?? {}
+    return projectProviderConfigMap()[providerID] ?? {}
   }
 
   function globalModelEnabled(providerID: string, modelID: string) {
@@ -3637,9 +3637,9 @@ function ProjectProvidersTab() {
         : [...blacklist, modelID]
     }
 
-    const result = await config.updateGlobal({
+    const result = await config.updateProject({
       provider: {
-        ...globalProviderConfigMap(),
+        ...projectProviderConfigMap(),
         [providerID]: nextProvider,
       },
     })
@@ -3888,7 +3888,7 @@ function ProjectProvidersTab() {
         <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
           <Cpu class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
             <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-              Global Provider Access
+            Project Provider Access
             </h2>
           </div>
         <div class="p-4 space-y-4">
@@ -3897,7 +3897,7 @@ function ProjectProvidersTab() {
               Enabled Providers
             </h3>
             <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
-              Control which providers are available globally. Disconnected providers stay visible so they can be re-enabled.
+              Control which providers are available for this project. Disconnected providers stay visible so they can be re-enabled.
             </p>
           </div>
           <div class="space-y-2 pr-1" style={{ "max-height": "min(40vh, 24rem)", overflow: "auto" }}>
@@ -3968,12 +3968,12 @@ function ProjectProvidersTab() {
         <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
           <Cpu class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
             <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-              Global Model Access
+            Project Model Access
             </h2>
           </div>
         <div class="p-4 space-y-4">
           <p class="text-xs" style={{ color: "var(--text-weak)" }}>
-            Model toggles use global whitelist or blacklist config. If neither exists yet, this UI starts a blacklist for the selected provider.
+            Model toggles use project whitelist or blacklist config. If neither exists yet, this UI starts a blacklist for the selected provider.
           </p>
           <div class="space-y-3 pr-1" style={{ "max-height": "min(50vh, 28rem)", overflow: "auto" }}>
             <For each={providerOptions().filter((provider) => provider.connected && provider.modelIDs.length > 0)}>

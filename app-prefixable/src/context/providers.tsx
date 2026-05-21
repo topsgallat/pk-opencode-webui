@@ -204,8 +204,6 @@ export function ProviderProvider(props: ParentProps) {
 
   function providerAllowed(providerID: string) {
     const base = providerBaseID(providerID)
-    if (cfg.global.enabled_providers) return cfg.global.enabled_providers.includes(base)
-    if (cfg.global.disabled_providers) return !cfg.global.disabled_providers.includes(base)
     if (cfg.project.enabled_providers) return cfg.project.enabled_providers.includes(base)
     if (cfg.project.disabled_providers) return !cfg.project.disabled_providers.includes(base)
     return true

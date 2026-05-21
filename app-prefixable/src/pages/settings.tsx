@@ -3761,10 +3761,10 @@ function ProjectProvidersTab() {
         <div class="flex items-center justify-between">
           <div>
             <h1 class="text-lg font-medium" style={{ color: "var(--text-strong)" }}>
-              Project Providers
+              Global Providers
             </h1>
             <p class="text-sm mt-1" style={{ color: "var(--text-weak)" }}>
-              Manage project-level provider entries, enabled providers, and default models
+              Manage global provider entries, enabled providers, and default models
             </p>
           </div>
           <div class="flex items-center gap-2">
@@ -3788,7 +3788,7 @@ function ProjectProvidersTab() {
         >
           <Info class="w-3.5 h-3.5 shrink-0" />
           <span>
-            Saved to <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code> in your project
+            Saved to <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code> globally
             {directory ? ` (${directory})` : ""}
           </span>
         </div>

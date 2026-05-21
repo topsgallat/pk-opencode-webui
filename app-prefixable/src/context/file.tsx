@@ -4,7 +4,7 @@ import type { FileNode } from "../sdk/client"
 import { useSDK } from "./sdk"
 import { useServer } from "./server"
 import { useEvents } from "./events"
-import { readFile, mkdir, createFile as apiCreateFile, deleteFile as apiDeleteFile, deleteDir as apiDeleteDir } from "../utils/extended-api"
+import { readFile, mkdir, createFile as apiCreateFile, deleteFile as apiDeleteFile, deleteDir as apiDeleteDir, uploadFile as apiUploadFile } from "../utils/extended-api"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { withTimeout, errorMessage } from "../utils/request-timeout"
 
@@ -22,6 +22,15 @@ type FileContent = {
   encoding?: string
   mimeType?: string
   type?: string
+}
+
+type DownloadedFile = FileContent & {
+  name: string
+}
+
+type UploadEntry = {
+  file: File
+  relativePath: string
 }
 
 type FileState = {
@@ -55,6 +64,8 @@ interface FileContextValue {
   createDir: (path: string) => Promise<boolean>
   deleteFile: (path: string) => Promise<boolean>
   deleteDir: (path: string) => Promise<boolean>
+  downloadFile: (path: string) => Promise<DownloadedFile | null>
+   uploadFiles: (parentPath: string, files: UploadEntry[]) => Promise<boolean>
 }
 
 const FileContext = createContext<FileContextValue>()
@@ -77,6 +88,10 @@ export function FileProvider(props: ParentProps) {
   })
 
   const inflight = new Map<string, Promise<void>>()
+
+  function resolvePath(path: string) {
+    return directory && !path.startsWith("/") ? `${directory}/${path}` : path
+  }
 
   async function listDir(dir: string, options?: { force?: boolean }) {
     const state = store.dirs[dir]
@@ -176,7 +191,7 @@ export function FileProvider(props: ParentProps) {
     setStore("files", path, { path, name: basename(path), loading: true, loaded: false })
 
     
-    const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
+    const fullPath = resolvePath(path)
     const existingContent = store.files[path]?.content?.content
 
     const promise = withTimeout(
@@ -265,7 +280,7 @@ export function FileProvider(props: ParentProps) {
 
   async function createFile(path: string): Promise<boolean> {
     if (!capabilities().canUseLocalExtFileOps) return false
-    const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
+    const fullPath = resolvePath(path)
     const success = await apiCreateFile(serverUrl, fullPath, targetUrl)
     if (success) {
       await refreshDir(parentDir(path))
@@ -275,7 +290,7 @@ export function FileProvider(props: ParentProps) {
 
   async function createDir(path: string): Promise<boolean> {
     if (!capabilities().canCreateDirectories) return false
-    const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
+    const fullPath = resolvePath(path)
     const success = await mkdir(serverUrl, fullPath, targetUrl)
     if (success) {
       await refreshDir(parentDir(path))
@@ -285,7 +300,7 @@ export function FileProvider(props: ParentProps) {
 
   async function deleteFile(path: string): Promise<boolean> {
     if (!capabilities().canUseLocalExtFileOps) return false
-    const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
+    const fullPath = resolvePath(path)
     const success = await apiDeleteFile(serverUrl, fullPath, targetUrl)
     if (success) {
       const dir = parentDir(path)
@@ -302,7 +317,7 @@ export function FileProvider(props: ParentProps) {
 
   async function deleteDir(path: string): Promise<boolean> {
     if (!capabilities().canUseLocalExtFileOps) return false
-    const fullPath = directory && !path.startsWith("/") ? `${directory}/${path}` : path
+    const fullPath = resolvePath(path)
     const success = await apiDeleteDir(serverUrl, fullPath, targetUrl)
     if (success) {
       const dir = parentDir(path)
@@ -321,6 +336,57 @@ export function FileProvider(props: ParentProps) {
       await refreshDir(dir)
     }
     return success
+  }
+
+  async function downloadFile(path: string): Promise<DownloadedFile | null> {
+    const localPath = resolvePath(path)
+
+    try {
+      const res = await withTimeout(
+        () => client.file.read({ path }),
+        FILE_READ_TIMEOUT_MS,
+        "file.read",
+      )
+
+      const data = res.data
+      if (!data) return null
+
+      return {
+        name: basename(path),
+        content: data.content,
+        encoding: data.encoding,
+        mimeType: data.mimeType,
+        type: data.type,
+      }
+    } catch (e) {
+      console.error("[File] Download read failed:", path, e)
+      const extContent = capabilities().canUseLocalExtFileOps
+        ? await readFile(serverUrl, localPath, targetUrl)
+        : null
+      if (extContent === null) return null
+      return {
+        name: basename(path),
+        content: extContent,
+        encoding: "utf-8",
+        type: "text",
+      }
+    }
+  }
+
+  async function uploadFiles(parentPath: string, files: UploadEntry[]): Promise<boolean> {
+    if (!capabilities().canUseLocalExtFileOps) return false
+    if (!files.length) return false
+
+    for (const { file, relativePath } of files) {
+      const relative = relativePath || file.name
+      const targetPath = parentPath ? `${parentPath}/${relative}` : relative
+      const fullPath = resolvePath(targetPath)
+      const ok = await apiUploadFile(serverUrl, fullPath, file, targetUrl)
+      if (!ok) return false
+    }
+
+    await refreshDir(parentPath)
+    return true
   }
 
   createEffect(() => {
@@ -366,6 +432,8 @@ export function FileProvider(props: ParentProps) {
     createDir,
     deleteFile,
     deleteDir,
+    downloadFile,
+    uploadFiles,
   }
 
   return <FileContext.Provider value={value}>{props.children}</FileContext.Provider>

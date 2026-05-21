@@ -61,6 +61,26 @@ export async function writeFile(serverUrl: string, path: string, content: string
 }
 
 /**
+ * Upload a browser file via the extended API
+ */
+export async function uploadFile(serverUrl: string, path: string, file: File, targetUrl?: string): Promise<boolean> {
+  try {
+    const form = new FormData()
+    form.set("path", path)
+    form.set("file", file, file.name)
+
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/file`, targetUrl), {
+      method: "POST",
+      body: form,
+    }, EXT_API_TIMEOUT_MS, "extended uploadFile")
+    return res.ok
+  } catch (e) {
+    console.error("[extended-api] uploadFile failed:", e)
+    return false
+  }
+}
+
+/**
  * Read file content via extended API
  */
 export async function readFile(serverUrl: string, path: string, targetUrl?: string): Promise<string | null> {

@@ -3547,7 +3547,7 @@ function ProjectProvidersTab() {
 
   const filteredProviderOptions = createMemo(() => {
     const q = providerSearch().toLowerCase().trim()
-    const all = providerOptions()
+    const all = providerOptions().filter((p) => p.connected)
     if (!q) return all
     return all.filter((p) => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q))
   })
@@ -3897,7 +3897,7 @@ function ProjectProvidersTab() {
               Enabled Providers
             </h3>
             <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
-              Control which providers are available for this project. Disconnected providers stay visible so they can be re-enabled.
+              Control which providers are available for this project.
             </p>
           </div>
           <div class="space-y-2 pr-1" style={{ "max-height": "min(40vh, 24rem)", overflow: "auto" }}>

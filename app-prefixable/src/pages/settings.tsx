@@ -3557,8 +3557,9 @@ function ProjectProvidersTab() {
 
   const filteredProviderOptions = createMemo(() => {
     const q = providerSearch().toLowerCase()
-    if (!q) return providerOptions()
-    return providerOptions().filter(
+    const connected = providerOptions().filter((p) => p.connected)
+    if (!q) return connected
+    return connected.filter(
       (p) => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q),
     )
   })
@@ -3910,7 +3911,7 @@ function ProjectProvidersTab() {
               Control which providers are available for this project.
             </p>
           </div>
-          <div class="space-y-2">
+          <div class="space-y-2 pr-1" style={{ "max-height": "min(40vh, 24rem)", overflow: "auto" }}>
             <div class="relative">
               <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-weak)" }} />
               <input
@@ -3973,8 +3974,8 @@ function ProjectProvidersTab() {
           <p class="text-xs" style={{ color: "var(--text-weak)" }}>
             Model toggles use provider whitelist or blacklist config. If neither exists yet, this UI starts a blacklist for the selected provider.
           </p>
-          <div class="space-y-3">
-            <For each={providerOptions().filter((provider) => provider.modelIDs.length > 0)}>
+          <div class="space-y-3 pr-1" style={{ "max-height": "min(50vh, 28rem)", overflow: "auto" }}>
+            <For each={providerOptions().filter((provider) => provider.connected && provider.modelIDs.length > 0)}>
               {(provider) => (
                 <div class="rounded-md p-3" style={{ background: "var(--surface-inset)" }}>
                   <button

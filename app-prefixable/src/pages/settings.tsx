@@ -2867,7 +2867,6 @@ function getPermissionPatterns(rule: unknown): Array<{ pattern: string; action: 
 
 function ProjectConfigTab() {
   const config = useConfig()
-  const providers = useProviders()
   const { directory } = useSDK()
   const basePath = useBasePath()
   const server = useServer()
@@ -3497,7 +3496,6 @@ function ProjectProvidersTab() {
   const config = useConfig()
   const providers = useProviders()
   const { directory } = useSDK()
-  const basePath = useBasePath()
   const [saving, setSaving] = createSignal(false)
   const [saved, setSaved] = createSignal(false)
   const [saveError, setSaveError] = createSignal<string | null>(null)
@@ -3729,33 +3727,6 @@ function ProjectProvidersTab() {
     if (savedTimer !== undefined) clearTimeout(savedTimer)
   })
 
-  function configFilePath() {
-    if (!directory) return null
-    return `${directory.replace(/\/$/, "")}/opencode.json`
-  }
-
-  async function writeConfigFile(content: string): Promise<boolean> {
-    if (!basePath.serverUrl) {
-      setSaving(false)
-      setSaveError("Writing opencode.json directly is unavailable.")
-      return false
-    }
-    const path = configFilePath()
-    if (!path) {
-      setSaving(false)
-      return false
-    }
-    const ok = await writeFile(basePath.serverUrl, path, content)
-    setSaving(false)
-    if (ok) {
-      await config.refresh()
-      showSaved()
-      return true
-    }
-    setSaveError("Failed to write opencode.json. Changes were not saved.")
-    return false
-  }
-
   return (
     <div class="space-y-6">
       <header>
@@ -3878,20 +3849,21 @@ function ProjectProvidersTab() {
         </div>
       </section>
 
-      <section
-        class="rounded-lg overflow-hidden"
-        style={{
-          background: "var(--background-base)",
-          border: "1px solid var(--border-base)",
-        }}
-      >
-        <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
-          <Cpu class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
-            <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-            Project Provider Access
-            </h2>
-          </div>
-        <div class="p-4 space-y-4">
+      <Show when={directory}>
+        <section
+          class="rounded-lg overflow-hidden"
+          style={{
+            background: "var(--background-base)",
+            border: "1px solid var(--border-base)",
+          }}
+        >
+          <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
+            <Cpu class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
+              <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+              Project Provider Access
+              </h2>
+            </div>
+          <div class="p-4 space-y-4">
           <div>
             <h3 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
               Enabled Providers
@@ -3925,25 +3897,10 @@ function ProjectProvidersTab() {
                         toggleGlobalModelList(provider.id)
                       }
                     }}
-                  >
+                    >
                     <div class="min-w-0">
                       <div class="text-sm font-medium truncate" style={{ color: "var(--text-strong)" }}>
                         {provider.name}
-                      </div>
-                      <div class="flex items-center gap-1 text-xs truncate" style={{ color: "var(--text-weak)" }}>
-                        <span class="truncate">{provider.id}</span>
-                        <Show
-                          when={provider.connected}
-                          fallback={
-                            <span class="px-1.5 py-0.5 rounded text-[10px] leading-none" style={{ background: "var(--surface-raised)" }}>
-                              Disconnected
-                            </span>
-                          }
-                        >
-                          <span class="px-1.5 py-0.5 rounded text-[10px] leading-none" style={{ background: "var(--surface-raised)" }}>
-                            Connected
-                          </span>
-                        </Show>
                       </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
@@ -4015,8 +3972,9 @@ function ProjectProvidersTab() {
               )}
             </For>
           </div>
-        </div>
-      </section>
+          </div>
+        </section>
+      </Show>
 
       <section
         class="rounded-lg overflow-hidden"
@@ -4132,14 +4090,14 @@ function PromptDialog(props: {
   onClose: () => void
 }) {
   const [container, setContainer] = createSignal<HTMLDivElement>()
-  let titleRef: HTMLInputElement | undefined
+  const [titleRef, setTitleRef] = createSignal<HTMLInputElement>()
 
   createEffect(() => {
     const el = container()
     if (!el) return
 
     // Focus title input on open
-    titleRef?.focus()
+    titleRef()?.focus()
 
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -4199,7 +4157,7 @@ function PromptDialog(props: {
                 Title
               </label>
               <input
-                ref={titleRef}
+                ref={setTitleRef}
                 type="text"
                 value={props.title()}
                 onInput={(e) => props.setTitle(e.currentTarget.value)}

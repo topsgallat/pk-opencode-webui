@@ -5,7 +5,7 @@ import type { FileNode } from "../sdk/client"
 import { useFile } from "../context/file"
 import { useServer } from "../context/server"
 import { getServerCapabilities } from "../utils/server-capabilities"
-import { ChevronDown, ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Trash2, Edit2, MessageSquarePlus } from "lucide-solid"
+import { ChevronDown, ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Trash2, Pencil, MessageSquarePlus, Upload, Download } from "lucide-solid"
 import { NewFileDialog } from "./new-file-dialog"
 
 type Kind = "add" | "del" | "mix"
@@ -24,9 +24,32 @@ function kindColor(kind: Kind) {
 
 const [contextMenu, setContextMenu] = createSignal<{ x: number; y: number; node: FileNode | { type: "directory"; path: string; name: string } } | null>(null)
 const [dialogState, setDialogState] = createSignal<{ open: boolean; mode: "file" | "folder"; parentPath: string }>({ open: false, mode: "file", parentPath: "" })
+const [uploadState, setUploadState] = createSignal<{ parentPath: string; folder: boolean } | null>(null)
+const [dragPath, setDragPath] = createSignal<string | null>(null)
 const [deleteTarget, setDeleteTarget] = createSignal<{ type: "directory" | "file"; path: string; name: string } | FileNode | null>(null)
 const [confirmOpen, setConfirmOpen] = createSignal(false)
 const scrollStore = new Map<string, number>()
+let dragDepth = 0
+
+type UploadEntry = {
+  file: File
+  relativePath: string
+}
+
+type DropEntry = {
+  isFile: boolean
+  isDirectory: boolean
+  fullPath: string
+  name: string
+  file: (success: (file: File) => void, error?: (err: unknown) => void) => void
+  createReader: () => {
+    readEntries: (success: (entries: DropEntry[]) => void, error?: (err: unknown) => void) => void
+  }
+}
+
+type DropItem = DataTransferItem & {
+  webkitGetAsEntry?: () => DropEntry | null
+}
 
 if (typeof window !== "undefined") {
   window.addEventListener("click", () => setContextMenu(null))
@@ -55,6 +78,61 @@ export function FileTree(props: FileTreeProps) {
   const canCreateDirectory = () => capabilities().canCreateDirectories
   const canDelete = () => capabilities().canUseLocalExtFileOps
   const canEdit = () => capabilities().canUseLocalExtFileOps
+  const canUpload = () => capabilities().canUseLocalExtFileOps
+
+  function toUploadEntries(files: File[], folder: boolean): UploadEntry[] {
+    return files.map((file) => ({
+      file,
+      relativePath: folder ? file.webkitRelativePath || file.name : file.name,
+    }))
+  }
+
+  async function readDirectory(entry: DropEntry): Promise<UploadEntry[]> {
+    if (entry.isFile) {
+      const file = await new Promise<File>((resolve, reject) => entry.file(resolve, reject))
+      return [{ file, relativePath: entry.fullPath.replace(/^\/+/, "") || file.name }]
+    }
+
+    const reader = entry.createReader()
+    const entries = await new Promise<DropEntry[]>((resolve, reject) => {
+      const out: DropEntry[] = []
+
+      const read = () => {
+        reader.readEntries((batch) => {
+          if (!batch.length) {
+            resolve(out)
+            return
+          }
+
+          out.push(...batch)
+          read()
+        }, reject)
+      }
+
+      read()
+    })
+
+    const nested = await Promise.all(entries.map((item) => readDirectory(item)))
+    return nested.flat()
+  }
+
+  async function collectDropEntries(e: DragEvent): Promise<UploadEntry[]> {
+    const items = Array.from(e.dataTransfer?.items ?? []) as DropItem[]
+    if (items.length > 0) {
+      const entries = await Promise.all(items.map(async (item) => {
+        const entry = item.webkitGetAsEntry?.()
+        if (!entry) {
+          const file = item.getAsFile()
+          return file ? [{ file, relativePath: file.webkitRelativePath || file.name }] : []
+        }
+
+        return readDirectory(entry)
+      }))
+      return entries.flat()
+    }
+
+    return toUploadEntries(Array.from(e.dataTransfer?.files ?? []), false)
+  }
 
   // Build filter set for "allowed" mode (changed files only)
   const filter = createMemo(() => {
@@ -201,8 +279,8 @@ export function FileTree(props: FileTreeProps) {
 
   const handleContextMenu = (e: MouseEvent, node: FileNode | { type: "directory"; path: string; name: string }) => {
     const canOpen = node.type === "directory"
-      ? canCreateFile() || canCreateDirectory() || (node.path !== "" && canDelete())
-      : canEdit() || canDelete()
+      ? canCreateFile() || canCreateDirectory() || canUpload() || (node.path !== "" && canDelete())
+      : true
     if (!canOpen) return
     e.preventDefault()
     e.stopPropagation()
@@ -243,17 +321,101 @@ export function FileTree(props: FileTreeProps) {
     setContextMenu(null)
   }
 
+  function openUpload(parentPath: string, folder: boolean) {
+    if (!canUpload()) return
+    setUploadState({ parentPath, folder })
+    const input = folder ? folderInputRef : fileInputRef
+    input?.click()
+  }
+
+  async function handleUploadChange(e: Event, folder: boolean) {
+    const input = e.currentTarget as HTMLInputElement
+    const files = Array.from(input.files ?? [])
+    const state = uploadState()
+    input.value = ""
+    setUploadState(null)
+    if (!state || !files.length) return
+    await file.uploadFiles(state.parentPath, toUploadEntries(files, folder))
+  }
+
+  async function handleDrop(e: DragEvent, parentPath: string) {
+    if (!canUpload()) return
+    e.preventDefault()
+    e.stopPropagation()
+    const uploads = await collectDropEntries(e)
+    if (!uploads.length) return
+    await file.uploadFiles(parentPath, uploads)
+  }
+
+  function handleDragOver(e: DragEvent) {
+    if (!canUpload()) return
+    e.preventDefault()
+    if (dragPath() === null) setDragPath("")
+  }
+
+  function handleDragEnter(e: DragEvent, path: string) {
+    if (!canUpload()) return
+    e.preventDefault()
+    dragDepth += 1
+    setDragPath(path)
+  }
+
+  function handleDragLeave(e: DragEvent) {
+    if (!canUpload()) return
+    e.preventDefault()
+    dragDepth = Math.max(0, dragDepth - 1)
+    if (dragDepth === 0) setDragPath(null)
+  }
+
+  function handleDropClear() {
+    dragDepth = 0
+    setDragPath(null)
+  }
+
+  function downloadNode(node: FileNode) {
+    void (async () => {
+      const data = await file.downloadFile(node.path)
+      if (!data) {
+        alert("Download failed")
+        return
+      }
+
+      const type = data.mimeType || (data.type === "binary" ? "application/octet-stream" : "text/plain;charset=utf-8")
+      const blob = data.encoding === "base64"
+        ? new Blob([Uint8Array.from(atob(data.content), (c) => c.charCodeAt(0))], { type })
+        : new Blob([data.content], { type })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = data.name
+      a.click()
+      URL.revokeObjectURL(url)
+    })()
+  }
+
+  let fileInputRef: HTMLInputElement | undefined
+  let folderInputRef: HTMLInputElement | undefined
+
+  onMount(() => {
+    folderInputRef?.setAttribute("webkitdirectory", "")
+  })
+
   return (
     <div
       ref={rootRef}
       class="flex flex-col gap-0.5 w-full h-full min-h-[100px] overflow-auto"
+      classList={{ "ring-2 ring-offset-1": dragPath() !== null }}
       onScroll={saveScroll}
+      onDragEnter={(e) => handleDragEnter(e, "")}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={(e) => { handleDropClear(); void handleDrop(e, "") }}
       onContextMenu={(e) => level() === 0 ? handleContextMenu(e, { type: "directory", path: "", name: "root" }) : undefined}
     >
       <Show when={level() === 0}>
         <div class="flex items-center justify-between px-2 py-1 mb-1 border-b border-white/5 dark:border-black/5" style={{ "border-color": "var(--border-base)" }}>
           <span class="text-xs font-semibold" style={{ color: "var(--text-weak)" }}>FILES</span>
-            <Show when={canCreateFile() || canCreateDirectory()}>
+            <Show when={canCreateFile() || canCreateDirectory() || canUpload()}>
             <div class="flex gap-1">
               <Show when={canCreateFile()}>
                 <button
@@ -275,12 +437,48 @@ export function FileTree(props: FileTreeProps) {
                   aria-label="New Folder"
                 >
                   <FolderPlus class="w-3.5 h-3.5" style={{ color: "var(--icon-weak)" }} />
+                  </button>
+              </Show>
+              <Show when={canUpload()}>
+                <button
+                  type="button"
+                  class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  onClick={(e) => { e.stopPropagation(); openUpload("", false) }}
+                  title="Upload File"
+                  aria-label="Upload File"
+                >
+                  <Upload class="w-3.5 h-3.5" style={{ color: "var(--icon-weak)" }} />
+                </button>
+              </Show>
+              <Show when={canUpload()}>
+                <button
+                  type="button"
+                  class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  onClick={(e) => { e.stopPropagation(); openUpload("", true) }}
+                  title="Upload Folder"
+                  aria-label="Upload Folder"
+                >
+                  <FolderPlus class="w-3.5 h-3.5" style={{ color: "var(--icon-weak)" }} />
                 </button>
               </Show>
             </div>
             </Show>
         </div>
       </Show>
+      <input
+        ref={(el) => { fileInputRef = el }}
+        type="file"
+        multiple
+        class="hidden"
+        onChange={(e) => void handleUploadChange(e, false)}
+      />
+      <input
+        ref={(el) => { folderInputRef = el }}
+        type="file"
+        multiple
+        class="hidden"
+        onChange={(e) => void handleUploadChange(e, true)}
+      />
       <For each={nodes()}>
         {(node) => {
           const expanded = () => file.tree.state(node.path)?.expanded ?? false
@@ -291,13 +489,18 @@ export function FileTree(props: FileTreeProps) {
             <Switch>
                 <Match when={node.type === "directory"}>
                  <div>
-                   <button
-                     type="button"
-                    onClick={() => (expanded() ? file.tree.collapse(node.path) : file.tree.expand(node.path))}
-                    aria-expanded={expanded()}
-                     onContextMenu={(e) => handleContextMenu(e, node)}
-                    class="w-full min-h-[44px] flex items-center gap-1.5 rounded px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                    style={{ "padding-left": `${Math.max(0, 6 + level() * 12)}px` }}
+                    <button
+                      type="button"
+                      onClick={() => (expanded() ? file.tree.collapse(node.path) : file.tree.expand(node.path))}
+                      aria-expanded={expanded()}
+                      classList={{ "bg-black/5 dark:bg-white/5": dragPath() === node.path }}
+                      onDragEnter={(e) => handleDragEnter(e, node.path)}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => { handleDropClear(); void handleDrop(e, node.path) }}
+                      onContextMenu={(e) => handleContextMenu(e, node)}
+                      class="w-full min-h-[44px] flex items-center gap-1.5 rounded px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                      style={{ "padding-left": `${Math.max(0, 6 + level() * 12)}px` }}
                   >
                     <span class="w-4 h-4 flex items-center justify-center" style={{ color: "var(--icon-weak)" }}>
                       {expanded() ? <ChevronDown class="w-3 h-3" /> : <ChevronRight class="w-3 h-3" />}
@@ -332,6 +535,8 @@ export function FileTree(props: FileTreeProps) {
                         active={props.active}
                         viewKey={props.viewKey}
                         onFileClick={props.onFileClick}
+                        onMentionFile={props.onMentionFile}
+                        onMentionFileLine={props.onMentionFileLine}
                       />
                     </div>
                   </Show>
@@ -427,12 +632,27 @@ export function FileTree(props: FileTreeProps) {
                       props.onFileClick?.(m.node as FileNode)
                     }}
                     >
-                      <Edit2 class="w-3.5 h-3.5" />
+                      <Pencil class="w-3.5 h-3.5" />
                       Edit File
                     </button>
                   <Show when={canDelete()}>
                     <div class="h-px w-full my-1" style={{ background: "var(--border-base)" }} />
                   </Show>
+                  </Show>
+
+                <Show when={menu().node.type === "file"}>
+                  <button
+                    class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const m = menu()
+                      setContextMenu(null)
+                      downloadNode(m.node as FileNode)
+                    }}
+                  >
+                    <Download class="w-3.5 h-3.5" />
+                    Download File
+                  </button>
                 </Show>
 
                 <Show when={menu().node.type === "file" && props.onMentionFile}>
@@ -462,6 +682,36 @@ export function FileTree(props: FileTreeProps) {
                   >
                     <Trash2 class="w-3.5 h-3.5" />
                     Delete {menu().node.type === "directory" ? "Folder" : "File"}
+                  </button>
+                </Show>
+
+                <Show when={menu().node.type === "directory" && canUpload()}>
+                  <div class="h-px w-full my-1" style={{ background: "var(--border-base)" }} />
+                  <button
+                    class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const m = menu()
+                      setContextMenu(null)
+                      openUpload(m.node.path, false)
+                    }}
+                    aria-label="Upload File"
+                  >
+                    <Upload class="w-3.5 h-3.5" />
+                    Upload File
+                  </button>
+                  <button
+                    class="w-full px-3 py-1.5 min-h-[44px] text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const m = menu()
+                      setContextMenu(null)
+                      openUpload(m.node.path, true)
+                    }}
+                    aria-label="Upload Folder"
+                  >
+                    <FolderPlus class="w-3.5 h-3.5" />
+                    Upload Folder
                   </button>
                 </Show>
               </div>

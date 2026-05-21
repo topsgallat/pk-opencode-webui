@@ -6,7 +6,7 @@ import { useBasePath } from "../context/base-path"
 import { useServer } from "../context/server"
 import { useDevice } from "../context/device"
 import { Spinner } from "./ui/spinner"
-import { FileCode, Pencil, Eye, Maximize2, X, MessageSquarePlus } from "lucide-solid"
+import { FileCode, Pencil, Eye, Maximize2, X, MessageSquarePlus, Download } from "lucide-solid"
 import { writeFile } from "../utils/extended-api"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { EditorDialog } from "./editor-dialog"
@@ -254,6 +254,25 @@ export function FileViewer(props: FileViewerProps) {
     }
   }
 
+  async function handleDownload() {
+    const data = await file.downloadFile(props.path)
+    if (!data) {
+      setSaveError("Failed to download file.")
+      return
+    }
+
+    const type = data.mimeType || (data.type === "binary" ? "application/octet-stream" : "text/plain;charset=utf-8")
+    const blob = data.encoding === "base64"
+      ? new Blob([Uint8Array.from(atob(data.content), (c) => c.charCodeAt(0))], { type })
+      : new Blob([data.content], { type })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = data.name || props.path.split("/").pop() || "download"
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
   return (
     <div class="flex-1 overflow-auto min-h-0 relative">
       <Switch>
@@ -344,7 +363,18 @@ export function FileViewer(props: FileViewerProps) {
                     >
                       <Pencil class="w-3.5 h-3.5" />
                     </button>
-                      </Show>
+                  </Show>
+                  <Show when={fileLoaded()}>
+                    <button
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
+                      onClick={() => void handleDownload()}
+                      title="Download File"
+                      aria-label="Download File"
+                      style={{ color: "var(--text-base)" }}
+                    >
+                      <Download class="w-3.5 h-3.5" />
+                    </button>
+                  </Show>
                   <Show when={props.onMentionFile}>
                     <button
                       class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"

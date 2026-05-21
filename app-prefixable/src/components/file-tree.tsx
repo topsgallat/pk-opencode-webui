@@ -365,12 +365,14 @@ export function FileTree(props: FileTreeProps) {
   function handleDragOver(e: DragEvent) {
     if (!canUpload()) return
     e.preventDefault()
+    e.stopPropagation()
     if (dragPath() === null) setDragPath("")
   }
 
   function handleDragEnter(e: DragEvent, path: string) {
     if (!canUpload()) return
     e.preventDefault()
+    e.stopPropagation()
     dragDepth += 1
     setDragPath(path)
   }
@@ -378,6 +380,7 @@ export function FileTree(props: FileTreeProps) {
   function handleDragLeave(e: DragEvent) {
     if (!canUpload()) return
     e.preventDefault()
+    e.stopPropagation()
     dragDepth = Math.max(0, dragDepth - 1)
     if (dragDepth === 0) setDragPath(null)
   }
@@ -424,7 +427,7 @@ export function FileTree(props: FileTreeProps) {
       onDragEnter={(e) => handleDragEnter(e, "")}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
-      onDrop={(e) => { handleDropClear(); void handleDrop(e, "") }}
+      onDrop={(e) => { e.stopPropagation(); handleDropClear(); void handleDrop(e, "") }}
       onContextMenu={(e) => level() === 0 ? handleContextMenu(e, { type: "directory", path: "", name: "root" }) : undefined}
     >
       <Show when={level() === 0}>
@@ -512,7 +515,7 @@ export function FileTree(props: FileTreeProps) {
                       onDragEnter={(e) => handleDragEnter(e, node.path)}
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
-                      onDrop={(e) => { handleDropClear(); void handleDrop(e, node.path) }}
+                      onDrop={(e) => { e.stopPropagation(); handleDropClear(); void handleDrop(e, node.path) }}
                       onContextMenu={(e) => handleContextMenu(e, node)}
                       class="w-full min-h-[44px] flex items-center gap-1.5 rounded px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
                       style={{ "padding-left": `${Math.max(0, 6 + level() * 12)}px` }}

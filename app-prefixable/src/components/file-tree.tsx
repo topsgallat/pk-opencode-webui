@@ -185,6 +185,21 @@ export function FileTree(props: FileTreeProps) {
 
   onMount(() => {
     requestAnimationFrame(restoreScroll)
+
+    const prevent = (e: DragEvent) => {
+      if (!canUpload()) return
+      const types = Array.from(e.dataTransfer?.types ?? [])
+      if (!types.includes("Files")) return
+      e.preventDefault()
+    }
+
+    window.addEventListener("dragover", prevent)
+    window.addEventListener("drop", prevent)
+
+    onCleanup(() => {
+      window.removeEventListener("dragover", prevent)
+      window.removeEventListener("drop", prevent)
+    })
   })
 
   onCleanup(() => {

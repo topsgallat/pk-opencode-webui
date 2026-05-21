@@ -3913,109 +3913,102 @@ function ProjectProvidersTab() {
             </div>
             <For each={filteredProviderOptions()}>
               {(provider) => (
-                <div class="rounded-md p-3 flex items-center justify-between gap-3" style={{ background: "var(--surface-inset)" }}>
-                  <div class="min-w-0">
-                    <div class="text-sm font-medium truncate" style={{ color: "var(--text-strong)" }}>
-                      {provider.name}
-                    </div>
-                    <div class="flex items-center gap-1 text-xs truncate" style={{ color: "var(--text-weak)" }}>
-                      <span class="truncate">{provider.id}</span>
-                      <Show
-                        when={provider.connected}
-                        fallback={
-                          <span class="px-1.5 py-0.5 rounded text-[10px] leading-none" style={{ background: "var(--surface-raised)" }}>
-                            Disconnected
-                          </span>
-                        }
-                      >
-                        <span class="px-1.5 py-0.5 rounded text-[10px] leading-none" style={{ background: "var(--surface-raised)" }}>
-                          Connected
-                        </span>
-                      </Show>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => toggleGlobalProvider(provider.id)}
-                    disabled={saving()}
-                    class="relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 shrink-0"
-                    role="switch"
-                    aria-checked={globalProviderEnabled(provider.id)}
-                    aria-label={`Toggle ${provider.name} provider access`}
-                    style={{ background: globalProviderEnabled(provider.id) ? "var(--interactive-base)" : "var(--surface-inset)" }}
-                  >
-                    <div
-                      class="absolute top-0.5 w-4 h-4 rounded-full transition-all"
-                      style={{
-                        background: "var(--background-base)",
-                        left: globalProviderEnabled(provider.id) ? "calc(100% - 18px)" : "2px",
-                      }}
-                    />
-                  </button>
-                </div>
-              )}
-            </For>
-          </div>
-
-          <div class="pt-2 border-t" style={{ "border-color": "var(--border-base)" }}>
-            <h3 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-              Model Access
-            </h3>
-            <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
-              Model toggles use project whitelist or blacklist config. If neither exists yet, this UI starts a blacklist for the selected provider.
-            </p>
-          </div>
-
-          <div class="space-y-3 pr-1" style={{ "max-height": "min(50vh, 28rem)", overflow: "auto" }}>
-            <For each={providerOptions().filter((provider) => provider.connected && provider.modelIDs.length > 0)}>
-              {(provider) => (
-                <div class="rounded-md p-3" style={{ background: "var(--surface-inset)" }}>
-                  <button
-                    type="button"
+                <div class="rounded-md overflow-hidden" style={{ background: "var(--surface-inset)" }}>
+                  <div
+                    class="flex items-center justify-between gap-3 p-3 cursor-pointer"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => toggleGlobalModelList(provider.id)}
-                    class="w-full flex items-center justify-between gap-3 text-left"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        toggleGlobalModelList(provider.id)
+                      }
+                    }}
                   >
                     <div class="min-w-0">
-                      <div class="text-sm font-medium truncate" style={{ color: "var(--text-strong)" }}>{provider.name}</div>
-                      <div class="text-xs truncate" style={{ color: "var(--text-weak)" }}>{provider.id}</div>
+                      <div class="text-sm font-medium truncate" style={{ color: "var(--text-strong)" }}>
+                        {provider.name}
+                      </div>
+                      <div class="flex items-center gap-1 text-xs truncate" style={{ color: "var(--text-weak)" }}>
+                        <span class="truncate">{provider.id}</span>
+                        <Show
+                          when={provider.connected}
+                          fallback={
+                            <span class="px-1.5 py-0.5 rounded text-[10px] leading-none" style={{ background: "var(--surface-raised)" }}>
+                              Disconnected
+                            </span>
+                          }
+                        >
+                          <span class="px-1.5 py-0.5 rounded text-[10px] leading-none" style={{ background: "var(--surface-raised)" }}>
+                            Connected
+                          </span>
+                        </Show>
+                      </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
-                      <span class="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}>
-                        {globalProviderModelConfig(provider.id).whitelist ? "Whitelist" : "Blacklist"}
-                      </span>
-                      <span class="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}>
-                        {provider.modelIDs.length} models
-                      </span>
+                      <Show when={provider.modelIDs.length > 0}>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--surface-raised)", color: "var(--text-weak)" }}>
+                          {provider.modelIDs.length} models
+                        </span>
+                      </Show>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleGlobalProvider(provider.id)
+                        }}
+                        disabled={saving()}
+                        class="relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 shrink-0"
+                        role="switch"
+                        aria-checked={globalProviderEnabled(provider.id)}
+                        aria-label={`Toggle ${provider.name} provider access`}
+                        style={{ background: globalProviderEnabled(provider.id) ? "var(--interactive-base)" : "var(--surface-inset)" }}
+                      >
+                        <div
+                          class="absolute top-0.5 w-4 h-4 rounded-full transition-all"
+                          style={{
+                            background: "var(--background-base)",
+                            left: globalProviderEnabled(provider.id) ? "calc(100% - 18px)" : "2px",
+                          }}
+                        />
+                      </button>
                       <Show when={globalModelListExpanded(provider.id)} fallback={<ChevronRight class="w-4 h-4" style={{ color: "var(--text-weak)" }} />}>
                         <ChevronDown class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
                       </Show>
                     </div>
-                  </button>
-                  <Show when={globalModelListExpanded(provider.id)}>
-                    <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                      <For each={provider.modelIDs.sort((a, b) => a.localeCompare(b))}>
-                        {(modelID) => (
-                          <div class="flex items-center justify-between gap-3 rounded-md px-3 py-2" style={{ background: "var(--background-base)" }}>
-                            <span class="text-sm truncate" style={{ color: "var(--text-base)" }}>{modelID}</span>
-                            <button
-                              onClick={() => toggleGlobalModel(provider.id, modelID)}
-                              disabled={saving()}
-                              class="relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 shrink-0"
-                              role="switch"
-                              aria-checked={globalModelEnabled(provider.id, modelID)}
-                              aria-label={`Toggle ${modelID} for ${provider.name}`}
-                              style={{ background: globalModelEnabled(provider.id, modelID) ? "var(--interactive-base)" : "var(--surface-inset)" }}
-                            >
-                              <div
-                                class="absolute top-0.5 w-4 h-4 rounded-full transition-all"
-                                style={{
-                                  background: "var(--background-base)",
-                                  left: globalModelEnabled(provider.id, modelID) ? "calc(100% - 18px)" : "2px",
-                                }}
-                              />
-                            </button>
-                          </div>
-                        )}
-                      </For>
+                  </div>
+
+                  <Show when={globalModelListExpanded(provider.id) && provider.modelIDs.length > 0}>
+                    <div class="px-3 pb-3 space-y-2">
+                      <div class="text-xs" style={{ color: "var(--text-weak)" }}>
+                        Model toggles use project whitelist or blacklist config. If neither exists yet, this UI starts a blacklist for the selected provider.
+                      </div>
+                      <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+                        <For each={provider.modelIDs.sort((a, b) => a.localeCompare(b))}>
+                          {(modelID) => (
+                            <div class="flex items-center justify-between gap-3 rounded-md px-3 py-2" style={{ background: "var(--background-base)" }}>
+                              <span class="text-sm truncate" style={{ color: "var(--text-base)" }}>{modelID}</span>
+                              <button
+                                onClick={() => toggleGlobalModel(provider.id, modelID)}
+                                disabled={saving()}
+                                class="relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 shrink-0"
+                                role="switch"
+                                aria-checked={globalModelEnabled(provider.id, modelID)}
+                                aria-label={`Toggle ${modelID} for ${provider.name}`}
+                                style={{ background: globalModelEnabled(provider.id, modelID) ? "var(--interactive-base)" : "var(--surface-inset)" }}
+                              >
+                                <div
+                                  class="absolute top-0.5 w-4 h-4 rounded-full transition-all"
+                                  style={{
+                                    background: "var(--background-base)",
+                                    left: globalModelEnabled(provider.id, modelID) ? "calc(100% - 18px)" : "2px",
+                                  }}
+                                />
+                              </button>
+                            </div>
+                          )}
+                        </For>
+                      </div>
                     </div>
                   </Show>
                 </div>

@@ -29,11 +29,10 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
   let smoothScrollFrame: number | undefined
   let resizeObserver: ResizeObserver | undefined
   let observedContent: HTMLElement | undefined
-  let anchorBottom = 0
   let suppressScroll = false
   let smoothScrolling = false
 
-  const threshold = options.bottomThreshold ?? 10
+  const threshold = options.bottomThreshold ?? 24
 
   const [store, setStore] = createStore({
     contentRef: undefined as HTMLElement | undefined,
@@ -44,12 +43,10 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
 
   const canScroll = (el: HTMLElement) => el.scrollHeight - el.clientHeight > 1
 
-  const readAnchorBottom = (el: HTMLElement) => Math.max(0, distanceFromBottom(el))
+  const scrollTargetTop = (el: HTMLElement) => Math.max(0, el.scrollHeight - el.clientHeight)
 
-  const scrollTargetTop = (el: HTMLElement, bottom: number) => Math.max(0, el.scrollHeight - el.clientHeight - bottom)
-
-  const writeAnchorBottom = (el: HTMLElement, bottom: number) => {
-    const next = scrollTargetTop(el, bottom)
+  const writeScrollBottom = (el: HTMLElement) => {
+    const next = scrollTargetTop(el)
     if (Math.abs(el.scrollTop - next) < 1) return
     suppressScroll = true
     el.scrollTop = next
@@ -68,7 +65,6 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
 
   const finishSmoothScroll = () => {
     cancelSmoothScroll()
-    anchorBottom = 0
     if (!store.pinned) setStore("pinned", true)
     queueScrollToBottom()
   }
@@ -80,9 +76,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
       const el = scroll
       if (!el) return
       if (!store.pinned) return
-      const next = scrollTargetTop(el, anchorBottom)
-      if (Math.abs(el.scrollTop - next) < 1) return
-      writeAnchorBottom(el, anchorBottom)
+      writeScrollBottom(el)
     })
   }
 
@@ -92,16 +86,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     cancelSmoothScroll()
     if (!force && !store.pinned) return
     if (!store.pinned) setStore("pinned", true)
-    anchorBottom = 0
-
-    // Delay scroll slightly to allow keyboard/viewport changes to settle on mobile
-    setTimeout(() => {
-      const activeEl = scroll
-      if (!activeEl) return
-      const next = scrollTargetTop(activeEl, anchorBottom)
-      if (Math.abs(activeEl.scrollTop - next) < 1) return
-      writeAnchorBottom(activeEl, anchorBottom)
-    }, 50)
+    queueScrollToBottom()
   }
 
   const smoothScrollToBottom = () => {
@@ -109,8 +94,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     if (!el) return
     cancelSmoothScroll()
     if (!store.pinned) setStore("pinned", true)
-    anchorBottom = 0
-    const target = scrollTargetTop(el, 0)
+    const target = scrollTargetTop(el)
     if (Math.abs(el.scrollTop - target) < 1) return
 
     smoothScrolling = true
@@ -119,7 +103,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     const monitor = () => {
       const active = scroll
       if (!active || !smoothScrolling) return
-      if (readAnchorBottom(active) <= threshold) {
+      if (distanceFromBottom(active) <= threshold) {
         finishSmoothScroll()
         return
       }
@@ -156,11 +140,10 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     if (!canScroll(el)) {
       cancelSmoothScroll()
       if (!store.pinned) setStore("pinned", true)
-      anchorBottom = 0
       return
     }
 
-    const bottom = readAnchorBottom(el)
+    const bottom = distanceFromBottom(el)
     if (smoothScrolling) {
       if (bottom <= threshold) {
         finishSmoothScroll()
@@ -170,12 +153,10 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
 
     if (bottom <= threshold) {
       if (!store.pinned) setStore("pinned", true)
-      anchorBottom = 0
       return
     }
 
     if (store.pinned) setStore("pinned", false)
-    anchorBottom = bottom
   }
 
   const updateOverflowAnchor = (el: HTMLElement) => {
@@ -190,11 +171,9 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
       if (!el) return
       if (!canScroll(el)) {
         if (!store.pinned) setStore("pinned", true)
-        anchorBottom = 0
         return
       }
       if (!store.pinned) return
-      anchorBottom = Math.min(anchorBottom, threshold)
       queueScrollToBottom()
     })
     resizeObserver.observe(content)
@@ -208,10 +187,9 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
   })
 
   createEffect(on(options.working, (working: boolean) => {
-    if (working) {
-      scrollToBottom(true)
-      return
-    }
+    if (!working) return
+    if (autoScroll.userScrolled()) return
+    autoScroll.scrollToBottom()
   }))
 
   createEffect(() => {
@@ -236,7 +214,6 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
       }
       scroll = el
       if (!el) return
-      anchorBottom = readAnchorBottom(el)
       updateOverflowAnchor(el)
       el.addEventListener("wheel", handleWheel, { passive: true })
       el.addEventListener("pointerdown", handlePointerDown, { passive: true })
@@ -390,7 +367,7 @@ export function MessageTimeline(props: {
         ref={(el) => { containerRef = el; autoScroll.scrollRef(el) }}
         onScroll={autoScroll.handleScroll}
         class="h-full overflow-y-auto p-6"
-        style={{ background: "var(--background-stronger)", "overflow-anchor": "none" }}
+        style={{ background: "var(--background-stronger)" }}
       >
         {/* Loading history indicator */}
         <Show when={props.loadingHistory}>

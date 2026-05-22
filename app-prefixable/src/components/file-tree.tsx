@@ -33,8 +33,10 @@ let dragDepth = 0
 const MOVE_DATA_TYPE = "application/x-opencode-file-path"
 
 function handleDragStart(e: DragEvent, path: string) {
+  if (!e.dataTransfer) return
+  e.dataTransfer.setData("text/plain", path)
   e.dataTransfer?.setData(MOVE_DATA_TYPE, path)
-  if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"
+  e.dataTransfer.effectAllowed = "move"
 }
 
 type UploadEntry = {
@@ -525,7 +527,7 @@ export function FileTree(props: FileTreeProps) {
                   <div>
                     <button
                       type="button"
-                      draggable
+                      draggable={true}
                       onClick={() => (expanded() ? file.tree.collapse(node.path) : file.tree.expand(node.path))}
                       aria-expanded={expanded()}
                       classList={{ "bg-black/5 dark:bg-white/5": dragPath() === node.path }}
@@ -581,7 +583,7 @@ export function FileTree(props: FileTreeProps) {
               <Match when={node.type === "file"}>
                 <button
                   type="button"
-                  draggable
+                  draggable={true}
                   onClick={() => props.onFileClick?.(node)}
                   onDragStart={(e) => handleDragStart(e, node.path)}
                   onContextMenu={(e) => handleContextMenu(e, node)}

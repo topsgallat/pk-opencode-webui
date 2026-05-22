@@ -188,8 +188,8 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
 
   createEffect(on(options.working, (working: boolean) => {
     if (!working) return
-    if (autoScroll.userScrolled()) return
-    autoScroll.scrollToBottom()
+    if (!store.pinned) return
+    scrollToBottom(false)
   }))
 
   createEffect(() => {

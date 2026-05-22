@@ -26,17 +26,78 @@ const [contextMenu, setContextMenu] = createSignal<{ x: number; y: number; node:
 const [dialogState, setDialogState] = createSignal<{ open: boolean; mode: "file" | "folder"; parentPath: string }>({ open: false, mode: "file", parentPath: "" })
 const [uploadState, setUploadState] = createSignal<{ parentPath: string; folder: boolean } | null>(null)
 const [dragPath, setDragPath] = createSignal<string | null>(null)
+const [dragSourcePath, setDragSourcePath] = createSignal<string | null>(null)
+const [dragInvalid, setDragInvalid] = createSignal(false)
+const [dragInternal, setDragInternal] = createSignal(false)
 const [deleteTarget, setDeleteTarget] = createSignal<{ type: "directory" | "file"; path: string; name: string } | FileNode | null>(null)
 const [confirmOpen, setConfirmOpen] = createSignal(false)
 const scrollStore = new Map<string, number>()
 let dragDepth = 0
 const MOVE_DATA_TYPE = "application/x-opencode-file-path"
+const AUTO_EXPAND_DELAY = 500
+let autoExpandTimer: number | undefined
+let autoExpandPath: string | null = null
+
+function clearAutoExpand(path?: string) {
+  if (path && autoExpandPath !== path) return
+  if (autoExpandTimer !== undefined) window.clearTimeout(autoExpandTimer)
+  autoExpandTimer = undefined
+  autoExpandPath = null
+}
 
 function handleDragStart(e: DragEvent, path: string) {
   if (!e.dataTransfer) return
   e.dataTransfer.setData("text/plain", path)
   e.dataTransfer?.setData(MOVE_DATA_TYPE, path)
   e.dataTransfer.effectAllowed = "move"
+  setDragSourcePath(path)
+  setDragInternal(true)
+  setDragInvalid(false)
+}
+
+function parentPath(path: string) {
+  const idx = path.lastIndexOf("/")
+  return idx === -1 ? "" : path.slice(0, idx)
+}
+
+function isInvalidMove(sourcePath: string, targetPath: string) {
+  if (sourcePath === targetPath) return true
+  if (parentPath(sourcePath) === targetPath) return true
+  return targetPath.startsWith(sourcePath + "/")
+}
+
+function readDragMeta(e: DragEvent, targetPath: string): {
+  internal: boolean
+  invalid: boolean
+  sourcePath: string | null
+  dropEffect: "none" | "move" | "copy"
+} | null {
+  const types = Array.from(e.dataTransfer?.types ?? [])
+  const internal = types.includes(MOVE_DATA_TYPE)
+  const files = types.includes("Files")
+  if (!internal && !files) return null
+
+  const sourcePath = internal ? e.dataTransfer?.getData(MOVE_DATA_TYPE) || dragSourcePath() : null
+  const invalid = !!sourcePath && isInvalidMove(sourcePath, targetPath)
+
+  return {
+    internal,
+    invalid,
+    sourcePath,
+    dropEffect: invalid ? "none" : internal ? "move" : "copy",
+  }
+}
+
+function syncDragState(e: DragEvent, targetPath: string, entering: boolean) {
+  const meta = readDragMeta(e, targetPath)
+  if (!meta) return false
+  if (entering) dragDepth += 1
+  setDragPath(targetPath)
+  setDragSourcePath(meta.sourcePath)
+  setDragInvalid(meta.invalid)
+  setDragInternal(meta.internal)
+  if (e.dataTransfer) e.dataTransfer.dropEffect = meta.dropEffect
+  return true
 }
 
 type UploadEntry = {
@@ -44,19 +105,18 @@ type UploadEntry = {
   relativePath: string
 }
 
-type DropEntry = {
-  isFile: boolean
-  isDirectory: boolean
-  fullPath: string
-  name: string
-  file: (success: (file: File) => void, error?: (err: unknown) => void) => void
-  createReader: () => {
-    readEntries: (success: (entries: DropEntry[]) => void, error?: (err: unknown) => void) => void
-  }
-}
+type DropEntry = FileSystemFileEntry | FileSystemDirectoryEntry
 
 type DropItem = DataTransferItem & {
-  webkitGetAsEntry?: () => DropEntry | null
+  webkitGetAsEntry?: () => FileSystemEntry | null
+}
+
+function isFileDropEntry(entry: FileSystemEntry): entry is FileSystemFileEntry {
+  return entry.isFile
+}
+
+function isDirectoryDropEntry(entry: FileSystemEntry): entry is FileSystemDirectoryEntry {
+  return entry.isDirectory
 }
 
 if (typeof window !== "undefined") {
@@ -95,11 +155,11 @@ export function FileTree(props: FileTreeProps) {
     }))
   }
 
-  async function readDirectory(entry: DropEntry): Promise<UploadEntry[]> {
-    if (entry.isFile) {
-      const file = await new Promise<File>((resolve, reject) => entry.file(resolve, reject))
-      return [{ file, relativePath: entry.fullPath.replace(/^\/+/, "") || file.name }]
-    }
+async function readDirectory(entry: DropEntry): Promise<UploadEntry[]> {
+  if (isFileDropEntry(entry)) {
+    const file = await new Promise<File>((resolve, reject) => entry.file(resolve, reject))
+    return [{ file, relativePath: entry.fullPath.replace(/^\/+/, "") || file.name }]
+  }
 
     const reader = entry.createReader()
     const entries = await new Promise<DropEntry[]>((resolve, reject) => {
@@ -112,7 +172,8 @@ export function FileTree(props: FileTreeProps) {
             return
           }
 
-          out.push(...batch)
+          const next = batch.filter((item): item is DropEntry => isFileDropEntry(item) || isDirectoryDropEntry(item))
+          out.push(...next)
           read()
         }, reject)
       }
@@ -120,7 +181,7 @@ export function FileTree(props: FileTreeProps) {
       read()
     })
 
-    const nested = await Promise.all(entries.map((item) => readDirectory(item)))
+    const nested = await Promise.all(entries.map((item: DropEntry) => readDirectory(item)))
     return nested.flat()
   }
 
@@ -134,7 +195,12 @@ export function FileTree(props: FileTreeProps) {
           return file ? [{ file, relativePath: file.webkitRelativePath || file.name }] : []
         }
 
-        return readDirectory(entry)
+        if (!isFileDropEntry(entry) && !isDirectoryDropEntry(entry)) {
+          return []
+        }
+
+        const dropEntry: DropEntry = entry
+        return readDirectory(dropEntry)
       }))
       return entries.flat()
     }
@@ -344,6 +410,18 @@ export function FileTree(props: FileTreeProps) {
     setContextMenu(null)
   }
 
+  function scheduleAutoExpand(path: string) {
+    if (autoExpandPath === path) return
+    clearAutoExpand()
+    autoExpandPath = path
+    autoExpandTimer = window.setTimeout(() => {
+      autoExpandTimer = undefined
+      if (autoExpandPath !== path) return
+      if (!file.tree.state(path)?.expanded) file.tree.expand(path)
+      autoExpandPath = null
+    }, AUTO_EXPAND_DELAY)
+  }
+
   function openUpload(parentPath: string, folder: boolean) {
     if (!canUpload()) return
     setUploadState({ parentPath, folder })
@@ -380,19 +458,30 @@ export function FileTree(props: FileTreeProps) {
     await file.uploadFiles(parentPath, uploads)
   }
 
-  function handleDragOver(e: DragEvent) {
-    if (!canUpload()) return
-    e.preventDefault()
-    e.stopPropagation()
-    if (dragPath() === null) setDragPath("")
-  }
+function handleDragEnter(e: DragEvent, path: string) {
+  if (!canUpload()) return
+  if (!syncDragState(e, path, true)) return
+  e.preventDefault()
+  e.stopPropagation()
+}
 
-  function handleDragEnter(e: DragEvent, path: string) {
+function handleDragOverTarget(e: DragEvent, path: string) {
+  if (!canUpload()) return
+  if (!syncDragState(e, path, false)) return
+  e.preventDefault()
+  e.stopPropagation()
+}
+
+  function handleDirectoryDragHover(e: DragEvent, path: string, expanded: boolean) {
     if (!canUpload()) return
+    if (!syncDragState(e, path, false)) return
     e.preventDefault()
     e.stopPropagation()
-    dragDepth += 1
-    setDragPath(path)
+    if (dragInvalid() || expanded) {
+      clearAutoExpand(path)
+      return
+    }
+    scheduleAutoExpand(path)
   }
 
   function handleDragLeave(e: DragEvent) {
@@ -405,7 +494,15 @@ export function FileTree(props: FileTreeProps) {
 
   function handleDropClear() {
     dragDepth = 0
+    clearAutoExpand()
     setDragPath(null)
+    setDragSourcePath(null)
+    setDragInvalid(false)
+    setDragInternal(false)
+  }
+
+  function handleDragEnd() {
+    handleDropClear()
   }
 
   function downloadNode(node: FileNode) {
@@ -436,17 +533,40 @@ export function FileTree(props: FileTreeProps) {
     folderInputRef?.setAttribute("webkitdirectory", "")
   })
 
+  const rootDropActive = () => dragPath() === ""
+  const treeDragActive = () => dragPath() !== null
+  const targetValid = (path: string) => dragPath() === path && !dragInvalid()
+  const targetInvalid = (path: string) => dragPath() === path && dragInvalid()
+  const sourceActive = (path: string) => dragSourcePath() === path
+
   return (
     <div
       ref={rootRef}
-      class="flex flex-col gap-0.5 w-full h-full min-h-[100px] overflow-auto"
-      classList={{ "ring-2 ring-offset-1": dragPath() !== null }}
+      class="flex flex-col gap-0.5 w-full h-full min-h-[100px] overflow-auto rounded-lg border border-transparent"
       onScroll={saveScroll}
       onDragEnter={(e) => handleDragEnter(e, "")}
       onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
+      onDragOver={(e) => handleDragOverTarget(e, "")}
       onDrop={(e) => { e.stopPropagation(); handleDropClear(); void handleDrop(e, "") }}
       onContextMenu={(e) => level() === 0 ? handleContextMenu(e, { type: "directory", path: "", name: "root" }) : undefined}
+      style={{
+        background: rootDropActive()
+          ? dragInvalid()
+            ? "var(--surface-critical-base)"
+            : dragInternal()
+              ? "var(--surface-brand-subtle)"
+              : "var(--surface-inset)"
+          : "transparent",
+        "border-color": rootDropActive()
+          ? dragInvalid()
+            ? "var(--border-critical-base)"
+            : dragInternal()
+              ? "var(--border-brand-subtle)"
+              : "var(--border-base)"
+          : treeDragActive()
+            ? "var(--border-base)"
+            : "transparent",
+      }}
     >
       <Show when={level() === 0}>
         <div class="flex items-center justify-between px-2 py-1 mb-1 border-b border-white/5 dark:border-black/5" style={{ "border-color": "var(--border-base)" }}>
@@ -530,16 +650,38 @@ export function FileTree(props: FileTreeProps) {
                       draggable={true}
                       onClick={() => (expanded() ? file.tree.collapse(node.path) : file.tree.expand(node.path))}
                       aria-expanded={expanded()}
-                      classList={{ "bg-black/5 dark:bg-white/5": dragPath() === node.path }}
-                      onDragStart={(e) => handleDragStart(e, node.path)}
-                      onDragEnter={(e) => handleDragEnter(e, node.path)}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => { e.stopPropagation(); handleDropClear(); void handleDrop(e, node.path) }}
+                      classList={{ "cursor-not-allowed": targetInvalid(node.path) }}
+                       onDragStart={(e) => handleDragStart(e, node.path)}
+                       onDragEnd={handleDragEnd}
+                       onDragEnter={(e) => handleDragEnter(e, node.path)}
+                       onDragOver={(e) => handleDirectoryDragHover(e, node.path, expanded())}
+                       onDragLeave={(e) => { clearAutoExpand(node.path); handleDragLeave(e) }}
+                       onDrop={(e) => { e.stopPropagation(); handleDropClear(); void handleDrop(e, node.path) }}
                       onContextMenu={(e) => handleContextMenu(e, node)}
-                      class="w-full min-h-[44px] flex items-center gap-1.5 rounded px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                      style={{ "padding-left": `${Math.max(0, 6 + level() * 12)}px` }}
-                  >
+                      class="w-full min-h-[44px] flex items-center gap-1.5 rounded-md border px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                      style={{
+                        "padding-left": `${Math.max(0, 6 + level() * 12)}px`,
+                        background: targetInvalid(node.path)
+                          ? "var(--surface-critical-base)"
+                          : targetValid(node.path)
+                            ? dragInternal()
+                              ? "var(--surface-brand-subtle)"
+                              : "var(--surface-inset)"
+                            : sourceActive(node.path)
+                              ? "var(--surface-inset)"
+                              : undefined,
+                        "border-color": targetInvalid(node.path)
+                          ? "var(--border-critical-base)"
+                          : targetValid(node.path)
+                            ? dragInternal()
+                              ? "var(--border-brand-subtle)"
+                              : "var(--border-base)"
+                            : sourceActive(node.path)
+                              ? "var(--border-strong)"
+                              : "transparent",
+                        opacity: sourceActive(node.path) ? "0.72" : "1",
+                      }}
+                   >
                     <span class="w-4 h-4 flex items-center justify-center" style={{ color: "var(--icon-weak)" }}>
                       {expanded() ? <ChevronDown class="w-3 h-3" /> : <ChevronRight class="w-3 h-3" />}
                     </span>
@@ -586,10 +728,19 @@ export function FileTree(props: FileTreeProps) {
                   draggable={true}
                   onClick={() => props.onFileClick?.(node)}
                   onDragStart={(e) => handleDragStart(e, node.path)}
+                  onDragEnd={handleDragEnd}
                   onContextMenu={(e) => handleContextMenu(e, node)}
-                  class="w-full min-h-[44px] flex items-center gap-1.5 rounded px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                  classList={{ "bg-black/5 dark:bg-white/5": node.path === props.active }}
-                  style={{ "padding-left": `${Math.max(0, 6 + level() * 12 + 16)}px` }}
+                  class="w-full min-h-[44px] flex items-center gap-1.5 rounded-md border px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                  style={{
+                    "padding-left": `${Math.max(0, 6 + level() * 12 + 16)}px`,
+                    background: sourceActive(node.path)
+                      ? "var(--surface-inset)"
+                      : node.path === props.active
+                        ? "var(--surface-interactive-hover)"
+                        : undefined,
+                    "border-color": sourceActive(node.path) ? "var(--border-strong)" : "transparent",
+                    opacity: sourceActive(node.path) ? "0.72" : "1",
+                  }}
                 >
                   <File class="w-4 h-4 shrink-0" style={{ color: "var(--icon-weak)" }} />
                   <span

@@ -30,6 +30,12 @@ const [deleteTarget, setDeleteTarget] = createSignal<{ type: "directory" | "file
 const [confirmOpen, setConfirmOpen] = createSignal(false)
 const scrollStore = new Map<string, number>()
 let dragDepth = 0
+const MOVE_DATA_TYPE = "application/x-opencode-file-path"
+
+function handleDragStart(e: DragEvent, path: string) {
+  e.dataTransfer?.setData(MOVE_DATA_TYPE, path)
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"
+}
 
 type UploadEntry = {
   file: File
@@ -189,7 +195,7 @@ export function FileTree(props: FileTreeProps) {
     const prevent = (e: DragEvent) => {
       if (!canUpload()) return
       const types = Array.from(e.dataTransfer?.types ?? [])
-      if (!types.includes("Files")) return
+      if (!types.includes("Files") && !types.includes(MOVE_DATA_TYPE)) return
       e.preventDefault()
     }
 
@@ -357,6 +363,16 @@ export function FileTree(props: FileTreeProps) {
     if (!canUpload()) return
     e.preventDefault()
     e.stopPropagation()
+
+    // Check for internal file-tree move first
+    const movePath = e.dataTransfer?.getData(MOVE_DATA_TYPE)
+    if (movePath) {
+      if (movePath === parentPath) return
+      if (parentPath.startsWith(movePath + "/")) return
+      await file.moveItem(movePath, parentPath)
+      return
+    }
+
     const uploads = await collectDropEntries(e)
     if (!uploads.length) return
     await file.uploadFiles(parentPath, uploads)
@@ -506,12 +522,14 @@ export function FileTree(props: FileTreeProps) {
           return (
             <Switch>
                 <Match when={node.type === "directory"}>
-                 <div>
+                  <div>
                     <button
                       type="button"
+                      draggable
                       onClick={() => (expanded() ? file.tree.collapse(node.path) : file.tree.expand(node.path))}
                       aria-expanded={expanded()}
                       classList={{ "bg-black/5 dark:bg-white/5": dragPath() === node.path }}
+                      onDragStart={(e) => handleDragStart(e, node.path)}
                       onDragEnter={(e) => handleDragEnter(e, node.path)}
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
@@ -563,7 +581,9 @@ export function FileTree(props: FileTreeProps) {
               <Match when={node.type === "file"}>
                 <button
                   type="button"
+                  draggable
                   onClick={() => props.onFileClick?.(node)}
+                  onDragStart={(e) => handleDragStart(e, node.path)}
                   onContextMenu={(e) => handleContextMenu(e, node)}
                   class="w-full min-h-[44px] flex items-center gap-1.5 rounded px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
                   classList={{ "bg-black/5 dark:bg-white/5": node.path === props.active }}

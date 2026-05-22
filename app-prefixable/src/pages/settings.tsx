@@ -3760,7 +3760,7 @@ function ProjectProvidersTab() {
         >
           <Info class="w-3.5 h-3.5 shrink-0" />
           <span>
-            Saved to <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code> globally
+            Saved to <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code> for this project
             {directory ? ` (${directory})` : ""}
           </span>
         </div>

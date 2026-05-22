@@ -35,14 +35,28 @@ const scrollStore = new Map<string, number>()
 let dragDepth = 0
 const MOVE_DATA_TYPE = "application/x-opencode-file-path"
 const AUTO_EXPAND_DELAY = 500
+const LONG_PRESS_DELAY = 450
 let autoExpandTimer: number | undefined
 let autoExpandPath: string | null = null
+let longPressTimer: number | undefined
+let suppressClickPath: string | null = null
 
 function clearAutoExpand(path?: string) {
   if (path && autoExpandPath !== path) return
   if (autoExpandTimer !== undefined) window.clearTimeout(autoExpandTimer)
   autoExpandTimer = undefined
   autoExpandPath = null
+}
+
+function clearLongPress() {
+  if (longPressTimer !== undefined) window.clearTimeout(longPressTimer)
+  longPressTimer = undefined
+}
+
+function consumeLongPress(path: string) {
+  if (suppressClickPath !== path) return false
+  suppressClickPath = null
+  return true
 }
 
 function handleDragStart(e: DragEvent, path: string) {
@@ -366,16 +380,45 @@ async function readDirectory(entry: DropEntry): Promise<UploadEntry[]> {
     return !!kind && !node.ignored
   }
 
-  const handleContextMenu = (e: MouseEvent, node: FileNode | { type: "directory"; path: string; name: string }) => {
+  const openContextMenu = (x: number, y: number, node: FileNode | { type: "directory"; path: string; name: string }) => {
     const canOpen = node.type === "directory"
       ? canCreateFile() || canCreateDirectory() || canUpload() || (node.path !== "" && canDelete())
       : true
-    if (!canOpen) return
+    if (!canOpen) return false
+    setContextMenu({
+      x: Math.min(x, window.innerWidth - 150),
+      y: Math.min(y, window.innerHeight - 150),
+      node,
+    })
+    return true
+  }
+
+  const handleContextMenu = (e: MouseEvent, node: FileNode | { type: "directory"; path: string; name: string }) => {
     e.preventDefault()
     e.stopPropagation()
-    const x = Math.min(e.clientX, window.innerWidth - 150)
-    const y = Math.min(e.clientY, window.innerHeight - 150)
-    setContextMenu({ x, y, node })
+    openContextMenu(e.clientX, e.clientY, node)
+  }
+
+  const handleTouchStart = (e: TouchEvent, node: FileNode | { type: "directory"; path: string; name: string }) => {
+    if (e.touches.length !== 1) {
+      clearLongPress()
+      return
+    }
+    const touch = e.touches[0]
+    clearLongPress()
+    longPressTimer = window.setTimeout(() => {
+      longPressTimer = undefined
+      const opened = openContextMenu(touch.clientX, touch.clientY, node)
+      if (!opened) return
+      suppressClickPath = node.path
+    }, LONG_PRESS_DELAY)
+  }
+
+  const handleTouchEnd = (path: string) => {
+    clearLongPress()
+    window.setTimeout(() => {
+      if (suppressClickPath === path) suppressClickPath = null
+    }, LONG_PRESS_DELAY)
   }
 
   const handleCreate = async (name: string) => {
@@ -646,20 +689,35 @@ function handleDragOverTarget(e: DragEvent, path: string) {
                 <Match when={node.type === "directory"}>
                   <div>
                     <button
-                      type="button"
-                      draggable={true}
-                      onClick={() => (expanded() ? file.tree.collapse(node.path) : file.tree.expand(node.path))}
-                      aria-expanded={expanded()}
-                      classList={{ "cursor-not-allowed": targetInvalid(node.path) }}
-                       onDragStart={(e) => handleDragStart(e, node.path)}
-                       onDragEnd={handleDragEnd}
-                       onDragEnter={(e) => handleDragEnter(e, node.path)}
-                       onDragOver={(e) => handleDirectoryDragHover(e, node.path, expanded())}
-                       onDragLeave={(e) => { clearAutoExpand(node.path); handleDragLeave(e) }}
-                       onDrop={(e) => { e.stopPropagation(); handleDropClear(); void handleDrop(e, node.path) }}
-                      onContextMenu={(e) => handleContextMenu(e, node)}
-                      class="w-full min-h-[44px] flex items-center gap-1.5 rounded-md border px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                      style={{
+                       type="button"
+                       draggable={true}
+                       onClick={(e) => {
+                         if (consumeLongPress(node.path)) {
+                           e.preventDefault()
+                           e.stopPropagation()
+                           return
+                         }
+                         if (expanded()) {
+                           file.tree.collapse(node.path)
+                           return
+                         }
+                         file.tree.expand(node.path)
+                       }}
+                       aria-expanded={expanded()}
+                       classList={{ "cursor-not-allowed": targetInvalid(node.path) }}
+                        onDragStart={(e) => { clearLongPress(); handleDragStart(e, node.path) }}
+                        onDragEnd={handleDragEnd}
+                        onDragEnter={(e) => handleDragEnter(e, node.path)}
+                        onDragOver={(e) => handleDirectoryDragHover(e, node.path, expanded())}
+                        onDragLeave={(e) => { clearAutoExpand(node.path); handleDragLeave(e) }}
+                        onDrop={(e) => { e.stopPropagation(); handleDropClear(); void handleDrop(e, node.path) }}
+                       onContextMenu={(e) => handleContextMenu(e, node)}
+                       onTouchStart={(e) => handleTouchStart(e, node)}
+                       onTouchEnd={() => handleTouchEnd(node.path)}
+                       onTouchMove={clearLongPress}
+                       onTouchCancel={clearLongPress}
+                       class="w-full min-h-[44px] flex items-center gap-1.5 rounded-md border px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                       style={{
                         "padding-left": `${Math.max(0, 6 + level() * 12)}px`,
                         background: targetInvalid(node.path)
                           ? "var(--surface-critical-base)"
@@ -726,10 +784,21 @@ function handleDragOverTarget(e: DragEvent, path: string) {
                 <button
                   type="button"
                   draggable={true}
-                  onClick={() => props.onFileClick?.(node)}
-                  onDragStart={(e) => handleDragStart(e, node.path)}
+                  onClick={(e) => {
+                    if (consumeLongPress(node.path)) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      return
+                    }
+                    props.onFileClick?.(node)
+                  }}
+                  onDragStart={(e) => { clearLongPress(); handleDragStart(e, node.path) }}
                   onDragEnd={handleDragEnd}
                   onContextMenu={(e) => handleContextMenu(e, node)}
+                  onTouchStart={(e) => handleTouchStart(e, node)}
+                  onTouchEnd={() => handleTouchEnd(node.path)}
+                  onTouchMove={clearLongPress}
+                  onTouchCancel={clearLongPress}
                   class="w-full min-h-[44px] flex items-center gap-1.5 rounded-md border px-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
                   style={{
                     "padding-left": `${Math.max(0, 6 + level() * 12 + 16)}px`,

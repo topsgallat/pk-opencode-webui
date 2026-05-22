@@ -136,6 +136,23 @@ export async function createFile(serverUrl: string, path: string, targetUrl?: st
 }
 
 /**
+ * Move a file or directory via extended API
+ */
+export async function moveItem(serverUrl: string, source: string, dest: string, targetUrl?: string): Promise<boolean> {
+  try {
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/move`, targetUrl), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source, dest }),
+    }, EXT_API_TIMEOUT_MS, "extended moveItem")
+    return res.ok
+  } catch (e) {
+    console.error("[extended-api] moveItem failed:", e)
+    return false
+  }
+}
+
+/**
  * Provider account storage keys (localStorage)
  */
 const PROVIDER_ACCOUNTS_KEY = "opencode.providerAccounts"

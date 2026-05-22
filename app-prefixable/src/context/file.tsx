@@ -4,7 +4,7 @@ import type { FileNode } from "../sdk/client"
 import { useSDK } from "./sdk"
 import { useServer } from "./server"
 import { useEvents } from "./events"
-import { readFile, mkdir, createFile as apiCreateFile, deleteFile as apiDeleteFile, deleteDir as apiDeleteDir, uploadFile as apiUploadFile } from "../utils/extended-api"
+import { readFile, mkdir, createFile as apiCreateFile, deleteFile as apiDeleteFile, deleteDir as apiDeleteDir, uploadFile as apiUploadFile, moveItem as apiMoveItem } from "../utils/extended-api"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { withTimeout, errorMessage } from "../utils/request-timeout"
 
@@ -65,7 +65,8 @@ interface FileContextValue {
   deleteFile: (path: string) => Promise<boolean>
   deleteDir: (path: string) => Promise<boolean>
   downloadFile: (path: string) => Promise<DownloadedFile | null>
-   uploadFiles: (parentPath: string, files: UploadEntry[]) => Promise<boolean>
+  uploadFiles: (parentPath: string, files: UploadEntry[]) => Promise<boolean>
+  moveItem: (source: string, destParent: string) => Promise<boolean>
 }
 
 const FileContext = createContext<FileContextValue>()
@@ -389,6 +390,39 @@ export function FileProvider(props: ParentProps) {
     return true
   }
 
+  function dirname(path: string) {
+    const idx = path.lastIndexOf("/")
+    return idx === -1 ? "" : path.slice(0, idx)
+  }
+
+  async function moveItem(source: string, destParent: string): Promise<boolean> {
+    if (!capabilities().canUseLocalExtFileOps) return false
+
+    const fullSource = resolvePath(source)
+    const parts = source.split("/").filter(Boolean)
+    const basename = parts.length > 0 ? parts[parts.length - 1] : source
+    const fullDest = destParent
+      ? resolvePath(destParent ? `${destParent}/${basename}` : basename)
+      : resolvePath(basename)
+
+    // Prevent no-op moves
+    if (fullSource === fullDest) return false
+
+    // Prevent moving directory into its own subtree
+    if (fullDest.startsWith(fullSource + "/")) return false
+
+    const success = await apiMoveItem(serverUrl, fullSource, fullDest, targetUrl)
+    if (success) {
+      const sourceParent = dirname(source)
+      const destParentDir = dirname(destParent ? `${destParent}/${basename}` : basename)
+      const dirsToRefresh = new Set([sourceParent, destParentDir])
+      for (const dir of dirsToRefresh) {
+        await refreshDir(dir)
+      }
+    }
+    return success
+  }
+
   createEffect(() => {
     const unsub = events.subscribe((event) => {
       if (event.type !== "file.watcher.updated") return
@@ -434,6 +468,7 @@ export function FileProvider(props: ParentProps) {
     deleteDir,
     downloadFile,
     uploadFiles,
+    moveItem,
   }
 
   return <FileContext.Provider value={value}>{props.children}</FileContext.Provider>

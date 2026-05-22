@@ -289,6 +289,32 @@ export async function handleExtendedEndpoint(
     }
   }
 
+  // POST /api/ext/move - Move a file or directory (rename)
+  if (path === "/api/ext/move" && method === "POST") {
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body.source !== "string" || typeof body.dest !== "string") {
+      return Response.json({ error: "source and dest are required" }, { status: 400 })
+    }
+
+    const allowedRoot = getAllowedRoot()
+    const validatedSource = validatePath(body.source, allowedRoot)
+    const validatedDest = validatePath(body.dest, allowedRoot)
+    if (!validatedSource || !validatedDest) {
+      console.warn("[ExtAPI] move: path outside allowed root:", body.source, body.dest)
+      return Response.json({ error: "path must be within allowed directory" }, { status: 403 })
+    }
+
+    console.log("[ExtAPI] move:", validatedSource, "->", validatedDest)
+
+    try {
+      await fs.promises.rename(validatedSource, validatedDest)
+      return Response.json({ success: true })
+    } catch (e) {
+      console.error("[ExtAPI] move error:", e)
+      return Response.json({ error: String(e) }, { status: 500 })
+    }
+  }
+
   // POST /api/ext/file - Upload file content (multipart form)
   if (path === "/api/ext/file" && method === "POST") {
     const form = await req.formData().catch(() => null)

@@ -92,6 +92,7 @@ const emptyMessages: DisplayMessage[] = [];
 interface SessionSelection {
   agent: string;
   model: { providerID: string; modelID: string };
+  variant?: string | null;
 }
 
 interface PendingPromptItem {
@@ -102,6 +103,7 @@ interface PendingPromptItem {
   images: ImageAttachment[];
   agent: string;
   model?: { providerID: string; modelID: string };
+  variant?: string | null;
   status?: "queued" | "running";
 }
 
@@ -114,6 +116,7 @@ interface PendingPromptStorage {
     imageAttachments?: ImageAttachment[];
     agent?: string;
     model?: { providerID: string; modelID: string };
+    variant?: string | null;
   }>;
 }
 
@@ -346,6 +349,7 @@ export function Session() {
   const [showMCPDialog, setShowMCPDialog] = createSignal(false);
   const [showMCPAddDialog, setShowMCPAddDialog] = createSignal(false);
   const [showModelPicker, setShowModelPicker] = createSignal(false);
+  const [showVariantPicker, setShowVariantPicker] = createSignal(false);
   const [showAgentPicker, setShowAgentPicker] = createSignal(false);
   const [showPromptPicker, setShowPromptPicker] = createSignal(false);
   const [promptPickerFilter, setPromptPickerFilter] = createSignal("");
@@ -388,6 +392,20 @@ export function Session() {
 
   const activeSelection = createMemo(() => sessionSelection() ?? defaultSelection());
 
+  function currentModelVariants(model = activeSelection()?.model) {
+    if (!model) return [] as Array<{ id: string; title: string; description?: string }>
+    const provider = providers.rawProviders.find((p) => p.id === model.providerID)
+    const variants = provider?.models[model.modelID]?.variants ?? {}
+    const items = Object.entries(variants)
+      .filter(([, config]) => !config.disabled)
+      .map(([id]) => ({ id, title: id }))
+    return items.length > 0
+      ? [{ id: "__default__", title: "Default", description: "Use the model default" }, ...items]
+      : items
+  }
+
+  const variantPickerItems = createMemo(() => currentModelVariants())
+
   function applySelection(next: SessionSelection) {
     batch(() => {
       setSessionSelection(next);
@@ -396,6 +414,7 @@ export function Session() {
         providerID: next.model.providerID,
         modelID: next.model.modelID,
       });
+      providers.setSelectedVariant(next.variant ?? null);
     });
   }
 
@@ -406,15 +425,33 @@ export function Session() {
     setSessionSelection({
       agent,
       model: { providerID: model.providerID, modelID: model.modelID },
+      variant: providers.selectedVariant,
     });
   }
 
   function selectModel(model: { providerID: string; modelID: string }) {
     providers.setSelectedModel(model);
+    providers.setSelectedVariant(null);
     setSessionSelection({
       agent: providers.selectedAgent,
       model: { providerID: model.providerID, modelID: model.modelID },
+      variant: null,
     });
+    if (currentModelVariants(model).length > 0) {
+      setShowVariantPicker(true);
+    }
+  }
+
+  function selectVariant(variant: string | null) {
+    providers.setSelectedVariant(variant);
+    setSessionSelection((prev) => {
+      const current = prev ?? activeSelection()
+      if (!current) return current
+      return {
+        ...current,
+        variant,
+      }
+    })
   }
 
   const [fileContext, setFileContext] = createSignal<FileContext[]>([]);
@@ -532,10 +569,12 @@ export function Session() {
       if (prevId && prevDir) {
         const selections = readSelections(prev?.serverKey ?? server.serverKey(), prevDir);
         const model = untrack(() => providers.selectedModel);
+        const variant = untrack(() => providers.selectedVariant);
         if (model) {
           selections[prevId] = {
             agent: untrack(() => providers.selectedAgent),
             model: { providerID: model.providerID, modelID: model.modelID },
+            variant,
           };
           writeSelections(prev?.serverKey ?? server.serverKey(), prevDir, selections);
         }
@@ -631,6 +670,7 @@ export function Session() {
     selections[id] = {
       agent: selection.agent,
       model: { providerID: selection.model.providerID, modelID: selection.model.modelID },
+      variant: selection.variant ?? null,
     };
     writeSelections(serverKey, dir, selections);
   });
@@ -649,13 +689,13 @@ export function Session() {
     if (!raw) return;
     const EXPIRY_MS = 60_000; // 60 seconds
     const parsed = (() => {
-      try { return JSON.parse(raw) as PendingPromptStorage | { text: string; ts: number }; }
+      try { return JSON.parse(raw) as PendingPromptStorage | { text: string; ts: number; variant?: string | null }; }
       catch { return null; }
     })();
     const queued = Array.isArray((parsed as PendingPromptStorage | null)?.items)
       ? (parsed as PendingPromptStorage).items
       : parsed && "text" in parsed && typeof parsed.text === "string" && typeof parsed.ts === "number"
-        ? [{ id: generateUUID(), text: parsed.text, ts: parsed.ts }]
+        ? [{ id: generateUUID(), text: parsed.text, ts: parsed.ts, variant: typeof parsed.variant === "string" ? parsed.variant : null }]
         : [];
     const valid = queued.filter((item) => item.text && Date.now() - item.ts <= EXPIRY_MS);
     if (valid.length === 0) {
@@ -690,6 +730,7 @@ export function Session() {
         images: item.imageAttachments ?? [],
         agent: item.agent ? item.agent : (providers.selectedAgent || "build"),
         model: item.model ?? providers.selectedModel,
+        variant: item.variant ?? providers.selectedVariant ?? undefined,
         status: "queued",
       });
     }
@@ -1792,6 +1833,7 @@ export function Session() {
         parts: buildPromptParts(item),
         agent: item.agent,
         model: item.model,
+        variant: item.variant ?? undefined,
       });
 
       setActivePrompt({ ...item, status: "running" });
@@ -1946,26 +1988,28 @@ export function Session() {
               modelID: providers.selectedModel.modelID,
             }
           : undefined,
+        variant: providers.selectedVariant ?? undefined,
         status: "queued",
       });
       return;
     }
 
-    await submitPrompt({
-      id: generateUUID(),
-      createdAt: Date.now(),
-      text,
-      files,
-      images,
-      agent: providers.selectedAgent || "build",
-      model: providers.selectedModel
-        ? {
-            providerID: providers.selectedModel.providerID,
-            modelID: providers.selectedModel.modelID,
-          }
-        : undefined,
-      status: "running",
-    });
+      await submitPrompt({
+        id: generateUUID(),
+        createdAt: Date.now(),
+        text,
+        files,
+        images,
+        agent: providers.selectedAgent || "build",
+        model: providers.selectedModel
+          ? {
+              providerID: providers.selectedModel.providerID,
+              modelID: providers.selectedModel.modelID,
+            }
+          : undefined,
+        variant: providers.selectedVariant ?? undefined,
+        status: "running",
+      });
   }
 
   async function createSessionAndSendPrompt(text: string) {
@@ -1993,6 +2037,7 @@ export function Session() {
             ts: Date.now(),
             agent: providers.selectedAgent || "build",
             model: providers.selectedModel,
+            variant: providers.selectedVariant ?? undefined,
           }],
         } satisfies PendingPromptStorage),
       );
@@ -2863,6 +2908,7 @@ export function Session() {
                     <SessionInfo
                       selectedAgent={() => activeSelection()?.agent ?? null}
                       selectedModel={() => activeSelection()?.model ?? null}
+                      selectedVariant={() => activeSelection()?.variant ?? providers.selectedVariant ?? null}
                       input={input}
                       loading={loading}
                       processing={processing}
@@ -2873,6 +2919,7 @@ export function Session() {
                       onAction={submitComposerAction}
                       onAgentClick={() => setShowAgentPicker(true)}
                       onModelClick={() => setShowModelPicker(true)}
+                      onVariantClick={() => setShowVariantPicker(true)}
                       hasAttachments={() => fileContext().length > 0 || imageAttachments().length > 0}
                     />
                   </div>
@@ -2945,6 +2992,18 @@ export function Session() {
               selectModel({ providerID, modelID });
             }}
             onClose={() => setShowModelPicker(false)}
+          />
+        </Show>
+
+        {/* Variant Picker Dialog */}
+        <Show when={showVariantPicker()}>
+          <PickerDialog
+            title="Select Variant"
+            placeholder="Filter variants..."
+            emptyMessage="No variants available for this model."
+            items={variantPickerItems()}
+            onSelect={(item) => selectVariant(item.id === "__default__" ? null : item.id)}
+            onClose={() => setShowVariantPicker(false)}
           />
         </Show>
 

@@ -17,14 +17,14 @@ const FALLBACK_AGENT = "build"
 const PROVIDER_REQUEST_TIMEOUT_MS = 12_000
 
 // Define types locally to avoid SDK type mismatches
-  interface Model {
+interface Model {
   id: string
   name: string
-  providerID?: string  // optional — injected during normalisation
+  providerID?: string // optional — injected during normalisation
   copilotMultiplier?: number
-    cost?: {
-      input: number
-      output: number
+  cost?: {
+    input: number
+    output: number
     cache_read?: number
     cache_write?: number
     context_over_200k?: {
@@ -34,12 +34,18 @@ const PROVIDER_REQUEST_TIMEOUT_MS = 12_000
       cache_write?: number
     }
   }
-    limit: {
-      context: number
-      input?: number
-      output: number
+  limit: {
+    context: number
+    input?: number
+    output: number
+  }
+  variants?: {
+    [key: string]: {
+      disabled?: boolean
+      [key: string]: unknown | boolean | undefined
     }
   }
+}
 
 function isZeroCost(cost?: Model["cost"]): boolean {
   return !cost || (cost.input === 0 && cost.output === 0)
@@ -103,9 +109,11 @@ interface ProviderContextValue {
   agents: Agent[]
   loading: boolean
   selectedModel: ModelKey | null
+  selectedVariant: string | null
   selectedAgent: string
   modelsByAgent: Record<string, ModelKey>
   setSelectedModel: (model: ModelKey | null) => void
+  setSelectedVariant: (variant: string | null) => void
   setSelectedAgent: (agent: string) => void
   refetch: () => void
   connectProvider: (providerID: string, apiKey: string, accountName?: string) => Promise<boolean>
@@ -122,9 +130,14 @@ export function ProviderProvider(props: ParentProps) {
   const cfg = useConfig()
   const server = useServer()
   const storageKey = () => `${MODELS_BY_AGENT_KEY}.${server.serverKey()}`
+  type StoredSelections = {
+    modelsByAgent: Record<string, ModelKey>
+    variantsByAgent: Record<string, string | null>
+  }
 
   const [store, setStore] = createStore({
     modelsByAgent: {} as Record<string, ModelKey>,
+    variantsByAgent: {} as Record<string, string | null>,
     selectedAgent: FALLBACK_AGENT,
   })
 
@@ -134,10 +147,16 @@ export function ProviderProvider(props: ParentProps) {
   // Load models from localStorage
   onMount(() => {
     try {
-    const stored = localStorage.getItem(storageKey())
+      const stored = localStorage.getItem(storageKey())
       if (stored) {
         const parsed = JSON.parse(stored)
-        setStore("modelsByAgent", parsed)
+        if (parsed && typeof parsed === "object" && "modelsByAgent" in parsed) {
+          const next = parsed as Partial<StoredSelections>
+          setStore("modelsByAgent", next.modelsByAgent ?? {})
+          setStore("variantsByAgent", next.variantsByAgent ?? {})
+        } else {
+          setStore("modelsByAgent", parsed)
+        }
       }
     } catch (e) {
       console.error("Failed to load models from storage:", e)
@@ -147,7 +166,10 @@ export function ProviderProvider(props: ParentProps) {
   // Save models to localStorage whenever they change
   createEffect(() => {
     try {
-      localStorage.setItem(storageKey(), JSON.stringify(store.modelsByAgent))
+      localStorage.setItem(storageKey(), JSON.stringify({
+        modelsByAgent: store.modelsByAgent,
+        variantsByAgent: store.variantsByAgent,
+      }))
     } catch (e) {
       console.error("Failed to save models to storage:", e)
     }
@@ -224,6 +246,14 @@ export function ProviderProvider(props: ParentProps) {
     return !!provider.models[model.modelID]
   }
 
+  function variantAllowed(model: ModelKey | null, variant: string | null | undefined) {
+    if (!model || !variant) return false
+    const provider = providerFor(model)
+    const selected = provider?.models[model.modelID]
+    const config = selected?.variants?.[variant]
+    return !!selected && !!config && !config.disabled
+  }
+
   function fallbackModel() {
     const configModel = cfg.project.model || cfg.global.model
     if (!configModel) {
@@ -265,6 +295,13 @@ export function ProviderProvider(props: ParentProps) {
     return fallbackModel()
   }
 
+  function resolveVariant(agent: string) {
+    const variant = store.variantsByAgent[agent]
+    const model = resolveSelection(agent)
+    if (variantAllowed(model, variant)) return variant
+    return null
+  }
+
   // Auto-select default model/agent from project config, falling back to hardcoded defaults.
   // localStorage selections take priority (user's runtime choice wins).
   createEffect(() => {
@@ -285,6 +322,12 @@ export function ProviderProvider(props: ParentProps) {
       if (modelAllowed(model)) continue
       const resolved = fallbackModel()
       if (resolved) setStore("modelsByAgent", agent, resolved)
+    }
+
+    for (const [agent, variant] of Object.entries(store.variantsByAgent)) {
+      const model = resolveSelection(agent)
+      if (variantAllowed(model, variant)) continue
+      if (variant !== null) setStore("variantsByAgent", agent, null)
     }
 
     if (!store.modelsByAgent[defaultAgent]) {
@@ -329,14 +372,33 @@ export function ProviderProvider(props: ParentProps) {
 
   function setSelectedModel(model: ModelKey | null) {
     if (model && modelAllowed(model)) {
+      const previous = resolveSelection(store.selectedAgent)
       setStore("modelsByAgent", store.selectedAgent, model)
+      if (!previous || previous.providerID !== model.providerID || previous.modelID !== model.modelID) {
+        setStore("variantsByAgent", store.selectedAgent, null)
+      }
+    }
+  }
+
+  function setSelectedVariant(variant: string | null) {
+    if (variant === null) {
+      setStore("variantsByAgent", store.selectedAgent, null)
+      return
+    }
+
+    const model = resolveSelection(store.selectedAgent)
+    if (variantAllowed(model, variant)) {
+      setStore("variantsByAgent", store.selectedAgent, variant)
     }
   }
 
   function setSelectedAgent(agent: string) {
     if (!store.modelsByAgent[agent]) {
-      const source = resolveSelection(store.selectedAgent) ?? resolveSelection(FALLBACK_AGENT)
+      const sourceAgent = store.selectedAgent
+      const source = resolveSelection(sourceAgent) ?? resolveSelection(FALLBACK_AGENT)
       if (source) setStore("modelsByAgent", agent, source)
+      const sourceVariant = resolveVariant(sourceAgent) ?? resolveVariant(FALLBACK_AGENT)
+      if (sourceVariant) setStore("variantsByAgent", agent, sourceVariant)
     }
     userChangedAgent = true
     setStore("selectedAgent", agent)
@@ -461,6 +523,9 @@ export function ProviderProvider(props: ParentProps) {
     get selectedModel() {
       return resolveSelection(store.selectedAgent)
     },
+    get selectedVariant() {
+      return resolveVariant(store.selectedAgent)
+    },
     get selectedAgent() {
       return store.selectedAgent
     },
@@ -468,6 +533,7 @@ export function ProviderProvider(props: ParentProps) {
       return store.modelsByAgent
     },
     setSelectedModel,
+    setSelectedVariant,
     setSelectedAgent,
     refetch,
     connectProvider,

@@ -831,15 +831,17 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
           </Show>
 
           {/* Output (collapsed by default, only shown if no child tools) */}
-          <Show when={getOutput(state()) && childTools().length === 0}>
-            {(output) => (
-              <div class="mt-2">
-                <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
-                  Result:
+          <Show when={childTools().length === 0}>
+            <Show when={getOutput(state())}>
+              {(output) => (
+                <div class="mt-2">
+                  <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
+                    Result:
+                  </div>
+                  <Markdown content={output()} class="text-xs" />
                 </div>
-                <Markdown content={output()} class="text-xs" />
-              </div>
-            )}
+              )}
+            </Show>
           </Show>
 
           {/* Error */}

@@ -82,8 +82,10 @@ interface SessionInfoProps {
   onAction: () => void
   onAgentClick: () => void
   onModelClick: () => void
+  onVariantClick?: () => void
   selectedAgent?: () => string | null
   selectedModel?: () => { providerID: string; modelID: string } | null
+  selectedVariant?: () => string | null
   hasAttachments?: () => boolean
 }
 
@@ -227,6 +229,16 @@ export function SessionInfo(props: SessionInfoProps) {
     const provider = providers.rawProviders.find((p: { id: string }) => p.id === selected.providerID)
     const model = provider?.models[selected.modelID]
     return model?.name || selected.modelID
+  })
+
+  const variantLabel = createMemo(() => {
+    const selected = selectedModel()
+    if (!selected) return null
+    const provider = providers.rawProviders.find((p: { id: string }) => p.id === selected.providerID)
+    const model = provider?.models[selected.modelID]
+    const variants = Object.entries(model?.variants ?? {}).filter(([, config]) => !config.disabled)
+    if (variants.length === 0) return null
+    return props.selectedVariant?.() ?? "default"
   })
 
   const quotaProvider = createMemo(() => {
@@ -454,19 +466,32 @@ export function SessionInfo(props: SessionInfoProps) {
           </button>
         </Show>
 
-        {/* Model + Send row */}
+        {/* Model + Variant + Send row */}
         <div class="flex w-full items-center gap-2 min-w-0 sm:gap-3">
-          <Show when={selectedModel()}>
-            <button
-              type="button"
-              class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer"
-              onClick={() => props.onModelClick()}
-            >
-              <span class="opacity-60 shrink-0">Model:</span>
-              <span class="truncate" style={{ color: "var(--text-base)" }}>{modelLabel()}</span>
-              {modelBadge()}
-            </button>
-          </Show>
+          <div class="flex flex-wrap items-center gap-2 min-w-0">
+            <Show when={selectedModel()}>
+              <button
+                type="button"
+                class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer"
+                onClick={() => props.onModelClick()}
+              >
+                <span class="opacity-60 shrink-0">Model:</span>
+                <span class="truncate" style={{ color: "var(--text-base)" }}>{modelLabel()}</span>
+                {modelBadge()}
+              </button>
+            </Show>
+
+            <Show when={variantLabel()}>
+              <button
+                type="button"
+                class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer"
+                onClick={() => props.onVariantClick?.()}
+              >
+                <span class="opacity-60 shrink-0">Variant:</span>
+                <span class="truncate" style={{ color: "var(--text-base)" }}>{variantLabel()}</span>
+              </button>
+            </Show>
+          </div>
 
           <div class="flex min-w-0 items-center gap-1">
             {/* No provider warning */}

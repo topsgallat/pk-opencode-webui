@@ -1828,6 +1828,7 @@ export function Layout(props: ParentProps) {
                     modelID: providers.selectedModel.modelID,
                   }
                 : undefined,
+              variant: providers.selectedVariant ?? undefined,
             }],
           }),
         );

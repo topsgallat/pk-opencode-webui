@@ -3507,6 +3507,7 @@ function ProjectProvidersTab() {
   const [newProviderApi, setNewProviderApi] = createSignal<string>("")
   const [newProviderNpm, setNewProviderNpm] = createSignal<string>(OPENAI_COMPATIBLE_PROVIDER)
   const [newProviderEnv, setNewProviderEnv] = createSignal<string>("")
+  const [newProviderModels, setNewProviderModels] = createSignal<Array<{ id: string; name: string }>>([])
   const [showProviderAdvanced, setShowProviderAdvanced] = createSignal(false)
   const [editingProviderId, setEditingProviderId] = createSignal<string | null>(null)
   const [providerToRemove, setProviderToRemove] = createSignal<string | null>(null)
@@ -3554,6 +3555,26 @@ function ProjectProvidersTab() {
     return all.filter((p) => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q))
   })
 
+  function addModelRow() {
+    setNewProviderModels([...newProviderModels(), { id: "", name: "" }])
+  }
+
+  function removeModelRow(index: number) {
+    setNewProviderModels(newProviderModels().filter((_, i) => i !== index))
+  }
+
+  function setModelId(index: number, value: string) {
+    const next = [...newProviderModels()]
+    next[index] = { ...next[index], id: value }
+    setNewProviderModels(next)
+  }
+
+  function setModelName(index: number, value: string) {
+    const next = [...newProviderModels()]
+    next[index] = { ...next[index], name: value }
+    setNewProviderModels(next)
+  }
+
   function resetProviderEditor() {
     setEditingProviderId(null)
     setNewProviderId("")
@@ -3563,6 +3584,7 @@ function ProjectProvidersTab() {
     setNewProviderApi("")
     setNewProviderNpm(OPENAI_COMPATIBLE_PROVIDER)
     setNewProviderEnv("")
+    setNewProviderModels([])
     setShowProviderAdvanced(false)
   }
 
@@ -3663,6 +3685,8 @@ function ProjectProvidersTab() {
     setNewProviderNpm(provider?.npm ?? OPENAI_COMPATIBLE_PROVIDER)
     setNewProviderEnv((provider?.env ?? []).join("\n"))
     setShowProviderAdvanced(Boolean(provider?.api || provider?.env?.length || (provider?.npm && provider.npm !== OPENAI_COMPATIBLE_PROVIDER)))
+    const models = Object.entries(provider?.models ?? {}).map(([id, m]) => ({ id, name: m.name ?? "" }))
+    setNewProviderModels(models.length > 0 ? models : [{ id: "", name: "" }])
   }
 
   async function saveGlobalProvider() {
@@ -3690,6 +3714,11 @@ function ProjectProvidersTab() {
       return
     }
 
+    const modelEntries = newProviderModels()
+      .filter((m) => m.id.trim())
+      .map((m) => [m.id.trim(), { name: m.name.trim() || m.id.trim() }])
+    const models = Object.fromEntries(modelEntries)
+
     const existingID = editingProviderId()
     const existing = existingID ? globalProviderConfigMap()[existingID] : undefined
     if (!existingID && globalProviderConfigMap()[id]) {
@@ -3714,6 +3743,7 @@ function ProjectProvidersTab() {
         apiKey: apiKey || undefined,
       },
       npm: newProviderNpm().trim() || OPENAI_COMPATIBLE_PROVIDER,
+      models: Object.keys(models).length > 0 ? models : undefined,
       ...(newProviderApi().trim() ? { api: newProviderApi().trim() } : {}),
       ...(env.length > 0 ? { env } : {}),
     }
@@ -4056,6 +4086,33 @@ function ProjectProvidersTab() {
                 <input value={newProviderName()} onInput={(e) => setNewProviderName(e.currentTarget.value)} placeholder="Display name" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
                 <input value={newProviderBaseURL()} onInput={(e) => setNewProviderBaseURL(e.currentTarget.value)} placeholder="Base URL, e.g. https://example.com/v1" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
                 <input type="password" value={newProviderApiKey()} onInput={(e) => setNewProviderApiKey(e.currentTarget.value)} placeholder="API key" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+
+                <div class="rounded-md p-3" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}>
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium" style={{ color: "var(--text-strong)" }}>Models</span>
+                    <button onClick={addModelRow} class="text-xs px-2 py-1 rounded flex items-center gap-1" style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}>
+                      <Plus class="w-3 h-3" /> Add model
+                    </button>
+                  </div>
+                  <Show when={newProviderModels().length > 0} fallback={
+                    <p class="text-xs" style={{ color: "var(--text-weak)" }}>No models configured. Models will be fetched from the API if not specified.</p>
+                  }>
+                    <div class="space-y-2">
+                      <For each={newProviderModels()}>
+                        {(m, i) => (
+                          <div class="flex gap-2 items-start">
+                            <input value={m.id} onInput={(e) => setModelId(i(), e.currentTarget.value)} placeholder="Model ID, e.g. gpt-4o" class="flex-1 px-3 py-2 rounded-md text-sm" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                            <input value={m.name} onInput={(e) => setModelName(i(), e.currentTarget.value)} placeholder="Display name, e.g. GPT-4o" class="flex-1 px-3 py-2 rounded-md text-sm" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                            <button onClick={() => removeModelRow(i())} class="p-2 rounded shrink-0" style={{ color: "var(--interactive-critical)" }} aria-label="Remove model">
+                              <X class="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                </div>
+
                 <p class="text-xs" style={{ color: "var(--text-weak)" }}>
                   Most providers only need a base URL and API key. The adapter package is prefilled for OpenAI-compatible providers.
                 </p>
@@ -4094,12 +4151,19 @@ function ProjectProvidersTab() {
                               {provider.name || providerID}
                             </div>
                             <div class="text-xs truncate" style={{ color: "var(--text-weak)" }}>{providerID}</div>
-                            <div class="text-[11px] truncate mt-0.5" style={{ color: "var(--text-weak)" }}>
-                              {provider.npm || OPENAI_COMPATIBLE_PROVIDER}
-                              <Show when={provider.options?.baseURL}>
-                                {(baseURL) => <span> · {baseURL()}</span>}
+                             <div class="text-[11px] truncate mt-0.5" style={{ color: "var(--text-weak)" }}>
+                                {provider.npm || OPENAI_COMPATIBLE_PROVIDER}
+                                <Show when={provider.options?.baseURL}>
+                                  {(baseURL) => <span> · {baseURL()}</span>}
+                                </Show>
+                              </div>
+                              <Show when={provider.models && Object.keys(provider.models).length > 0}>
+                                {(models) => (
+                                  <div class="text-[11px] truncate mt-0.5" style={{ color: "var(--text-weak)" }}>
+                                    {Object.keys(models()).length} model{Object.keys(models()).length !== 1 ? "s" : ""}
+                                  </div>
+                                )}
                               </Show>
-                            </div>
                           </div>
                           <div class="flex items-center gap-2 shrink-0">
                             <button onClick={() => editGlobalProvider(providerID)} class="text-xs px-2 py-1 rounded" style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}>

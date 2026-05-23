@@ -3496,14 +3496,18 @@ function ProjectProvidersTab() {
   const config = useConfig()
   const providers = useProviders()
   const { directory } = useSDK()
+  const OPENAI_COMPATIBLE_PROVIDER = "@ai-sdk/openai-compatible"
   const [saving, setSaving] = createSignal(false)
   const [saved, setSaved] = createSignal(false)
   const [saveError, setSaveError] = createSignal<string | null>(null)
   const [newProviderId, setNewProviderId] = createSignal<string>("")
   const [newProviderName, setNewProviderName] = createSignal<string>("")
+  const [newProviderBaseURL, setNewProviderBaseURL] = createSignal<string>("")
+  const [newProviderApiKey, setNewProviderApiKey] = createSignal<string>("")
   const [newProviderApi, setNewProviderApi] = createSignal<string>("")
-  const [newProviderNpm, setNewProviderNpm] = createSignal<string>("")
+  const [newProviderNpm, setNewProviderNpm] = createSignal<string>(OPENAI_COMPATIBLE_PROVIDER)
   const [newProviderEnv, setNewProviderEnv] = createSignal<string>("")
+  const [showProviderAdvanced, setShowProviderAdvanced] = createSignal(false)
   const [editingProviderId, setEditingProviderId] = createSignal<string | null>(null)
   const [providerToRemove, setProviderToRemove] = createSignal<string | null>(null)
   const [providerSearch, setProviderSearch] = createSignal("")
@@ -3554,9 +3558,12 @@ function ProjectProvidersTab() {
     setEditingProviderId(null)
     setNewProviderId("")
     setNewProviderName("")
+    setNewProviderBaseURL("")
+    setNewProviderApiKey("")
     setNewProviderApi("")
-    setNewProviderNpm("")
+    setNewProviderNpm(OPENAI_COMPATIBLE_PROVIDER)
     setNewProviderEnv("")
+    setShowProviderAdvanced(false)
   }
 
   function globalProviderEnabled(providerID: string) {
@@ -3650,9 +3657,12 @@ function ProjectProvidersTab() {
     setEditingProviderId(providerID)
     setNewProviderId(providerID)
     setNewProviderName(provider?.name ?? providerID)
+    setNewProviderBaseURL(provider?.options?.baseURL ?? "")
+    setNewProviderApiKey(provider?.options?.apiKey ?? "")
     setNewProviderApi(provider?.api ?? "")
-    setNewProviderNpm(provider?.npm ?? "")
+    setNewProviderNpm(provider?.npm ?? OPENAI_COMPATIBLE_PROVIDER)
     setNewProviderEnv((provider?.env ?? []).join("\n"))
+    setShowProviderAdvanced(Boolean(provider?.api || provider?.env?.length || (provider?.npm && provider.npm !== OPENAI_COMPATIBLE_PROVIDER)))
   }
 
   async function saveGlobalProvider() {
@@ -3662,10 +3672,23 @@ function ProjectProvidersTab() {
       return
     }
 
+    const baseURL = newProviderBaseURL().trim()
+    if (!baseURL) {
+      setSaveError("Base URL is required")
+      return
+    }
+
+    const apiKey = newProviderApiKey().trim()
+    
     const env = newProviderEnv()
       .split(/\r?\n/)
       .map((item) => item.trim())
       .filter(Boolean)
+
+    if (!apiKey && env.length === 0) {
+      setSaveError("API key or environment variable is required")
+      return
+    }
 
     const existingID = editingProviderId()
     const existing = existingID ? globalProviderConfigMap()[existingID] : undefined
@@ -3685,8 +3708,13 @@ function ProjectProvidersTab() {
       ...existing,
       id,
       name: newProviderName().trim() || id,
+      options: {
+        ...(existing?.options ?? {}),
+        baseURL,
+        apiKey: apiKey || undefined,
+      },
+      npm: newProviderNpm().trim() || OPENAI_COMPATIBLE_PROVIDER,
       ...(newProviderApi().trim() ? { api: newProviderApi().trim() } : {}),
-      ...(newProviderNpm().trim() ? { npm: newProviderNpm().trim() } : {}),
       ...(env.length > 0 ? { env } : {}),
     }
 
@@ -3733,10 +3761,10 @@ function ProjectProvidersTab() {
         <div class="flex items-center justify-between">
           <div>
             <h1 class="text-lg font-medium" style={{ color: "var(--text-strong)" }}>
-              Project Providers
+              Provider Settings
             </h1>
             <p class="text-sm mt-1" style={{ color: "var(--text-weak)" }}>
-              Manage project provider entries, enabled providers, and default models
+              Manage global provider definitions and project access
             </p>
           </div>
           <div class="flex items-center gap-2">
@@ -3790,7 +3818,7 @@ function ProjectProvidersTab() {
         <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
           <Settings2 class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
               <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-                Project Model Defaults
+              Global Model Defaults
               </h2>
         </div>
         <div class="p-4 space-y-4">
@@ -3986,34 +4014,60 @@ function ProjectProvidersTab() {
         <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
           <Settings2 class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
           <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-            Project Custom Providers
+            Global Custom Providers
           </h2>
         </div>
         <div class="p-4">
           <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div class="rounded-md p-3" style={{ background: "var(--surface-inset)" }}>
-              <div class="flex items-center justify-between gap-2 mb-3">
-                <span class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-                  {editingProviderId() ? `Edit ${editingProviderId()}` : "Add custom provider"}
-                </span>
-                <Show when={editingProviderId()}>
+              <div class="flex items-start justify-between gap-2 mb-3">
+                <div class="min-w-0">
+                  <div class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                    {editingProviderId() ? `Edit ${editingProviderId()}` : "Add custom provider"}
+                  </div>
+                  <div class="text-xs mt-0.5" style={{ color: "var(--text-weak)" }}>
+                    OpenAI-compatible providers only.
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <span class="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--background-base)", color: "var(--text-weak)" }}>
+                    {OPENAI_COMPATIBLE_PROVIDER}
+                  </span>
                   <button
-                    onClick={resetProviderEditor}
-                    class="text-xs hover:underline"
-                    style={{ color: "var(--text-interactive-base)" }}
+                    onClick={() => setShowProviderAdvanced((current) => !current)}
+                    class="text-xs px-2 py-1 rounded"
+                    style={{ background: "var(--background-base)", color: "var(--text-base)" }}
                   >
-                    Clear
+                    {showProviderAdvanced() ? "Hide advanced" : "Advanced"}
                   </button>
-                </Show>
+                  <Show when={editingProviderId()}>
+                    <button
+                      onClick={resetProviderEditor}
+                      class="text-xs hover:underline"
+                      style={{ color: "var(--text-interactive-base)" }}
+                    >
+                      Clear
+                    </button>
+                  </Show>
+                </div>
               </div>
               <div class="space-y-2">
                 <input value={newProviderId()} onInput={(e) => setNewProviderId(e.currentTarget.value)} placeholder="Provider ID" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
                 <input value={newProviderName()} onInput={(e) => setNewProviderName(e.currentTarget.value)} placeholder="Display name" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                <input value={newProviderApi()} onInput={(e) => setNewProviderApi(e.currentTarget.value)} placeholder="API module / URL" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                <input value={newProviderNpm()} onInput={(e) => setNewProviderNpm(e.currentTarget.value)} placeholder="NPM package" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                <textarea value={newProviderEnv()} onInput={(e) => setNewProviderEnv(e.currentTarget.value)} rows={4} placeholder="Environment variables, one per line" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                <div class="flex items-center gap-2 flex-wrap">
-                    <Button onClick={saveGlobalProvider} variant="primary" size="sm" disabled={saving() || !newProviderId().trim()}>
+                <input value={newProviderBaseURL()} onInput={(e) => setNewProviderBaseURL(e.currentTarget.value)} placeholder="Base URL, e.g. https://example.com/v1" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                <input type="password" value={newProviderApiKey()} onInput={(e) => setNewProviderApiKey(e.currentTarget.value)} placeholder="API key" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                <p class="text-xs" style={{ color: "var(--text-weak)" }}>
+                  Most providers only need a base URL and API key. The adapter package is prefilled for OpenAI-compatible providers.
+                </p>
+                <Show when={showProviderAdvanced()}>
+                  <div class="space-y-2 rounded-md p-3" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}>
+                    <input value={newProviderNpm()} onInput={(e) => setNewProviderNpm(e.currentTarget.value)} placeholder="Adapter package" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                    <input value={newProviderApi()} onInput={(e) => setNewProviderApi(e.currentTarget.value)} placeholder="Adapter API (optional)" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                    <textarea value={newProviderEnv()} onInput={(e) => setNewProviderEnv(e.currentTarget.value)} rows={4} placeholder="Environment variables, one per line (optional)" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                  </div>
+                </Show>
+                <div class="flex items-center gap-2 flex-wrap pt-1">
+                  <Button onClick={saveGlobalProvider} variant="primary" size="sm" disabled={saving() || !newProviderId().trim()}>
                     <Save class="w-3.5 h-3.5" />
                     {editingProviderId() ? "Save Provider" : "Add Provider"}
                   </Button>
@@ -4027,9 +4081,9 @@ function ProjectProvidersTab() {
             </div>
             <div class="rounded-md p-3" style={{ background: "var(--surface-inset)" }}>
               <div class="text-sm font-medium mb-3" style={{ color: "var(--text-strong)" }}>
-                Global provider entries ({Object.keys(globalProviderConfigMap()).length})
+                Global custom providers ({Object.keys(globalProviderConfigMap()).length})
               </div>
-              <Show when={Object.keys(globalProviderConfigMap()).length > 0} fallback={<p class="text-sm" style={{ color: "var(--text-weak)" }}>No global provider config entries yet.</p>}>
+              <Show when={Object.keys(globalProviderConfigMap()).length > 0} fallback={<p class="text-sm" style={{ color: "var(--text-weak)" }}>No global custom providers yet.</p>}>
                 <div class="space-y-2">
                   <For each={Object.entries(globalProviderConfigMap()).sort((a, b) => a[0].localeCompare(b[0]))}>
                     {([providerID, provider]) => (
@@ -4040,6 +4094,12 @@ function ProjectProvidersTab() {
                               {provider.name || providerID}
                             </div>
                             <div class="text-xs truncate" style={{ color: "var(--text-weak)" }}>{providerID}</div>
+                            <div class="text-[11px] truncate mt-0.5" style={{ color: "var(--text-weak)" }}>
+                              {provider.npm || OPENAI_COMPATIBLE_PROVIDER}
+                              <Show when={provider.options?.baseURL}>
+                                {(baseURL) => <span> · {baseURL()}</span>}
+                              </Show>
+                            </div>
                           </div>
                           <div class="flex items-center gap-2 shrink-0">
                             <button onClick={() => editGlobalProvider(providerID)} class="text-xs px-2 py-1 rounded" style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}>
@@ -4062,7 +4122,7 @@ function ProjectProvidersTab() {
 
       <ConfirmDialog
         open={!!providerToRemove()}
-        title="Remove Global Provider"
+        title="Remove Global Custom Provider"
         message={`Remove provider '${providerToRemove() ?? ""}' from global opencode.json?`}
         confirmLabel="Remove"
         variant="danger"

@@ -1,0 +1,9 @@
+{
+  "timestamp": "2026-05-17T19:26:32.565Z",
+  "baseUrl": "http://localhost:3000",
+  "logs": [
+    "[test] API /session check: {\"status\":\"error\",\"error\":\"timeout\"}"
+  ],
+  "networkResponses": [],
+  "skipped": true
+}

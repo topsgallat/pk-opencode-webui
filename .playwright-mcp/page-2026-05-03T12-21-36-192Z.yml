@@ -1,0 +1,95 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - button "Open Project" [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+      - button "Open Project" [ref=e10] [cursor=pointer]:
+        - img [ref=e11]
+      - generic [ref=e12]:
+        - 'button "Terminal (Ctrl+`)" [ref=e13] [cursor=pointer]':
+          - img [ref=e14]
+        - generic [ref=e17]:
+          - 'button "Server: Local" [ref=e18] [cursor=pointer]':
+            - img [ref=e19]
+          - button "Local http://127.0.0.1:4096" [ref=e56] [cursor=pointer]:
+            - img [ref=e57]
+            - generic [ref=e59]:
+              - generic [ref=e60]: Local
+              - generic [ref=e61]: http://127.0.0.1:4096
+        - button "Settings" [ref=e22] [cursor=pointer]:
+          - img [ref=e23]
+    - main [ref=e27]:
+      - generic [ref=e62]:
+        - generic [ref=e63]: "PATCH LOADED: Settings patch is active"
+        - generic [ref=e64]:
+          - generic [ref=e65]: Settings
+          - generic [ref=e66]:
+            - button "Providers Global" [ref=e67] [cursor=pointer]:
+              - img [ref=e68]
+              - generic [ref=e70]: Providers
+              - generic [ref=e71]: Global
+            - button "Git Global" [ref=e72] [cursor=pointer]:
+              - img [ref=e73]
+              - generic [ref=e77]: Git
+              - generic [ref=e78]: Global
+            - button "MCP Servers Global + Project" [ref=e79] [cursor=pointer]:
+              - img [ref=e80]
+              - generic [ref=e83]: MCP Servers
+              - generic [ref=e84]: Global + Project
+            - button "Prompts" [ref=e85] [cursor=pointer]:
+              - img [ref=e86]
+              - generic [ref=e88]: Prompts
+            - button "Instructions" [ref=e89] [cursor=pointer]:
+              - img [ref=e90]
+              - generic [ref=e92]: Instructions
+            - button "Appearance" [ref=e93] [cursor=pointer]:
+              - img [ref=e94]
+              - generic [ref=e100]: Appearance
+            - button "Sounds" [ref=e101] [cursor=pointer]:
+              - img [ref=e102]
+              - generic [ref=e106]: Sounds
+            - button "Servers" [ref=e107] [cursor=pointer]:
+              - img [ref=e108]
+              - generic [ref=e111]: Servers
+        - generic [ref=e615]:
+          - generic [ref=e616]:
+            - heading "OpenCode Backends" [level=1] [ref=e617]
+            - paragraph [ref=e618]: Manage connections to multiple OpenCode backend endpoints
+          - generic [ref=e619]:
+            - generic [ref=e620]:
+              - heading "Servers (1)" [level=2] [ref=e621]
+              - button "+ Add Server" [active] [ref=e622] [cursor=pointer]
+            - generic [ref=e624]:
+              - generic [ref=e625]:
+                - generic [ref=e626]:
+                  - generic [ref=e627]: Local
+                  - generic [ref=e628]: Default
+                - paragraph [ref=e629]: http://127.0.0.1:4096
+              - generic [ref=e630]:
+                - button "Edit server" [ref=e631] [cursor=pointer]:
+                  - img [ref=e632]
+                - button "Delete server" [ref=e635] [cursor=pointer]:
+                  - img [ref=e636]
+          - generic [ref=e639]:
+            - heading "About Servers" [level=3] [ref=e640]
+            - paragraph [ref=e641]: Add multiple OpenCode backends to switch between them. Each backend maintains its own sessions, projects, and server-scoped UI state.
+  - generic [ref=e643]:
+    - heading "Add Server" [level=2] [ref=e644]
+    - generic [ref=e645]:
+      - generic [ref=e646]:
+        - generic [ref=e647]: Name
+        - textbox "e.g., Production, Dev, Local" [ref=e648]
+      - generic [ref=e649]:
+        - generic [ref=e650]: Server URL
+        - textbox "e.g., http://localhost:4096" [ref=e651]
+        - paragraph [ref=e652]: The base URL of your OpenCode backend
+      - generic [ref=e653]:
+        - generic [ref=e654]:
+          - generic [ref=e655]: Username (optional)
+          - textbox "opencode" [ref=e656]
+        - generic [ref=e657]:
+          - generic [ref=e658]: Password
+          - textbox "Leave blank for no auth" [ref=e659]
+    - generic [ref=e660]:
+      - button "Cancel" [ref=e661] [cursor=pointer]
+      - button "Add" [disabled] [ref=e662]

@@ -1,0 +1,56 @@
+- generic [ref=e3]:
+  - button "Switch Server" [ref=e5] [cursor=pointer]:
+    - img [ref=e6]
+    - generic "Local" [ref=e9]
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16]: Settings Menu
+      - generic [ref=e17]:
+        - combobox [ref=e18]:
+          - option "Providers (Global)"
+          - option "Git (Global)"
+          - option "MCP Servers (Global + Project)"
+          - option "Prompts (Project)"
+          - option "Instructions (Project)"
+          - option "Project Config (Project)" [selected]
+          - option "Appearance"
+          - option "Sounds"
+          - option "Servers"
+        - img
+    - generic [ref=e19]:
+      - img [ref=e20]
+      - generic [ref=e22]: "Project: /home/sgallat/pk-opencode-webui"
+    - generic [ref=e83]:
+      - banner [ref=e84]:
+        - generic [ref=e86]:
+          - heading "Project Config" [level=1] [ref=e87]
+          - paragraph [ref=e88]: Configure permissions, model defaults, and tool access for this project
+        - generic [ref=e89]:
+          - img [ref=e90]
+          - generic [ref=e92]:
+            - text: Saved to
+            - code [ref=e93]: opencode.json
+            - text: in your project (/home/sgallat/pk-opencode-webui)
+      - generic [ref=e94]:
+        - button "Form" [ref=e95] [cursor=pointer]:
+          - img [ref=e96]
+          - text: Form
+        - button "JSON" [ref=e99] [cursor=pointer]:
+          - img [ref=e100]
+          - text: JSON
+      - generic [ref=e103]:
+        - img [ref=e104]
+        - generic [ref=e121]: Loading configuration...
+  - navigation [ref=e61]:
+    - button "Chat" [ref=e62] [cursor=pointer]:
+      - img [ref=e63]
+      - generic [ref=e65]: Chat
+    - button "Sessions" [ref=e66] [cursor=pointer]:
+      - img [ref=e67]
+      - generic [ref=e69]: Sessions
+    - button "Review" [ref=e70] [cursor=pointer]:
+      - img [ref=e71]
+      - generic [ref=e76]: Review
+    - button "Settings" [ref=e77] [cursor=pointer]:
+      - img [ref=e78]
+      - generic [ref=e81]: Settings

@@ -1,0 +1,52 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - link "Gmail" [ref=e8] [cursor=pointer]:
+          - /url: https://mail.google.com/mail/&ogbl
+        - link "ค้นหารูปภาพ" [ref=e10] [cursor=pointer]:
+          - /url: https://www.google.com/imghp?hl=th&ogbl
+          - text: ค้นรูป
+      - button "แอป Google" [ref=e13] [cursor=pointer]:
+        - img [ref=e14]
+      - link "เข้าสู่ระบบ" [ref=e18] [cursor=pointer]:
+        - /url: https://accounts.google.com/ServiceLogin?hl=th&passive=true&continue=https://www.google.com/&ec=futura_exp_og_so_72776762_e
+  - img "Google" [ref=e21]
+  - search [ref=e29]:
+    - generic [ref=e31]:
+      - generic [ref=e33]:
+        - img [ref=e37]
+        - combobox "ค้นหา" [active] [ref=e40]
+        - generic [ref=e42]:
+          - button "เครื่องมือป้อนข้อมูล" [ref=e43] [cursor=pointer]:
+            - img [ref=e45]
+          - button "ค้นหาด้วยเสียง" [ref=e47] [cursor=pointer]:
+            - img [ref=e48]
+          - button "ค้นหาจากภาพ" [ref=e50] [cursor=pointer]:
+            - img [ref=e51]
+      - generic [ref=e54]:
+        - button "ค้นหาด้วย Google" [ref=e55] [cursor=pointer]
+        - button "ดีใจจัง ค้นแล้วเจอเลย" [ref=e56] [cursor=pointer]
+  - generic [ref=e59]:
+    - text: "แสดง Google ใน:"
+    - link "English" [ref=e60] [cursor=pointer]:
+      - /url: https://www.google.com/setprefs?sig=0_WXeDB9iTWr5Yksdc1ep75i7CWdc%3D&hl=en&source=homepage&sa=X&ved=0ahUKEwj86dXJja6UAxW_CbwBHSCgENEQ2ZgBCBU
+  - contentinfo [ref=e62]:
+    - generic [ref=e63]: ไทย
+    - generic [ref=e64]:
+      - generic [ref=e65]:
+        - link "เกี่ยวกับ" [ref=e66] [cursor=pointer]:
+          - /url: https://about.google/?utm_source=google-TH&utm_medium=referral&utm_campaign=hp-footer&fg=1
+        - link "โฆษณา" [ref=e67] [cursor=pointer]:
+          - /url: https://www.google.com/intl/th_th/ads/?subid=ww-ww-et-g-awa-a-g_hpafoot1_1!o2&utm_source=google.com&utm_medium=referral&utm_campaign=google_hpafooter&fg=1
+        - link "ธุรกิจ" [ref=e68] [cursor=pointer]:
+          - /url: https://www.google.com/services/?subid=ww-ww-et-g-awa-a-g_hpbfoot1_1!o2&utm_source=google.com&utm_medium=referral&utm_campaign=google_hpbfooter&fg=1
+        - link "วิธีการทำงานของ Search" [ref=e69] [cursor=pointer]:
+          - /url: https://google.com/search/howsearchworks/?fg=1
+      - generic [ref=e70]:
+        - link "ความเป็นส่วนตัว" [ref=e71] [cursor=pointer]:
+          - /url: https://policies.google.com/privacy?hl=th&fg=1
+        - link "ข้อกำหนด" [ref=e72] [cursor=pointer]:
+          - /url: https://policies.google.com/terms?hl=th&fg=1
+        - button "การตั้งค่า" [ref=e76] [cursor=pointer]:
+          - generic [ref=e77]: การตั้งค่า

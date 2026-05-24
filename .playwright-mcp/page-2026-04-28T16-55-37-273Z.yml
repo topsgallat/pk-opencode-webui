@@ -1,0 +1,88 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - button "Open Project" [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+      - button "Open Project" [ref=e10] [cursor=pointer]:
+        - img [ref=e11]
+      - generic [ref=e12]:
+        - 'button "Terminal (Ctrl+`)" [ref=e13] [cursor=pointer]':
+          - img [ref=e14]
+        - generic [ref=e17]:
+          - 'button "Server: Local" [ref=e18] [cursor=pointer]':
+            - img [ref=e19]
+          - button "Local http://127.0.0.1:4096" [ref=e56] [cursor=pointer]:
+            - img [ref=e57]
+            - generic [ref=e59]:
+              - generic [ref=e60]: Local
+              - generic [ref=e61]: http://127.0.0.1:4096
+        - button "Settings" [ref=e22] [cursor=pointer]:
+          - img [ref=e23]
+    - main [ref=e27]:
+      - generic [ref=e62]:
+        - generic [ref=e63]: "PATCH LOADED: Settings patch is active"
+        - generic [ref=e64]:
+          - generic [ref=e65]: Settings
+          - generic [ref=e66]:
+            - button "Providers Global" [ref=e67] [cursor=pointer]:
+              - img [ref=e68]
+              - generic [ref=e70]: Providers
+              - generic [ref=e71]: Global
+            - button "Git Global" [ref=e72] [cursor=pointer]:
+              - img [ref=e73]
+              - generic [ref=e77]: Git
+              - generic [ref=e78]: Global
+            - button "MCP Servers Global + Project" [ref=e79] [cursor=pointer]:
+              - img [ref=e80]
+              - generic [ref=e83]: MCP Servers
+              - generic [ref=e84]: Global + Project
+            - button "Prompts" [ref=e85] [cursor=pointer]:
+              - img [ref=e86]
+              - generic [ref=e88]: Prompts
+            - button "Instructions" [ref=e89] [cursor=pointer]:
+              - img [ref=e90]
+              - generic [ref=e92]: Instructions
+            - button "Appearance" [ref=e93] [cursor=pointer]:
+              - img [ref=e94]
+              - generic [ref=e100]: Appearance
+            - button "Sounds" [ref=e101] [cursor=pointer]:
+              - img [ref=e102]
+              - generic [ref=e106]: Sounds
+            - button "Servers" [ref=e107] [cursor=pointer]:
+              - img [ref=e108]
+              - generic [ref=e111]: Servers
+        - generic [ref=e611]:
+          - generic [ref=e612]:
+            - heading "OpenCode Servers" [level=1] [ref=e613]
+            - paragraph [ref=e614]: Manage connections to multiple OpenCode server instances
+          - generic [ref=e615]:
+            - generic [ref=e616]:
+              - heading "Servers (1)" [level=2] [ref=e617]
+              - button "+ Add Server" [active] [ref=e618] [cursor=pointer]
+            - generic [ref=e620]:
+              - generic [ref=e621]:
+                - generic [ref=e622]:
+                  - generic [ref=e623]: Local
+                  - generic [ref=e624]: Default
+                - paragraph [ref=e625]: http://127.0.0.1:4096
+              - generic [ref=e626]:
+                - button "Edit server" [ref=e627] [cursor=pointer]:
+                  - img [ref=e628]
+                - button "Delete server" [ref=e631] [cursor=pointer]:
+                  - img [ref=e632]
+          - generic [ref=e635]:
+            - heading "About Servers" [level=3] [ref=e636]
+            - paragraph [ref=e637]: Add multiple OpenCode servers to switch between them. Each server maintains its own providers, projects, and configuration.
+  - generic [ref=e639]:
+    - heading "Add Server" [level=2] [ref=e640]
+    - generic [ref=e641]:
+      - generic [ref=e642]:
+        - generic [ref=e643]: Name
+        - textbox "e.g., Production, Dev, Local" [ref=e644]
+      - generic [ref=e645]:
+        - generic [ref=e646]: Server URL
+        - textbox "e.g., http://localhost:4096" [ref=e647]
+        - paragraph [ref=e648]: The base URL of your OpenCode server
+    - generic [ref=e649]:
+      - button "Cancel" [ref=e650] [cursor=pointer]
+      - button "Add" [disabled] [ref=e651]

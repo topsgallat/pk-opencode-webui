@@ -1,0 +1,478 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Home" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - generic [ref=e9]:
+      - generic ".github" [ref=e10] [cursor=pointer]:
+        - generic [ref=e12]: G
+      - generic "pk-opencode-webui" [ref=e13] [cursor=pointer]:
+        - generic [ref=e15]: PO
+      - button "Open Project" [ref=e16] [cursor=pointer]:
+        - img [ref=e17]
+    - generic [ref=e18]:
+      - 'button "Terminal (Ctrl+`)" [ref=e19] [cursor=pointer]':
+        - img [ref=e20]
+      - generic [ref=e23]:
+        - 'button "Server: Local" [ref=e24] [cursor=pointer]':
+          - img [ref=e25]
+        - generic "Local" [ref=e28]
+      - button "Settings" [ref=e29] [cursor=pointer]:
+        - img [ref=e30]
+      - button "Server Logs" [ref=e33] [cursor=pointer]:
+        - img [ref=e34]
+  - navigation "Session list":
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e40]: PO
+        - generic [ref=e41]:
+          - generic [ref=e42]: pk-opencode-webui
+          - generic [ref=e43]: ~/pk-opencode-webui
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e44] [cursor=pointer]:
+          - img [ref=e45]
+      - button "New Session" [ref=e49] [cursor=pointer]:
+        - img [ref=e50]
+        - generic [ref=e51]: New Session
+      - generic [ref=e53]:
+        - img [ref=e54]
+        - textbox "Search sessions" [ref=e57]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]:
+          - img
+      - listbox "Sessions" [ref=e58]:
+        - generic [ref=e187]:
+          - text: Today
+          - generic [ref=e188]:
+            - option "ตั้งค่าเปิด/ปิดโมเดล ยกเลิกเชื่อมต่อ และ custom provider ใน Settings" [ref=e189]:
+              - link "ตั้งค่าเปิด/ปิดโมเดล ยกเลิกเชื่อมต่อ และ custom provider ใน Settings" [ref=e190] [cursor=pointer]:
+                - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aQ/session/ses_2042af4b3ffeHz4GsKPLTsvf6w
+                - img [ref=e192]
+                - generic [ref=e195]: ตั้งค่าเปิด/ปิดโมเดล ยกเลิกเชื่อมต่อ และ custom provider ใน Settings
+            - option "Support multiple opencode servers" [ref=e196]:
+              - link "Support multiple opencode servers" [ref=e197] [cursor=pointer]:
+                - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aQ/session/ses_2319d759fffeZh7fKG8Hlp8ckK
+                - img [ref=e199]
+                - generic [ref=e202]: Support multiple opencode servers
+            - option "เพิ่มฟีเจอร์พรีวิวไฟล์ .md ก่อนแก้ไข" [ref=e203]:
+              - link "เพิ่มฟีเจอร์พรีวิวไฟล์ .md ก่อนแก้ไข" [ref=e204] [cursor=pointer]:
+                - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aQ/session/ses_2321c1342ffequgNPPC985Qp1W
+                - img [ref=e206]
+                - generic [ref=e209]: เพิ่มฟีเจอร์พรีวิวไฟล์ .md ก่อนแก้ไข
+            - option "pk-opencode-webui chat UI failing to initialize" [ref=e210]:
+              - link "pk-opencode-webui chat UI failing to initialize" [ref=e211] [cursor=pointer]:
+                - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aQ/session/ses_20701d4e9ffe0rkypPOZx6SFk5
+                - img [ref=e213]
+                - generic [ref=e216]: pk-opencode-webui chat UI failing to initialize
+        - generic [ref=e217]:
+          - text: Yesterday
+          - generic [ref=e218]:
+            - option "ปรับสีตัวหนังสือใน dark mode" [ref=e219]:
+              - link "ปรับสีตัวหนังสือใน dark mode" [ref=e220] [cursor=pointer]:
+                - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aQ/session/ses_21b6b87deffe662qvjA0hzBGRS
+                - img [ref=e222]
+                - generic [ref=e225]: ปรับสีตัวหนังสือใน dark mode
+            - option "ปรับปรุง Project Picker มือถือ เพิ่มการเลื่อน (scroll)" [ref=e226]:
+              - link "ปรับปรุง Project Picker มือถือ เพิ่มการเลื่อน (scroll)" [ref=e227] [cursor=pointer]:
+                - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aQ/session/ses_207515ee8ffeEBUcUtZ4jw34C5
+                - img [ref=e229]
+                - generic [ref=e232]: ปรับปรุง Project Picker มือถือ เพิ่มการเลื่อน (scroll)
+            - option "ปรับปรุง UI แชทมือถือ ให้เลื่อนตารางกว้าง" [ref=e233]:
+              - link "ปรับปรุง UI แชทมือถือ ให้เลื่อนตารางกว้าง" [ref=e234] [cursor=pointer]:
+                - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aQ/session/ses_21175d5cfffe4M1ix3a3cvCTPr
+                - img [ref=e236]
+                - generic [ref=e239]: ปรับปรุง UI แชทมือถือ ให้เลื่อนตารางกว้าง
+            - option "Environment variable hostname in serve-ui.ts on line 160" [ref=e240]:
+              - link "Environment variable hostname in serve-ui.ts on line 160" [ref=e241] [cursor=pointer]:
+                - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aQ/session/ses_223d1e3d4ffe4RALeRwuapGl4d
+                - img [ref=e243]
+                - generic [ref=e246]: Environment variable hostname in serve-ui.ts on line 160
+            - option "New session - 2026-04-30T07:03:48.148Z" [ref=e247]:
+              - link "New session - 2026-04-30T07:03:48.148Z" [ref=e248] [cursor=pointer]:
+                - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aQ/session/ses_222cc934bffex8ezj4cKZoFPwv
+                - img [ref=e250]
+                - generic [ref=e253]: New session - 2026-04-30T07:03:48.148Z
+        - generic [ref=e254]:
+          - text: Last 7 days
+          - option "New session - 2026-04-27T07:42:35.540Z" [ref=e256]:
+            - link "New session - 2026-04-27T07:42:35.540Z" [ref=e257] [cursor=pointer]:
+              - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aQ/session/ses_2321c23ebffe2QjHwlPG5DCnWB
+              - img [ref=e259]
+              - generic [ref=e262]: New session - 2026-04-27T07:42:35.540Z
+        - generic [ref=e263]:
+          - text: Older
+          - option "New session - 2026-04-27T05:20:18.015Z" [ref=e265]:
+            - link "New session - 2026-04-27T05:20:18.015Z" [ref=e266] [cursor=pointer]:
+              - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aQ/session/ses_2329e69a1ffe5LSUGEuueUJ5Ev
+              - img [ref=e268]
+              - generic [ref=e271]: New session - 2026-04-27T05:20:18.015Z
+      - generic [ref=e273]: 3 provider(s)
+  - main [ref=e83]:
+    - generic [ref=e84]:
+      - generic [ref=e85]: "PATCH LOADED: Settings patch is active"
+      - generic [ref=e86]:
+        - generic [ref=e87]: Settings
+        - generic "/home/sgallat/pk-opencode-webui" [ref=e88]: pk-opencode-webui
+        - generic [ref=e89]:
+          - button "Providers Global" [ref=e90] [cursor=pointer]:
+            - img [ref=e91]
+            - generic [ref=e93]: Providers
+            - generic [ref=e94]: Global
+          - button "Git Global" [ref=e95] [cursor=pointer]:
+            - img [ref=e96]
+            - generic [ref=e100]: Git
+            - generic [ref=e101]: Global
+          - button "MCP Servers Global + Project" [ref=e102] [cursor=pointer]:
+            - img [ref=e103]
+            - generic [ref=e106]: MCP Servers
+            - generic [ref=e107]: Global + Project
+          - button "Prompts Project" [ref=e108] [cursor=pointer]:
+            - img [ref=e109]
+            - generic [ref=e111]: Prompts
+            - generic [ref=e112]: Project
+          - button "Instructions Project" [ref=e113] [cursor=pointer]:
+            - img [ref=e114]
+            - generic [ref=e116]: Instructions
+            - generic [ref=e117]: Project
+          - button "Project Config Project" [active] [ref=e118] [cursor=pointer]:
+            - img [ref=e119]
+            - generic [ref=e122]: Project Config
+            - generic [ref=e123]: Project
+          - button "Appearance" [ref=e124] [cursor=pointer]:
+            - img [ref=e125]
+            - generic [ref=e131]: Appearance
+          - button "Sounds" [ref=e132] [cursor=pointer]:
+            - img [ref=e133]
+            - generic [ref=e137]: Sounds
+          - button "Servers" [ref=e138] [cursor=pointer]:
+            - img [ref=e139]
+            - generic [ref=e142]: Servers
+      - generic [ref=e144]:
+        - generic [ref=e145]:
+          - img [ref=e146]
+          - generic [ref=e148]: "Project: /home/sgallat/pk-opencode-webui"
+        - generic [ref=e775]:
+          - generic [ref=e776]:
+            - generic [ref=e778]:
+              - heading "Project Config" [level=1] [ref=e779]
+              - paragraph [ref=e780]: Configure permissions, model defaults, and tool access for this project
+            - generic [ref=e781]:
+              - img [ref=e782]
+              - generic [ref=e784]:
+                - text: Saved to
+                - code [ref=e785]: opencode.json
+                - text: in your project (/home/sgallat/pk-opencode-webui)
+          - generic [ref=e786]:
+            - button "Form" [ref=e787] [cursor=pointer]:
+              - img [ref=e788]
+              - text: Form
+            - button "JSON" [ref=e791] [cursor=pointer]:
+              - img [ref=e792]
+              - text: JSON
+          - generic [ref=e795]:
+            - generic [ref=e796]:
+              - generic [ref=e797]:
+                - img [ref=e798]
+                - heading "Permissions" [level=2] [ref=e800]
+              - generic [ref=e801]:
+                - generic [ref=e803]:
+                  - button "Read Files" [ref=e804] [cursor=pointer]:
+                    - img [ref=e805]
+                    - text: Read Files
+                  - generic [ref=e807]:
+                    - button "allow" [ref=e808] [cursor=pointer]
+                    - button "ask" [ref=e809] [cursor=pointer]
+                    - button "deny" [ref=e810] [cursor=pointer]
+                - generic [ref=e812]:
+                  - button "Edit Files" [ref=e813] [cursor=pointer]:
+                    - img [ref=e814]
+                    - text: Edit Files
+                  - generic [ref=e816]:
+                    - button "allow" [ref=e817] [cursor=pointer]
+                    - button "ask" [ref=e818] [cursor=pointer]
+                    - button "deny" [ref=e819] [cursor=pointer]
+                - generic [ref=e821]:
+                  - button "Bash Commands" [ref=e822] [cursor=pointer]:
+                    - img [ref=e823]
+                    - text: Bash Commands
+                  - generic [ref=e825]:
+                    - button "allow" [ref=e826] [cursor=pointer]
+                    - button "ask" [ref=e827] [cursor=pointer]
+                    - button "deny" [ref=e828] [cursor=pointer]
+                - generic [ref=e830]:
+                  - button "Glob Search" [ref=e831] [cursor=pointer]:
+                    - img [ref=e832]
+                    - text: Glob Search
+                  - generic [ref=e834]:
+                    - button "allow" [ref=e835] [cursor=pointer]
+                    - button "ask" [ref=e836] [cursor=pointer]
+                    - button "deny" [ref=e837] [cursor=pointer]
+                - generic [ref=e839]:
+                  - button "Grep Search" [ref=e840] [cursor=pointer]:
+                    - img [ref=e841]
+                    - text: Grep Search
+                  - generic [ref=e843]:
+                    - button "allow" [ref=e844] [cursor=pointer]
+                    - button "ask" [ref=e845] [cursor=pointer]
+                    - button "deny" [ref=e846] [cursor=pointer]
+                - generic [ref=e848]:
+                  - button "List Files" [ref=e849] [cursor=pointer]:
+                    - img [ref=e850]
+                    - text: List Files
+                  - generic [ref=e852]:
+                    - button "allow" [ref=e853] [cursor=pointer]
+                    - button "ask" [ref=e854] [cursor=pointer]
+                    - button "deny" [ref=e855] [cursor=pointer]
+                - generic [ref=e857]:
+                  - generic [ref=e858]: Web Fetch
+                  - generic [ref=e859]:
+                    - button "allow" [ref=e860] [cursor=pointer]
+                    - button "ask" [ref=e861] [cursor=pointer]
+                    - button "deny" [ref=e862] [cursor=pointer]
+                - generic [ref=e864]:
+                  - button "Task (Sub-agent)" [ref=e865] [cursor=pointer]:
+                    - img [ref=e866]
+                    - text: Task (Sub-agent)
+                  - generic [ref=e868]:
+                    - button "allow" [ref=e869] [cursor=pointer]
+                    - button "ask" [ref=e870] [cursor=pointer]
+                    - button "deny" [ref=e871] [cursor=pointer]
+                - generic [ref=e873]:
+                  - generic [ref=e874]: Todo Write
+                  - generic [ref=e875]:
+                    - button "allow" [ref=e876] [cursor=pointer]
+                    - button "ask" [ref=e877] [cursor=pointer]
+                    - button "deny" [ref=e878] [cursor=pointer]
+                - generic [ref=e880]:
+                  - generic [ref=e881]: Todo Read
+                  - generic [ref=e882]:
+                    - button "allow" [ref=e883] [cursor=pointer]
+                    - button "ask" [ref=e884] [cursor=pointer]
+                    - button "deny" [ref=e885] [cursor=pointer]
+                - generic [ref=e887]:
+                  - generic [ref=e888]: Question
+                  - generic [ref=e889]:
+                    - button "allow" [ref=e890] [cursor=pointer]
+                    - button "ask" [ref=e891] [cursor=pointer]
+                    - button "deny" [ref=e892] [cursor=pointer]
+                - generic [ref=e894]:
+                  - generic [ref=e895]: Web Search
+                  - generic [ref=e896]:
+                    - button "allow" [ref=e897] [cursor=pointer]
+                    - button "ask" [ref=e898] [cursor=pointer]
+                    - button "deny" [ref=e899] [cursor=pointer]
+                - generic [ref=e901]:
+                  - generic [ref=e902]: Code Search
+                  - generic [ref=e903]:
+                    - button "allow" [ref=e904] [cursor=pointer]
+                    - button "ask" [ref=e905] [cursor=pointer]
+                    - button "deny" [ref=e906] [cursor=pointer]
+                - generic [ref=e908]:
+                  - button "LSP" [ref=e909] [cursor=pointer]:
+                    - img [ref=e910]
+                    - text: LSP
+                  - generic [ref=e912]:
+                    - button "allow" [ref=e913] [cursor=pointer]
+                    - button "ask" [ref=e914] [cursor=pointer]
+                    - button "deny" [ref=e915] [cursor=pointer]
+                - generic [ref=e917]:
+                  - button "Skill" [ref=e918] [cursor=pointer]:
+                    - img [ref=e919]
+                    - text: Skill
+                  - generic [ref=e921]:
+                    - button "allow" [ref=e922] [cursor=pointer]
+                    - button "ask" [ref=e923] [cursor=pointer]
+                    - button "deny" [ref=e924] [cursor=pointer]
+            - generic [ref=e925]:
+              - generic [ref=e926]:
+                - img [ref=e927]
+                - heading "Model Defaults" [level=2] [ref=e930]
+              - generic [ref=e931]:
+                - generic [ref=e932]:
+                  - generic [ref=e933]: Default Model
+                  - combobox [ref=e934]:
+                    - option "Use system default" [selected]
+                    - option "OpenCode Zen / GPT-5 Nano"
+                    - option "OpenCode Zen / MiniMax M2.5 Free"
+                    - option "OpenCode Zen / Big Pickle"
+                    - option "OpenCode Zen / Hy3 preview Free"
+                    - option "OpenCode Zen / Nemotron 3 Super Free"
+                    - option "GitHub Copilot / Gemini 3.1 Pro Preview"
+                    - option "GitHub Copilot / Gemini 3 Flash"
+                    - option "GitHub Copilot / GPT-5-mini"
+                    - option "GitHub Copilot / GPT-5.3-Codex"
+                    - option "GitHub Copilot / Gemini 2.5 Pro"
+                    - option "GitHub Copilot / GPT-5.2"
+                    - option "GitHub Copilot / GPT-5.4 Mini"
+                    - option "GitHub Copilot / GPT-5.2-Codex"
+                    - option "GitHub Copilot / Claude Sonnet 4"
+                    - option "GitHub Copilot / Grok Code Fast 1"
+                    - option "GitHub Copilot / Claude Sonnet 4.5"
+                    - option "GitHub Copilot / Claude Opus 4.5"
+                    - option "GitHub Copilot / GPT-5.4"
+                    - option "GitHub Copilot / GPT-4o"
+                    - option "GitHub Copilot / Claude Haiku 4.5"
+                    - option "GitHub Copilot / GPT-4.1"
+                    - option "GitHub Copilot / Claude Sonnet 4.6"
+                    - option "Nvidia / FLUX.1-dev"
+                    - option "Nvidia / Step 3.5 Flash"
+                    - option "Nvidia / Codestral 22b Instruct V0.1"
+                    - option "Nvidia / Mistral Large 3 675B Instruct 2512"
+                    - option "Nvidia / Devstral-2-123B-Instruct-2512"
+                    - option "Nvidia / Ministral 3 14B Instruct 2512"
+                    - option "Nvidia / Mistral Small 3.1 24b Instruct 2503"
+                    - option "Nvidia / Mamba Codestral 7b V0.1"
+                    - option "Nvidia / Mistral Large 2 Instruct"
+                    - option "Nvidia / Phi 3 Medium 4k Instruct"
+                    - option "Nvidia / Phi 3.5 Moe Instruct"
+                    - option "Nvidia / Phi-4-Mini"
+                    - option "Nvidia / Phi 3 Small 8k Instruct"
+                    - option "Nvidia / Phi 3 Vision 128k Instruct"
+                    - option "Nvidia / Phi 3.5 Vision Instruct"
+                    - option "Nvidia / Phi 3 Small 128k Instruct"
+                    - option "Nvidia / Phi 3 Medium 128k Instruct"
+                    - option "Nvidia / Nemotron 3 Nano Omni"
+                    - option "Nvidia / Llama 3.3 Nemotron Super 49b V1"
+                    - option "Nvidia / Nemotron 4 340b Instruct"
+                    - option "Nvidia / Llama3 Chatqa 1.5 70b"
+                    - option "Nvidia / Llama 3.3 Nemotron Super 49b V1.5"
+                    - option "Nvidia / Nemotron 3 Super"
+                    - option "Nvidia / Parakeet TDT 0.6B v2"
+                    - option "Nvidia / nemotron-3-nano-30b-a3b"
+                    - option "Nvidia / Llama-3.1-Nemotron-Ultra-253B-v1"
+                    - option "Nvidia / nvidia-nemotron-nano-9b-v2"
+                    - option "Nvidia / Cosmos Nemotron 34B"
+                    - option "Nvidia / Llama Embed Nemotron 8B"
+                    - option "Nvidia / Llama 3.1 Nemotron 51b Instruct"
+                    - option "Nvidia / Llama 3.1 Nemotron 70b Instruct"
+                    - option "Nvidia / NeMo Retriever OCR v1"
+                    - option "Nvidia / Deepseek R1"
+                    - option "Nvidia / DeepSeek V3.1"
+                    - option "Nvidia / Deepseek Coder 6.7b Instruct"
+                    - option "Nvidia / DeepSeek V3.2"
+                    - option "Nvidia / Deepseek R1 0528"
+                    - option "Nvidia / DeepSeek V3.1 Terminus"
+                    - option "Nvidia / Whisper Large v3"
+                    - option "Nvidia / GPT-OSS-120B"
+                    - option "Nvidia / MiniMax-M2.7"
+                    - option "Nvidia / MiniMax-M2.1"
+                    - option "Nvidia / MiniMax-M2.5"
+                    - option "Nvidia / GLM-4.7"
+                    - option "Nvidia / GLM5"
+                    - option "Nvidia / GLM-5.1"
+                    - option "Nvidia / Llama 4 Scout 17b 16e Instruct"
+                    - option "Nvidia / Llama 3.3 70b Instruct"
+                    - option "Nvidia / Llama3 8b Instruct"
+                    - option "Nvidia / Llama3 70b Instruct"
+                    - option "Nvidia / Codellama 70b"
+                    - option "Nvidia / Llama 3.2 11b Vision Instruct"
+                    - option "Nvidia / Llama 3.1 70b Instruct"
+                    - option "Nvidia / Llama 3.2 1b Instruct"
+                    - option "Nvidia / Llama 4 Maverick 17b 128e Instruct"
+                    - option "Nvidia / Llama 3.1 405b Instruct"
+                    - option "Nvidia / Qwen3-235B-A22B"
+                    - option "Nvidia / Qwen2.5 Coder 7b Instruct"
+                    - option "Nvidia / Qwen2.5 Coder 32b Instruct"
+                    - option "Nvidia / Qwen3.5-397B-A17B"
+                    - option "Nvidia / Qwen3-Next-80B-A3B-Thinking"
+                    - option "Nvidia / Qwq 32b"
+                    - option "Nvidia / Qwen3-Next-80B-A3B-Instruct"
+                    - option "Nvidia / Qwen3 Coder 480B A35B Instruct"
+                    - option "Nvidia / Gemma 2 2b It"
+                    - option "Nvidia / Gemma 3n E4b It"
+                    - option "Nvidia / Gemma 3 1b It"
+                    - option "Nvidia / Codegemma 7b"
+                    - option "Nvidia / Gemma-4-31B-IT"
+                    - option "Nvidia / Gemma 3 12b It"
+                    - option "Nvidia / Codegemma 1.1 7b"
+                    - option "Nvidia / Gemma 3n E2b It"
+                    - option "Nvidia / Gemma 2 27b It"
+                    - option "Nvidia / Gemma-3-27B-IT"
+                    - option "Nvidia / Kimi K2.5"
+                    - option "Nvidia / Kimi K2 Instruct"
+                    - option "Nvidia / Kimi K2.6"
+                    - option "Nvidia / Kimi K2 0905"
+                    - option "Nvidia / Kimi K2 Thinking"
+                    - option "Nvidia / Mistral Medium 3.5 128B"
+                    - option "Nvidia / DeepSeek V4 Flash"
+                    - option "Nvidia / DeepSeek V4 Pro"
+                  - paragraph [ref=e935]:
+                    - text: "Format:"
+                    - code [ref=e936]: provider/model
+                    - text: (e.g. anthropic/claude-sonnet-4-5)
+                - generic [ref=e937]:
+                  - generic [ref=e938]: Default Agent
+                  - combobox [ref=e939]:
+                    - option "Use system default"
+                    - option "Pentesters Sisyphus - Engagement Lead" [selected]
+                    - option "Pentesters Hephaestus - Exploit Validation"
+                    - option "Pentesters Prometheus - Engagement Planner"
+                    - option "Pentesters Atlas - Workflow Coordinator"
+                    - option "Sisyphus - Ultraworker"
+                    - option "Hephaestus - Deep Agent"
+                    - option "Prometheus - Plan Builder"
+                    - option "Atlas - Plan Executor"
+                    - option "Metis - Plan Consultant"
+                    - option "Momus - Plan Critic"
+                    - option "Pentesters Argus - Web App Validator"
+                    - option "Pentesters Explore - Asset Mapper"
+                    - option "Pentesters Librarian - Reference Recon"
+                    - option "Pentesters Metis - Scope Analyst"
+                    - option "Pentesters Momus - Report QA Critic"
+                    - option "Pentesters Multimodal Looker - Evidence Curator"
+                    - option "Pentesters Oracle - Retest Reviewer"
+                    - option "Pentesters Sisyphus-Junior - Scoped Executor"
+                    - option "Sisyphus-Junior"
+                    - option "explore"
+                    - option "general"
+                    - option "librarian"
+                    - option "multimodal-looker"
+                    - option "oracle"
+            - generic [ref=e940]:
+              - generic [ref=e941]:
+                - img [ref=e942]
+                - heading "Tool Access" [level=2] [ref=e944]
+              - generic [ref=e945]:
+                - generic [ref=e946]:
+                  - generic [ref=e947]: Bash
+                  - switch "Toggle Bash access" [checked] [ref=e948] [cursor=pointer]
+                - generic [ref=e950]:
+                  - generic [ref=e951]: Web Fetch
+                  - switch "Toggle Web Fetch access" [checked] [ref=e952] [cursor=pointer]
+                - generic [ref=e954]:
+                  - generic [ref=e955]: Web Search
+                  - switch "Toggle Web Search access" [checked] [ref=e956] [cursor=pointer]
+                - generic [ref=e958]:
+                  - generic [ref=e959]: Code Search
+                  - switch "Toggle Code Search access" [checked] [ref=e960] [cursor=pointer]
+                - generic [ref=e962]:
+                  - generic [ref=e963]: Glob
+                  - switch "Toggle Glob access" [checked] [ref=e964] [cursor=pointer]
+                - generic [ref=e966]:
+                  - generic [ref=e967]: Grep
+                  - switch "Toggle Grep access" [checked] [ref=e968] [cursor=pointer]
+                - generic [ref=e970]:
+                  - generic [ref=e971]: Read
+                  - switch "Toggle Read access" [checked] [ref=e972] [cursor=pointer]
+                - generic [ref=e974]:
+                  - generic [ref=e975]: Edit
+                  - switch "Toggle Edit access" [checked] [ref=e976] [cursor=pointer]
+                - generic [ref=e978]:
+                  - generic [ref=e979]: List
+                  - switch "Toggle List access" [checked] [ref=e980] [cursor=pointer]
+                - generic [ref=e982]:
+                  - generic [ref=e983]: Task
+                  - switch "Toggle Task access" [checked] [ref=e984] [cursor=pointer]
+                - generic [ref=e986]:
+                  - generic [ref=e987]: Todo Write
+                  - switch "Toggle Todo Write access" [checked] [ref=e988] [cursor=pointer]
+                - generic [ref=e990]:
+                  - generic [ref=e991]: Todo Read
+                  - switch "Toggle Todo Read access" [checked] [ref=e992] [cursor=pointer]
+                - generic [ref=e994]:
+                  - generic [ref=e995]: Question
+                  - switch "Toggle Question access" [checked] [ref=e996] [cursor=pointer]
+                - generic [ref=e998]:
+                  - generic [ref=e999]: LSP
+                  - switch "Toggle LSP access" [checked] [ref=e1000] [cursor=pointer]
+                - generic [ref=e1002]:
+                  - generic [ref=e1003]: Skill
+                  - switch "Toggle Skill access" [checked] [ref=e1004] [cursor=pointer]

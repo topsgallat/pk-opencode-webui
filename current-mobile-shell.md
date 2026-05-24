@@ -1,0 +1,7 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Open Project" [ref=e5] [cursor=pointer]
+    - button "Open Project" [ref=e10] [cursor=pointer]
+    - generic [ref=e12]
+  - main [ref=e27]:
+    - generic [ref=e28]

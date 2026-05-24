@@ -1,0 +1,52 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - button "Home" [ref=e6] [cursor=pointer]:
+      - img [ref=e7]
+    - generic [ref=e10]:
+      - generic "pk-opencode-webui" [ref=e11] [cursor=pointer]:
+        - generic [ref=e13]: PO
+      - button "Open Project" [ref=e14] [cursor=pointer]:
+        - img [ref=e15]
+    - generic [ref=e16]:
+      - 'button "Terminal (Ctrl+`)" [ref=e17] [cursor=pointer]':
+        - img [ref=e18]
+      - 'button "Server: Local" [ref=e22] [cursor=pointer]':
+        - img [ref=e23]
+      - button "Settings" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+      - button "Server Logs" [ref=e30] [cursor=pointer]:
+        - img [ref=e31]
+  - navigation "Session list" [ref=e34]:
+    - generic [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e38]: PO
+        - generic [ref=e39]:
+          - generic [ref=e40]: pk-opencode-webui
+          - generic [ref=e41]: ~/pk-opencode-webui
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e42] [cursor=pointer]:
+          - img [ref=e43]
+      - button "New Session" [ref=e47] [cursor=pointer]:
+        - img [ref=e48]
+        - generic [ref=e49]: New Session
+      - generic [ref=e51]:
+        - img [ref=e52]
+        - textbox "Search sessions" [ref=e55]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]:
+          - img
+      - listbox "Sessions" [ref=e56]:
+        - generic [ref=e159]:
+          - paragraph [ref=e160]: No sessions yet
+          - paragraph [ref=e161]: Click "New Session" to start
+      - generic [ref=e79]: No providers
+  - main [ref=e83]:
+    - generic [ref=e163]:
+      - img [ref=e165]
+      - generic [ref=e184]:
+        - button "New Session" [ref=e185] [cursor=pointer]:
+          - img [ref=e186]
+          - generic [ref=e187]: New Session
+        - button "Settings" [ref=e188] [cursor=pointer]:
+          - img [ref=e189]
+          - generic [ref=e192]: Settings
+      - paragraph [ref=e193]: Select a session from the sidebar or start a new one

@@ -1,0 +1,1 @@
+"Select Model\nArrow keys to navigate-Enter to select-Esc to close\nPROVIDER A\nModel A\nprovider-a/model-a\nModel B\nprovider-a/model-b\nPROVIDER B\nModel C\nprovider-b/model-c\nModel D\nprovider-b/model-d"

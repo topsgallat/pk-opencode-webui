@@ -1,0 +1,92 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Home" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - generic [ref=e9]:
+      - generic "opencode" [ref=e10] [cursor=pointer]:
+        - generic [ref=e12]: O
+      - button "Open Project" [ref=e13] [cursor=pointer]:
+        - img [ref=e14]
+    - generic [ref=e15]:
+      - 'button "Terminal (Ctrl+`)" [ref=e16] [cursor=pointer]':
+        - img [ref=e17]
+      - 'button "Server: Local" [ref=e21] [cursor=pointer]':
+        - img [ref=e22]
+      - button "Settings" [ref=e25] [cursor=pointer]:
+        - img [ref=e26]
+      - button "Server Logs" [ref=e29] [cursor=pointer]:
+        - img [ref=e30]
+  - navigation "Session list" [ref=e33]:
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - generic [ref=e37]: O
+        - generic [ref=e38]:
+          - generic [ref=e39]: opencode
+          - generic [ref=e40]: ~
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e41] [cursor=pointer]:
+          - img [ref=e42]
+      - button "New Session" [ref=e46] [cursor=pointer]:
+        - img [ref=e47]
+        - generic [ref=e48]: New Session
+      - generic [ref=e50]:
+        - img [ref=e51]
+        - textbox "Search sessions" [ref=e54]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]:
+          - img
+      - listbox "Sessions" [ref=e55]:
+        - generic [ref=e115]:
+          - text: Today
+          - option "Oh My Pentesters install guide and security-engagement.jsonc runthrough" [ref=e117]:
+            - link "Oh My Pentesters install guide and security-engagement.jsonc runthrough" [ref=e118] [cursor=pointer]:
+              - /url: /L2hvbWUvb3BlbmNvZGU/session/ses_20be909a3ffehgy5Qm7VUCpAwG
+              - img [ref=e120]
+              - generic [ref=e123]: Oh My Pentesters install guide and security-engagement.jsonc runthrough
+        - generic [ref=e124]:
+          - text: Yesterday
+          - generic [ref=e125]:
+            - 'option "Oh My Pentesters install and run: security-engagement.jsonc controls" [ref=e126]':
+              - 'link "Oh My Pentesters install and run: security-engagement.jsonc controls" [ref=e127] [cursor=pointer]':
+                - /url: /L2hvbWUvb3BlbmNvZGU/session/ses_20dafb135ffeW5PgH1C2DlVLq2
+                - img [ref=e129]
+                - generic [ref=e132]: "Oh My Pentesters install and run: security-engagement.jsonc controls"
+            - option "Oh My Pentesters setup and engagement docs guide" [ref=e133]:
+              - link "Oh My Pentesters setup and engagement docs guide" [ref=e134] [cursor=pointer]:
+                - /url: /L2hvbWUvb3BlbmNvZGU/session/ses_20d1aa728ffeORftoqmU7vWPwU
+                - img [ref=e136]
+                - generic [ref=e139]: Oh My Pentesters setup and engagement docs guide
+        - generic [ref=e140]:
+          - text: Last 7 days
+          - generic [ref=e141]:
+            - option "Playwright browser testing issue report guide (Thai)" [ref=e142]:
+              - link "Playwright browser testing issue report guide (Thai)" [ref=e143] [cursor=pointer]:
+                - /url: /L2hvbWUvb3BlbmNvZGU/session/ses_213083018fferQ8DK9xLp9PT9c
+                - img [ref=e145]
+                - generic [ref=e148]: Playwright browser testing issue report guide (Thai)
+            - option "Playwright browser accessibility test" [ref=e149]:
+              - link "Playwright browser accessibility test" [ref=e150] [cursor=pointer]:
+                - /url: /L2hvbWUvb3BlbmNvZGU/session/ses_213571f2fffeL6sxAt6YdchIZq
+                - img [ref=e152]
+                - generic [ref=e155]: Playwright browser accessibility test
+            - option "OpenCode plugin installation for LLM agents" [ref=e156]:
+              - link "OpenCode plugin installation for LLM agents" [ref=e157] [cursor=pointer]:
+                - /url: /L2hvbWUvb3BlbmNvZGU/session/ses_2138478beffefPckMXOTlwFcfo
+                - img [ref=e159]
+                - generic [ref=e162]: OpenCode plugin installation for LLM agents
+            - option "New session - 2026-05-03T06:14:54.288Z" [ref=e163]:
+              - link "New session - 2026-05-03T06:14:54.288Z" [ref=e164] [cursor=pointer]:
+                - /url: /L2hvbWUvb3BlbmNvZGU/session/ses_2138643afffevbjrWydYEiONKh
+                - img [ref=e166]
+                - generic [ref=e169]: New session - 2026-05-03T06:14:54.288Z
+      - generic [ref=e171]: 1 provider(s)
+  - main [ref=e82]:
+    - generic [ref=e84]:
+      - img [ref=e86]
+      - generic [ref=e105]:
+        - button "New Session" [ref=e106] [cursor=pointer]:
+          - img [ref=e107]
+          - generic [ref=e108]: New Session
+        - button "Settings" [ref=e109] [cursor=pointer]:
+          - img [ref=e110]
+          - generic [ref=e113]: Settings
+      - paragraph [ref=e114]: Select a session from the sidebar or start a new one

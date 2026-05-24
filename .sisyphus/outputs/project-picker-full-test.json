@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-05-01T09:06:32.979Z",
+  "baseUrl": "http://192.168.1.173:8090",
+  "consoleLogs": [
+    "[log] [OpenCode] Starting app...",
+    "[log] [OpenCode] Rendering...",
+    "[log] [Events] Connecting to SSE: http://192.168.1.173:8090/event?target=http%3A%2F%2F127.0.0.1%3A4096",
+    "[log] [OpenCode] Rendered successfully",
+    "[log] [OpenCode] Root innerHTML: <div class=\"flex h-screen\" style=\"background:var(--background-stronger)\"><div class=\"w-16 shrink-0 flex flex-col items-center\" style=\"background:var(--background-base);border-right:1px solid var(--bor",
+    "[log] [Events] Connected",
+    "[log] [Events] Received: server.connected {}",
+    "[log] [ProjectDialog] homeDirectory set to: /home/opencode",
+    "[log] [searchDirectories] input: \"\" home: /home/opencode endsWithSlash: false",
+    "[log] [getDirs] remote: key: /home/opencode home: /home/opencode toRemoteListPath: /home/opencode",
+    "[log] [getDirs] remote: response data: 0 items",
+    "[log] [getDirs] remote: filtered dirs: 0 items",
+    "[log] [searchDirectories] input: \"~/\" home: /home/opencode endsWithSlash: true",
+    "[test] Results count after ~/ : 0",
+    "[test] Has \"No matching\" message: true",
+    "[log] [searchDirectories] input: \"/\" home: /home/opencode endsWithSlash: true",
+    "[log] [getDirs] remote: key: / home: /home/opencode toRemoteListPath: /",
+    "[log] [getDirs] remote: response data: 8 items",
+    "[log] [getDirs] remote: filtered dirs: 5 items",
+    "[test] Results count after / : 5"
+  ],
+  "tildeSlashCount": 0,
+  "rootSlashCount": 5,
+  "hasNoMatchMessage": true
+}

@@ -1,0 +1,27 @@
+- dialog "Select Model" [ref=e1] [box=226,100,448,500]:
+  - generic [ref=e2] [box=227,101,446,53]:
+    - heading "Select Model" [level=2] [ref=e3] [box=243,115,102,24]
+    - button "Close" [ref=e4] [cursor=pointer] [box=629,113,28,28]:
+      - img [ref=e5] [box=633,117,20,20]
+  - generic [ref=e8] [box=227,154,446,76]:
+    - generic [ref=e9] [box=243,162,414,38]:
+      - img [ref=e10] [box=256,173,16,16]
+      - combobox "Filter models..." [expanded] [active] [ref=e13] [box=280,171,364,20]
+    - generic [ref=e14] [box=243,206,414,15]: Arrow keys to navigate-Enter to select-Esc to close
+  - listbox "Select Model" [ref=e15] [box=227,230,446,369]:
+    - generic [ref=e16] [box=227,230,446,150]:
+      - generic [ref=e17] [box=227,230,446,34]: Provider A
+      - option "Model A provider-a/model-a" [selected] [ref=e18] [cursor=pointer] [box=227,264,446,58]:
+        - generic [ref=e19] [box=246,274,411,20]: Model A
+        - generic [ref=e20] [box=246,296,411,16]: provider-a/model-a
+      - option "Model B provider-a/model-b" [ref=e21] [cursor=pointer] [box=227,322,446,58]:
+        - generic [ref=e22] [box=246,332,411,20]: Model B
+        - generic [ref=e23] [box=246,354,411,16]: provider-a/model-b
+    - generic [ref=e24] [box=227,380,446,150]:
+      - generic [ref=e25] [box=227,380,446,34]: Provider B
+      - option "Model C provider-b/model-c" [ref=e26] [cursor=pointer] [box=227,413,446,58]:
+        - generic [ref=e27] [box=246,423,411,20]: Model C
+        - generic [ref=e28] [box=246,445,411,16]: provider-b/model-c
+      - option "Model D provider-b/model-d" [ref=e29] [cursor=pointer] [box=227,471,446,58]:
+        - generic [ref=e30] [box=246,481,411,20]: Model D
+        - generic [ref=e31] [box=246,503,411,16]: provider-b/model-d

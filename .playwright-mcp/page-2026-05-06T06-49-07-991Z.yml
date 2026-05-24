@@ -1,0 +1,98 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Home" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - generic [ref=e9]:
+      - generic "pk-opencode-webui" [ref=e10] [cursor=pointer]:
+        - generic [ref=e12]: PO
+      - button "Open Project" [ref=e13] [cursor=pointer]:
+        - img [ref=e14]
+    - generic [ref=e15]:
+      - 'button "Terminal (Ctrl+`)" [ref=e16] [cursor=pointer]':
+        - img [ref=e17]
+      - generic [ref=e20]:
+        - 'button "Server: Local" [ref=e21] [cursor=pointer]':
+          - img [ref=e22]
+        - generic "Local" [ref=e25]
+      - button "Settings" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+      - button "Server Logs" [ref=e30] [cursor=pointer]:
+        - img [ref=e31]
+  - navigation "Session list":
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - generic [ref=e37]: PO
+        - generic [ref=e38]:
+          - generic [ref=e39]: pk-opencode-webui
+          - generic [ref=e40]: ~/pk-opencode-webui
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e41] [cursor=pointer]:
+          - img [ref=e42]
+      - button "New Session" [ref=e46] [cursor=pointer]:
+        - img [ref=e47]
+        - generic [ref=e48]: New Session
+      - generic [ref=e50]:
+        - img [ref=e51]
+        - textbox "Search sessions" [ref=e54]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]:
+          - img
+      - listbox "Sessions" [ref=e55]:
+        - generic [ref=e56]:
+          - paragraph [ref=e57]: No sessions yet
+          - paragraph [ref=e58]: Click "New Session" to start
+      - generic [ref=e62]: No providers
+  - main [ref=e64]:
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - generic [ref=e67]: Settings
+        - generic "/home/sgallat/pk-opencode-webui" [ref=e68]: pk-opencode-webui
+        - generic [ref=e69]:
+          - button "Providers Global" [ref=e70] [cursor=pointer]:
+            - img [ref=e71]
+            - generic [ref=e73]: Providers
+            - generic [ref=e74]: Global
+          - button "Git Global" [ref=e75] [cursor=pointer]:
+            - img [ref=e76]
+            - generic [ref=e80]: Git
+            - generic [ref=e81]: Global
+          - button "MCP Servers Global + Project" [ref=e82] [cursor=pointer]:
+            - img [ref=e83]
+            - generic [ref=e86]: MCP Servers
+            - generic [ref=e87]: Global + Project
+          - button "Prompts Project" [ref=e88] [cursor=pointer]:
+            - img [ref=e89]
+            - generic [ref=e91]: Prompts
+            - generic [ref=e92]: Project
+          - button "Instructions Project" [ref=e93] [cursor=pointer]:
+            - img [ref=e94]
+            - generic [ref=e96]: Instructions
+            - generic [ref=e97]: Project
+          - button "Project Config Project" [ref=e98] [cursor=pointer]:
+            - img [ref=e99]
+            - generic [ref=e102]: Project Config
+            - generic [ref=e103]: Project
+          - button "Appearance" [ref=e104] [cursor=pointer]:
+            - img [ref=e105]
+            - generic [ref=e111]: Appearance
+          - button "Sounds" [ref=e112] [cursor=pointer]:
+            - img [ref=e113]
+            - generic [ref=e117]: Sounds
+          - button "Servers" [ref=e118] [cursor=pointer]:
+            - img [ref=e119]
+            - generic [ref=e122]: Servers
+      - generic [ref=e124]:
+        - generic [ref=e125]:
+          - img [ref=e126]
+          - generic [ref=e128]: "Project: /home/sgallat/pk-opencode-webui"
+        - generic [ref=e129]:
+          - generic [ref=e130]:
+            - heading "Providers" [level=1] [ref=e131]
+            - paragraph [ref=e132]: Connect AI providers to enable chat functionality
+          - generic [ref=e133]:
+            - heading "Connected Providers" [level=2] [ref=e135]
+            - paragraph [ref=e137]: No providers connected yet.
+          - generic [ref=e138]:
+            - heading "Add Provider" [level=2] [ref=e140]
+            - generic [ref=e144]:
+              - img [ref=e145]
+              - textbox "Search providers..." [ref=e148]

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fullscreen Preview Test</title>
+  <script src="https://unpkg.com/solid-js@1.9.10/dist/solid.js"></script>
+  <script src="https://unpkg.com/solid-js@1.9.10/dist/web.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .button { padding: 8px 16px; margin: 4px; cursor: pointer; }
+    .overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.5); }
+    .overlay-content { width: 100%; height: 100%; background: white; position: relative; }
+    .preview { padding: 20px; max-width: 800px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <h1>Fullscreen Preview - Logic Test</h1>
+  
+  <div id="app"></div>
+  
+  <script>
+    const { createSignal, createEffect, onCleanup, Show } = Solid;
+    
+    function FileViewerTest() {
+      const [isMarkdown, setIsMarkdown] = createSignal(true);
+      const [markdownPreview, setMarkdownPreview] = createSignal(true);
+      const [htmlPreview, setHtmlPreview] = createSignal(true);
+      const [fullscreenPreview, setFullscreenPreview] = createSignal(false);
+      const [fileContent, setFileContent] = createSignal('# Test Markdown\n\nThis is a test.');
+      
+      createEffect(() => {
+        if (!fullscreenPreview()) return;
+        const handler = (e) => {
+          if (e.key === 'Escape') setFullscreenPreview(false);
+        };
+        document.addEventListener('keydown', handler);
+        onCleanup(() => document.removeEventListener('keydown', handler));
+      });
+      
+      return Solid.createMemo(() => {
+        const showMaximize = () => (isMarkdown() && markdownPreview()) || (!isMarkdown() && htmlPreview());
+        
+        return Solid.jsx(
+          'div',
+          null,
+          Solid.jsx('h2', null, 'File: test.md'),
+          Solid.jsx('div', null,
+            Solid.jsx('button', { 
+              class: 'button',
+              onClick: () => setMarkdownPreview(!markdownPreview()),
+              innerText: markdownPreview() ? 'Switch to Source' : 'Switch to Preview'
+            }),
+            Solid.jsx('button', { 
+              class: 'button',
+              onClick: () => setFullscreenPreview(true),
+              innerText: 'Maximize',
+              style: { display: showMaximize() ? 'inline-block' : 'none' }
+            })
+          ),
+          Solid.jsx(Show, { when: fullscreenPreview(), children: () => 
+            Solid.jsx('div', { class: 'overlay' },
+              Solid.jsx('div', { class: 'overlay-content' },
+                Solid.jsx('button', { 
+                  class: 'button',
+                  style: { position: 'absolute', top: '16px', right: '16px' },
+                  onClick: () => setFullscreenPreview(false),
+                  innerText: 'X'
+                }),
+                Solid.jsx('button', { 
+                  class: 'button',
+                  style: { position: 'absolute', top: '16px', right: '80px' },
+                  onClick: () => setFullscreenPreview(false),
+                  innerText: 'Minimize'
+                }),
+                Solid.jsx('div', { class: 'preview' },
+                  Solid.jsx('h3', null, 'Fullscreen Preview'),
+                  Solid.jsx('div', null, fileContent())
+                )
+              )
+            )
+          })
+        );
+      });
+    }
+    
+    const app = document.getElementById('app');
+    Solid.render(() => FileViewerTest(), app);
+    
+    console.log('Test app loaded');
+    console.log('Tests:');
+    console.log('1. Maximize button should show when markdownPreview is true');
+    console.log('2. Clicking Maximize should show fullscreen overlay');
+    console.log('3. X button should close fullscreen');
+    console.log('4. Minimize button should close fullscreen');
+    console.log('5. ESC key should close fullscreen');
+  </script>
+</body>
+</html>

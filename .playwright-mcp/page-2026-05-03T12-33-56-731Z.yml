@@ -1,0 +1,72 @@
+- generic [ref=e151]:
+  - generic [ref=e152]:
+    - button "Home" [ref=e153] [cursor=pointer]:
+      - img [ref=e154]
+    - generic [ref=e157]:
+      - generic "opencode" [ref=e158] [cursor=pointer]:
+        - generic [ref=e160]: O
+      - button "Open Project" [ref=e161] [cursor=pointer]:
+        - img [ref=e162]
+    - generic [ref=e163]:
+      - 'button "Terminal (Ctrl+`)" [ref=e164] [cursor=pointer]':
+        - img [ref=e165]
+      - 'button "Server: Local" [ref=e169] [cursor=pointer]':
+        - img [ref=e170]
+      - button "Settings" [ref=e173] [cursor=pointer]:
+        - img [ref=e174]
+      - button "Server Logs" [ref=e177] [cursor=pointer]:
+        - img [ref=e178]
+  - navigation "Session list":
+    - generic [ref=e181]:
+      - generic [ref=e182]:
+        - generic [ref=e184]: O
+        - generic [ref=e185]:
+          - generic [ref=e186]: opencode
+          - generic [ref=e187]: ~
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e188] [cursor=pointer]:
+          - img [ref=e189]
+      - button "New Session" [ref=e193] [cursor=pointer]:
+        - img [ref=e194]
+        - generic [ref=e195]: New Session
+      - generic [ref=e197]:
+        - img [ref=e198]
+        - textbox "Search sessions" [ref=e201]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]:
+          - img
+      - listbox "Sessions" [ref=e202]:
+        - generic [ref=e203]:
+          - text: Today
+          - generic [ref=e204]:
+            - option "Playwright browser testing issue report guide (Thai)" [ref=e205]:
+              - link "Playwright browser testing issue report guide (Thai)" [ref=e206] [cursor=pointer]:
+                - /url: /L2hvbWUvb3BlbmNvZGU/session/ses_213083018fferQ8DK9xLp9PT9c
+                - img [ref=e208]
+                - generic [ref=e211]: Playwright browser testing issue report guide (Thai)
+            - option "Playwright browser accessibility test" [ref=e212]:
+              - link "Playwright browser accessibility test" [ref=e213] [cursor=pointer]:
+                - /url: /L2hvbWUvb3BlbmNvZGU/session/ses_213571f2fffeL6sxAt6YdchIZq
+                - img [ref=e215]
+                - generic [ref=e218]: Playwright browser accessibility test
+            - option "OpenCode plugin installation for LLM agents" [ref=e219]:
+              - link "OpenCode plugin installation for LLM agents" [ref=e220] [cursor=pointer]:
+                - /url: /L2hvbWUvb3BlbmNvZGU/session/ses_2138478beffefPckMXOTlwFcfo
+                - img [ref=e222]
+                - generic [ref=e225]: OpenCode plugin installation for LLM agents
+            - option "New session - 2026-05-03T06:14:54.288Z" [ref=e226]:
+              - link "New session - 2026-05-03T06:14:54.288Z" [ref=e227] [cursor=pointer]:
+                - /url: /L2hvbWUvb3BlbmNvZGU/session/ses_2138643afffevbjrWydYEiONKh
+                - img [ref=e229]
+                - generic [ref=e232]: New session - 2026-05-03T06:14:54.288Z
+      - generic [ref=e236]: 1 provider(s)
+  - main [ref=e238]:
+    - generic [ref=e240]:
+      - img [ref=e242]
+      - generic [ref=e261]:
+        - button "New Session" [ref=e262] [cursor=pointer]:
+          - img [ref=e263]
+          - generic [ref=e264]: New Session
+        - button "Settings" [ref=e265] [cursor=pointer]:
+          - img [ref=e266]
+          - generic [ref=e269]: Settings
+      - paragraph [ref=e270]: Select a session from the sidebar or start a new one

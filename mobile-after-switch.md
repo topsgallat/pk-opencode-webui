@@ -1,0 +1,11 @@
+- generic [ref=e247]:
+  - generic [ref=e251]:
+    - img [ref=e253]
+    - generic [ref=e272]
+    - paragraph [ref=e281]: Select a session from the sidebar or start a new one
+  - navigation [ref=e282]:
+    - button "Chat" [ref=e283] [cursor=pointer]
+    - button "Sessions" [ref=e287] [cursor=pointer]
+    - button "Review" [ref=e291] [cursor=pointer]
+    - button "Settings" [ref=e298] [cursor=pointer]
+    - button "Server" [ref=e303] [cursor=pointer]

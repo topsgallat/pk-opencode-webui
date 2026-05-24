@@ -1,0 +1,2 @@
+[GET] http://192.168.1.173:8090/event?target=http%3A%2F%2F192.168.1.173%3A4096 => [200] OK
+[GET] http://192.168.1.173:8090/api/ext/list-dirs?directory=%2Fhome%2Fsgallat&limit=500&depth=1&target=http%3A%2F%2F192.168.1.173%3A4096 => [403] Forbidden

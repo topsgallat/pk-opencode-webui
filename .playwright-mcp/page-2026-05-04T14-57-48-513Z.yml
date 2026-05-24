@@ -1,0 +1,96 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Home" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - generic [ref=e9]:
+      - generic "opencode" [ref=e10] [cursor=pointer]:
+        - generic [ref=e12]: O
+      - button "Open Project" [ref=e13] [cursor=pointer]:
+        - img [ref=e14]
+    - generic [ref=e15]:
+      - 'button "Terminal (Ctrl+`)" [ref=e16] [cursor=pointer]':
+        - img [ref=e17]
+      - 'button "Server: Local" [ref=e21] [cursor=pointer]':
+        - img [ref=e22]
+      - button "Settings" [ref=e25] [cursor=pointer]:
+        - img [ref=e26]
+      - button "Server Logs" [ref=e29] [cursor=pointer]:
+        - img [ref=e30]
+  - navigation "Session list":
+    - generic [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e36]: O
+        - generic [ref=e37]:
+          - generic [ref=e38]: opencode
+          - generic [ref=e39]: ~
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e40] [cursor=pointer]:
+          - img [ref=e41]
+      - button "New Session" [ref=e45] [cursor=pointer]:
+        - img [ref=e46]
+        - generic [ref=e47]: New Session
+      - generic [ref=e49]:
+        - img [ref=e50]
+        - textbox "Search sessions" [ref=e53]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]:
+          - img
+      - listbox "Sessions" [ref=e54]:
+        - generic [ref=e55]:
+          - img [ref=e56]
+          - generic [ref=e73]: Loading sessions...
+      - generic [ref=e77]: No providers
+  - main [ref=e79]:
+    - generic [ref=e80]:
+      - generic [ref=e82]:
+        - generic [ref=e83]:
+          - heading "New Session" [level=1] [ref=e87]
+          - generic [ref=e88]:
+            - button "MCP Servers" [ref=e89] [cursor=pointer]:
+              - img [ref=e90]
+            - button "Toggle Review Panel" [ref=e92] [cursor=pointer]:
+              - img [ref=e93]
+            - button "Toggle Info Panel" [ref=e98] [cursor=pointer]:
+              - img [ref=e99]
+            - button "Toggle Terminal" [ref=e102] [cursor=pointer]:
+              - img [ref=e103]
+            - button "Toggle completion notifications" [ref=e106] [cursor=pointer]:
+              - img [ref=e107]
+        - generic [ref=e112]:
+          - img [ref=e113]
+          - paragraph [ref=e130]: Loading chat history...
+        - generic [ref=e134]:
+          - textbox "Type a message... (@ for files, / for commands)" [active] [ref=e137]
+          - generic [ref=e138]:
+            - generic [ref=e140]:
+              - button "Upload image or PDF" [ref=e141] [cursor=pointer]:
+                - img [ref=e142]
+              - button "Attach file from project" [ref=e145] [cursor=pointer]:
+                - img [ref=e146]
+            - generic [ref=e150]:
+              - 'button "Agent: build" [ref=e151] [cursor=pointer]':
+                - generic [ref=e152]: "Agent:"
+                - generic [ref=e153]: build
+              - 'button "Model: big-pickle" [ref=e154] [cursor=pointer]':
+                - generic [ref=e155]: "Model:"
+                - generic [ref=e156]: big-pickle
+      - complementary "Review panel" [ref=e157]:
+        - generic [ref=e161]:
+          - button "Review" [ref=e163] [cursor=pointer]:
+            - img [ref=e164]
+            - generic [ref=e169]: Review
+          - generic [ref=e170]:
+            - button "Refresh" [ref=e172] [cursor=pointer]:
+              - img [ref=e173]
+            - button [ref=e178] [cursor=pointer]:
+              - img [ref=e179]
+          - generic [ref=e181]:
+            - tablist [ref=e183]:
+              - tab "0 Changes" [selected] [ref=e185] [cursor=pointer]
+              - tab "All Files" [ref=e187] [cursor=pointer]
+            - tabpanel [ref=e188]:
+              - generic [ref=e190]:
+                - img [ref=e191]
+                - generic [ref=e208]: Loading changes...
+              - generic [ref=e210]:
+                - img [ref=e211]
+                - generic [ref=e216]: No changes in this session

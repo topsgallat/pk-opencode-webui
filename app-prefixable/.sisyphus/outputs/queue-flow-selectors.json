@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-05-17T19:26:25.934Z",
+  "baseUrl": "http://localhost:3000",
+  "selectors": {
+    "addToQueueInDOM": false,
+    "queuedBadgeInDOM": false,
+    "queueTextInDOM": false,
+    "deleteQueuedInDOM": false,
+    "sendButtonInDOM": false,
+    "stopButtonInDOM": false
+  }
+}

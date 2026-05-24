@@ -1,0 +1,130 @@
+- generic [ref=e3]:
+  - generic [ref=e57]:
+    - generic [ref=e58]:
+      - heading "Open Project" [level=2] [ref=e59]
+      - button [ref=e60] [cursor=pointer]:
+        - img [ref=e61]
+    - generic [ref=e64]:
+      - generic [ref=e65]:
+        - textbox "Search directories" [ref=e66]:
+          - /placeholder: Type to search... (Tab to complete, Enter to select)
+          - text: pk-opencode-webui
+        - paragraph [ref=e67]: Search directories on Local. You can also type a full path and press Enter.
+      - listbox "Directory search results" [ref=e68]:
+        - option "~/ pk-opencode-webui /" [ref=e439] [cursor=pointer]:
+          - img [ref=e440]
+          - generic [ref=e442]:
+            - generic [ref=e443]: ~/
+            - generic [ref=e444]: pk-opencode-webui
+            - generic [ref=e445]: /
+        - option "~/ pk-opencode-webui.bak /" [ref=e446] [cursor=pointer]:
+          - img [ref=e447]
+          - generic [ref=e449]:
+            - generic [ref=e450]: ~/
+            - generic [ref=e451]: pk-opencode-webui.bak
+            - generic [ref=e452]: /
+        - option "~/ pk-opencode-webui-dev /" [ref=e453] [cursor=pointer]:
+          - img [ref=e454]
+          - generic [ref=e456]:
+            - generic [ref=e457]: ~/
+            - generic [ref=e458]: pk-opencode-webui-dev
+            - generic [ref=e459]: /
+        - option "~/ pk-opencode-webui.bak2 /" [ref=e460] [cursor=pointer]:
+          - img [ref=e461]
+          - generic [ref=e463]:
+            - generic [ref=e464]: ~/
+            - generic [ref=e465]: pk-opencode-webui.bak2
+            - generic [ref=e466]: /
+        - option "~/pk-opencode-webui/ .github /" [ref=e467] [cursor=pointer]:
+          - img [ref=e468]
+          - generic [ref=e470]:
+            - generic [ref=e471]: ~/pk-opencode-webui/
+            - generic [ref=e472]: .github
+            - generic [ref=e473]: /
+        - option "~/pk-opencode-webui/ .playwright-mcp /" [ref=e474] [cursor=pointer]:
+          - img [ref=e475]
+          - generic [ref=e477]:
+            - generic [ref=e478]: ~/pk-opencode-webui/
+            - generic [ref=e479]: .playwright-mcp
+            - generic [ref=e480]: /
+        - option "~/pk-opencode-webui/ .sisyphus /" [ref=e481] [cursor=pointer]:
+          - img [ref=e482]
+          - generic [ref=e484]:
+            - generic [ref=e485]: ~/pk-opencode-webui/
+            - generic [ref=e486]: .sisyphus
+            - generic [ref=e487]: /
+        - option "~/pk-opencode-webui/ app-prefixable /" [active] [selected] [ref=e488] [cursor=pointer]:
+          - img [ref=e489]
+          - generic [ref=e491]:
+            - generic [ref=e492]: ~/pk-opencode-webui/
+            - generic [ref=e493]: app-prefixable
+            - generic [ref=e494]: /
+        - option "~/pk-opencode-webui/ docker /" [ref=e495] [cursor=pointer]:
+          - img [ref=e496]
+          - generic [ref=e498]:
+            - generic [ref=e499]: ~/pk-opencode-webui/
+            - generic [ref=e500]: docker
+            - generic [ref=e501]: /
+        - option "~/pk-opencode-webui/ docs /" [ref=e502] [cursor=pointer]:
+          - img [ref=e503]
+          - generic [ref=e505]:
+            - generic [ref=e506]: ~/pk-opencode-webui/
+            - generic [ref=e507]: docs
+            - generic [ref=e508]: /
+        - option "~/pk-opencode-webui/ examples /" [ref=e509] [cursor=pointer]:
+          - img [ref=e510]
+          - generic [ref=e512]:
+            - generic [ref=e513]: ~/pk-opencode-webui/
+            - generic [ref=e514]: examples
+            - generic [ref=e515]: /
+        - option "~/pk-opencode-webui/ pk-opencode-webui /" [ref=e516] [cursor=pointer]:
+          - img [ref=e517]
+          - generic [ref=e519]:
+            - generic [ref=e520]: ~/pk-opencode-webui/
+            - generic [ref=e521]: pk-opencode-webui
+            - generic [ref=e522]: /
+        - option "~/pk-opencode-webui/ shared /" [ref=e523] [cursor=pointer]:
+          - img [ref=e524]
+          - generic [ref=e526]:
+            - generic [ref=e527]: ~/pk-opencode-webui/
+            - generic [ref=e528]: shared
+            - generic [ref=e529]: /
+        - option "~/pk-opencode-webui/ tests /" [ref=e530] [cursor=pointer]:
+          - img [ref=e531]
+          - generic [ref=e533]:
+            - generic [ref=e534]: ~/pk-opencode-webui/
+            - generic [ref=e535]: tests
+            - generic [ref=e536]: /
+      - button "Open" [ref=e426] [cursor=pointer]
+      - generic [ref=e427]:
+        - generic [ref=e428]: Create new folder
+        - generic [ref=e429]:
+          - textbox "my-new-project" [ref=e430]
+          - button "Create" [disabled] [ref=e431]
+      - button "Clone Git Repository" [ref=e433] [cursor=pointer]:
+        - img [ref=e434]
+        - generic [ref=e438]: Clone Git Repository
+  - generic [ref=e4]:
+    - button "Open Project" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - button "Open Project" [ref=e10] [cursor=pointer]:
+      - img [ref=e11]
+    - generic [ref=e12]:
+      - 'button "Terminal (Ctrl+`)" [ref=e13] [cursor=pointer]':
+        - img [ref=e14]
+      - generic [ref=e17]:
+        - 'button "Server: Local" [ref=e18] [cursor=pointer]':
+          - img [ref=e19]
+        - generic "Local" [ref=e22]
+      - button "Settings" [ref=e23] [cursor=pointer]:
+        - img [ref=e24]
+  - main [ref=e28]:
+    - generic [ref=e29]:
+      - img [ref=e30]
+      - generic [ref=e47]:
+        - button "Open Project" [ref=e48] [cursor=pointer]:
+          - img [ref=e49]
+          - text: Open Project
+        - button "Clone Repository" [ref=e51] [cursor=pointer]:
+          - img [ref=e52]
+          - text: Clone Repository

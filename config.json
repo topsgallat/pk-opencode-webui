@@ -8,5 +8,10 @@
   "$schema": "https://opencode.ai/config.json",
   "instructions": [
     "AGENTS.md"
+  ],
+  "disabled_providers": [
+    "freellm",
+    "google",
+    "nvidia"
   ]
 }

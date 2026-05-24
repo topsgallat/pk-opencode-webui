@@ -1,0 +1,23 @@
+- generic [ref=e68]:
+  - generic [ref=e69]:
+    - button "Open Project" [ref=e70] [cursor=pointer]:
+      - img [ref=e71]
+    - button "Open Project" [ref=e75] [cursor=pointer]:
+      - img [ref=e76]
+    - generic [ref=e77]:
+      - 'button "Terminal (Ctrl+`)" [ref=e78] [cursor=pointer]':
+        - img [ref=e79]
+      - 'button "Server: Remote 173" [ref=e83] [cursor=pointer]':
+        - img [ref=e84]
+      - button "Settings" [ref=e87] [cursor=pointer]:
+        - img [ref=e88]
+  - main [ref=e92]:
+    - generic [ref=e93]:
+      - img [ref=e94]
+      - generic [ref=e111]:
+        - button "Open Project" [ref=e112] [cursor=pointer]:
+          - img [ref=e113]
+          - text: Open Project
+        - button "Clone Repository" [ref=e115] [cursor=pointer]:
+          - img [ref=e116]
+          - text: Clone Repository

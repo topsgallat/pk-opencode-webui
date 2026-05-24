@@ -1,0 +1,47 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Open Project" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - button "Open Project" [ref=e10] [cursor=pointer]:
+      - img [ref=e11]
+    - generic [ref=e12]:
+      - 'button "Terminal (Ctrl+`)" [ref=e13] [cursor=pointer]':
+        - img [ref=e14]
+      - generic [ref=e17]:
+        - 'button "Server: Local" [ref=e18] [cursor=pointer]':
+          - img [ref=e19]
+        - generic "Local" [ref=e22]
+      - button "Settings" [ref=e23] [cursor=pointer]:
+        - img [ref=e24]
+  - main [ref=e28]:
+    - generic [ref=e29]:
+      - img [ref=e30]
+      - generic [ref=e47]:
+        - button "Open Project" [ref=e48] [cursor=pointer]:
+          - img [ref=e49]
+          - text: Open Project
+        - button "Clone Repository" [ref=e51] [cursor=pointer]:
+          - img [ref=e52]
+          - text: Clone Repository
+      - generic [ref=e57]:
+        - generic [ref=e58]:
+          - heading "Open Project" [level=2] [ref=e59]
+          - button [ref=e60] [cursor=pointer]:
+            - img [ref=e61]
+        - generic [ref=e64]:
+          - generic [ref=e65]:
+            - textbox "Search directories" [active] [ref=e66]:
+              - /placeholder: Type to search... (Tab to complete, Enter to select)
+              - text: /home/sgallat/pk-opencode-webui
+            - paragraph [ref=e67]: Search directories on Local. You can also type a full path and press Enter.
+          - listbox "Directory search results" [ref=e68]:
+            - generic [ref=e69]: No matching directories or paths
+          - button "Open" [disabled] [ref=e71]
+          - generic [ref=e72]:
+            - generic [ref=e73]: Create new folder
+            - generic [ref=e74]:
+              - textbox "my-new-project" [ref=e75]
+              - button "Create" [disabled] [ref=e76]
+          - button "Clone Git Repository" [ref=e78] [cursor=pointer]:
+            - img [ref=e79]
+            - generic [ref=e83]: Clone Git Repository

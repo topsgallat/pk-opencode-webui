@@ -1,0 +1,56 @@
+- generic [ref=e460]:
+  - generic [ref=e461]:
+    - button "Home" [ref=e462] [cursor=pointer]:
+      - img [ref=e463]
+    - generic [ref=e466]:
+      - generic "app-prefixable" [ref=e467] [cursor=pointer]:
+        - generic [ref=e469]: AP
+      - generic ".github" [ref=e470] [cursor=pointer]:
+        - generic [ref=e472]: G
+      - button "Open Project" [ref=e473] [cursor=pointer]:
+        - img [ref=e474]
+    - generic [ref=e475]:
+      - 'button "Terminal (Ctrl+`)" [ref=e476] [cursor=pointer]':
+        - img [ref=e477]
+      - generic [ref=e480]:
+        - 'button "Server: Local" [ref=e481] [cursor=pointer]':
+          - img [ref=e482]
+        - generic "Local" [ref=e485]
+      - button "Settings" [ref=e486] [cursor=pointer]:
+        - img [ref=e487]
+      - button "Server Logs" [ref=e490] [cursor=pointer]:
+        - img [ref=e491]
+  - navigation "Session list":
+    - generic [ref=e494]:
+      - generic [ref=e495]:
+        - generic [ref=e497]: G
+        - generic [ref=e498]:
+          - generic [ref=e499]: .github
+          - generic [ref=e500]: ~/pk-opencode-webui/.github
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e501] [cursor=pointer]:
+          - img [ref=e502]
+      - button "New Session" [ref=e506] [cursor=pointer]:
+        - img [ref=e507]
+        - generic [ref=e508]: New Session
+      - generic [ref=e510]:
+        - img [ref=e511]
+        - textbox "Search sessions" [ref=e514]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]:
+          - img
+      - listbox "Sessions" [ref=e515]:
+        - generic [ref=e516]:
+          - paragraph [ref=e517]: No sessions yet
+          - paragraph [ref=e518]: Click "New Session" to start
+      - generic [ref=e522]: 3 provider(s)
+  - main [ref=e524]:
+    - generic [ref=e526]:
+      - img [ref=e528]
+      - generic [ref=e547]:
+        - button "New Session" [ref=e548] [cursor=pointer]:
+          - img [ref=e549]
+          - generic [ref=e550]: New Session
+        - button "Settings" [ref=e551] [cursor=pointer]:
+          - img [ref=e552]
+          - generic [ref=e555]: Settings
+      - paragraph [ref=e556]: Select a session from the sidebar or start a new one

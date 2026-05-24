@@ -1,0 +1,62 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Open Project" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - button "Open Project" [ref=e10] [cursor=pointer]:
+      - img [ref=e11]
+    - generic [ref=e12]:
+      - 'button "Terminal (Ctrl+`)" [ref=e13] [cursor=pointer]':
+        - img [ref=e14]
+      - 'button "Server: Local" [ref=e18] [cursor=pointer]':
+        - img [ref=e19]
+      - button "Settings" [ref=e22] [cursor=pointer]:
+        - img [ref=e23]
+  - main [ref=e27]:
+    - generic [ref=e28]:
+      - generic [ref=e29]: "PATCH LOADED: Settings patch is active"
+      - generic [ref=e30]:
+        - generic [ref=e31]: Settings
+        - generic [ref=e32]:
+          - button "Providers Global" [ref=e33] [cursor=pointer]:
+            - img [ref=e34]
+            - generic [ref=e36]: Providers
+            - generic [ref=e37]: Global
+          - button "Git Global" [ref=e38] [cursor=pointer]:
+            - img [ref=e39]
+            - generic [ref=e43]: Git
+            - generic [ref=e44]: Global
+          - button "MCP Servers Global + Project" [ref=e45] [cursor=pointer]:
+            - img [ref=e46]
+            - generic [ref=e49]: MCP Servers
+            - generic [ref=e50]: Global + Project
+          - button "Prompts" [ref=e51] [cursor=pointer]:
+            - img [ref=e52]
+            - generic [ref=e54]: Prompts
+          - button "Instructions" [ref=e55] [cursor=pointer]:
+            - img [ref=e56]
+            - generic [ref=e58]: Instructions
+          - button "Appearance" [ref=e59] [cursor=pointer]:
+            - img [ref=e60]
+            - generic [ref=e66]: Appearance
+          - button "Sounds" [ref=e67] [cursor=pointer]:
+            - img [ref=e68]
+            - generic [ref=e72]: Sounds
+          - button "Servers" [ref=e73] [cursor=pointer]:
+            - img [ref=e74]
+            - generic [ref=e77]: Servers
+      - generic [ref=e80]:
+        - generic [ref=e81]:
+          - heading "Providers" [level=1] [ref=e82]
+          - paragraph [ref=e83]: Connect AI providers to enable chat functionality
+        - generic [ref=e84]:
+          - generic [ref=e85]:
+            - heading "Connected Providers" [level=2] [ref=e86]
+            - 'button "Debug: patch check" [ref=e87] [cursor=pointer]'
+          - generic [ref=e89]:
+            - img
+            - generic [ref=e106]: Loading connected providers...
+        - generic [ref=e107]:
+          - heading "Add Provider" [level=2] [ref=e109]
+          - generic [ref=e113]:
+            - img [ref=e114]
+            - textbox "Search providers..." [ref=e117]

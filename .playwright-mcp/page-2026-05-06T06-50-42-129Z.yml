@@ -1,0 +1,49 @@
+- generic [ref=e3]:
+  - button "Switch Server" [ref=e5] [cursor=pointer]:
+    - img [ref=e6]
+    - generic "Local" [ref=e9]
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16]: Settings Menu
+      - generic [ref=e17]:
+        - combobox [ref=e18]:
+          - option "Providers (Global)" [selected]
+          - option "Git (Global)"
+          - option "MCP Servers (Global + Project)"
+          - option "Prompts (Project)"
+          - option "Instructions (Project)"
+          - option "Project Config (Project)"
+          - option "Appearance"
+          - option "Sounds"
+          - option "Servers"
+        - img
+    - generic [ref=e19]:
+      - img [ref=e20]
+      - generic [ref=e22]: "Project: /home/sgallat/pk-opencode-webui"
+    - generic [ref=e23]:
+      - banner [ref=e24]:
+        - heading "Providers" [level=1] [ref=e25]
+        - paragraph [ref=e26]: Connect AI providers to enable chat functionality
+      - generic [ref=e27]:
+        - heading "Connected Providers" [level=2] [ref=e29]
+        - generic [ref=e31]:
+          - img [ref=e32]
+          - generic [ref=e49]: Loading connected providers...
+      - generic [ref=e50]:
+        - heading "Add Provider" [level=2] [ref=e52]
+        - generic [ref=e56]:
+          - img [ref=e57]
+          - textbox "Search providers..." [ref=e60]
+  - navigation [ref=e61]:
+    - button "Chat" [ref=e62] [cursor=pointer]:
+      - img [ref=e63]
+      - generic [ref=e65]: Chat
+    - button "Sessions" [ref=e66] [cursor=pointer]:
+      - img [ref=e67]
+      - generic [ref=e69]: Sessions
+    - button "Review" [ref=e70] [cursor=pointer]:
+      - img [ref=e71]
+      - generic [ref=e76]: Review
+    - button "Settings" [ref=e77] [cursor=pointer]:
+      - img [ref=e78]
+      - generic [ref=e81]: Settings

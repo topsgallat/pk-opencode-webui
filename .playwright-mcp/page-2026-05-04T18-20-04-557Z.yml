@@ -1,0 +1,23 @@
+- generic [ref=e7]:
+  - generic [ref=e8]:
+    - generic [ref=e10]: Question from AI
+    - button "Dismiss (Esc)" [ref=e11] [cursor=pointer]
+  - generic [ref=e12]:
+    - button "Scope" [ref=e13] [cursor=pointer]
+    - button "Mode" [ref=e14] [cursor=pointer]
+    - button "Confirm" [active] [ref=e15] [cursor=pointer]
+  - generic [ref=e16]:
+    - generic [ref=e82]:
+      - paragraph [ref=e83]: Review your answers
+      - generic [ref=e84]:
+        - generic [ref=e85]:
+          - generic [ref=e86]: "Scope:"
+          - text: (not answered)
+        - generic [ref=e87]:
+          - generic [ref=e88]: "Mode:"
+          - text: (not answered)
+    - button "Submit Answers" [ref=e89] [cursor=pointer]
+  - generic [ref=e76]:
+    - generic [ref=e77]: Tab switch
+    - generic [ref=e79]: Enter submit
+    - generic [ref=e80]: Esc dismiss

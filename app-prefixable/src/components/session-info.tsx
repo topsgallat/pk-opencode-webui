@@ -449,10 +449,8 @@ export function SessionInfo(props: SessionInfoProps) {
   })
 
   return (
-    <div class="flex flex-col px-2 py-1.5 text-xs gap-y-2 sm:flex-row sm:flex-wrap sm:items-center sm:px-4" style={{ color: "var(--text-weak)" }}>
-      {/* Left group - info text, stacks on mobile */}
-      <div class="flex flex-1 flex-col min-w-0 gap-1 pr-2 [&_button:focus-visible]:outline-offset-[-2px] [&_a:focus-visible]:outline-offset-[-2px]">
-        {/* Agent */}
+    <div class="relative flex items-center gap-2 px-2 py-1.5 text-xs sm:gap-3 sm:px-4" style={{ color: "var(--text-weak)" }}>
+      <div class="flex min-w-0 flex-1 flex-col gap-1 [&_button:focus-visible]:outline-offset-[-2px] [&_a:focus-visible]:outline-offset-[-2px] sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
         <Show when={selectedAgent()}>
           <button
             type="button"
@@ -460,81 +458,267 @@ export function SessionInfo(props: SessionInfoProps) {
             onClick={() => props.onAgentClick()}
           >
             <span class="opacity-60">Agent:</span>
-            <span class="capitalize" style={{ color: "var(--text-base)" }}>
-              {selectedAgent()}
-            </span>
+            <span class="capitalize" style={{ color: "var(--text-base)" }}>{selectedAgent()}</span>
           </button>
         </Show>
 
-        {/* Model + Variant + Send row */}
-        <div class="flex w-full items-center gap-2 min-w-0 sm:gap-3">
-          <div class="flex flex-wrap items-center gap-2 min-w-0">
-            <Show when={selectedModel()}>
-              <button
-                type="button"
-                class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer"
-                onClick={() => props.onModelClick()}
-              >
-                <span class="opacity-60 shrink-0">Model:</span>
-                <span class="truncate" style={{ color: "var(--text-base)" }}>{modelLabel()}</span>
-                {modelBadge()}
-              </button>
-            </Show>
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+          <Show when={selectedModel()}>
+            <button
+              type="button"
+              class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer"
+              onClick={() => props.onModelClick()}
+            >
+              <span class="opacity-60 shrink-0">Model:</span>
+              <span class="truncate" style={{ color: "var(--text-base)" }}>{modelLabel()}</span>
+              {modelBadge()}
+            </button>
+          </Show>
 
-            <Show when={variantLabel()}>
-              <button
-                type="button"
-                class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer"
-                onClick={() => props.onVariantClick?.()}
-              >
-                <span class="opacity-60 shrink-0">Variant:</span>
-                <span class="truncate" style={{ color: "var(--text-base)" }}>{variantLabel()}</span>
-              </button>
-            </Show>
-          </div>
-
-          <div class="flex min-w-0 items-center gap-1">
-            {/* No provider warning */}
-            <Show when={!selectedModel() && providers.connected.length === 0}>
-              <a href={`/${dirSlug()}/settings`} style={{ color: "var(--text-interactive-base)" }} class="hover:underline">
-                Connect a provider to start
-              </a>
-            </Show>
-
-            <Show when={!selectedModel() && providers.connected.length > 0}>
-              <span style={{ color: "var(--status-warning-text)" }}>No model selected</span>
-            </Show>
-          </div>
-
-          <Show when={!props.loading()}>
-            <Show when={actionMode()}>
-              <button
-                type="button"
-                class="ml-auto inline-flex items-center gap-1.5 cursor-pointer rounded-xl px-4 py-2 text-[11px] font-medium transition-opacity hover:opacity-100 shrink-0 touch-manipulation whitespace-nowrap min-h-11"
-                style={actionMode() === "stop"
-                  ? {
-                    background: "var(--status-danger-dim)",
-                    color: "var(--status-danger-text)",
-                    border: "1px solid var(--status-danger-border)",
-                  }
-                  : {
-                    background: "var(--interactive-base)",
-                    color: "var(--text-on-interactive)",
-                }}
-                title={actionMode() === "queue" ? "Add to queue" : actionMode() === "stop" ? "Stop generation (Esc Esc)" : "Click or press Enter to send"}
-                aria-label={actionMode() === "queue" ? "Add to queue" : actionMode() === "stop" ? "Stop generation" : "Send message"}
-                onClick={() => (actionMode() === "stop" ? props.onAbort() : props.onAction())}
-              >
-                <div class="uppercase tracking-wide">
-                  {actionMode() === "queue" ? "ADD TO QUEUE" : actionMode() === "stop" ? "STOP" : "SEND"}
-                </div>
-                <Show when={actionMode() === "stop"} fallback={<CornerDownLeft class="w-4 h-4" />}>
-                  <Square class="w-4 h-4" />
-                </Show>
-              </button>
-            </Show>
+          <Show when={variantLabel()}>
+            <button
+              type="button"
+              class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer"
+              onClick={() => props.onVariantClick?.()}
+            >
+              <span class="opacity-60 shrink-0">Variant:</span>
+              <span class="truncate" style={{ color: "var(--text-base)" }}>{variantLabel()}</span>
+            </button>
           </Show>
         </div>
+
+        <Show when={stats()}>
+          {(s) => (
+            <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <div class="relative">
+                <button
+                  ref={triggerRef}
+                  type="button"
+                  class="flex items-center gap-2 transition-opacity hover:opacity-80"
+                  style={{ color: "var(--text-base)" }}
+                  onClick={toggleTokenPopover}
+                  aria-haspopup="true"
+                  aria-expanded={showTokenPopover()}
+                  title="Show token breakdown"
+                  aria-label="Show token breakdown"
+                >
+                  <Zap class="w-3 h-3" />
+                  <span class="flex items-center gap-1 shrink-0 text-[10px] font-medium uppercase tracking-wide">
+                    <span>{s().tokens}</span>
+                    <span class="opacity-60 normal-case tracking-normal">tokens</span>
+                  </span>
+                  <Show when={s().usage !== null}>
+                    <span
+                      class="px-1 py-0.5 rounded text-[10px] font-medium"
+                      style={{
+                        background: s().usage! > 80 ? "var(--surface-critical-subtle)" : "var(--surface-inset)",
+                        color: s().usage! > 80 ? "var(--text-critical-base)" : "var(--text-weak)",
+                      }}
+                    >
+                      {s().usage}%
+                    </span>
+                  </Show>
+                </button>
+
+                <Show when={showTokenPopover()}>
+                  <Portal>
+                    <div
+                      ref={popoverRef}
+                      class="w-72 rounded-lg shadow-lg text-xs"
+                      style={{
+                        position: "fixed",
+                        top: `${popoverPos().top}px`,
+                        left: `${popoverPos().left}px`,
+                        transform: "translateY(-100%)",
+                        "z-index": "9999",
+                        background: "var(--background-base)",
+                        border: "1px solid var(--border-base)",
+                      }}
+                    >
+                      <div
+                        class="px-3 py-2 font-medium"
+                        style={{
+                          color: "var(--text-strong)",
+                          "border-bottom": "1px solid var(--border-base)",
+                          background: "var(--surface-inset)",
+                          "border-radius": "0.5rem 0.5rem 0 0",
+                        }}
+                      >
+                        Token Breakdown
+                      </div>
+                      <div class="px-3 py-2 space-y-1.5 font-mono" style={{ color: "var(--text-base)" }}>
+                        <div class="flex justify-between">
+                          <span>Context:</span>
+                          <span>
+                            {fmt(s().contextTokens)}
+                            <Show when={s().contextLimit > 0}>
+                              <span class="opacity-60"> / {fmt(s().contextLimit)}</span>
+                            </Show>
+                            <Show when={s().usage !== null}>
+                              <span class="opacity-60"> ({s().usage}%)</span>
+                            </Show>
+                          </span>
+                        </div>
+
+                        <div class="flex justify-between pl-3" style={{ color: "var(--text-weak)" }}>
+                          <span>Input:</span>
+                          <span>{fmt(s().input)}</span>
+                        </div>
+
+                        <div class="flex justify-between pl-3" style={{ color: "var(--text-weak)" }}>
+                          <span>Cache:</span>
+                          <span>{fmt(s().cacheTotal)}</span>
+                        </div>
+                        <Show when={s().cacheRead > 0 || s().cacheWrite > 0}>
+                          <div class="flex justify-between pl-6" style={{ color: "var(--text-weak)", opacity: 0.8 }}>
+                            <span>read / write:</span>
+                            <span>{fmt(s().cacheRead)} / {fmt(s().cacheWrite)}</span>
+                          </div>
+                        </Show>
+
+                        <div class="flex justify-between">
+                          <span>Output:</span>
+                          <span>{fmt(s().output)}</span>
+                        </div>
+
+                        <Show when={s().reasoning > 0}>
+                          <div class="flex justify-between">
+                            <span>Reasoning:</span>
+                            <span>{fmt(s().reasoning)}</span>
+                          </div>
+                        </Show>
+
+                        <Show when={s().estimatedCost !== null}>
+                          <div class="flex justify-between pt-1.5 mt-1" style={{ "border-top": "1px solid var(--border-base)" }}>
+                            <span>Estimate:</span>
+                            <span>{usd.format(s().estimatedCost || 0)}</span>
+                          </div>
+                        </Show>
+
+                        <div class="flex justify-between">
+                          <span>Cost:</span>
+                          <span>{s().cost} <span class="opacity-60" style={{ "font-family": "inherit" }}>(session)</span></span>
+                        </div>
+
+                        <Show when={quota.loading}>
+                          <div class="pt-1.5 mt-1 text-[11px]" style={{ "border-top": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
+                            Loading quota...
+                          </div>
+                        </Show>
+
+                        <Show when={quota.error && !quota.loading}>
+                          <div class="pt-1.5 mt-1 text-[11px]" style={{ "border-top": "1px solid var(--border-base)", color: "var(--text-critical-base)" }}>
+                            Quota unavailable
+                          </div>
+                        </Show>
+
+                        <Show when={quota() && !quota.loading && !quota.error}>
+                          <div class="pt-1.5 mt-1 space-y-2" style={{ "border-top": "1px solid var(--border-base)" }}>
+                            <div class="flex items-center justify-between gap-2 font-sans">
+                              <span class="font-medium" style={{ color: "var(--text-strong)" }}>Quota</span>
+                              <span class="text-[10px]" style={{ color: "var(--text-weak)" }}>
+                                {quota()!.summary.availableProviders.length} available / {quota()!.summary.unavailableProviders.length} unavailable
+                              </span>
+                            </div>
+
+                            <Show when={quotaProvider()} fallback={
+                              <div class="text-[11px] font-sans" style={{ color: "var(--text-weak)" }}>
+                                No quota provider matched this composer.
+                              </div>
+                            }>
+                              <div
+                                class="rounded-md px-2.5 py-2 space-y-2 font-sans"
+                                style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)" }}
+                              >
+                                <div class="flex items-center justify-between gap-2">
+                                  <span class="min-w-0 truncate font-medium" style={{ color: "var(--text-strong)" }}>
+                                    {quotaProvider()!.name}
+                                  </span>
+                                  <span
+                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+                                    style={{
+                                      background: quotaStatus(quotaProvider()!.status).background,
+                                      color: quotaStatus(quotaProvider()!.status).color,
+                                      border: quotaStatus(quotaProvider()!.status).border,
+                                    }}
+                                  >
+                                    {quotaStatus(quotaProvider()!.status).label}
+                                  </span>
+                                </div>
+
+                                <Show when={quotaProvider()!.warning}>
+                                  {(message) => (
+                                    <div class="text-[10px] leading-snug" style={{ color: "var(--status-warning-text)" }}>
+                                      {message()}
+                                    </div>
+                                  )}
+                                </Show>
+
+                                <Show when={quotaProvider()!.entries.length > 0} fallback={
+                                  <div class="text-[11px]" style={{ color: "var(--text-weak)" }}>
+                                    No quota limits reported.
+                                  </div>
+                                }>
+                                  <div class="space-y-1.5">
+                                    <For each={quotaProvider()!.entries.slice(0, 3)}>
+                                      {(entry) => {
+                                        const percent = quotaPercent(entry)
+                                        return (
+                                          <div class="space-y-1">
+                                            <div class="flex items-center justify-between gap-2 text-[11px]">
+                                              <span class="min-w-0 truncate" style={{ color: "var(--text-base)" }}>
+                                                {entry.label}
+                                              </span>
+                                              <span class="shrink-0" style={{ color: "var(--text-weak)" }}>
+                                                {entry.unlimited ? "Unlimited" : entry.used !== undefined && entry.total !== undefined
+                                                  ? `${entry.used.toLocaleString()} / ${entry.total.toLocaleString()}`
+                                                  : entry.percentUsed !== undefined
+                                                    ? `${Math.round(entry.percentUsed)}% used`
+                                                    : entry.remaining !== undefined
+                                                      ? `${entry.remaining.toLocaleString()} remaining`
+                                                      : "-"}
+                                              </span>
+                                            </div>
+                                            <Show when={quotaResetLabel(entry)}>
+                                              {(label) => (
+                                                <div class="text-[10px]" style={{ color: "var(--text-weak)" }}>
+                                                  {label()}
+                                                </div>
+                                              )}
+                                            </Show>
+                                            <Show when={percent !== null}>
+                                              <div class="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--background-base)" }}>
+                                                <div
+                                                  class="h-full rounded-full transition-all duration-300"
+                                                  style={{ width: `${percent}%`, background: quotaBarColor(percent) }}
+                                                />
+                                              </div>
+                                            </Show>
+                                          </div>
+                                        )
+                                      }}
+                                    </For>
+                                  </div>
+                                </Show>
+                              </div>
+                            </Show>
+                          </div>
+                        </Show>
+                      </div>
+                    </div>
+                  </Portal>
+                </Show>
+              </div>
+
+              <span class="flex items-center gap-1 shrink-0 text-[10px]">
+                <span class="opacity-60">Cost</span>
+                <span style={{ color: "var(--text-base)" }}>{s().cost}</span>
+              </span>
+
+              <ConnectionBadge />
+            </div>
+          )}
+        </Show>
 
         <Show when={queueCount() > 0}>
           <span
@@ -565,240 +749,40 @@ export function SessionInfo(props: SessionInfoProps) {
         </Show>
       </div>
 
-      {/* Right group - action controls, always visible */}
-      <Show when={stats()}>
-        {(s) => (
-          <div class="ml-0 flex w-full flex-wrap items-center justify-start gap-x-2 gap-y-1 sm:ml-3 sm:w-auto sm:flex-nowrap sm:justify-end">
-            <div class="relative">
-              <button
-                ref={triggerRef}
-                type="button"
-                class="flex items-center gap-2 transition-opacity hover:opacity-80"
-                style={{ color: "var(--text-base)" }}
-                onClick={toggleTokenPopover}
-                aria-haspopup="true"
-                aria-expanded={showTokenPopover()}
-                title="Show token breakdown"
-                aria-label="Show token breakdown"
-              >
-                <Zap class="w-3 h-3" />
-                <span class="flex items-center gap-1 shrink-0 text-[10px] font-medium uppercase tracking-wide">
-                  <span>{s().tokens}</span>
-                  <span class="opacity-60 normal-case tracking-normal">tokens</span>
-                </span>
-                <Show when={s().usage !== null}>
-                  <span
-                    class="px-1 py-0.5 rounded text-[10px] font-medium"
-                    style={{
-                      background: s().usage! > 80 ? "var(--surface-critical-subtle)" : "var(--surface-inset)",
-                      color: s().usage! > 80 ? "var(--text-critical-base)" : "var(--text-weak)",
-                    }}
-                  >
-                    {s().usage}%
-                  </span>
-                </Show>
-              </button>
-
-              {/* Token breakdown popover - portalled to escape overflow-hidden */}
-              <Show when={showTokenPopover()}>
-                <Portal>
-                  <div
-                    ref={popoverRef}
-                    class="w-72 rounded-lg shadow-lg text-xs"
-                    style={{
-                      position: "fixed",
-                      top: `${popoverPos().top}px`,
-                      left: `${popoverPos().left}px`,
-                      transform: "translateY(-100%)",
-                      "z-index": "9999",
-                      background: "var(--background-base)",
-                      border: "1px solid var(--border-base)",
-                    }}
-                  >
-                    <div
-                      class="px-3 py-2 font-medium"
-                      style={{
-                        color: "var(--text-strong)",
-                        "border-bottom": "1px solid var(--border-base)",
-                        background: "var(--surface-inset)",
-                        "border-radius": "0.5rem 0.5rem 0 0",
-                      }}
-                    >
-                      Token Breakdown
-                    </div>
-                    <div class="px-3 py-2 space-y-1.5 font-mono" style={{ color: "var(--text-base)" }}>
-                      <div class="flex justify-between">
-                        <span>Context:</span>
-                        <span>
-                          {fmt(s().contextTokens)}
-                          <Show when={s().contextLimit > 0}>
-                            <span class="opacity-60"> / {fmt(s().contextLimit)}</span>
-                          </Show>
-                          <Show when={s().usage !== null}>
-                            <span class="opacity-60"> ({s().usage}%)</span>
-                          </Show>
-                        </span>
-                      </div>
-
-                      <div class="flex justify-between pl-3" style={{ color: "var(--text-weak)" }}>
-                        <span>Input:</span>
-                        <span>{fmt(s().input)}</span>
-                      </div>
-
-                      <div class="flex justify-between pl-3" style={{ color: "var(--text-weak)" }}>
-                        <span>Cache:</span>
-                        <span>{fmt(s().cacheTotal)}</span>
-                      </div>
-                      <Show when={s().cacheRead > 0 || s().cacheWrite > 0}>
-                        <div class="flex justify-between pl-6" style={{ color: "var(--text-weak)", opacity: 0.8 }}>
-                          <span>read / write:</span>
-                          <span>{fmt(s().cacheRead)} / {fmt(s().cacheWrite)}</span>
-                        </div>
-                      </Show>
-
-                      <div class="flex justify-between">
-                        <span>Output:</span>
-                        <span>{fmt(s().output)}</span>
-                      </div>
-
-                      <Show when={s().reasoning > 0}>
-                        <div class="flex justify-between">
-                          <span>Reasoning:</span>
-                          <span>{fmt(s().reasoning)}</span>
-                        </div>
-                      </Show>
-
-                      <Show when={s().estimatedCost !== null}>
-                        <div class="flex justify-between pt-1.5 mt-1" style={{ "border-top": "1px solid var(--border-base)" }}>
-                          <span>Estimate:</span>
-                          <span>{usd.format(s().estimatedCost || 0)}</span>
-                        </div>
-                      </Show>
-
-                      <div class="flex justify-between">
-                        <span>Cost:</span>
-                        <span>{s().cost} <span class="opacity-60" style={{ "font-family": "inherit" }}>(session)</span></span>
-                      </div>
-
-                      <Show when={quota.loading}>
-                        <div class="pt-1.5 mt-1 text-[11px]" style={{ "border-top": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
-                          Loading quota...
-                        </div>
-                      </Show>
-
-                      <Show when={quota.error && !quota.loading}>
-                        <div class="pt-1.5 mt-1 text-[11px]" style={{ "border-top": "1px solid var(--border-base)", color: "var(--text-critical-base)" }}>
-                          Quota unavailable
-                        </div>
-                      </Show>
-
-                      <Show when={quota() && !quota.loading && !quota.error}>
-                        <div class="pt-1.5 mt-1 space-y-2" style={{ "border-top": "1px solid var(--border-base)" }}>
-                          <div class="flex items-center justify-between gap-2 font-sans">
-                            <span class="font-medium" style={{ color: "var(--text-strong)" }}>Quota</span>
-                            <span class="text-[10px]" style={{ color: "var(--text-weak)" }}>
-                              {quota()!.summary.availableProviders.length} available / {quota()!.summary.unavailableProviders.length} unavailable
-                            </span>
-                          </div>
-
-                          <Show when={quotaProvider()} fallback={
-                            <div class="text-[11px] font-sans" style={{ color: "var(--text-weak)" }}>
-                              No quota provider matched this composer.
-                            </div>
-                          }>
-                            <div
-                              class="rounded-md px-2.5 py-2 space-y-2 font-sans"
-                              style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)" }}
-                            >
-                              <div class="flex items-center justify-between gap-2">
-                                <span class="min-w-0 truncate font-medium" style={{ color: "var(--text-strong)" }}>
-                                  {quotaProvider()!.name}
-                                </span>
-                                <span
-                                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
-                                  style={{
-                                    background: quotaStatus(quotaProvider()!.status).background,
-                                    color: quotaStatus(quotaProvider()!.status).color,
-                                    border: quotaStatus(quotaProvider()!.status).border,
-                                  }}
-                                >
-                                  {quotaStatus(quotaProvider()!.status).label}
-                                </span>
-                              </div>
-
-                              <Show when={quotaProvider()!.warning}>
-                                {(message) => (
-                                  <div class="text-[10px] leading-snug" style={{ color: "var(--status-warning-text)" }}>
-                                    {message()}
-                                  </div>
-                                )}
-                              </Show>
-
-                              <Show when={quotaProvider()!.entries.length > 0} fallback={
-                                <div class="text-[11px]" style={{ color: "var(--text-weak)" }}>
-                                  No quota limits reported.
-                                </div>
-                              }>
-                                <div class="space-y-1.5">
-                                  <For each={quotaProvider()!.entries.slice(0, 3)}>
-                                    {(entry) => {
-                                      const percent = quotaPercent(entry)
-                                      return (
-                                        <div class="space-y-1">
-                                          <div class="flex items-center justify-between gap-2 text-[11px]">
-                                            <span class="min-w-0 truncate" style={{ color: "var(--text-base)" }}>
-                                              {entry.label}
-                                            </span>
-                                            <span class="shrink-0" style={{ color: "var(--text-weak)" }}>
-                                              {entry.unlimited ? "Unlimited" : entry.used !== undefined && entry.total !== undefined
-                                                ? `${entry.used.toLocaleString()} / ${entry.total.toLocaleString()}`
-                                                : entry.percentUsed !== undefined
-                                                  ? `${Math.round(entry.percentUsed)}% used`
-                                                : entry.remaining !== undefined
-                                                  ? `${entry.remaining.toLocaleString()} remaining`
-                                                  : "-"}
-                                            </span>
-                                          </div>
-                                          <Show when={quotaResetLabel(entry)}>
-                                            {(label) => (
-                                              <div class="text-[10px]" style={{ color: "var(--text-weak)" }}>
-                                                {label()}
-                                              </div>
-                                            )}
-                                          </Show>
-                                          <Show when={percent !== null}>
-                                            <div class="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--background-base)" }}>
-                                              <div
-                                                class="h-full rounded-full transition-all duration-300"
-                                                style={{ width: `${percent}%`, background: quotaBarColor(percent) }}
-                                              />
-                                            </div>
-                                          </Show>
-                                        </div>
-                                      )
-                                    }}
-                                  </For>
-                                </div>
-                              </Show>
-                            </div>
-                          </Show>
-                        </div>
-                      </Show>
-                    </div>
-                  </div>
-                </Portal>
+      <Show when={!props.loading()}>
+        <Show when={actionMode()}>
+          {/* Right-side action column: ensure vertical centering on mobile and desktop */}
+          <div class="flex items-center h-full">
+          {/* Absolute-position the Send button so it's always vertically centered relative to this container */}
+          <button
+            type="button"
+            class="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2 text-[11px] font-medium transition-opacity hover:opacity-100 touch-manipulation absolute right-2 top-1/2 -translate-y-1/2"
+              type="button"
+              class="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2 text-[11px] font-medium transition-opacity hover:opacity-100 touch-manipulation self-center"
+              style={actionMode() === "stop"
+                ? {
+                  background: "var(--status-danger-dim)",
+                  color: "var(--status-danger-text)",
+                  border: "1px solid var(--status-danger-border)",
+                }
+                : {
+                  background: "var(--interactive-base)",
+                  color: "var(--text-on-interactive)",
+                }}
+              title={actionMode() === "queue" ? "Add to queue" : actionMode() === "stop" ? "Stop generation (Esc Esc)" : "Click or press Enter to send"}
+              aria-label={actionMode() === "queue" ? "Add to queue" : actionMode() === "stop" ? "Stop generation" : "Send message"}
+              onClick={() => (actionMode() === "stop" ? props.onAbort() : props.onAction())}
+            >
+              <div class="uppercase tracking-wide">
+                {actionMode() === "queue" ? "ADD TO QUEUE" : actionMode() === "stop" ? "STOP" : "SEND"}
+              </div>
+              <Show when={actionMode() === "stop"} fallback={<CornerDownLeft class="w-4 h-4" />}>
+                <Square class="w-4 h-4" />
               </Show>
-            </div>
-
-            <span class="flex items-center gap-1 shrink-0 text-[10px]">
-              <span class="opacity-60">Cost</span>
-              <span style={{ color: "var(--text-base)" }}>{s().cost}</span>
-            </span>
-
-            <ConnectionBadge />
+            </button>
           </div>
-        )}
+        </Show>
       </Show>
-      </div>
+    </div>
   )
 }

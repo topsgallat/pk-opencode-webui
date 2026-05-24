@@ -1,0 +1,39 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e96]:
+      - generic [ref=e98]: Review
+      - generic [ref=e100]:
+        - img [ref=e101]
+        - generic [ref=e106]: Review Panel
+        - generic [ref=e107]: Changes will appear here when the AI modifies files
+    - navigation [ref=e74]:
+      - button "Chat" [ref=e75] [cursor=pointer]:
+        - img [ref=e76]
+        - generic [ref=e78]: Chat
+      - button "Sessions" [ref=e79] [cursor=pointer]:
+        - img [ref=e80]
+        - generic [ref=e82]: Sessions
+      - button "Review" [active] [ref=e83] [cursor=pointer]:
+        - img [ref=e84]
+        - generic [ref=e89]: Review
+      - button "Settings" [ref=e90] [cursor=pointer]:
+        - img [ref=e91]
+        - generic [ref=e94]: Settings
+  - generic [ref=e109]:
+    - button "Review" [ref=e111] [cursor=pointer]:
+      - img [ref=e112]
+      - generic [ref=e117]: Review
+    - generic [ref=e118]:
+      - button "Refresh" [ref=e120] [cursor=pointer]:
+        - img [ref=e121]
+      - button [ref=e126] [cursor=pointer]:
+        - img [ref=e127]
+    - generic [ref=e129]:
+      - tablist [ref=e131]:
+        - tab "0 Changes" [selected] [ref=e133] [cursor=pointer]
+        - tab "All Files" [ref=e135] [cursor=pointer]
+      - tabpanel [ref=e136]:
+        - generic [ref=e138]: No changes in this session
+        - generic [ref=e140]:
+          - img [ref=e141]
+          - generic [ref=e146]: No changes in this session

@@ -1,0 +1,426 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Open Project" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - button "Open Project" [ref=e10] [cursor=pointer]:
+      - img [ref=e11]
+    - generic [ref=e12]:
+      - 'button "Terminal (Ctrl+`)" [ref=e13] [cursor=pointer]':
+        - img [ref=e14]
+      - generic [ref=e17]:
+        - 'button "Server: Local" [ref=e18] [cursor=pointer]':
+          - img [ref=e19]
+        - button "Local http://127.0.0.1:4096" [ref=e56] [cursor=pointer]:
+          - img [ref=e57]
+          - generic [ref=e59]:
+            - generic [ref=e60]: Local
+            - generic [ref=e61]: http://127.0.0.1:4096
+      - button "Settings" [active] [ref=e22] [cursor=pointer]:
+        - img [ref=e23]
+  - main [ref=e27]:
+    - generic [ref=e62]:
+      - generic [ref=e63]: "PATCH LOADED: Settings patch is active"
+      - generic [ref=e64]:
+        - generic [ref=e65]: Settings
+        - generic [ref=e66]:
+          - button "Providers Global" [ref=e67] [cursor=pointer]:
+            - img [ref=e68]
+            - generic [ref=e70]: Providers
+            - generic [ref=e71]: Global
+          - button "Git Global" [ref=e72] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e77]: Git
+            - generic [ref=e78]: Global
+          - button "MCP Servers Global + Project" [ref=e79] [cursor=pointer]:
+            - img [ref=e80]
+            - generic [ref=e83]: MCP Servers
+            - generic [ref=e84]: Global + Project
+          - button "Prompts" [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+            - generic [ref=e88]: Prompts
+          - button "Instructions" [ref=e89] [cursor=pointer]:
+            - img [ref=e90]
+            - generic [ref=e92]: Instructions
+          - button "Appearance" [ref=e93] [cursor=pointer]:
+            - img [ref=e94]
+            - generic [ref=e100]: Appearance
+          - button "Sounds" [ref=e101] [cursor=pointer]:
+            - img [ref=e102]
+            - generic [ref=e106]: Sounds
+          - button "Servers" [ref=e107] [cursor=pointer]:
+            - img [ref=e108]
+            - generic [ref=e111]: Servers
+      - generic [ref=e114]:
+        - generic [ref=e115]:
+          - heading "Providers" [level=1] [ref=e116]
+          - paragraph [ref=e117]: Connect AI providers to enable chat functionality
+        - generic [ref=e118]:
+          - generic [ref=e119]:
+            - heading "Connected Providers" [level=2] [ref=e120]
+            - 'button "Debug: patch check" [ref=e121] [cursor=pointer]'
+          - generic [ref=e124]:
+            - generic [ref=e125]:
+              - img [ref=e127]
+              - generic [ref=e129]: OpenCode Zen
+            - generic [ref=e130]:
+              - generic [ref=e131]: Connected
+              - button "Add account" [ref=e132] [cursor=pointer]:
+                - img [ref=e133]
+                - text: Add account
+        - generic [ref=e134]:
+          - heading "Add Provider" [level=2] [ref=e136]
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - img [ref=e141]
+              - textbox "Search providers..." [ref=e144]
+            - generic [ref=e145]:
+              - button "OpenCode Zen Recommended 6 models" [ref=e146] [cursor=pointer]:
+                - generic [ref=e147]:
+                  - generic [ref=e148]: OpenCode Zen
+                  - generic [ref=e149]: Recommended
+                - generic [ref=e150]: 6 models
+              - button "Anthropic 24 models" [ref=e151] [cursor=pointer]:
+                - generic [ref=e153]: Anthropic
+                - generic [ref=e154]: 24 models
+              - button "GitHub Copilot 27 models" [ref=e155] [cursor=pointer]:
+                - generic [ref=e157]: GitHub Copilot
+                - generic [ref=e158]: 27 models
+              - button "OpenAI 54 models" [ref=e159] [cursor=pointer]:
+                - generic [ref=e161]: OpenAI
+                - generic [ref=e162]: 54 models
+              - button "Google 37 models" [ref=e163] [cursor=pointer]:
+                - generic [ref=e165]: Google
+                - generic [ref=e166]: 37 models
+              - button "OpenRouter 179 models" [ref=e167] [cursor=pointer]:
+                - generic [ref=e169]: OpenRouter
+                - generic [ref=e170]: 179 models
+              - button "302.AI 95 models" [ref=e171] [cursor=pointer]:
+                - generic [ref=e173]: 302.AI
+                - generic [ref=e174]: 95 models
+              - button "Abacus 65 models" [ref=e175] [cursor=pointer]:
+                - generic [ref=e177]: Abacus
+                - generic [ref=e178]: 65 models
+              - button "abliteration.ai 1 models" [ref=e179] [cursor=pointer]:
+                - generic [ref=e181]: abliteration.ai
+                - generic [ref=e182]: 1 models
+              - button "AIHubMix 52 models" [ref=e183] [cursor=pointer]:
+                - generic [ref=e185]: AIHubMix
+                - generic [ref=e186]: 52 models
+              - button "Alibaba 47 models" [ref=e187] [cursor=pointer]:
+                - generic [ref=e189]: Alibaba
+                - generic [ref=e190]: 47 models
+              - button "Alibaba (China) 80 models" [ref=e191] [cursor=pointer]:
+                - generic [ref=e193]: Alibaba (China)
+                - generic [ref=e194]: 80 models
+              - button "Alibaba Coding Plan 9 models" [ref=e195] [cursor=pointer]:
+                - generic [ref=e197]: Alibaba Coding Plan
+                - generic [ref=e198]: 9 models
+              - button "Alibaba Coding Plan (China) 9 models" [ref=e199] [cursor=pointer]:
+                - generic [ref=e201]: Alibaba Coding Plan (China)
+                - generic [ref=e202]: 9 models
+              - button "Amazon Bedrock 94 models" [ref=e203] [cursor=pointer]:
+                - generic [ref=e205]: Amazon Bedrock
+                - generic [ref=e206]: 94 models
+              - button "Azure 108 models" [ref=e207] [cursor=pointer]:
+                - generic [ref=e209]: Azure
+                - generic [ref=e210]: 108 models
+              - button "Azure Cognitive Services 100 models" [ref=e211] [cursor=pointer]:
+                - generic [ref=e213]: Azure Cognitive Services
+                - generic [ref=e214]: 100 models
+              - button "Bailing 2 models" [ref=e215] [cursor=pointer]:
+                - generic [ref=e217]: Bailing
+                - generic [ref=e218]: 2 models
+              - button "Baseten 13 models" [ref=e219] [cursor=pointer]:
+                - generic [ref=e221]: Baseten
+                - generic [ref=e222]: 13 models
+              - button "Berget.AI 5 models" [ref=e223] [cursor=pointer]:
+                - generic [ref=e225]: Berget.AI
+                - generic [ref=e226]: 5 models
+              - button "Cerebras 4 models" [ref=e227] [cursor=pointer]:
+                - generic [ref=e229]: Cerebras
+                - generic [ref=e230]: 4 models
+              - button "Chutes 70 models" [ref=e231] [cursor=pointer]:
+                - generic [ref=e233]: Chutes
+                - generic [ref=e234]: 70 models
+              - button "Clarifai 11 models" [ref=e235] [cursor=pointer]:
+                - generic [ref=e237]: Clarifai
+                - generic [ref=e238]: 11 models
+              - button "CloudFerro Sherlock 5 models" [ref=e239] [cursor=pointer]:
+                - generic [ref=e241]: CloudFerro Sherlock
+                - generic [ref=e242]: 5 models
+              - button "Cloudflare AI Gateway 75 models" [ref=e243] [cursor=pointer]:
+                - generic [ref=e245]: Cloudflare AI Gateway
+                - generic [ref=e246]: 75 models
+              - button "Cloudflare Workers AI 8 models" [ref=e247] [cursor=pointer]:
+                - generic [ref=e249]: Cloudflare Workers AI
+                - generic [ref=e250]: 8 models
+              - button "Cohere 12 models" [ref=e251] [cursor=pointer]:
+                - generic [ref=e253]: Cohere
+                - generic [ref=e254]: 12 models
+              - button "Cortecs 34 models" [ref=e255] [cursor=pointer]:
+                - generic [ref=e257]: Cortecs
+                - generic [ref=e258]: 34 models
+              - button "D.Run (China) 3 models" [ref=e259] [cursor=pointer]:
+                - generic [ref=e261]: D.Run (China)
+                - generic [ref=e262]: 3 models
+              - button "Deep Infra 33 models" [ref=e263] [cursor=pointer]:
+                - generic [ref=e265]: Deep Infra
+                - generic [ref=e266]: 33 models
+              - button "DeepSeek 4 models" [ref=e267] [cursor=pointer]:
+                - generic [ref=e269]: DeepSeek
+                - generic [ref=e270]: 4 models
+              - button "DigitalOcean 46 models" [ref=e271] [cursor=pointer]:
+                - generic [ref=e273]: DigitalOcean
+                - generic [ref=e274]: 46 models
+              - button "DInference 3 models" [ref=e275] [cursor=pointer]:
+                - generic [ref=e277]: DInference
+                - generic [ref=e278]: 3 models
+              - button "evroc 13 models" [ref=e279] [cursor=pointer]:
+                - generic [ref=e281]: evroc
+                - generic [ref=e282]: 13 models
+              - button "FastRouter 15 models" [ref=e283] [cursor=pointer]:
+                - generic [ref=e285]: FastRouter
+                - generic [ref=e286]: 15 models
+              - button "Fireworks AI 19 models" [ref=e287] [cursor=pointer]:
+                - generic [ref=e289]: Fireworks AI
+                - generic [ref=e290]: 19 models
+              - button "Firmware 25 models" [ref=e291] [cursor=pointer]:
+                - generic [ref=e293]: Firmware
+                - generic [ref=e294]: 25 models
+              - button "Friendli 6 models" [ref=e295] [cursor=pointer]:
+                - generic [ref=e297]: Friendli
+                - generic [ref=e298]: 6 models
+              - button "GitHub Models 55 models" [ref=e299] [cursor=pointer]:
+                - generic [ref=e301]: GitHub Models
+                - generic [ref=e302]: 55 models
+              - button "GitLab Duo 15 models" [ref=e303] [cursor=pointer]:
+                - generic [ref=e305]: GitLab Duo
+                - generic [ref=e306]: 15 models
+              - button "Groq 27 models" [ref=e307] [cursor=pointer]:
+                - generic [ref=e309]: Groq
+                - generic [ref=e310]: 27 models
+              - button "Helicone 90 models" [ref=e311] [cursor=pointer]:
+                - generic [ref=e313]: Helicone
+                - generic [ref=e314]: 90 models
+              - button "HPC-AI 3 models" [ref=e315] [cursor=pointer]:
+                - generic [ref=e317]: HPC-AI
+                - generic [ref=e318]: 3 models
+              - button "Hugging Face 24 models" [ref=e319] [cursor=pointer]:
+                - generic [ref=e321]: Hugging Face
+                - generic [ref=e322]: 24 models
+              - button "iFlow 14 models" [ref=e323] [cursor=pointer]:
+                - generic [ref=e325]: iFlow
+                - generic [ref=e326]: 14 models
+              - button "Inception 2 models" [ref=e327] [cursor=pointer]:
+                - generic [ref=e329]: Inception
+                - generic [ref=e330]: 2 models
+              - button "Inference 9 models" [ref=e331] [cursor=pointer]:
+                - generic [ref=e333]: Inference
+                - generic [ref=e334]: 9 models
+              - button "IO.NET 17 models" [ref=e335] [cursor=pointer]:
+                - generic [ref=e337]: IO.NET
+                - generic [ref=e338]: 17 models
+              - button "Jiekou.AI 61 models" [ref=e339] [cursor=pointer]:
+                - generic [ref=e341]: Jiekou.AI
+                - generic [ref=e342]: 61 models
+              - button "Kilo Gateway 337 models" [ref=e343] [cursor=pointer]:
+                - generic [ref=e345]: Kilo Gateway
+                - generic [ref=e346]: 337 models
+              - button "Kimi For Coding 3 models" [ref=e347] [cursor=pointer]:
+                - generic [ref=e349]: Kimi For Coding
+                - generic [ref=e350]: 3 models
+              - button "KUAE Cloud Coding Plan 1 models" [ref=e351] [cursor=pointer]:
+                - generic [ref=e353]: KUAE Cloud Coding Plan
+                - generic [ref=e354]: 1 models
+              - button "Llama 7 models" [ref=e355] [cursor=pointer]:
+                - generic [ref=e357]: Llama
+                - generic [ref=e358]: 7 models
+              - button "LLM Gateway 185 models" [ref=e359] [cursor=pointer]:
+                - generic [ref=e361]: LLM Gateway
+                - generic [ref=e362]: 185 models
+              - button "LMStudio 3 models" [ref=e363] [cursor=pointer]:
+                - generic [ref=e365]: LMStudio
+                - generic [ref=e366]: 3 models
+              - button "LucidQuery AI 2 models" [ref=e367] [cursor=pointer]:
+                - generic [ref=e369]: LucidQuery AI
+                - generic [ref=e370]: 2 models
+              - button "Meganova 19 models" [ref=e371] [cursor=pointer]:
+                - generic [ref=e373]: Meganova
+                - generic [ref=e374]: 19 models
+              - button "MiniMax (minimax.io) 6 models" [ref=e375] [cursor=pointer]:
+                - generic [ref=e377]: MiniMax (minimax.io)
+                - generic [ref=e378]: 6 models
+              - button "MiniMax (minimaxi.com) 6 models" [ref=e379] [cursor=pointer]:
+                - generic [ref=e381]: MiniMax (minimaxi.com)
+                - generic [ref=e382]: 6 models
+              - button "MiniMax Coding Plan (minimax.io) 6 models" [ref=e383] [cursor=pointer]:
+                - generic [ref=e385]: MiniMax Coding Plan (minimax.io)
+                - generic [ref=e386]: 6 models
+              - button "MiniMax Coding Plan (minimaxi.com) 6 models" [ref=e387] [cursor=pointer]:
+                - generic [ref=e389]: MiniMax Coding Plan (minimaxi.com)
+                - generic [ref=e390]: 6 models
+              - button "Mistral 27 models" [ref=e391] [cursor=pointer]:
+                - generic [ref=e393]: Mistral
+                - generic [ref=e394]: 27 models
+              - button "Mixlayer 5 models" [ref=e395] [cursor=pointer]:
+                - generic [ref=e397]: Mixlayer
+                - generic [ref=e398]: 5 models
+              - button "Moark 2 models" [ref=e399] [cursor=pointer]:
+                - generic [ref=e401]: Moark
+                - generic [ref=e402]: 2 models
+              - button "ModelScope 7 models" [ref=e403] [cursor=pointer]:
+                - generic [ref=e405]: ModelScope
+                - generic [ref=e406]: 7 models
+              - button "Moonshot AI 7 models" [ref=e407] [cursor=pointer]:
+                - generic [ref=e409]: Moonshot AI
+                - generic [ref=e410]: 7 models
+              - button "Moonshot AI (China) 7 models" [ref=e411] [cursor=pointer]:
+                - generic [ref=e413]: Moonshot AI (China)
+                - generic [ref=e414]: 7 models
+              - button "Morph 3 models" [ref=e415] [cursor=pointer]:
+                - generic [ref=e417]: Morph
+                - generic [ref=e418]: 3 models
+              - button "NanoGPT 525 models" [ref=e419] [cursor=pointer]:
+                - generic [ref=e421]: NanoGPT
+                - generic [ref=e422]: 525 models
+              - button "Nebius Token Factory 49 models" [ref=e423] [cursor=pointer]:
+                - generic [ref=e425]: Nebius Token Factory
+                - generic [ref=e426]: 49 models
+              - button "Nova 2 models" [ref=e427] [cursor=pointer]:
+                - generic [ref=e429]: Nova
+                - generic [ref=e430]: 2 models
+              - button "NovitaAI 99 models" [ref=e431] [cursor=pointer]:
+                - generic [ref=e433]: NovitaAI
+                - generic [ref=e434]: 99 models
+              - button "Nvidia 79 models" [ref=e435] [cursor=pointer]:
+                - generic [ref=e437]: Nvidia
+                - generic [ref=e438]: 79 models
+              - button "Ollama Cloud 39 models" [ref=e439] [cursor=pointer]:
+                - generic [ref=e441]: Ollama Cloud
+                - generic [ref=e442]: 39 models
+              - button "OpenCode Go 14 models" [ref=e443] [cursor=pointer]:
+                - generic [ref=e445]: OpenCode Go
+                - generic [ref=e446]: 14 models
+              - button "OVHcloud AI Endpoints 10 models" [ref=e447] [cursor=pointer]:
+                - generic [ref=e449]: OVHcloud AI Endpoints
+                - generic [ref=e450]: 10 models
+              - button "Perplexity 4 models" [ref=e451] [cursor=pointer]:
+                - generic [ref=e453]: Perplexity
+                - generic [ref=e454]: 4 models
+              - button "Perplexity Agent 16 models" [ref=e455] [cursor=pointer]:
+                - generic [ref=e457]: Perplexity Agent
+                - generic [ref=e458]: 16 models
+              - button "Poe 132 models" [ref=e459] [cursor=pointer]:
+                - generic [ref=e461]: Poe
+                - generic [ref=e462]: 132 models
+              - button "Privatemode AI 5 models" [ref=e463] [cursor=pointer]:
+                - generic [ref=e465]: Privatemode AI
+                - generic [ref=e466]: 5 models
+              - button "QiHang 9 models" [ref=e467] [cursor=pointer]:
+                - generic [ref=e469]: QiHang
+                - generic [ref=e470]: 9 models
+              - button "Qiniu 91 models" [ref=e471] [cursor=pointer]:
+                - generic [ref=e473]: Qiniu
+                - generic [ref=e474]: 91 models
+              - button "Regolo AI 13 models" [ref=e475] [cursor=pointer]:
+                - generic [ref=e477]: Regolo AI
+                - generic [ref=e478]: 13 models
+              - button "Requesty 38 models" [ref=e479] [cursor=pointer]:
+                - generic [ref=e481]: Requesty
+                - generic [ref=e482]: 38 models
+              - button "SAP AI Core 23 models" [ref=e483] [cursor=pointer]:
+                - generic [ref=e485]: SAP AI Core
+                - generic [ref=e486]: 23 models
+              - button "Scaleway 16 models" [ref=e487] [cursor=pointer]:
+                - generic [ref=e489]: Scaleway
+                - generic [ref=e490]: 16 models
+              - button "SiliconFlow 74 models" [ref=e491] [cursor=pointer]:
+                - generic [ref=e493]: SiliconFlow
+                - generic [ref=e494]: 74 models
+              - button "SiliconFlow (China) 81 models" [ref=e495] [cursor=pointer]:
+                - generic [ref=e497]: SiliconFlow (China)
+                - generic [ref=e498]: 81 models
+              - button "STACKIT 8 models" [ref=e499] [cursor=pointer]:
+                - generic [ref=e501]: STACKIT
+                - generic [ref=e502]: 8 models
+              - button "StepFun 4 models" [ref=e503] [cursor=pointer]:
+                - generic [ref=e505]: StepFun
+                - generic [ref=e506]: 4 models
+              - button "submodel 9 models" [ref=e507] [cursor=pointer]:
+                - generic [ref=e509]: submodel
+                - generic [ref=e510]: 9 models
+              - button "Synthetic 32 models" [ref=e511] [cursor=pointer]:
+                - generic [ref=e513]: Synthetic
+                - generic [ref=e514]: 32 models
+              - button "Tencent Coding Plan (China) 8 models" [ref=e515] [cursor=pointer]:
+                - generic [ref=e517]: Tencent Coding Plan (China)
+                - generic [ref=e518]: 8 models
+              - button "Tencent TokenHub 1 models" [ref=e519] [cursor=pointer]:
+                - generic [ref=e521]: Tencent TokenHub
+                - generic [ref=e522]: 1 models
+              - button "The Grid AI 3 models" [ref=e523] [cursor=pointer]:
+                - generic [ref=e525]: The Grid AI
+                - generic [ref=e526]: 3 models
+              - button "Together AI 17 models" [ref=e527] [cursor=pointer]:
+                - generic [ref=e529]: Together AI
+                - generic [ref=e530]: 17 models
+              - button "Upstage 3 models" [ref=e531] [cursor=pointer]:
+                - generic [ref=e533]: Upstage
+                - generic [ref=e534]: 3 models
+              - button "v0 3 models" [ref=e535] [cursor=pointer]:
+                - generic [ref=e537]: v0
+                - generic [ref=e538]: 3 models
+              - button "Venice AI 66 models" [ref=e539] [cursor=pointer]:
+                - generic [ref=e541]: Venice AI
+                - generic [ref=e542]: 66 models
+              - button "Vercel AI Gateway 241 models" [ref=e543] [cursor=pointer]:
+                - generic [ref=e545]: Vercel AI Gateway
+                - generic [ref=e546]: 241 models
+              - button "Vertex 30 models" [ref=e547] [cursor=pointer]:
+                - generic [ref=e549]: Vertex
+                - generic [ref=e550]: 30 models
+              - button "Vertex (Anthropic) 12 models" [ref=e551] [cursor=pointer]:
+                - generic [ref=e553]: Vertex (Anthropic)
+                - generic [ref=e554]: 12 models
+              - button "Vivgrid 12 models" [ref=e555] [cursor=pointer]:
+                - generic [ref=e557]: Vivgrid
+                - generic [ref=e558]: 12 models
+              - button "Vultr 5 models" [ref=e559] [cursor=pointer]:
+                - generic [ref=e561]: Vultr
+                - generic [ref=e562]: 5 models
+              - button "Wafer 2 models" [ref=e563] [cursor=pointer]:
+                - generic [ref=e565]: Wafer
+                - generic [ref=e566]: 2 models
+              - button "Weights & Biases 17 models" [ref=e567] [cursor=pointer]:
+                - generic [ref=e569]: Weights & Biases
+                - generic [ref=e570]: 17 models
+              - button "xAI 25 models" [ref=e571] [cursor=pointer]:
+                - generic [ref=e573]: xAI
+                - generic [ref=e574]: 25 models
+              - button "Xiaomi 5 models" [ref=e575] [cursor=pointer]:
+                - generic [ref=e577]: Xiaomi
+                - generic [ref=e578]: 5 models
+              - button "Xiaomi Token Plan (China) 5 models" [ref=e579] [cursor=pointer]:
+                - generic [ref=e581]: Xiaomi Token Plan (China)
+                - generic [ref=e582]: 5 models
+              - button "Xiaomi Token Plan (Europe) 5 models" [ref=e583] [cursor=pointer]:
+                - generic [ref=e585]: Xiaomi Token Plan (Europe)
+                - generic [ref=e586]: 5 models
+              - button "Xiaomi Token Plan (Singapore) 5 models" [ref=e587] [cursor=pointer]:
+                - generic [ref=e589]: Xiaomi Token Plan (Singapore)
+                - generic [ref=e590]: 5 models
+              - button "Z.AI 13 models" [ref=e591] [cursor=pointer]:
+                - generic [ref=e593]: Z.AI
+                - generic [ref=e594]: 13 models
+              - button "Z.AI Coding Plan 4 models" [ref=e595] [cursor=pointer]:
+                - generic [ref=e597]: Z.AI Coding Plan
+                - generic [ref=e598]: 4 models
+              - button "ZenMux 89 models" [ref=e599] [cursor=pointer]:
+                - generic [ref=e601]: ZenMux
+                - generic [ref=e602]: 89 models
+              - button "Zhipu AI 12 models" [ref=e603] [cursor=pointer]:
+                - generic [ref=e605]: Zhipu AI
+                - generic [ref=e606]: 12 models
+              - button "Zhipu AI Coding Plan 4 models" [ref=e607] [cursor=pointer]:
+                - generic [ref=e609]: Zhipu AI Coding Plan
+                - generic [ref=e610]: 4 models

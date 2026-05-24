@@ -1,0 +1,14 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Open Project" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - button "Open Project" [ref=e10] [cursor=pointer]:
+      - img [ref=e11]
+    - generic [ref=e12]:
+      - 'button "Terminal (Ctrl+`)" [ref=e13] [cursor=pointer]'
+      - 'button "Server: Local" [ref=e18] [cursor=pointer]'
+      - button "Settings" [ref=e22] [cursor=pointer]
+  - main [ref=e27]:
+    - generic [ref=e28]:
+      - img [ref=e29]
+      - generic [ref=e46]

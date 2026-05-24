@@ -1,0 +1,91 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Open Project" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - button "Open Project" [ref=e10] [cursor=pointer]:
+      - img [ref=e11]
+    - generic [ref=e12]:
+      - 'button "Terminal (Ctrl+`)" [ref=e13] [cursor=pointer]':
+        - img [ref=e14]
+      - generic [ref=e17]:
+        - 'button "Server: Local" [ref=e18] [cursor=pointer]':
+          - img [ref=e19]
+        - generic [ref=e55]:
+          - button "Local http://127.0.0.1:4096" [ref=e663] [cursor=pointer]:
+            - img [ref=e664]
+            - generic [ref=e666]:
+              - generic [ref=e667]: Local
+              - generic [ref=e668]: http://127.0.0.1:4096
+          - button "Main http://192.168.1.173:4096" [ref=e669] [cursor=pointer]:
+            - img [ref=e670]
+            - generic [ref=e672]:
+              - generic [ref=e673]: Main
+              - generic [ref=e674]: http://192.168.1.173:4096
+      - button "Settings" [ref=e22] [cursor=pointer]:
+        - img [ref=e23]
+  - main [ref=e27]:
+    - generic [ref=e62]:
+      - generic [ref=e63]: "PATCH LOADED: Settings patch is active"
+      - generic [ref=e64]:
+        - generic [ref=e65]: Settings
+        - generic [ref=e66]:
+          - button "Providers Global" [ref=e67] [cursor=pointer]:
+            - img [ref=e68]
+            - generic [ref=e70]: Providers
+            - generic [ref=e71]: Global
+          - button "Git Global" [ref=e72] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e77]: Git
+            - generic [ref=e78]: Global
+          - button "MCP Servers Global + Project" [ref=e79] [cursor=pointer]:
+            - img [ref=e80]
+            - generic [ref=e83]: MCP Servers
+            - generic [ref=e84]: Global + Project
+          - button "Prompts" [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+            - generic [ref=e88]: Prompts
+          - button "Instructions" [ref=e89] [cursor=pointer]:
+            - img [ref=e90]
+            - generic [ref=e92]: Instructions
+          - button "Appearance" [ref=e93] [cursor=pointer]:
+            - img [ref=e94]
+            - generic [ref=e100]: Appearance
+          - button "Sounds" [ref=e101] [cursor=pointer]:
+            - img [ref=e102]
+            - generic [ref=e106]: Sounds
+          - button "Servers" [ref=e107] [cursor=pointer]:
+            - img [ref=e108]
+            - generic [ref=e111]: Servers
+      - generic [ref=e615]:
+        - generic [ref=e616]:
+          - heading "OpenCode Backends" [level=1] [ref=e617]
+          - paragraph [ref=e618]: Manage connections to multiple OpenCode backend endpoints
+        - generic [ref=e619]:
+          - generic [ref=e620]:
+            - heading "Servers (2)" [level=2] [ref=e675]
+            - button "+ Add Server" [ref=e622] [cursor=pointer]
+          - generic [ref=e623]:
+            - generic [ref=e676]:
+              - generic [ref=e677]:
+                - generic [ref=e678]:
+                  - generic [ref=e679]: Local
+                  - generic [ref=e680]: Default
+                - paragraph [ref=e681]: http://127.0.0.1:4096
+              - generic [ref=e682]:
+                - button "Edit server" [ref=e683] [cursor=pointer]:
+                  - img [ref=e684]
+                - button "Delete server" [ref=e687] [cursor=pointer]:
+                  - img [ref=e688]
+            - generic [ref=e691]:
+              - generic:
+                - generic [ref=e692]: Main
+                - paragraph: http://192.168.1.173:4096
+              - generic [ref=e693]:
+                - button "Set Default" [ref=e694] [cursor=pointer]
+                - button "Edit server" [ref=e695] [cursor=pointer]:
+                  - img [ref=e696]
+                - button "Delete server" [ref=e699] [cursor=pointer]:
+                  - img [ref=e700]
+        - generic [ref=e639]:
+          - heading "About Servers" [level=3] [ref=e640]
+          - paragraph [ref=e641]: Add multiple OpenCode backends to switch between them. Each backend maintains its own sessions, projects, and server-scoped UI state.

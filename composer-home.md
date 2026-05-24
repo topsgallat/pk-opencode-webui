@@ -1,0 +1,23 @@
+- generic [ref=e4] [box=0,0,1280,900]:
+  - generic [ref=e5] [box=0,0,64,900]:
+    - button "Open Project" [ref=e6] [cursor=pointer] [box=0,0,63,65]:
+      - img [ref=e7] [box=16,12,32,40]
+    - button "Open Project" [ref=e11] [cursor=pointer] [box=12,77,40,40]:
+      - img [ref=e12] [box=22,87,20,20]
+    - generic [ref=e13] [box=12,739,40,161]:
+      - 'button "Terminal (Ctrl+`)" [ref=e14] [cursor=pointer] [box=12,752,40,40]':
+        - img [ref=e15] [box=22,762,20,20]
+      - 'button "Server: Local" [ref=e19] [cursor=pointer] [box=12,800,40,40]':
+        - img [ref=e20] [box=22,810,20,20]
+      - button "Settings" [ref=e23] [cursor=pointer] [box=12,848,40,40]:
+        - img [ref=e24] [box=22,858,20,20]
+  - main [ref=e28] [box=64,0,1216,900]:
+    - generic [ref=e29] [box=506,160,332,198]:
+      - img [ref=e30] [box=522,160,300,54]
+      - generic [ref=e47] [box=522,246,300,112]:
+        - button "Open Project" [ref=e48] [cursor=pointer] [box=522,246,300,52]:
+          - img [ref=e49] [box=607,262,20,20]
+          - text: Open Project
+        - button "Clone Repository" [ref=e51] [cursor=pointer] [box=522,306,300,52]:
+          - img [ref=e52] [box=590,322,20,20]
+          - text: Clone Repository

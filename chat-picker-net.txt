@@ -1,0 +1,10 @@
+6. [GET] http://127.0.0.1:8080/provider => [200] OK
+7. [GET] http://127.0.0.1:8080/provider/auth => [200] OK
+8. [GET] http://127.0.0.1:8080/agent => [200] OK
+9. [GET] http://127.0.0.1:8080/global/config => [200] OK
+10. [GET] http://127.0.0.1:8080/mcp => [200] OK
+11. [GET] http://127.0.0.1:8080/path => [200] OK
+14. [GET] http://127.0.0.1:8080/global/config => [200] OK
+15. [GET] http://127.0.0.1:8080/mcp => [200] OK
+
+Note: 7 static requests not shown, run with "static" option to see them.

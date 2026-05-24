@@ -1,0 +1,75 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Home" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - generic [ref=e9]:
+      - generic "pk-opencode-webui" [ref=e10] [cursor=pointer]:
+        - generic [ref=e12]: PO
+      - button "Open Project" [ref=e13] [cursor=pointer]:
+        - img [ref=e14]
+    - generic [ref=e15]:
+      - 'button "Terminal (Ctrl+`)" [ref=e16] [cursor=pointer]':
+        - img [ref=e17]
+      - generic [ref=e20]:
+        - 'button "Server: Local" [ref=e21] [cursor=pointer]':
+          - img [ref=e22]
+        - generic "Local" [ref=e25]
+      - button "Settings" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+      - button "Server Logs" [ref=e30] [cursor=pointer]:
+        - img [ref=e31]
+  - navigation "Session list":
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - generic [ref=e37]: PO
+        - generic [ref=e38]:
+          - generic [ref=e39]: pk-opencode-webui
+          - generic [ref=e40]: ~/pk-opencode-webui
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e41] [cursor=pointer]:
+          - img [ref=e42]
+      - button "New Session" [ref=e46] [cursor=pointer]:
+        - img [ref=e47]
+        - generic [ref=e48]: New Session
+      - generic [ref=e50]:
+        - img [ref=e51]
+        - textbox "Search sessions" [ref=e54]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]:
+          - img
+      - listbox "Sessions" [ref=e55]:
+        - generic [ref=e56]:
+          - img [ref=e57]
+          - generic [ref=e74]: Loading sessions...
+      - generic [ref=e78]: No providers
+  - main [ref=e80]:
+    - generic [ref=e83]:
+      - generic [ref=e84]:
+        - heading "New Session" [level=1] [ref=e88]
+        - generic [ref=e89]:
+          - button "MCP Servers" [ref=e90] [cursor=pointer]:
+            - img [ref=e91]
+          - button "Toggle Review Panel" [ref=e93] [cursor=pointer]:
+            - img [ref=e94]
+          - button "Toggle Info Panel" [ref=e99] [cursor=pointer]:
+            - img [ref=e100]
+          - button "Toggle Terminal" [ref=e103] [cursor=pointer]:
+            - img [ref=e104]
+          - button "Toggle completion notifications" [ref=e107] [cursor=pointer]:
+            - img [ref=e108]
+      - generic [ref=e113]:
+        - img [ref=e114]
+        - paragraph [ref=e131]: Loading chat history...
+      - generic [ref=e135]:
+        - textbox "Type a message... (@ for files, / for commands)" [active] [ref=e138]
+        - generic [ref=e139]:
+          - generic [ref=e141]:
+            - button "Upload image or PDF" [ref=e142] [cursor=pointer]:
+              - img [ref=e143]
+            - button "Attach file from project" [ref=e146] [cursor=pointer]:
+              - img [ref=e147]
+          - generic [ref=e151]:
+            - 'button "Agent: build" [ref=e152] [cursor=pointer]':
+              - generic [ref=e153]: "Agent:"
+              - generic [ref=e154]: build
+            - link "Connect a provider to start" [ref=e155] [cursor=pointer]:
+              - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aQ/settings

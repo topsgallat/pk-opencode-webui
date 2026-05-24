@@ -1,0 +1,105 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Home" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - generic [ref=e9]:
+      - generic ".github" [ref=e10] [cursor=pointer]:
+        - generic [ref=e12]: G
+      - generic "pk-opencode-webui" [ref=e13] [cursor=pointer]:
+        - generic [ref=e15]: PO
+      - button "Open Project" [ref=e16] [cursor=pointer]:
+        - img [ref=e17]
+    - generic [ref=e18]:
+      - 'button "Terminal (Ctrl+`)" [ref=e19] [cursor=pointer]':
+        - img [ref=e20]
+      - generic [ref=e23]:
+        - 'button "Server: Local" [ref=e24] [cursor=pointer]':
+          - img [ref=e25]
+        - generic "Local" [ref=e28]
+      - button "Settings" [ref=e29] [cursor=pointer]:
+        - img [ref=e30]
+      - button "Server Logs" [ref=e33] [cursor=pointer]:
+        - img [ref=e34]
+  - navigation "Session list":
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e40]: PO
+        - generic [ref=e41]:
+          - generic [ref=e42]: pk-opencode-webui
+          - generic [ref=e43]: ~/pk-opencode-webui
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e44] [cursor=pointer]:
+          - img [ref=e45]
+      - button "New Session" [ref=e49] [cursor=pointer]:
+        - img [ref=e50]
+        - generic [ref=e51]: New Session
+      - generic [ref=e53]:
+        - img [ref=e54]
+        - textbox "Search sessions" [ref=e57]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]:
+          - img
+      - listbox "Sessions" [ref=e58]:
+        - generic [ref=e59]:
+          - img [ref=e60]
+          - generic [ref=e77]: Loading sessions...
+      - generic [ref=e81]: No providers
+  - main [ref=e83]:
+    - generic [ref=e84]:
+      - generic [ref=e85]: "PATCH LOADED: Settings patch is active"
+      - generic [ref=e86]:
+        - generic [ref=e87]: Settings
+        - generic "/home/sgallat/pk-opencode-webui" [ref=e88]: pk-opencode-webui
+        - generic [ref=e89]:
+          - button "Providers Global" [ref=e90] [cursor=pointer]:
+            - img [ref=e91]
+            - generic [ref=e93]: Providers
+            - generic [ref=e94]: Global
+          - button "Git Global" [ref=e95] [cursor=pointer]:
+            - img [ref=e96]
+            - generic [ref=e100]: Git
+            - generic [ref=e101]: Global
+          - button "MCP Servers Global + Project" [ref=e102] [cursor=pointer]:
+            - img [ref=e103]
+            - generic [ref=e106]: MCP Servers
+            - generic [ref=e107]: Global + Project
+          - button "Prompts Project" [ref=e108] [cursor=pointer]:
+            - img [ref=e109]
+            - generic [ref=e111]: Prompts
+            - generic [ref=e112]: Project
+          - button "Instructions Project" [ref=e113] [cursor=pointer]:
+            - img [ref=e114]
+            - generic [ref=e116]: Instructions
+            - generic [ref=e117]: Project
+          - button "Project Config Project" [ref=e118] [cursor=pointer]:
+            - img [ref=e119]
+            - generic [ref=e122]: Project Config
+            - generic [ref=e123]: Project
+          - button "Appearance" [ref=e124] [cursor=pointer]:
+            - img [ref=e125]
+            - generic [ref=e131]: Appearance
+          - button "Sounds" [ref=e132] [cursor=pointer]:
+            - img [ref=e133]
+            - generic [ref=e137]: Sounds
+          - button "Servers" [ref=e138] [cursor=pointer]:
+            - img [ref=e139]
+            - generic [ref=e142]: Servers
+      - generic [ref=e144]:
+        - generic [ref=e145]:
+          - img [ref=e146]
+          - generic [ref=e148]: "Project: /home/sgallat/pk-opencode-webui"
+        - generic [ref=e149]:
+          - generic [ref=e150]:
+            - heading "Providers" [level=1] [ref=e151]
+            - paragraph [ref=e152]: Connect AI providers to enable chat functionality
+          - generic [ref=e153]:
+            - generic [ref=e154]:
+              - heading "Connected Providers" [level=2] [ref=e155]
+              - 'button "Debug: patch check" [ref=e156] [cursor=pointer]'
+            - generic [ref=e158]:
+              - img
+              - generic [ref=e175]: Loading connected providers...
+          - generic [ref=e176]:
+            - heading "Add Provider" [level=2] [ref=e178]
+            - generic [ref=e182]:
+              - img [ref=e183]
+              - textbox "Search providers..." [ref=e186]

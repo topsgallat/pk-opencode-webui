@@ -1,0 +1,48 @@
+- generic [ref=e68]:
+  - generic [ref=e69]:
+    - button "Open Project" [ref=e70] [cursor=pointer]:
+      - img [ref=e71]
+    - button "Open Project" [ref=e75] [cursor=pointer]:
+      - img [ref=e76]
+    - generic [ref=e77]:
+      - 'button "Terminal (Ctrl+`)" [ref=e78] [cursor=pointer]':
+        - img [ref=e79]
+      - 'button "Server: Remote 173" [ref=e83] [cursor=pointer]':
+        - img [ref=e84]
+      - button "Settings" [ref=e87] [cursor=pointer]:
+        - img [ref=e88]
+  - main [ref=e92]:
+    - generic [ref=e93]:
+      - img [ref=e94]
+      - generic [ref=e111]:
+        - button "Open Project" [ref=e112] [cursor=pointer]:
+          - img [ref=e113]
+          - text: Open Project
+        - button "Clone Repository" [ref=e115] [cursor=pointer]:
+          - img [ref=e116]
+          - text: Clone Repository
+      - generic [ref=e121]:
+        - generic [ref=e122]:
+          - heading "Open Project" [level=2] [ref=e123]
+          - button [ref=e124] [cursor=pointer]:
+            - img [ref=e125]
+        - generic [ref=e128]:
+          - generic [ref=e129]:
+            - textbox "Search directories" [active] [ref=e130]:
+              - /placeholder: Type to search... (Tab to complete, Enter to select)
+            - paragraph [ref=e131]: Use Tab to auto-complete. Click to select, double-click or Enter to open.
+          - listbox "Directory search results" [ref=e132]:
+            - option "~ /" [selected] [ref=e133] [cursor=pointer]:
+              - img [ref=e134]
+              - generic [ref=e136]:
+                - generic [ref=e137]: ~
+                - generic [ref=e138]: /
+          - button "Open" [ref=e140] [cursor=pointer]
+          - generic [ref=e141]:
+            - generic [ref=e142]: Create new folder
+            - generic [ref=e143]:
+              - textbox "my-new-project" [ref=e144]
+              - button "Create" [disabled] [ref=e145]
+          - button "Clone Git Repository" [ref=e147] [cursor=pointer]:
+            - img [ref=e148]
+            - generic [ref=e152]: Clone Git Repository

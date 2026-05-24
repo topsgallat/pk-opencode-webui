@@ -1,0 +1,103 @@
+{
+  "active_plan": "/home/sgallat/pk-opencode-webui/.sisyphus/plans/fullscreen-preview.md",
+  "started_at": "2026-05-01T12:00:00Z",
+  "session_ids": [
+    "ses_232134f5effefJDDenKDWEEe7h",
+    "ses_2319d759fffeZh7fKG8Hlp8ckK",
+    "ses_207179424ffeLH9F9Nlz9J81NH",
+    "ses_20717940effeIB84uQdCE0R75F",
+    "ses_2071793caffepARSw9fHLTYtRl",
+    "ses_20717938cffeIdn5Tw7SpudRxE",
+    "ses_2071793e4ffekFd2xbNvOb8r5Q",
+    "ses_1fca15fa6ffep7RCLEWokL9wm3",
+    "ses_1f880f57cffeN0CrdqoMUDEF2a",
+    "ses_1f880f553ffehWFeSVG8pkxqwm",
+    "ses_1f880f51affem4wfpGPvgh2IRQ",
+    "ses_1f880f4feffeqhqfL5kU28pvOZ",
+    "ses_1f880f571ffeJ3E5guuPFc1FgB",
+    "ses_1f8300c19ffeTzRnGwKmBa9wOX",
+    "ses_1f8300befffeEF2CuQ4K0zcJmA",
+    "ses_1f8300bcdffe0aYyE1gSVycF5d",
+    "ses_1f8300bafffepUz5l4oEomLFdl",
+    "ses_1f8300b8fffe6EI9u1fyWMOApN"
+  ],
+  "plan_name": "fullscreen-preview",
+  "worktree_path": "",
+  "completed": true,
+  "session_origins": {
+    "ses_232134f5effefJDDenKDWEEe7h": "direct",
+    "ses_207179424ffeLH9F9Nlz9J81NH": "appended",
+    "ses_20717940effeIB84uQdCE0R75F": "appended",
+    "ses_2071793caffepARSw9fHLTYtRl": "appended",
+    "ses_20717938cffeIdn5Tw7SpudRxE": "appended",
+    "ses_2071793e4ffekFd2xbNvOb8r5Q": "appended",
+    "ses_1fca15fa6ffep7RCLEWokL9wm3": "direct",
+    "ses_1f880f57cffeN0CrdqoMUDEF2a": "appended",
+    "ses_1f880f553ffehWFeSVG8pkxqwm": "appended",
+    "ses_1f880f51affem4wfpGPvgh2IRQ": "appended",
+    "ses_1f880f4feffeqhqfL5kU28pvOZ": "appended",
+    "ses_1f880f571ffeJ3E5guuPFc1FgB": "appended",
+    "ses_1f8300c19ffeTzRnGwKmBa9wOX": "appended",
+    "ses_1f8300befffeEF2CuQ4K0zcJmA": "appended",
+    "ses_1f8300bcdffe0aYyE1gSVycF5d": "appended",
+    "ses_1f8300bafffepUz5l4oEomLFdl": "appended",
+    "ses_1f8300b8fffe6EI9u1fyWMOApN": "appended"
+  },
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Add fullscreen state and Maximize2 button to file-viewer.tsx header",
+      "session_id": "ses_20770c2d4ffe5UiOqITuT8YJLF",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-05-05T15:34:37.576Z"
+    },
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "Implement fullscreen overlay with preview content",
+      "session_id": "ses_20770c2d4ffe5UiOqITuT8YJLF",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-05-05T16:06:15.807Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "Plan Compliance Audit — oracle",
+      "session_id": "ses_1f807f004ffeQFZKdJm5n1O0gV",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-05-08T14:22:39.657Z"
+    },
+    "final-wave:f2": {
+      "task_key": "final-wave:f2",
+      "task_label": "F2",
+      "task_title": "Code Quality Review — unspecified-high",
+      "session_id": "ses_1f8300031ffe04VCm0AajKsTFd",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-08T14:22:39.657Z"
+    },
+    "final-wave:f3": {
+      "task_key": "final-wave:f3",
+      "task_label": "F3",
+      "task_title": "Real Manual QA — unspecified-high (+ playwright if UI)",
+      "session_id": "ses_1f8300151ffem93W7UfJ2L46CK",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-08T14:22:39.657Z"
+    },
+    "final-wave:f4": {
+      "task_key": "final-wave:f4",
+      "task_label": "F4",
+      "task_title": "Scope Fidelity Check — deep",
+      "session_id": "ses_1f83000c0ffeJbLC0vUecRaUzX",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-05-08T14:22:39.657Z"
+    }
+  },
+  "agent": "atlas"
+}

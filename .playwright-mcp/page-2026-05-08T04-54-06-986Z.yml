@@ -1,0 +1,54 @@
+- generic [ref=e56]:
+  - generic [ref=e57]:
+    - button "Home" [ref=e58] [cursor=pointer]:
+      - img [ref=e59]
+    - generic [ref=e62]:
+      - generic "app-prefixable" [ref=e63] [cursor=pointer]:
+        - generic [ref=e65]: AP
+      - button "Open Project" [ref=e66] [cursor=pointer]:
+        - img [ref=e67]
+    - generic [ref=e68]:
+      - 'button "Terminal (Ctrl+`)" [ref=e69] [cursor=pointer]':
+        - img [ref=e70]
+      - generic [ref=e73]:
+        - 'button "Server: Local" [ref=e74] [cursor=pointer]':
+          - img [ref=e75]
+        - generic "Local" [ref=e78]
+      - button "Settings" [ref=e79] [cursor=pointer]:
+        - img [ref=e80]
+      - button "Server Logs" [ref=e83] [cursor=pointer]:
+        - img [ref=e84]
+  - navigation "Session list" [ref=e87]:
+    - generic [ref=e88]:
+      - generic [ref=e89]:
+        - generic [ref=e91]: AP
+        - generic [ref=e92]:
+          - generic [ref=e93]: app-prefixable
+          - generic [ref=e94]: ~/app-prefixable
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e95] [cursor=pointer]:
+          - img [ref=e96]
+      - button "New Session" [ref=e100] [cursor=pointer]:
+        - img [ref=e101]
+        - generic [ref=e102]: New Session
+      - generic [ref=e104]:
+        - img [ref=e105]
+        - textbox "Search sessions" [ref=e108]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]:
+          - img
+      - listbox "Sessions" [ref=e109]:
+        - generic [ref=e110]:
+          - paragraph [ref=e111]: No sessions yet
+          - paragraph [ref=e112]: Click "New Session" to start
+      - generic [ref=e116]: No providers
+  - main [ref=e120]:
+    - generic [ref=e122]:
+      - img [ref=e124]
+      - generic [ref=e143]:
+        - button "New Session" [ref=e144] [cursor=pointer]:
+          - img [ref=e145]
+          - generic [ref=e146]: New Session
+        - button "Settings" [ref=e147] [cursor=pointer]:
+          - img [ref=e148]
+          - generic [ref=e151]: Settings
+      - paragraph [ref=e152]: Select a session from the sidebar or start a new one

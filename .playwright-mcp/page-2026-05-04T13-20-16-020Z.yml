@@ -1,0 +1,77 @@
+- generic [ref=e7]:
+  - generic [ref=e8]:
+    - generic [ref=e9]: Question from AI
+    - button "Dismiss (Esc)" [ref=e10]
+  - generic [ref=e11]:
+    - button "Scope" [ref=e12]
+    - button "Mode" [ref=e13]
+    - button "Confirm" [ref=e14]
+  - generic [ref=e15]:
+    - generic [ref=e17]:
+      - paragraph [ref=e18]: Please review this long question before answering.
+      - paragraph [ref=e19]: "Line 1: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e20]: "Line 2: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e21]: "Line 3: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e22]: "Line 4: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e23]: "Line 5: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e24]: "Line 6: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e25]: "Line 7: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e26]: "Line 8: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e27]: "Line 9: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e28]: "Line 10: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e29]: "Line 11: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e30]: "Line 12: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e31]: "Line 13: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e32]: "Line 14: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e33]: "Line 15: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e34]: "Line 16: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e35]: "Line 17: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e36]: "Line 18: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e37]: "Line 19: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e38]: "Line 20: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e39]: "Line 21: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e40]: "Line 22: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e41]: "Line 23: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e42]:
+        - text: "Line 24: this is intentionally long content to force vertical scrolling inside the question prompt."
+        - emphasis [ref=e43]: (select all that apply)
+    - generic [ref=e44]:
+      - button "1[ ] Alpha First option" [ref=e45]:
+        - generic [ref=e46]:
+          - text: "1"
+          - generic [ref=e47]:
+            - generic [ref=e48]: "[ ]"
+            - text: Alpha
+        - paragraph [ref=e49]: First option
+      - button "2[ ] Beta Second option" [ref=e50]:
+        - generic [ref=e51]:
+          - text: "2"
+          - generic [ref=e52]:
+            - generic [ref=e53]: "[ ]"
+            - text: Beta
+        - paragraph [ref=e54]: Second option
+      - button "3[ ] Gamma Third option" [ref=e55]:
+        - generic [ref=e56]:
+          - text: "3"
+          - generic [ref=e57]:
+            - generic [ref=e58]: "[ ]"
+            - text: Gamma
+        - paragraph [ref=e59]: Third option
+      - button "4[ ] Delta Fourth option" [ref=e60]:
+        - generic [ref=e61]:
+          - text: "4"
+          - generic [ref=e62]:
+            - generic [ref=e63]: "[ ]"
+            - text: Delta
+        - paragraph [ref=e64]: Fourth option
+      - button "5[ ] Type your own answer" [ref=e66]:
+        - generic [ref=e67]:
+          - text: "5"
+          - generic [ref=e68]:
+            - generic [ref=e69]: "[ ]"
+            - text: Type your own answer
+  - generic [ref=e70]:
+    - generic [ref=e71]: Tab switch
+    - generic [ref=e72]: ↑↓ select
+    - generic [ref=e73]: Enter toggle
+    - generic [ref=e74]: Esc dismiss

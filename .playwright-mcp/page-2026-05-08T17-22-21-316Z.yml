@@ -1,0 +1,207 @@
+- generic [ref=e1]:
+  - generic [ref=e439]:
+    - generic [ref=e440]:
+      - button "Home" [ref=e441] [cursor=pointer]:
+        - img [ref=e442]
+      - generic [ref=e445]:
+        - generic "app-prefixable" [ref=e446] [cursor=pointer]:
+          - generic [ref=e448]: AP
+        - button "Open Project" [ref=e449] [cursor=pointer]:
+          - img [ref=e450]
+      - generic [ref=e451]:
+        - 'button "Terminal (Ctrl+`)" [ref=e452] [cursor=pointer]':
+          - img [ref=e453]
+        - generic [ref=e456]:
+          - 'button "Server: Local" [ref=e457] [cursor=pointer]':
+            - img [ref=e458]
+          - generic "Local" [ref=e461]
+        - button "Settings" [ref=e462] [cursor=pointer]:
+          - img [ref=e463]
+        - button "Server Logs" [ref=e466] [cursor=pointer]:
+          - img [ref=e467]
+    - navigation "Session list" [ref=e470]:
+      - generic [ref=e471]:
+        - generic [ref=e472]:
+          - generic [ref=e474]: AP
+          - generic [ref=e475]:
+            - generic [ref=e476]: app-prefixable
+            - generic [ref=e477]: ~/app-prefixable
+          - button "Collapse Sidebar (Ctrl+B)" [ref=e478] [cursor=pointer]:
+            - img [ref=e479]
+        - button "New Session" [ref=e483] [cursor=pointer]:
+          - img [ref=e484]
+          - generic [ref=e485]: New Session
+        - generic [ref=e487]:
+          - img [ref=e488]
+          - textbox "Search sessions" [ref=e491]:
+            - /placeholder: Search sessions...
+          - button "Clear search" [disabled]:
+            - img
+        - listbox "Sessions" [ref=e492]:
+          - generic [ref=e536]:
+            - text: Today
+            - option "New session - 2026-05-08T17:22:05.776Z" [selected] [ref=e538]:
+              - link "New session - 2026-05-08T17:22:05.776Z" [ref=e539] [cursor=pointer]:
+                - /url: /L2hvbWUvc2dhbGxhdC9hcHAtcHJlZml4YWJsZQ/session/ses_1f763a2afffeyIaw4zgtOzLLH4
+                - img [ref=e541]
+                - generic [ref=e544]: New session - 2026-05-08T17:22:05.776Z
+        - generic [ref=e499]: 3 provider(s)
+    - main [ref=e503]:
+      - generic [ref=e547]:
+        - generic [ref=e548]:
+          - generic [ref=e550]:
+            - heading "New session - 2026-05-08T17:22:05.776Z" [level=1] [ref=e552]
+            - paragraph [ref=e553]: ses_1f763a2afffeyIaw4zgtOzLLH4
+          - generic [ref=e554]:
+            - button "MCP Servers" [ref=e555] [cursor=pointer]:
+              - img [ref=e556]
+            - button "Toggle Review Panel" [ref=e558] [cursor=pointer]:
+              - img [ref=e559]
+            - button "Toggle Info Panel" [ref=e564] [cursor=pointer]:
+              - img [ref=e565]
+            - button "Toggle Terminal" [ref=e568] [cursor=pointer]:
+              - img [ref=e569]
+            - button "Toggle completion notifications" [ref=e572] [cursor=pointer]:
+              - img [ref=e573]
+        - generic [ref=e578]:
+          - img [ref=e580]
+          - paragraph [ref=e582]: Ready to chat
+          - paragraph [ref=e583]: Type a message below to begin
+        - generic [ref=e587]:
+          - textbox "Type a message... (@ for files, / for commands)" [ref=e590]
+          - generic [ref=e591]:
+            - generic [ref=e593]:
+              - button "Upload image or PDF" [ref=e594] [cursor=pointer]:
+                - img [ref=e595]
+              - button "Attach file from project" [ref=e598] [cursor=pointer]:
+                - img [ref=e599]
+            - generic [ref=e603]:
+              - 'button "Agent: Pentesters Sisyphus - Engagement Lead" [ref=e604] [cursor=pointer]':
+                - generic [ref=e605]: "Agent:"
+                - generic [ref=e606]: Pentesters Sisyphus - Engagement Lead
+              - 'button "Model: Big Pickle $0/$0/M" [ref=e607] [cursor=pointer]':
+                - generic [ref=e608]: "Model:"
+                - generic [ref=e609]: Big Pickle
+                - generic [ref=e610]: $0/$0/M
+  - dialog "Select Model" [ref=e619]:
+    - generic [ref=e620]:
+      - heading "Select Model" [level=2] [ref=e621]
+      - button "Close" [ref=e622] [cursor=pointer]:
+        - img [ref=e623]
+    - generic [ref=e626]:
+      - generic [ref=e627]:
+        - img [ref=e628]
+        - combobox "Filter models..." [expanded] [active] [ref=e631]
+      - generic [ref=e632]: Arrow keys to navigate-Enter to select-Esc to close
+    - listbox "Select Model" [ref=e633]:
+      - generic [ref=e634]:
+        - generic [ref=e635]: GitHub Copilot
+        - option "Gemini 3.1 Pro Preview github-copilot/gemini-3.1-pro-preview · $0/$0/M tokens" [selected] [ref=e636] [cursor=pointer]:
+          - generic [ref=e637]: Gemini 3.1 Pro Preview
+          - generic [ref=e638]: github-copilot/gemini-3.1-pro-preview · $0/$0/M tokens
+        - option "Gemini 3 Flash github-copilot/gemini-3-flash-preview · x0.33" [ref=e639] [cursor=pointer]:
+          - generic [ref=e640]: Gemini 3 Flash
+          - generic [ref=e641]: github-copilot/gemini-3-flash-preview · x0.33
+        - option "GPT-5-mini github-copilot/gpt-5-mini · x0" [ref=e642] [cursor=pointer]:
+          - generic [ref=e643]: GPT-5-mini
+          - generic [ref=e644]: github-copilot/gpt-5-mini · x0
+        - option "GPT-5.3-Codex github-copilot/gpt-5.3-codex · x1" [ref=e645] [cursor=pointer]:
+          - generic [ref=e646]: GPT-5.3-Codex
+          - generic [ref=e647]: github-copilot/gpt-5.3-codex · x1
+        - option "Gemini 2.5 Pro github-copilot/gemini-2.5-pro · x1" [ref=e648] [cursor=pointer]:
+          - generic [ref=e649]: Gemini 2.5 Pro
+          - generic [ref=e650]: github-copilot/gemini-2.5-pro · x1
+        - option "GPT-5.2 github-copilot/gpt-5.2 · x1" [ref=e651] [cursor=pointer]:
+          - generic [ref=e652]: GPT-5.2
+          - generic [ref=e653]: github-copilot/gpt-5.2 · x1
+        - option "GPT-5.4 Mini github-copilot/gpt-5.4-mini · x0.33" [ref=e654] [cursor=pointer]:
+          - generic [ref=e655]: GPT-5.4 Mini
+          - generic [ref=e656]: github-copilot/gpt-5.4-mini · x0.33
+        - option "GPT-5.2-Codex github-copilot/gpt-5.2-codex · x1" [ref=e657] [cursor=pointer]:
+          - generic [ref=e658]: GPT-5.2-Codex
+          - generic [ref=e659]: github-copilot/gpt-5.2-codex · x1
+        - option "Grok Code Fast 1 github-copilot/grok-code-fast-1 · x0.25" [ref=e660] [cursor=pointer]:
+          - generic [ref=e661]: Grok Code Fast 1
+          - generic [ref=e662]: github-copilot/grok-code-fast-1 · x0.25
+        - option "Claude Sonnet 4.5 github-copilot/claude-sonnet-4.5 · x1" [ref=e663] [cursor=pointer]:
+          - generic [ref=e664]: Claude Sonnet 4.5
+          - generic [ref=e665]: github-copilot/claude-sonnet-4.5 · x1
+        - option "Claude Opus 4.5 github-copilot/claude-opus-4.5 · x3" [ref=e666] [cursor=pointer]:
+          - generic [ref=e667]: Claude Opus 4.5
+          - generic [ref=e668]: github-copilot/claude-opus-4.5 · x3
+        - option "GPT-5.4 github-copilot/gpt-5.4 · x1" [ref=e669] [cursor=pointer]:
+          - generic [ref=e670]: GPT-5.4
+          - generic [ref=e671]: github-copilot/gpt-5.4 · x1
+        - option "GPT-4o github-copilot/gpt-4o · x0" [ref=e672] [cursor=pointer]:
+          - generic [ref=e673]: GPT-4o
+          - generic [ref=e674]: github-copilot/gpt-4o · x0
+        - option "Claude Haiku 4.5 github-copilot/claude-haiku-4.5 · x0.33" [ref=e675] [cursor=pointer]:
+          - generic [ref=e676]: Claude Haiku 4.5
+          - generic [ref=e677]: github-copilot/claude-haiku-4.5 · x0.33
+        - option "GPT-4.1 github-copilot/gpt-4.1 · x0" [ref=e678] [cursor=pointer]:
+          - generic [ref=e679]: GPT-4.1
+          - generic [ref=e680]: github-copilot/gpt-4.1 · x0
+        - option "Claude Sonnet 4.6 github-copilot/claude-sonnet-4.6 · x1" [ref=e681] [cursor=pointer]:
+          - generic [ref=e682]: Claude Sonnet 4.6
+          - generic [ref=e683]: github-copilot/claude-sonnet-4.6 · x1
+      - generic [ref=e684]:
+        - generic [ref=e685]: OpenCode Zen
+        - option "MiniMax M2.5 Free opencode/minimax-m2.5-free · $0/$0/M tokens" [ref=e686] [cursor=pointer]:
+          - generic [ref=e687]: MiniMax M2.5 Free
+          - generic [ref=e688]: opencode/minimax-m2.5-free · $0/$0/M tokens
+        - option "Big Pickle opencode/big-pickle · $0/$0/M tokens" [ref=e689] [cursor=pointer]:
+          - generic [ref=e690]: Big Pickle
+          - generic [ref=e691]: opencode/big-pickle · $0/$0/M tokens
+        - option "Hy3 preview Free opencode/hy3-preview-free · $0/$0/M tokens" [ref=e692] [cursor=pointer]:
+          - generic [ref=e693]: Hy3 preview Free
+          - generic [ref=e694]: opencode/hy3-preview-free · $0/$0/M tokens
+        - option "Nemotron 3 Super Free opencode/nemotron-3-super-free · $0/$0/M tokens" [ref=e695] [cursor=pointer]:
+          - generic [ref=e696]: Nemotron 3 Super Free
+          - generic [ref=e697]: opencode/nemotron-3-super-free · $0/$0/M tokens
+      - generic [ref=e698]:
+        - generic [ref=e699]: OpenAI
+        - option "GPT-5.1 Codex Max openai/gpt-5.1-codex-max · $0/$0/M tokens" [ref=e700] [cursor=pointer]:
+          - generic [ref=e701]: GPT-5.1 Codex Max
+          - generic [ref=e702]: openai/gpt-5.1-codex-max · $0/$0/M tokens
+        - option "GPT-5.5 openai/gpt-5.5 · $0/$0/M tokens" [ref=e703] [cursor=pointer]:
+          - generic [ref=e704]: GPT-5.5
+          - generic [ref=e705]: openai/gpt-5.5 · $0/$0/M tokens
+        - option "GPT-5.5 Fast openai/gpt-5.5-fast · $0/$0/M tokens" [ref=e706] [cursor=pointer]:
+          - generic [ref=e707]: GPT-5.5 Fast
+          - generic [ref=e708]: openai/gpt-5.5-fast · $0/$0/M tokens
+        - option "GPT-5.3 Codex openai/gpt-5.3-codex · $0/$0/M tokens" [ref=e709] [cursor=pointer]:
+          - generic [ref=e710]: GPT-5.3 Codex
+          - generic [ref=e711]: openai/gpt-5.3-codex · $0/$0/M tokens
+        - option "GPT-5.2 openai/gpt-5.2 · $0/$0/M tokens" [ref=e712] [cursor=pointer]:
+          - generic [ref=e713]: GPT-5.2
+          - generic [ref=e714]: openai/gpt-5.2 · $0/$0/M tokens
+        - option "GPT-5.4 mini openai/gpt-5.4-mini · $0/$0/M tokens" [ref=e715] [cursor=pointer]:
+          - generic [ref=e716]: GPT-5.4 mini
+          - generic [ref=e717]: openai/gpt-5.4-mini · $0/$0/M tokens
+        - option "GPT-5.4 mini Fast openai/gpt-5.4-mini-fast · $0/$0/M tokens" [ref=e718] [cursor=pointer]:
+          - generic [ref=e719]: GPT-5.4 mini Fast
+          - generic [ref=e720]: openai/gpt-5.4-mini-fast · $0/$0/M tokens
+        - option "GPT-5.2 Codex openai/gpt-5.2-codex · $0/$0/M tokens" [ref=e721] [cursor=pointer]:
+          - generic [ref=e722]: GPT-5.2 Codex
+          - generic [ref=e723]: openai/gpt-5.2-codex · $0/$0/M tokens
+        - option "GPT-5.1 Codex mini openai/gpt-5.1-codex-mini · $0/$0/M tokens" [ref=e724] [cursor=pointer]:
+          - generic [ref=e725]: GPT-5.1 Codex mini
+          - generic [ref=e726]: openai/gpt-5.1-codex-mini · $0/$0/M tokens
+        - option "GPT-5-Codex openai/gpt-5-codex · $0/$0/M tokens" [ref=e727] [cursor=pointer]:
+          - generic [ref=e728]: GPT-5-Codex
+          - generic [ref=e729]: openai/gpt-5-codex · $0/$0/M tokens
+        - option "GPT-5.4 openai/gpt-5.4 · $0/$0/M tokens" [ref=e730] [cursor=pointer]:
+          - generic [ref=e731]: GPT-5.4
+          - generic [ref=e732]: openai/gpt-5.4 · $0/$0/M tokens
+        - option "GPT-5.4 Fast openai/gpt-5.4-fast · $0/$0/M tokens" [ref=e733] [cursor=pointer]:
+          - generic [ref=e734]: GPT-5.4 Fast
+          - generic [ref=e735]: openai/gpt-5.4-fast · $0/$0/M tokens
+        - option "GPT-5.3 Codex Spark openai/gpt-5.3-codex-spark · $0/$0/M tokens" [ref=e736] [cursor=pointer]:
+          - generic [ref=e737]: GPT-5.3 Codex Spark
+          - generic [ref=e738]: openai/gpt-5.3-codex-spark · $0/$0/M tokens
+        - option "GPT-5.5 Pro openai/gpt-5.5-pro · $0/$0/M tokens" [ref=e739] [cursor=pointer]:
+          - generic [ref=e740]: GPT-5.5 Pro
+          - generic [ref=e741]: openai/gpt-5.5-pro · $0/$0/M tokens
+        - option "GPT-5.1 Codex openai/gpt-5.1-codex · $0/$0/M tokens" [ref=e742] [cursor=pointer]:
+          - generic [ref=e743]: GPT-5.1 Codex
+          - generic [ref=e744]: openai/gpt-5.1-codex · $0/$0/M tokens

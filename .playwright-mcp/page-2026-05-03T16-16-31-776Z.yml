@@ -1,0 +1,23 @@
+- generic [ref=e175]:
+  - generic [ref=e176]:
+    - button "Open Project" [ref=e177] [cursor=pointer]:
+      - img [ref=e178]
+    - button "Open Project" [ref=e182] [cursor=pointer]:
+      - img [ref=e183]
+    - generic [ref=e184]:
+      - 'button "Terminal (Ctrl+`)" [ref=e185] [cursor=pointer]':
+        - img [ref=e186]
+      - 'button "Server: Main" [ref=e190] [cursor=pointer]':
+        - img [ref=e191]
+      - button "Settings" [ref=e194] [cursor=pointer]:
+        - img [ref=e195]
+  - main [ref=e199]:
+    - generic [ref=e200]:
+      - img [ref=e201]
+      - generic [ref=e218]:
+        - button "Open Project" [ref=e219] [cursor=pointer]:
+          - img [ref=e220]
+          - text: Open Project
+        - button "Clone Repository" [ref=e222] [cursor=pointer]:
+          - img [ref=e223]
+          - text: Clone Repository

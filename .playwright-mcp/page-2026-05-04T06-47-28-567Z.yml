@@ -1,0 +1,102 @@
+- generic [ref=e3]:
+  - generic [ref=e152]:
+    - generic [ref=e153]:
+      - heading "Open Project" [level=2] [ref=e154]
+      - button [ref=e155] [cursor=pointer]:
+        - img [ref=e156]
+    - generic [ref=e159]:
+      - generic [ref=e160]:
+        - textbox "Search directories" [ref=e161]:
+          - /placeholder: Type to search... (Tab to complete, Enter to select)
+        - paragraph [ref=e162]: Search directories on Local. You can also type a full path and press Enter.
+      - listbox "Directory search results" [ref=e163]:
+        - option "~ /" [active] [selected] [ref=e164] [cursor=pointer]:
+          - img [ref=e165]
+          - generic [ref=e167]:
+            - generic [ref=e168]: ~
+            - generic [ref=e169]: /
+        - option "~/ .cache /" [ref=e170] [cursor=pointer]:
+          - img [ref=e171]
+          - generic [ref=e173]:
+            - generic [ref=e174]: ~/
+            - generic [ref=e175]: .cache
+            - generic [ref=e176]: /
+        - option "~/ .claude /" [ref=e177] [cursor=pointer]:
+          - img [ref=e178]
+          - generic [ref=e180]:
+            - generic [ref=e181]: ~/
+            - generic [ref=e182]: .claude
+            - generic [ref=e183]: /
+        - option "~/ .config /" [ref=e184] [cursor=pointer]:
+          - img [ref=e185]
+          - generic [ref=e187]:
+            - generic [ref=e188]: ~/
+            - generic [ref=e189]: .config
+            - generic [ref=e190]: /
+        - option "~/ .local /" [ref=e191] [cursor=pointer]:
+          - img [ref=e192]
+          - generic [ref=e194]:
+            - generic [ref=e195]: ~/
+            - generic [ref=e196]: .local
+            - generic [ref=e197]: /
+        - option "~/ .npm /" [ref=e198] [cursor=pointer]:
+          - img [ref=e199]
+          - generic [ref=e201]:
+            - generic [ref=e202]: ~/
+            - generic [ref=e203]: .npm
+            - generic [ref=e204]: /
+        - option "~/ .playwright /" [ref=e205] [cursor=pointer]:
+          - img [ref=e206]
+          - generic [ref=e208]:
+            - generic [ref=e209]: ~/
+            - generic [ref=e210]: .playwright
+            - generic [ref=e211]: /
+        - option "~/ .playwright-mcp /" [ref=e212] [cursor=pointer]:
+          - img [ref=e213]
+          - generic [ref=e215]:
+            - generic [ref=e216]: ~/
+            - generic [ref=e217]: .playwright-mcp
+            - generic [ref=e218]: /
+        - option "~/ .sisyphus /" [ref=e219] [cursor=pointer]:
+          - img [ref=e220]
+          - generic [ref=e222]:
+            - generic [ref=e223]: ~/
+            - generic [ref=e224]: .sisyphus
+            - generic [ref=e225]: /
+        - option "~/ node_modules /" [ref=e226] [cursor=pointer]:
+          - img [ref=e227]
+          - generic [ref=e229]:
+            - generic [ref=e230]: ~/
+            - generic [ref=e231]: node_modules
+            - generic [ref=e232]: /
+      - button "Open" [ref=e234] [cursor=pointer]
+      - generic [ref=e235]:
+        - generic [ref=e236]: Create new folder
+        - generic [ref=e237]:
+          - textbox "my-new-project" [ref=e238]
+          - button "Create" [disabled] [ref=e239]
+      - button "Clone Git Repository" [ref=e241] [cursor=pointer]:
+        - img [ref=e242]
+        - generic [ref=e246]: Clone Git Repository
+  - generic [ref=e4]:
+    - button "Open Project" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - button "Open Project" [ref=e10] [cursor=pointer]:
+      - img [ref=e11]
+    - generic [ref=e12]:
+      - 'button "Terminal (Ctrl+`)" [ref=e13] [cursor=pointer]':
+        - img [ref=e14]
+      - 'button "Server: Local" [ref=e18] [cursor=pointer]':
+        - img [ref=e19]
+      - button "Settings" [ref=e22] [cursor=pointer]:
+        - img [ref=e23]
+  - main [ref=e27]:
+    - generic [ref=e28]:
+      - img [ref=e29]
+      - generic [ref=e46]:
+        - button "Open Project" [ref=e47] [cursor=pointer]:
+          - img [ref=e48]
+          - text: Open Project
+        - button "Clone Repository" [ref=e50] [cursor=pointer]:
+          - img [ref=e51]
+          - text: Clone Repository

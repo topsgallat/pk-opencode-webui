@@ -1,0 +1,79 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Open Project" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - button "Open Project" [ref=e10] [cursor=pointer]:
+      - img [ref=e11]
+    - generic [ref=e12]:
+      - 'button "Terminal (Ctrl+`)" [ref=e13] [cursor=pointer]':
+        - img [ref=e14]
+      - 'button "Server: Local" [active] [ref=e18] [cursor=pointer]':
+        - img [ref=e19]
+      - button "Settings" [ref=e22] [cursor=pointer]:
+        - img [ref=e23]
+  - main [ref=e27]:
+    - generic [ref=e62]:
+      - generic [ref=e63]: "PATCH LOADED: Settings patch is active"
+      - generic [ref=e64]:
+        - generic [ref=e65]: Settings
+        - generic [ref=e66]:
+          - button "Providers Global" [ref=e67] [cursor=pointer]:
+            - img [ref=e68]
+            - generic [ref=e70]: Providers
+            - generic [ref=e71]: Global
+          - button "Git Global" [ref=e72] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e77]: Git
+            - generic [ref=e78]: Global
+          - button "MCP Servers Global + Project" [ref=e79] [cursor=pointer]:
+            - img [ref=e80]
+            - generic [ref=e83]: MCP Servers
+            - generic [ref=e84]: Global + Project
+          - button "Prompts" [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+            - generic [ref=e88]: Prompts
+          - button "Instructions" [ref=e89] [cursor=pointer]:
+            - img [ref=e90]
+            - generic [ref=e92]: Instructions
+          - button "Appearance" [ref=e93] [cursor=pointer]:
+            - img [ref=e94]
+            - generic [ref=e100]: Appearance
+          - button "Sounds" [ref=e101] [cursor=pointer]:
+            - img [ref=e102]
+            - generic [ref=e106]: Sounds
+          - button "Servers" [ref=e107] [cursor=pointer]:
+            - img [ref=e108]
+            - generic [ref=e111]: Servers
+      - generic [ref=e611]:
+        - generic [ref=e612]:
+          - heading "OpenCode Servers" [level=1] [ref=e613]
+          - paragraph [ref=e614]: Manage connections to multiple OpenCode server instances
+        - generic [ref=e615]:
+          - generic [ref=e616]:
+            - heading "Servers (2)" [level=2] [ref=e664]
+            - button "+ Add Server" [ref=e618] [cursor=pointer]
+          - generic [ref=e619]:
+            - generic [ref=e665]:
+              - generic [ref=e666]:
+                - generic [ref=e667]:
+                  - generic [ref=e668]: Local
+                  - generic [ref=e669]: Default
+                - paragraph [ref=e670]: http://127.0.0.1:4096
+              - generic [ref=e671]:
+                - button "Edit server" [ref=e672] [cursor=pointer]:
+                  - img [ref=e673]
+                - button "Delete server" [ref=e676] [cursor=pointer]:
+                  - img [ref=e677]
+            - generic [ref=e680]:
+              - generic [ref=e681]:
+                - generic [ref=e683]: Remote 173
+                - paragraph [ref=e684]: http://192.168.1.173:4096
+              - generic [ref=e685]:
+                - button "Set Default" [ref=e686] [cursor=pointer]
+                - button "Edit server" [ref=e687] [cursor=pointer]:
+                  - img [ref=e688]
+                - button "Delete server" [ref=e691] [cursor=pointer]:
+                  - img [ref=e692]
+        - generic [ref=e635]:
+          - heading "About Servers" [level=3] [ref=e636]
+          - paragraph [ref=e637]: Add multiple OpenCode servers to switch between them. Each server maintains its own providers, projects, and configuration.

@@ -1,0 +1,35 @@
+- generic [ref=e3]:
+  - generic [ref=e176]:
+    - banner [ref=e177]:
+      - 'heading "Oh My Pentesters install and run: security-engagement.jsonc controls" [level=1] [ref=e181]'
+      - generic [ref=e182]:
+        - button "MCP Servers" [ref=e183] [cursor=pointer]
+        - button "Toggle Review Panel" [ref=e186] [cursor=pointer]
+        - button "Toggle Terminal" [ref=e192] [cursor=pointer]
+    - generic [ref=e195]:
+      - generic [ref=e197]:
+        - generic [ref=e199]
+        - generic [ref=e225]
+      - generic [ref=e431]:
+        - generic [ref=e432]
+        - generic [ref=e436]
+        - generic [ref=e443]
+        - generic [ref=e468]
+    - generic [ref=e476]:
+      - textbox "Respond to the prompt above to continue..." [disabled] [ref=e479]
+      - generic [ref=e480]:
+        - generic [ref=e482]
+        - generic [ref=e491]
+  - navigation [ref=e38]:
+    - button "Chat" [ref=e39] [cursor=pointer]:
+      - img [ref=e40]
+      - generic [ref=e42]: Chat
+    - button "Sessions" [ref=e43] [cursor=pointer]:
+      - img [ref=e44]
+      - generic [ref=e46]: Sessions
+    - button "Review" [ref=e47] [cursor=pointer]:
+      - img [ref=e48]
+      - generic [ref=e53]: Review
+    - button "Settings" [ref=e54] [cursor=pointer]:
+      - img [ref=e55]
+      - generic [ref=e58]: Settings

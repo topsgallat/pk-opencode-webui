@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-05-17T19:26:23.188Z",
+  "storageResult": {
+    "ok": true,
+    "items": 1,
+    "text": "Hello, this is a test prompt"
+  },
+  "compatResult": {
+    "ok": true,
+    "text": "legacy prompt"
+  }
+}

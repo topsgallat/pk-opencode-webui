@@ -1,0 +1,27 @@
+- dialog "Select Model" [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Select Model" [level=2] [ref=e3]
+    - button "Close" [ref=e4] [cursor=pointer]:
+      - img [ref=e5]
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - img [ref=e10]
+      - combobox "Filter models..." [expanded] [active] [ref=e13]
+    - generic [ref=e14]: Arrow keys to navigate-Enter to select-Esc to close
+  - listbox "Select Model" [ref=e15]:
+    - generic [ref=e16]:
+      - generic [ref=e17]: Provider A
+      - option "Model A provider-a/model-a" [selected] [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: Model A
+        - generic [ref=e20]: provider-a/model-a
+      - option "Model B provider-a/model-b" [ref=e21] [cursor=pointer]:
+        - generic [ref=e22]: Model B
+        - generic [ref=e23]: provider-a/model-b
+    - generic [ref=e24]:
+      - generic [ref=e25]: Provider B
+      - option "Model C provider-b/model-c" [ref=e26] [cursor=pointer]:
+        - generic [ref=e27]: Model C
+        - generic [ref=e28]: provider-b/model-c
+      - option "Model D provider-b/model-d" [ref=e29] [cursor=pointer]:
+        - generic [ref=e30]: Model D
+        - generic [ref=e31]: provider-b/model-d

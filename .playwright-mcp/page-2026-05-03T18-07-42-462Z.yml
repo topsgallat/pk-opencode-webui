@@ -1,0 +1,54 @@
+- generic [ref=e65]:
+  - generic [ref=e127]:
+    - generic [ref=e128]:
+      - button "Switch Project" [ref=e129] [cursor=pointer]:
+        - img [ref=e130]
+        - generic [ref=e133]: opencode
+        - img [ref=e134]
+      - button "New" [ref=e136] [cursor=pointer]:
+        - img [ref=e137]
+        - generic [ref=e138]: New
+    - generic [ref=e140]:
+      - img [ref=e141]
+      - textbox "Search sessions..." [ref=e144]
+    - generic [ref=e145]:
+      - button "Active (4)" [ref=e146] [cursor=pointer]
+      - button "Archived (0)" [ref=e147] [cursor=pointer]
+    - generic [ref=e149]:
+      - generic [ref=e150]: Today
+      - generic [ref=e151] [cursor=pointer]:
+        - img [ref=e153]
+        - generic [ref=e156]: Playwright browser testing issue report guide (Thai)
+        - button [ref=e157]:
+          - img [ref=e158]
+      - generic [ref=e162] [cursor=pointer]:
+        - img [ref=e164]
+        - generic [ref=e167]: Playwright browser accessibility test
+        - button [ref=e168]:
+          - img [ref=e169]
+      - generic [ref=e173] [cursor=pointer]:
+        - img [ref=e175]
+        - generic [ref=e178]: OpenCode plugin installation for LLM agents
+        - button [ref=e179]:
+          - img [ref=e180]
+      - generic [ref=e184] [cursor=pointer]:
+        - img [ref=e186]
+        - generic [ref=e189]: New session - 2026-05-03T06:14:54.288Z
+        - button [ref=e190]:
+          - img [ref=e191]
+  - navigation [ref=e100]:
+    - button "Chat" [ref=e101] [cursor=pointer]:
+      - img [ref=e102]
+      - generic [ref=e104]: Chat
+    - button "Sessions" [active] [ref=e105] [cursor=pointer]:
+      - img [ref=e106]
+      - generic [ref=e108]: Sessions
+    - button "Review" [ref=e109] [cursor=pointer]:
+      - img [ref=e110]
+      - generic [ref=e115]: Review
+    - button "Settings" [ref=e116] [cursor=pointer]:
+      - img [ref=e117]
+      - generic [ref=e120]: Settings
+    - button "Server" [ref=e121] [cursor=pointer]:
+      - img [ref=e122]
+      - generic [ref=e125]: Server

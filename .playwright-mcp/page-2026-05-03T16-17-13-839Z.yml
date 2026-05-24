@@ -1,0 +1,33 @@
+- generic [ref=e240]:
+  - generic [ref=e241]:
+    - button "Open Project" [ref=e242] [cursor=pointer]:
+      - img [ref=e243]
+    - generic [ref=e246]:
+      - generic "opencode" [ref=e247] [cursor=pointer]:
+        - generic [ref=e249]: O
+      - button "Open Project" [ref=e250] [cursor=pointer]:
+        - img [ref=e251]
+    - generic [ref=e252]:
+      - 'button "Terminal (Ctrl+`)" [ref=e253] [cursor=pointer]':
+        - img [ref=e254]
+      - 'button "Server: Local" [ref=e258] [cursor=pointer]':
+        - img [ref=e259]
+      - button "Settings" [ref=e262] [cursor=pointer]:
+        - img [ref=e263]
+  - main [ref=e267]:
+    - generic [ref=e268]:
+      - img [ref=e269]
+      - generic [ref=e286]:
+        - button "Open Project" [ref=e287] [cursor=pointer]:
+          - img [ref=e288]
+          - text: Open Project
+        - button "Clone Repository" [ref=e290] [cursor=pointer]:
+          - img [ref=e291]
+          - text: Clone Repository
+      - generic [ref=e295]:
+        - generic [ref=e296]:
+          - generic [ref=e297]: Recent Projects
+          - generic [ref=e298]: Local
+        - button "~ 3h ago" [ref=e299] [cursor=pointer]:
+          - generic [ref=e300]: ~
+          - generic [ref=e301]: 3h ago

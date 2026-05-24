@@ -1,0 +1,45 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Open Project" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - generic [ref=e9]:
+      - generic "opencode" [ref=e10] [cursor=pointer]:
+        - generic [ref=e12]: O
+      - button "Open Project" [ref=e13] [cursor=pointer]:
+        - img [ref=e14]
+    - generic [ref=e15]:
+      - 'button "Terminal (Ctrl+`)" [ref=e16] [cursor=pointer]':
+        - img [ref=e17]
+      - generic [ref=e20]:
+        - 'button "Server: Local" [active] [ref=e21] [cursor=pointer]':
+          - img [ref=e22]
+        - generic [ref=e65]:
+          - button "Local http://127.0.0.1:4096" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e69]:
+              - generic [ref=e70]: Local
+              - generic [ref=e71]: http://127.0.0.1:4096
+          - button "Main http://192.168.1.173:4096" [ref=e72] [cursor=pointer]:
+            - img [ref=e73]
+            - generic [ref=e75]:
+              - generic [ref=e76]: Main
+              - generic [ref=e77]: http://192.168.1.173:4096
+      - button "Settings" [ref=e25] [cursor=pointer]:
+        - img [ref=e26]
+  - main [ref=e30]:
+    - generic [ref=e31]:
+      - img [ref=e32]
+      - generic [ref=e49]:
+        - button "Open Project" [ref=e50] [cursor=pointer]:
+          - img [ref=e51]
+          - text: Open Project
+        - button "Clone Repository" [ref=e53] [cursor=pointer]:
+          - img [ref=e54]
+          - text: Clone Repository
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - generic [ref=e60]: Recent Projects
+          - generic [ref=e61]: Local
+        - button "~ just now" [ref=e78] [cursor=pointer]:
+          - generic [ref=e63]: ~
+          - generic [ref=e64]: just now

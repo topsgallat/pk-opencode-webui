@@ -1,0 +1,42 @@
+- generic [ref=e3]:
+  - generic [ref=e8]:
+    - banner [ref=e9]:
+      - heading "New Session" [level=1] [ref=e13]
+      - generic [ref=e14]:
+        - button "MCP Servers" [ref=e15] [cursor=pointer]:
+          - img [ref=e16]
+        - button "Toggle Review Panel" [ref=e18] [cursor=pointer]:
+          - img [ref=e19]
+        - button "Toggle Terminal" [ref=e24] [cursor=pointer]:
+          - img [ref=e25]
+    - generic [ref=e29]:
+      - img [ref=e30]
+      - paragraph [ref=e47]: Loading chat history...
+    - generic [ref=e51]:
+      - textbox "Type a message... (@ for files, / for commands)" [active] [ref=e54]
+      - generic [ref=e55]:
+        - generic [ref=e57]:
+          - button "Upload image or PDF" [ref=e58] [cursor=pointer]:
+            - img [ref=e59]
+          - button "Attach file from project" [ref=e62] [cursor=pointer]:
+            - img [ref=e63]
+        - generic [ref=e67]:
+          - 'button "Agent: build" [ref=e68] [cursor=pointer]':
+            - generic [ref=e69]: "Agent:"
+            - generic [ref=e70]: build
+          - 'button "Model: big-pickle" [ref=e71] [cursor=pointer]':
+            - generic [ref=e72]: "Model:"
+            - generic [ref=e73]: big-pickle
+  - navigation [ref=e74]:
+    - button "Chat" [ref=e75] [cursor=pointer]:
+      - img [ref=e76]
+      - generic [ref=e78]: Chat
+    - button "Sessions" [ref=e79] [cursor=pointer]:
+      - img [ref=e80]
+      - generic [ref=e82]: Sessions
+    - button "Review" [ref=e83] [cursor=pointer]:
+      - img [ref=e84]
+      - generic [ref=e89]: Review
+    - button "Settings" [ref=e90] [cursor=pointer]:
+      - img [ref=e91]
+      - generic [ref=e94]: Settings

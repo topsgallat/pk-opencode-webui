@@ -1,0 +1,45 @@
+- generic [ref=e1]:
+  - generic [ref=e3251]:
+    - generic [ref=e3256]:
+      - banner [ref=e3257]:
+        - 'heading "Oh My Pentesters install and run: security-engagement.jsonc controls" [level=1] [ref=e3261]'
+        - generic [ref=e3262]
+      - generic [ref=e3277]:
+        - generic [ref=e3279]
+        - generic [ref=e3306]
+        - generic [ref=e3328]
+      - generic [ref=e6197]:
+        - textbox "Type a message... (@ for files, / for commands)" [active] [ref=e6200]
+        - generic [ref=e6201]
+    - navigation [ref=e6231]:
+      - button "Chat" [ref=e6232] [cursor=pointer]:
+        - img [ref=e6233]
+        - generic [ref=e6235]: Chat
+      - button "Sessions" [ref=e6236] [cursor=pointer]:
+        - img [ref=e6237]
+        - generic [ref=e6239]: Sessions
+      - button "Review" [ref=e6240] [cursor=pointer]:
+        - img [ref=e6241]
+        - generic [ref=e6246]: Review
+      - button "Settings" [ref=e6247] [cursor=pointer]:
+        - img [ref=e6248]
+        - generic [ref=e6251]: Settings
+      - button "Server" [ref=e6252] [cursor=pointer]:
+        - img [ref=e6253]
+        - generic [ref=e6256]: Server
+  - generic [ref=e6258]:
+    - button "Review" [ref=e6260] [cursor=pointer]:
+      - img [ref=e6261]
+      - generic [ref=e6266]: Review
+    - generic [ref=e6267]:
+      - button "Refresh" [ref=e6269] [cursor=pointer]:
+        - img [ref=e6270]
+      - button [ref=e6275] [cursor=pointer]:
+        - img [ref=e6276]
+    - generic [ref=e6278]:
+      - tablist [ref=e6280]:
+        - tab "0 Changes" [selected] [ref=e6282] [cursor=pointer]
+        - tab "All Files" [ref=e6284] [cursor=pointer]
+      - tabpanel [ref=e6285]:
+        - generic [ref=e6287]: No changes in this session
+        - generic [ref=e6289]

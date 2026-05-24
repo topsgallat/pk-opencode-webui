@@ -1,0 +1,41 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - img [ref=e9]
+    - generic [ref=e28]:
+      - button "New Session" [ref=e29] [cursor=pointer]:
+        - img [ref=e30]
+        - generic [ref=e31]: New Session
+      - button "Settings" [ref=e32] [cursor=pointer]:
+        - img [ref=e33]
+        - generic [ref=e36]: Settings
+    - paragraph [ref=e37]: Select a session from the sidebar or start a new one
+  - navigation [ref=e38]:
+    - button "Chat" [ref=e39] [cursor=pointer]:
+      - img [ref=e40]
+      - generic [ref=e42]: Chat
+    - button "Sessions" [ref=e43] [cursor=pointer]:
+      - img [ref=e44]
+      - generic [ref=e46]: Sessions
+    - button "Review" [ref=e47] [cursor=pointer]:
+      - img [ref=e48]
+      - generic [ref=e53]: Review
+    - button "Settings" [ref=e54] [cursor=pointer]:
+      - img [ref=e55]
+      - generic [ref=e58]: Settings
+    - button "Server" [active] [ref=e59] [cursor=pointer]:
+      - img [ref=e60]
+      - generic [ref=e63]: Server
+  - generic [ref=e66]:
+    - generic [ref=e69]: Switch Server
+    - generic [ref=e70]:
+      - button "Local http://127.0.0.1:4096" [ref=e71] [cursor=pointer]:
+        - img [ref=e72]
+        - generic [ref=e75]:
+          - generic [ref=e76]: Local
+          - generic [ref=e77]: http://127.0.0.1:4096
+      - button "Main http://192.168.1.173:4096" [ref=e79] [cursor=pointer]:
+        - img [ref=e80]
+        - generic [ref=e83]:
+          - generic [ref=e84]: Main
+          - generic [ref=e85]: http://192.168.1.173:4096
+    - button "Cancel" [ref=e87] [cursor=pointer]

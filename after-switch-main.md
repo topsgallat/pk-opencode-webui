@@ -1,0 +1,27 @@
+- generic [ref=e6320]:
+  - generic [ref=e6324]:
+    - img [ref=e6326]
+    - generic [ref=e6345]:
+      - button "New Session" [ref=e6346] [cursor=pointer]:
+        - img [ref=e6347]
+        - generic [ref=e6348]: New Session
+      - button "Settings" [ref=e6349] [cursor=pointer]:
+        - img [ref=e6350]
+        - generic [ref=e6353]: Settings
+    - paragraph [ref=e6354]: Select a session from the sidebar or start a new one
+  - navigation [ref=e6355]:
+    - button "Chat" [ref=e6356] [cursor=pointer]:
+      - img [ref=e6357]
+      - generic [ref=e6359]: Chat
+    - button "Sessions" [ref=e6360] [cursor=pointer]:
+      - img [ref=e6361]
+      - generic [ref=e6363]: Sessions
+    - button "Review" [ref=e6364] [cursor=pointer]:
+      - img [ref=e6365]
+      - generic [ref=e6370]: Review
+    - button "Settings" [ref=e6371] [cursor=pointer]:
+      - img [ref=e6372]
+      - generic [ref=e6375]: Settings
+    - button "Server" [ref=e6376] [cursor=pointer]:
+      - img [ref=e6377]
+      - generic [ref=e6380]: Server

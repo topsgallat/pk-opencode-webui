@@ -1,0 +1,16 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - button "Open Project" [ref=e6] [cursor=pointer]
+      - button "Open Project" [ref=e11] [cursor=pointer]
+      - generic [ref=e13]
+    - main [ref=e28]:
+      - generic [ref=e29]
+  - generic [ref=e57]:
+    - generic [ref=e58]:
+      - generic [ref=e59]: Question from AI
+      - button "Dismiss" [ref=e60] [cursor=pointer]
+    - generic [ref=e61]:
+      - generic [ref=e63]: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      - generic [ref=e64]: Tall content
+    - generic [ref=e65]: Footer

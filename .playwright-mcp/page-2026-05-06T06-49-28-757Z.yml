@@ -1,0 +1,315 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Home" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - generic [ref=e9]:
+      - generic "pk-opencode-webui" [ref=e10] [cursor=pointer]:
+        - generic [ref=e12]: PO
+      - button "Open Project" [ref=e13] [cursor=pointer]:
+        - img [ref=e14]
+    - generic [ref=e15]:
+      - 'button "Terminal (Ctrl+`)" [ref=e16] [cursor=pointer]':
+        - img [ref=e17]
+      - generic [ref=e20]:
+        - 'button "Server: Local" [ref=e21] [cursor=pointer]':
+          - img [ref=e22]
+        - generic "Local" [ref=e25]
+      - button "Settings" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+      - button "Server Logs" [ref=e30] [cursor=pointer]:
+        - img [ref=e31]
+  - navigation "Session list":
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - generic [ref=e37]: PO
+        - generic [ref=e38]:
+          - generic [ref=e39]: pk-opencode-webui
+          - generic [ref=e40]: ~/pk-opencode-webui
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e41] [cursor=pointer]:
+          - img [ref=e42]
+      - button "New Session" [ref=e46] [cursor=pointer]:
+        - img [ref=e47]
+        - generic [ref=e48]: New Session
+      - generic [ref=e50]:
+        - img [ref=e51]
+        - textbox "Search sessions" [ref=e54]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]:
+          - img
+      - listbox "Sessions" [ref=e55]:
+        - generic [ref=e56]:
+          - paragraph [ref=e57]: No sessions yet
+          - paragraph [ref=e58]: Click "New Session" to start
+      - generic [ref=e62]: No providers
+  - main [ref=e64]:
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - generic [ref=e67]: Settings
+        - generic "/home/sgallat/pk-opencode-webui" [ref=e68]: pk-opencode-webui
+        - generic [ref=e69]:
+          - button "Providers Global" [ref=e70] [cursor=pointer]:
+            - img [ref=e71]
+            - generic [ref=e73]: Providers
+            - generic [ref=e74]: Global
+          - button "Git Global" [ref=e75] [cursor=pointer]:
+            - img [ref=e76]
+            - generic [ref=e80]: Git
+            - generic [ref=e81]: Global
+          - button "MCP Servers Global + Project" [ref=e82] [cursor=pointer]:
+            - img [ref=e83]
+            - generic [ref=e86]: MCP Servers
+            - generic [ref=e87]: Global + Project
+          - button "Prompts Project" [ref=e88] [cursor=pointer]:
+            - img [ref=e89]
+            - generic [ref=e91]: Prompts
+            - generic [ref=e92]: Project
+          - button "Instructions Project" [ref=e93] [cursor=pointer]:
+            - img [ref=e94]
+            - generic [ref=e96]: Instructions
+            - generic [ref=e97]: Project
+          - button "Project Config Project" [active] [ref=e98] [cursor=pointer]:
+            - img [ref=e99]
+            - generic [ref=e102]: Project Config
+            - generic [ref=e103]: Project
+          - button "Appearance" [ref=e104] [cursor=pointer]:
+            - img [ref=e105]
+            - generic [ref=e111]: Appearance
+          - button "Sounds" [ref=e112] [cursor=pointer]:
+            - img [ref=e113]
+            - generic [ref=e117]: Sounds
+          - button "Servers" [ref=e118] [cursor=pointer]:
+            - img [ref=e119]
+            - generic [ref=e122]: Servers
+      - generic [ref=e124]:
+        - generic [ref=e125]:
+          - img [ref=e126]
+          - generic [ref=e128]: "Project: /home/sgallat/pk-opencode-webui"
+        - generic [ref=e149]:
+          - generic [ref=e150]:
+            - generic [ref=e152]:
+              - heading "Project Config" [level=1] [ref=e153]
+              - paragraph [ref=e154]: Configure permissions, model defaults, and tool access for this project
+            - generic [ref=e155]:
+              - img [ref=e156]
+              - generic [ref=e158]:
+                - text: Saved to
+                - code [ref=e159]: opencode.json
+                - text: in your project (/home/sgallat/pk-opencode-webui)
+          - generic [ref=e160]:
+            - button "Form" [ref=e161] [cursor=pointer]:
+              - img [ref=e162]
+              - text: Form
+            - button "JSON" [ref=e165] [cursor=pointer]:
+              - img [ref=e166]
+              - text: JSON
+          - generic [ref=e169]:
+            - generic [ref=e170]:
+              - generic [ref=e171]:
+                - img [ref=e172]
+                - heading "Permissions" [level=2] [ref=e174]
+              - generic [ref=e175]:
+                - generic [ref=e177]:
+                  - button "Read Files" [ref=e178] [cursor=pointer]:
+                    - img [ref=e179]
+                    - text: Read Files
+                  - generic [ref=e181]:
+                    - button "allow" [ref=e182] [cursor=pointer]
+                    - button "ask" [ref=e183] [cursor=pointer]
+                    - button "deny" [ref=e184] [cursor=pointer]
+                - generic [ref=e186]:
+                  - button "Edit Files" [ref=e187] [cursor=pointer]:
+                    - img [ref=e188]
+                    - text: Edit Files
+                  - generic [ref=e190]:
+                    - button "allow" [ref=e191] [cursor=pointer]
+                    - button "ask" [ref=e192] [cursor=pointer]
+                    - button "deny" [ref=e193] [cursor=pointer]
+                - generic [ref=e195]:
+                  - button "Bash Commands" [ref=e196] [cursor=pointer]:
+                    - img [ref=e197]
+                    - text: Bash Commands
+                  - generic [ref=e199]:
+                    - button "allow" [ref=e200] [cursor=pointer]
+                    - button "ask" [ref=e201] [cursor=pointer]
+                    - button "deny" [ref=e202] [cursor=pointer]
+                - generic [ref=e204]:
+                  - button "Glob Search" [ref=e205] [cursor=pointer]:
+                    - img [ref=e206]
+                    - text: Glob Search
+                  - generic [ref=e208]:
+                    - button "allow" [ref=e209] [cursor=pointer]
+                    - button "ask" [ref=e210] [cursor=pointer]
+                    - button "deny" [ref=e211] [cursor=pointer]
+                - generic [ref=e213]:
+                  - button "Grep Search" [ref=e214] [cursor=pointer]:
+                    - img [ref=e215]
+                    - text: Grep Search
+                  - generic [ref=e217]:
+                    - button "allow" [ref=e218] [cursor=pointer]
+                    - button "ask" [ref=e219] [cursor=pointer]
+                    - button "deny" [ref=e220] [cursor=pointer]
+                - generic [ref=e222]:
+                  - button "List Files" [ref=e223] [cursor=pointer]:
+                    - img [ref=e224]
+                    - text: List Files
+                  - generic [ref=e226]:
+                    - button "allow" [ref=e227] [cursor=pointer]
+                    - button "ask" [ref=e228] [cursor=pointer]
+                    - button "deny" [ref=e229] [cursor=pointer]
+                - generic [ref=e231]:
+                  - generic [ref=e232]: Web Fetch
+                  - generic [ref=e233]:
+                    - button "allow" [ref=e234] [cursor=pointer]
+                    - button "ask" [ref=e235] [cursor=pointer]
+                    - button "deny" [ref=e236] [cursor=pointer]
+                - generic [ref=e238]:
+                  - button "Task (Sub-agent)" [ref=e239] [cursor=pointer]:
+                    - img [ref=e240]
+                    - text: Task (Sub-agent)
+                  - generic [ref=e242]:
+                    - button "allow" [ref=e243] [cursor=pointer]
+                    - button "ask" [ref=e244] [cursor=pointer]
+                    - button "deny" [ref=e245] [cursor=pointer]
+                - generic [ref=e247]:
+                  - generic [ref=e248]: Todo Write
+                  - generic [ref=e249]:
+                    - button "allow" [ref=e250] [cursor=pointer]
+                    - button "ask" [ref=e251] [cursor=pointer]
+                    - button "deny" [ref=e252] [cursor=pointer]
+                - generic [ref=e254]:
+                  - generic [ref=e255]: Todo Read
+                  - generic [ref=e256]:
+                    - button "allow" [ref=e257] [cursor=pointer]
+                    - button "ask" [ref=e258] [cursor=pointer]
+                    - button "deny" [ref=e259] [cursor=pointer]
+                - generic [ref=e261]:
+                  - generic [ref=e262]: Question
+                  - generic [ref=e263]:
+                    - button "allow" [ref=e264] [cursor=pointer]
+                    - button "ask" [ref=e265] [cursor=pointer]
+                    - button "deny" [ref=e266] [cursor=pointer]
+                - generic [ref=e268]:
+                  - generic [ref=e269]: Web Search
+                  - generic [ref=e270]:
+                    - button "allow" [ref=e271] [cursor=pointer]
+                    - button "ask" [ref=e272] [cursor=pointer]
+                    - button "deny" [ref=e273] [cursor=pointer]
+                - generic [ref=e275]:
+                  - generic [ref=e276]: Code Search
+                  - generic [ref=e277]:
+                    - button "allow" [ref=e278] [cursor=pointer]
+                    - button "ask" [ref=e279] [cursor=pointer]
+                    - button "deny" [ref=e280] [cursor=pointer]
+                - generic [ref=e282]:
+                  - button "LSP" [ref=e283] [cursor=pointer]:
+                    - img [ref=e284]
+                    - text: LSP
+                  - generic [ref=e286]:
+                    - button "allow" [ref=e287] [cursor=pointer]
+                    - button "ask" [ref=e288] [cursor=pointer]
+                    - button "deny" [ref=e289] [cursor=pointer]
+                - generic [ref=e291]:
+                  - button "Skill" [ref=e292] [cursor=pointer]:
+                    - img [ref=e293]
+                    - text: Skill
+                  - generic [ref=e295]:
+                    - button "allow" [ref=e296] [cursor=pointer]
+                    - button "ask" [ref=e297] [cursor=pointer]
+                    - button "deny" [ref=e298] [cursor=pointer]
+            - generic [ref=e299]:
+              - generic [ref=e300]:
+                - img [ref=e301]
+                - heading "Providers and Models" [level=2] [ref=e303]
+              - generic [ref=e304]:
+                - generic [ref=e306]:
+                  - heading "Project Provider Access" [level=3] [ref=e307]
+                  - paragraph [ref=e308]: Control which providers are enabled for this project. Connection state is managed in the Providers tab.
+                - generic [ref=e310]:
+                  - heading "Project Model Access" [level=3] [ref=e311]
+                  - paragraph [ref=e312]: Model toggles use provider whitelist or blacklist config. If neither exists yet, this UI starts a blacklist for the selected provider.
+                - generic [ref=e313]:
+                  - generic [ref=e314]:
+                    - heading "Custom Providers" [level=3] [ref=e315]
+                    - paragraph [ref=e316]: Add or edit project-level provider definitions for custom backends. Use JSON view for advanced fields.
+                  - generic [ref=e317]:
+                    - generic [ref=e318]:
+                      - generic [ref=e320]: Add custom provider
+                      - generic [ref=e321]:
+                        - textbox "Provider ID" [ref=e322]
+                        - textbox "Display name" [ref=e323]
+                        - textbox "API module / URL" [ref=e324]
+                        - textbox "NPM package" [ref=e325]
+                        - textbox "Environment variables, one per line" [ref=e326]
+                        - button "Add Provider" [disabled] [ref=e328]:
+                          - img [ref=e329]
+                          - text: Add Provider
+                    - generic [ref=e333]:
+                      - generic [ref=e334]: Configured provider entries (0)
+                      - paragraph [ref=e335]: No custom provider config entries yet.
+            - generic [ref=e336]:
+              - generic [ref=e337]:
+                - img [ref=e338]
+                - heading "Model Defaults" [level=2] [ref=e341]
+              - generic [ref=e342]:
+                - generic [ref=e343]:
+                  - generic [ref=e344]: Default Model
+                  - combobox [ref=e345]:
+                    - option "Use system default" [selected]
+                  - paragraph [ref=e346]:
+                    - text: "Format:"
+                    - code [ref=e347]: provider/model
+                    - text: (e.g. anthropic/claude-sonnet-4-5)
+                - generic [ref=e348]:
+                  - generic [ref=e349]: Default Agent
+                  - combobox [ref=e350]:
+                    - option "Use system default" [selected]
+            - generic [ref=e351]:
+              - generic [ref=e352]:
+                - img [ref=e353]
+                - heading "Tool Access" [level=2] [ref=e355]
+              - generic [ref=e356]:
+                - generic [ref=e357]:
+                  - generic [ref=e358]: Bash
+                  - switch "Toggle Bash access" [checked] [ref=e359] [cursor=pointer]
+                - generic [ref=e361]:
+                  - generic [ref=e362]: Web Fetch
+                  - switch "Toggle Web Fetch access" [checked] [ref=e363] [cursor=pointer]
+                - generic [ref=e365]:
+                  - generic [ref=e366]: Web Search
+                  - switch "Toggle Web Search access" [checked] [ref=e367] [cursor=pointer]
+                - generic [ref=e369]:
+                  - generic [ref=e370]: Code Search
+                  - switch "Toggle Code Search access" [checked] [ref=e371] [cursor=pointer]
+                - generic [ref=e373]:
+                  - generic [ref=e374]: Glob
+                  - switch "Toggle Glob access" [checked] [ref=e375] [cursor=pointer]
+                - generic [ref=e377]:
+                  - generic [ref=e378]: Grep
+                  - switch "Toggle Grep access" [checked] [ref=e379] [cursor=pointer]
+                - generic [ref=e381]:
+                  - generic [ref=e382]: Read
+                  - switch "Toggle Read access" [checked] [ref=e383] [cursor=pointer]
+                - generic [ref=e385]:
+                  - generic [ref=e386]: Edit
+                  - switch "Toggle Edit access" [checked] [ref=e387] [cursor=pointer]
+                - generic [ref=e389]:
+                  - generic [ref=e390]: List
+                  - switch "Toggle List access" [checked] [ref=e391] [cursor=pointer]
+                - generic [ref=e393]:
+                  - generic [ref=e394]: Task
+                  - switch "Toggle Task access" [checked] [ref=e395] [cursor=pointer]
+                - generic [ref=e397]:
+                  - generic [ref=e398]: Todo Write
+                  - switch "Toggle Todo Write access" [checked] [ref=e399] [cursor=pointer]
+                - generic [ref=e401]:
+                  - generic [ref=e402]: Todo Read
+                  - switch "Toggle Todo Read access" [checked] [ref=e403] [cursor=pointer]
+                - generic [ref=e405]:
+                  - generic [ref=e406]: Question
+                  - switch "Toggle Question access" [checked] [ref=e407] [cursor=pointer]
+                - generic [ref=e409]:
+                  - generic [ref=e410]: LSP
+                  - switch "Toggle LSP access" [checked] [ref=e411] [cursor=pointer]
+                - generic [ref=e413]:
+                  - generic [ref=e414]: Skill
+                  - switch "Toggle Skill access" [checked] [ref=e415] [cursor=pointer]

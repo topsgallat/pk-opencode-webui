@@ -1,0 +1,77 @@
+- generic [ref=e7] [box=16,464,358,772]:
+  - generic [ref=e8] [box=18,466,354,41]:
+    - generic [ref=e10] [box=34,476,118,20]: Question from AI
+    - button "Dismiss (Esc)" [ref=e11] [cursor=pointer] [box=260,474,96,24]
+  - generic [ref=e12] [box=18,507,354,49]:
+    - button "Scope" [ref=e13] [cursor=pointer] [box=34,515,67,32]
+    - button "Mode" [ref=e14] [cursor=pointer] [box=105,515,62,32]
+    - button "Confirm" [ref=e15] [cursor=pointer] [box=171,515,79,32]
+  - generic [ref=e16] [box=18,556,354,628]:
+    - generic [ref=e18] [box=34,572,322,1864]:
+      - paragraph [ref=e19] [box=34,572,322,40]: Please review this long question before answering.
+      - paragraph [ref=e20] [box=34,628,322,60]: "Line 1: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e21] [box=34,704,322,60]: "Line 2: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e22] [box=34,780,322,60]: "Line 3: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e23] [box=34,856,322,60]: "Line 4: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e24] [box=34,932,322,60]: "Line 5: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e25] [box=34,1008,322,60]: "Line 6: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e26] [box=34,1084,322,60]: "Line 7: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e27] [box=34,1160,322,60]: "Line 8: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e28] [box=34,1236,322,60]: "Line 9: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e29] [box=34,1312,322,60]: "Line 10: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e30] [box=34,1388,322,60]: "Line 11: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e31] [box=34,1464,322,60]: "Line 12: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e32] [box=34,1540,322,60]: "Line 13: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e33] [box=34,1616,322,60]: "Line 14: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e34] [box=34,1692,322,60]: "Line 15: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e35] [box=34,1768,322,60]: "Line 16: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e36] [box=34,1844,322,60]: "Line 17: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e37] [box=34,1920,322,60]: "Line 18: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e38] [box=34,1996,322,60]: "Line 19: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e39] [box=34,2072,322,60]: "Line 20: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e40] [box=34,2148,322,60]: "Line 21: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e41] [box=34,2224,322,60]: "Line 22: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e42] [box=34,2300,322,60]: "Line 23: this is intentionally long content to force vertical scrolling inside the question prompt."
+      - paragraph [ref=e43] [box=34,2376,322,60]:
+        - text: "Line 24: this is intentionally long content to force vertical scrolling inside the question prompt."
+        - emphasis [ref=e44] [box=94,2418,149,16]: (select all that apply)
+    - generic [ref=e45] [box=34,844,322,324]:
+      - button "1 [ ] Alpha First option" [ref=e46] [cursor=pointer] [box=34,844,322,62]:
+        - generic [ref=e47] [box=47,853,296,24]:
+          - generic [ref=e48] [box=47,855,20,20]: "1"
+          - generic [ref=e49] [box=75,853,268,24]:
+            - generic [ref=e50] [box=75,855,23,19]: "[ ]"
+            - text: Alpha
+        - paragraph [ref=e51] [box=75,881,268,16]: First option
+      - button "2 [ ] Beta Second option" [ref=e52] [cursor=pointer] [box=34,914,322,62]:
+        - generic [ref=e53] [box=47,923,296,24]:
+          - generic [ref=e54] [box=47,925,20,20]: "2"
+          - generic [ref=e55] [box=75,923,268,24]:
+            - generic [ref=e56] [box=75,925,23,19]: "[ ]"
+            - text: Beta
+        - paragraph [ref=e57] [box=75,951,268,16]: Second option
+      - button "3 [ ] Gamma Third option" [ref=e58] [cursor=pointer] [box=34,984,322,62]:
+        - generic [ref=e59] [box=47,993,296,24]:
+          - generic [ref=e60] [box=47,995,20,20]: "3"
+          - generic [ref=e61] [box=75,993,268,24]:
+            - generic [ref=e62] [box=75,995,23,19]: "[ ]"
+            - text: Gamma
+        - paragraph [ref=e63] [box=75,1021,268,16]: Third option
+      - button "4 [ ] Delta Fourth option" [ref=e64] [cursor=pointer] [box=34,1054,322,62]:
+        - generic [ref=e65] [box=47,1063,296,24]:
+          - generic [ref=e66] [box=47,1065,20,20]: "4"
+          - generic [ref=e67] [box=75,1063,268,24]:
+            - generic [ref=e68] [box=75,1065,23,19]: "[ ]"
+            - text: Delta
+        - paragraph [ref=e69] [box=75,1091,268,16]: Fourth option
+      - button "5 [ ] Type your own answer" [ref=e71] [cursor=pointer] [box=47,1135,296,24]:
+        - generic [ref=e72] [box=47,1135,296,24]:
+          - generic [ref=e73] [box=47,1137,20,20]: "5"
+          - generic [ref=e74] [box=75,1135,201,24]:
+            - generic [ref=e75] [box=75,1137,23,19]: "[ ]"
+            - text: Type your own answer
+  - generic [ref=e76] [box=18,1184,354,50]:
+    - generic [ref=e77] [box=34,1193,66,33]: Tab switch
+    - generic [ref=e78] [box=116,1193,57,33]: ↑↓ select
+    - generic [ref=e79] [box=189,1193,79,33]: Enter toggle
+    - generic [ref=e80] [box=284,1193,72,33]: Esc dismiss

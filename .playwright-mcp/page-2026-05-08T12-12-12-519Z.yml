@@ -1,0 +1,353 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Open Project" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - generic [ref=e9]:
+      - generic "app-prefixable" [ref=e10] [cursor=pointer]:
+        - generic [ref=e12]: AP
+      - button "Open Project" [ref=e13] [cursor=pointer]:
+        - img [ref=e14]
+    - generic [ref=e15]:
+      - 'button "Terminal (Ctrl+`)" [ref=e16] [cursor=pointer]':
+        - img [ref=e17]
+      - generic [ref=e20]:
+        - 'button "Server: Local" [ref=e21] [cursor=pointer]':
+          - img [ref=e22]
+        - generic "Local" [ref=e25]
+      - button "Settings" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+  - main [ref=e31]:
+    - generic [ref=e32]:
+      - img [ref=e33]
+      - generic [ref=e50]:
+        - button "Open Project" [ref=e51] [cursor=pointer]:
+          - img [ref=e52]
+          - text: Open Project
+        - button "Clone Repository" [ref=e54] [cursor=pointer]:
+          - img [ref=e55]
+          - text: Clone Repository
+      - generic [ref=e60]:
+        - generic [ref=e61]:
+          - heading "Open Project" [level=2] [ref=e62]
+          - button [ref=e63] [cursor=pointer]:
+            - img [ref=e64]
+        - generic [ref=e67]:
+          - generic [ref=e68]:
+            - textbox "Search directories" [active] [ref=e69]:
+              - /placeholder: Type to search... (Tab to complete, Enter to select)
+            - paragraph [ref=e70]: Search directories on Local. You can also type a full path and press Enter.
+          - listbox "Directory search results" [ref=e71]:
+            - option "~ /" [selected] [ref=e72] [cursor=pointer]:
+              - img [ref=e73]
+              - generic [ref=e75]:
+                - generic [ref=e76]: ~
+                - generic [ref=e77]: /
+            - option "~/ .agents.bak /" [ref=e78] [cursor=pointer]:
+              - img [ref=e79]
+              - generic [ref=e81]:
+                - generic [ref=e82]: ~/
+                - generic [ref=e83]: .agents.bak
+                - generic [ref=e84]: /
+            - option "~/ .antigravity-server /" [ref=e85] [cursor=pointer]:
+              - img [ref=e86]
+              - generic [ref=e88]:
+                - generic [ref=e89]: ~/
+                - generic [ref=e90]: .antigravity-server
+                - generic [ref=e91]: /
+            - option "~/ .bun /" [ref=e92] [cursor=pointer]:
+              - img [ref=e93]
+              - generic [ref=e95]:
+                - generic [ref=e96]: ~/
+                - generic [ref=e97]: .bun
+                - generic [ref=e98]: /
+            - option "~/ .cache /" [ref=e99] [cursor=pointer]:
+              - img [ref=e100]
+              - generic [ref=e102]:
+                - generic [ref=e103]: ~/
+                - generic [ref=e104]: .cache
+                - generic [ref=e105]: /
+            - option "~/ .cargo /" [ref=e106] [cursor=pointer]:
+              - img [ref=e107]
+              - generic [ref=e109]:
+                - generic [ref=e110]: ~/
+                - generic [ref=e111]: .cargo
+                - generic [ref=e112]: /
+            - option "~/ .claude /" [ref=e113] [cursor=pointer]:
+              - img [ref=e114]
+              - generic [ref=e116]:
+                - generic [ref=e117]: ~/
+                - generic [ref=e118]: .claude
+                - generic [ref=e119]: /
+            - option "~/ .codeium /" [ref=e120] [cursor=pointer]:
+              - img [ref=e121]
+              - generic [ref=e123]:
+                - generic [ref=e124]: ~/
+                - generic [ref=e125]: .codeium
+                - generic [ref=e126]: /
+            - option "~/ .codex /" [ref=e127] [cursor=pointer]:
+              - img [ref=e128]
+              - generic [ref=e130]:
+                - generic [ref=e131]: ~/
+                - generic [ref=e132]: .codex
+                - generic [ref=e133]: /
+            - option "~/ .config /" [ref=e134] [cursor=pointer]:
+              - img [ref=e135]
+              - generic [ref=e137]:
+                - generic [ref=e138]: ~/
+                - generic [ref=e139]: .config
+                - generic [ref=e140]: /
+            - option "~/ .copilot /" [ref=e141] [cursor=pointer]:
+              - img [ref=e142]
+              - generic [ref=e144]:
+                - generic [ref=e145]: ~/
+                - generic [ref=e146]: .copilot
+                - generic [ref=e147]: /
+            - option "~/ .docker /" [ref=e148] [cursor=pointer]:
+              - img [ref=e149]
+              - generic [ref=e151]:
+                - generic [ref=e152]: ~/
+                - generic [ref=e153]: .docker
+                - generic [ref=e154]: /
+            - option "~/ .dotnet /" [ref=e155] [cursor=pointer]:
+              - img [ref=e156]
+              - generic [ref=e158]:
+                - generic [ref=e159]: ~/
+                - generic [ref=e160]: .dotnet
+                - generic [ref=e161]: /
+            - option "~/ .gemini /" [ref=e162] [cursor=pointer]:
+              - img [ref=e163]
+              - generic [ref=e165]:
+                - generic [ref=e166]: ~/
+                - generic [ref=e167]: .gemini
+                - generic [ref=e168]: /
+            - option "~/ .landscape /" [ref=e169] [cursor=pointer]:
+              - img [ref=e170]
+              - generic [ref=e172]:
+                - generic [ref=e173]: ~/
+                - generic [ref=e174]: .landscape
+                - generic [ref=e175]: /
+            - option "~/ .local /" [ref=e176] [cursor=pointer]:
+              - img [ref=e177]
+              - generic [ref=e179]:
+                - generic [ref=e180]: ~/
+                - generic [ref=e181]: .local
+                - generic [ref=e182]: /
+            - option "~/ .mem0 /" [ref=e183] [cursor=pointer]:
+              - img [ref=e184]
+              - generic [ref=e186]:
+                - generic [ref=e187]: ~/
+                - generic [ref=e188]: .mem0
+                - generic [ref=e189]: /
+            - option "~/ .mozilla /" [ref=e190] [cursor=pointer]:
+              - img [ref=e191]
+              - generic [ref=e193]:
+                - generic [ref=e194]: ~/
+                - generic [ref=e195]: .mozilla
+                - generic [ref=e196]: /
+            - option "~/ .npm /" [ref=e197] [cursor=pointer]:
+              - img [ref=e198]
+              - generic [ref=e200]:
+                - generic [ref=e201]: ~/
+                - generic [ref=e202]: .npm
+                - generic [ref=e203]: /
+            - option "~/ .opencode /" [ref=e204] [cursor=pointer]:
+              - img [ref=e205]
+              - generic [ref=e207]:
+                - generic [ref=e208]: ~/
+                - generic [ref=e209]: .opencode
+                - generic [ref=e210]: /
+            - option "~/ .openvscode-server /" [ref=e211] [cursor=pointer]:
+              - img [ref=e212]
+              - generic [ref=e214]:
+                - generic [ref=e215]: ~/
+                - generic [ref=e216]: .openvscode-server
+                - generic [ref=e217]: /
+            - option "~/ .pki /" [ref=e218] [cursor=pointer]:
+              - img [ref=e219]
+              - generic [ref=e221]:
+                - generic [ref=e222]: ~/
+                - generic [ref=e223]: .pki
+                - generic [ref=e224]: /
+            - option "~/ .playwright-mcp /" [ref=e225] [cursor=pointer]:
+              - img [ref=e226]
+              - generic [ref=e228]:
+                - generic [ref=e229]: ~/
+                - generic [ref=e230]: .playwright-mcp
+                - generic [ref=e231]: /
+            - option "~/ .rustup /" [ref=e232] [cursor=pointer]:
+              - img [ref=e233]
+              - generic [ref=e235]:
+                - generic [ref=e236]: ~/
+                - generic [ref=e237]: .rustup
+                - generic [ref=e238]: /
+            - option "~/ .sisyphus /" [ref=e239] [cursor=pointer]:
+              - img [ref=e240]
+              - generic [ref=e242]:
+                - generic [ref=e243]: ~/
+                - generic [ref=e244]: .sisyphus
+                - generic [ref=e245]: /
+            - option "~/ .ssh /" [ref=e246] [cursor=pointer]:
+              - img [ref=e247]
+              - generic [ref=e249]:
+                - generic [ref=e250]: ~/
+                - generic [ref=e251]: .ssh
+                - generic [ref=e252]: /
+            - option "~/ .stfolder /" [ref=e253] [cursor=pointer]:
+              - img [ref=e254]
+              - generic [ref=e256]:
+                - generic [ref=e257]: ~/
+                - generic [ref=e258]: .stfolder
+                - generic [ref=e259]: /
+            - option "~/ .stversions /" [ref=e260] [cursor=pointer]:
+              - img [ref=e261]
+              - generic [ref=e263]:
+                - generic [ref=e264]: ~/
+                - generic [ref=e265]: .stversions
+                - generic [ref=e266]: /
+            - option "~/ .tmp-omo /" [ref=e267] [cursor=pointer]:
+              - img [ref=e268]
+              - generic [ref=e270]:
+                - generic [ref=e271]: ~/
+                - generic [ref=e272]: .tmp-omo
+                - generic [ref=e273]: /
+            - option "~/ .tmp-omo-run /" [ref=e274] [cursor=pointer]:
+              - img [ref=e275]
+              - generic [ref=e277]:
+                - generic [ref=e278]: ~/
+                - generic [ref=e279]: .tmp-omo-run
+                - generic [ref=e280]: /
+            - option "~/ .windsurf /" [ref=e281] [cursor=pointer]:
+              - img [ref=e282]
+              - generic [ref=e284]:
+                - generic [ref=e285]: ~/
+                - generic [ref=e286]: .windsurf
+                - generic [ref=e287]: /
+            - option "~/ .windsurf-server /" [ref=e288] [cursor=pointer]:
+              - img [ref=e289]
+              - generic [ref=e291]:
+                - generic [ref=e292]: ~/
+                - generic [ref=e293]: .windsurf-server
+                - generic [ref=e294]: /
+            - option "~/ 2 /" [ref=e295] [cursor=pointer]:
+              - img [ref=e296]
+              - generic [ref=e298]:
+                - generic [ref=e299]: ~/
+                - generic [ref=e300]: "2"
+                - generic [ref=e301]: /
+            - option "~/ app-prefixable /" [ref=e302] [cursor=pointer]:
+              - img [ref=e303]
+              - generic [ref=e305]:
+                - generic [ref=e306]: ~/
+                - generic [ref=e307]: app-prefixable
+                - generic [ref=e308]: /
+            - option "~/ AppData /" [ref=e309] [cursor=pointer]:
+              - img [ref=e310]
+              - generic [ref=e312]:
+                - generic [ref=e313]: ~/
+                - generic [ref=e314]: AppData
+                - generic [ref=e315]: /
+            - option "~/ backups /" [ref=e316] [cursor=pointer]:
+              - img [ref=e317]
+              - generic [ref=e319]:
+                - generic [ref=e320]: ~/
+                - generic [ref=e321]: backups
+                - generic [ref=e322]: /
+            - option "~/ burp-suite-http-proxy-history-converter /" [ref=e323] [cursor=pointer]:
+              - img [ref=e324]
+              - generic [ref=e326]:
+                - generic [ref=e327]: ~/
+                - generic [ref=e328]: burp-suite-http-proxy-history-converter
+                - generic [ref=e329]: /
+            - option "~/ chrome /" [ref=e330] [cursor=pointer]:
+              - img [ref=e331]
+              - generic [ref=e333]:
+                - generic [ref=e334]: ~/
+                - generic [ref=e335]: chrome
+                - generic [ref=e336]: /
+            - option "~/ crackerjack /" [ref=e337] [cursor=pointer]:
+              - img [ref=e338]
+              - generic [ref=e340]:
+                - generic [ref=e341]: ~/
+                - generic [ref=e342]: crackerjack
+                - generic [ref=e343]: /
+            - option "~/ DarkMonitor /" [ref=e344] [cursor=pointer]:
+              - img [ref=e345]
+              - generic [ref=e347]:
+                - generic [ref=e348]: ~/
+                - generic [ref=e349]: DarkMonitor
+                - generic [ref=e350]: /
+            - option "~/ DarkMonitor_Restore /" [ref=e351] [cursor=pointer]:
+              - img [ref=e352]
+              - generic [ref=e354]:
+                - generic [ref=e355]: ~/
+                - generic [ref=e356]: DarkMonitor_Restore
+                - generic [ref=e357]: /
+            - option "~/ Downloads /" [ref=e358] [cursor=pointer]:
+              - img [ref=e359]
+              - generic [ref=e361]:
+                - generic [ref=e362]: ~/
+                - generic [ref=e363]: Downloads
+                - generic [ref=e364]: /
+            - option "~/ frida /" [ref=e365] [cursor=pointer]:
+              - img [ref=e366]
+              - generic [ref=e368]:
+                - generic [ref=e369]: ~/
+                - generic [ref=e370]: frida
+                - generic [ref=e371]: /
+            - option "~/ go /" [ref=e372] [cursor=pointer]:
+              - img [ref=e373]
+              - generic [ref=e375]:
+                - generic [ref=e376]: ~/
+                - generic [ref=e377]: go
+                - generic [ref=e378]: /
+            - option "~/ Kentico-12-RCE-via-SyncServer /" [ref=e379] [cursor=pointer]:
+              - img [ref=e380]
+              - generic [ref=e382]:
+                - generic [ref=e383]: ~/
+                - generic [ref=e384]: Kentico-12-RCE-via-SyncServer
+                - generic [ref=e385]: /
+            - option "~/ mcp-browser-use /" [ref=e386] [cursor=pointer]:
+              - img [ref=e387]
+              - generic [ref=e389]:
+                - generic [ref=e390]: ~/
+                - generic [ref=e391]: mcp-browser-use
+                - generic [ref=e392]: /
+            - option "~/ mission-control /" [ref=e393] [cursor=pointer]:
+              - img [ref=e394]
+              - generic [ref=e396]:
+                - generic [ref=e397]: ~/
+                - generic [ref=e398]: mission-control
+                - generic [ref=e399]: /
+            - option "~/ money-planner-v5 /" [ref=e400] [cursor=pointer]:
+              - img [ref=e401]
+              - generic [ref=e403]:
+                - generic [ref=e404]: ~/
+                - generic [ref=e405]: money-planner-v5
+                - generic [ref=e406]: /
+            - option "~/ node_modules /" [ref=e407] [cursor=pointer]:
+              - img [ref=e408]
+              - generic [ref=e410]:
+                - generic [ref=e411]: ~/
+                - generic [ref=e412]: node_modules
+                - generic [ref=e413]: /
+            - option "~/ oh-my-openagent /" [ref=e414] [cursor=pointer]:
+              - img [ref=e415]
+              - generic [ref=e417]:
+                - generic [ref=e418]: ~/
+                - generic [ref=e419]: oh-my-openagent
+                - generic [ref=e420]: /
+            - option "~/ oh-my-opencode-src /" [ref=e421] [cursor=pointer]:
+              - img [ref=e422]
+              - generic [ref=e424]:
+                - generic [ref=e425]: ~/
+                - generic [ref=e426]: oh-my-opencode-src
+                - generic [ref=e427]: /
+          - button "Open" [ref=e429] [cursor=pointer]
+          - generic [ref=e430]:
+            - generic [ref=e431]: Create new folder
+            - generic [ref=e432]:
+              - textbox "my-new-project" [ref=e433]
+              - button "Create" [disabled] [ref=e434]
+          - button "Clone Git Repository" [ref=e436] [cursor=pointer]:
+            - img [ref=e437]
+            - generic [ref=e441]: Clone Git Repository

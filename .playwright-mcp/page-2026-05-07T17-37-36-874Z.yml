@@ -1,0 +1,83 @@
+- generic [ref=e537]:
+  - generic [ref=e538]:
+    - button "Home" [ref=e539] [cursor=pointer]:
+      - img [ref=e540]
+    - generic [ref=e543]:
+      - generic "app-prefixable" [ref=e544] [cursor=pointer]:
+        - generic [ref=e546]: AP
+      - button "Open Project" [ref=e547] [cursor=pointer]:
+        - img [ref=e548]
+    - generic [ref=e549]:
+      - 'button "Terminal (Ctrl+`)" [ref=e550] [cursor=pointer]':
+        - img [ref=e551]
+      - generic [ref=e554]:
+        - 'button "Server: Local" [ref=e555] [cursor=pointer]':
+          - img [ref=e556]
+        - generic "Local" [ref=e559]
+      - button "Settings" [ref=e560] [cursor=pointer]:
+        - img [ref=e561]
+      - button "Server Logs" [ref=e564] [cursor=pointer]:
+        - img [ref=e565]
+  - navigation "Session list":
+    - generic [ref=e568]:
+      - generic [ref=e569]:
+        - generic [ref=e571]: AP
+        - generic [ref=e572]:
+          - generic [ref=e573]: app-prefixable
+          - generic [ref=e574]: ~/pk-opencode-webui/app-prefixable
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e575] [cursor=pointer]:
+          - img [ref=e576]
+      - button "New Session" [ref=e580] [cursor=pointer]:
+        - img [ref=e581]
+        - generic [ref=e582]: New Session
+      - generic [ref=e584]:
+        - img [ref=e585]
+        - textbox "Search sessions" [ref=e588]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]:
+          - img
+      - listbox "Sessions" [ref=e589]:
+        - generic [ref=e631]:
+          - text: Today
+          - option "New session - 2026-05-07T17:37:35.826Z" [selected] [ref=e633]:
+            - link "New session - 2026-05-07T17:37:35.826Z" [ref=e634] [cursor=pointer]:
+              - /url: /L2hvbWUvc2dhbGxhdC9way1vcGVuY29kZS13ZWJ1aS9hcHAtcHJlZml4YWJsZQ/session/ses_1fc7bcdaeffeCwsJGZByPLLwVD
+              - img [ref=e636]
+              - generic [ref=e639]: New session - 2026-05-07T17:37:35.826Z
+      - generic [ref=e596]: 3 provider(s)
+  - main [ref=e598]:
+    - generic [ref=e642]:
+      - generic [ref=e643]:
+        - generic [ref=e645]:
+          - heading "New session - 2026-05-07T17:37:35.826Z" [level=1] [ref=e647]
+          - paragraph [ref=e648]: ses_1fc7bcdaeffeCwsJGZByPLLwVD
+        - generic [ref=e649]:
+          - button "MCP Servers" [ref=e650] [cursor=pointer]:
+            - img [ref=e651]
+          - button "Toggle Review Panel" [ref=e653] [cursor=pointer]:
+            - img [ref=e654]
+          - button "Toggle Info Panel" [ref=e659] [cursor=pointer]:
+            - img [ref=e660]
+          - button "Toggle Terminal" [ref=e663] [cursor=pointer]:
+            - img [ref=e664]
+          - button "Toggle completion notifications" [ref=e667] [cursor=pointer]:
+            - img [ref=e668]
+      - generic [ref=e673]:
+        - img [ref=e675]
+        - paragraph [ref=e677]: Ready to chat
+        - paragraph [ref=e678]: Type a message below to begin
+      - generic [ref=e682]:
+        - textbox "Type a message... (@ for files, / for commands)" [active] [ref=e685]
+        - generic [ref=e686]:
+          - generic [ref=e688]:
+            - button "Upload image or PDF" [ref=e689] [cursor=pointer]:
+              - img [ref=e690]
+            - button "Attach file from project" [ref=e693] [cursor=pointer]:
+              - img [ref=e694]
+          - generic [ref=e698]:
+            - 'button "Agent: Pentesters Sisyphus - Engagement Lead" [ref=e699] [cursor=pointer]':
+              - generic [ref=e700]: "Agent:"
+              - generic [ref=e701]: Pentesters Sisyphus - Engagement Lead
+            - 'button "Model: Big Pickle" [ref=e702] [cursor=pointer]':
+              - generic [ref=e703]: "Model:"
+              - generic [ref=e704]: Big Pickle

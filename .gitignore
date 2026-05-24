@@ -36,3 +36,4 @@ worktrees/
 # Local OpenCode config
 .opencode/
 .claude/
+app-prefixable/core.*

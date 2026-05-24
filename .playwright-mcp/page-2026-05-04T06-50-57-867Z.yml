@@ -1,0 +1,51 @@
+- generic [ref=e247]:
+  - generic [ref=e304]:
+    - generic [ref=e305]:
+      - button "Switch Project" [ref=e306] [cursor=pointer]:
+        - img [ref=e307]
+        - generic [ref=e310]: opencode
+        - img [ref=e311]
+      - button "New" [ref=e313] [cursor=pointer]:
+        - img [ref=e314]
+        - generic [ref=e315]: New
+    - generic [ref=e317]:
+      - img [ref=e318]
+      - textbox "Search sessions..." [ref=e321]
+    - generic [ref=e322]:
+      - button "Active (4)" [ref=e323] [cursor=pointer]
+      - button "Archived (0)" [ref=e324] [cursor=pointer]
+    - generic [ref=e326]:
+      - generic [ref=e327]: Yesterday
+      - generic [ref=e328] [cursor=pointer]:
+        - img [ref=e330]
+        - generic [ref=e333]: Playwright browser testing issue report guide (Thai)
+        - button [ref=e334]:
+          - img [ref=e335]
+      - generic [ref=e339] [cursor=pointer]:
+        - img [ref=e341]
+        - generic [ref=e344]: Playwright browser accessibility test
+        - button [ref=e345]:
+          - img [ref=e346]
+      - generic [ref=e350] [cursor=pointer]:
+        - img [ref=e352]
+        - generic [ref=e355]: OpenCode plugin installation for LLM agents
+        - button [ref=e356]:
+          - img [ref=e357]
+      - generic [ref=e361] [cursor=pointer]:
+        - img [ref=e363]
+        - generic [ref=e366]: New session - 2026-05-03T06:14:54.288Z
+        - button [ref=e367]:
+          - img [ref=e368]
+  - navigation [ref=e282]:
+    - button "Chat" [ref=e283] [cursor=pointer]:
+      - img [ref=e284]
+      - generic [ref=e286]: Chat
+    - button "Sessions" [active] [ref=e287] [cursor=pointer]:
+      - img [ref=e288]
+      - generic [ref=e290]: Sessions
+    - button "Review" [ref=e291] [cursor=pointer]:
+      - img [ref=e292]
+      - generic [ref=e297]: Review
+    - button "Settings" [ref=e298] [cursor=pointer]:
+      - img [ref=e299]
+      - generic [ref=e302]: Settings

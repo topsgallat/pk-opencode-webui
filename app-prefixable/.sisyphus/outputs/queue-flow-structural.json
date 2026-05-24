@@ -1,0 +1,8 @@
+{
+  "timestamp": "2026-05-17T19:26:20.612Z",
+  "baseUrl": "http://localhost:3000",
+  "logs": [
+    "[test] Add to queue button visible (without session): false"
+  ],
+  "addToQueueButtonVisible": false
+}

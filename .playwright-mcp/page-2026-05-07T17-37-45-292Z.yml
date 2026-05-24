@@ -1,0 +1,52 @@
+- generic [ref=e713]:
+  - generic [ref=e718]:
+    - banner [ref=e719]:
+      - heading "New session - 2026-05-07T17:37:35.826Z" [level=1] [ref=e723]
+      - generic [ref=e724]:
+        - button "MCP Servers" [ref=e725] [cursor=pointer]:
+          - img [ref=e726]
+        - button "Toggle Review Panel" [ref=e728] [cursor=pointer]:
+          - img [ref=e729]
+        - button "Toggle Terminal" [ref=e734] [cursor=pointer]:
+          - img [ref=e735]
+    - generic [ref=e739]:
+      - img [ref=e741]
+      - paragraph [ref=e743]: Ready to chat
+      - paragraph [ref=e744]: Type a message below to begin
+    - generic [ref=e748]:
+      - textbox "Type a message... (@ for files, / for commands)" [active] [ref=e751]
+      - generic [ref=e752]:
+        - generic [ref=e754]:
+          - button "Upload image or PDF" [ref=e755] [cursor=pointer]:
+            - img [ref=e756]
+          - button "Attach file from project" [ref=e759] [cursor=pointer]:
+            - img [ref=e760]
+        - generic [ref=e764]:
+          - 'button "Agent: Pentesters Sisyphus - Engagement Lead" [ref=e765] [cursor=pointer]':
+            - generic [ref=e766]: "Agent:"
+            - generic [ref=e767]: Pentesters Sisyphus - Engagement Lead
+          - 'button "Model: Big Pickle" [ref=e768] [cursor=pointer]':
+            - generic [ref=e769]: "Model:"
+            - generic [ref=e770]: Big Pickle
+    - generic [ref=e771]:
+      - generic [ref=e772]:
+        - generic [ref=e773]: · OhMyOpenCode 3.17.6
+        - generic [ref=e774]: Sisyphus on steroids is steering OpenCode.
+      - button "Close notification" [ref=e775] [cursor=pointer]:
+        - img [ref=e776]
+  - navigation [ref=e779]:
+    - button "Chat" [ref=e780] [cursor=pointer]:
+      - img [ref=e781]
+      - generic [ref=e783]: Chat
+    - button "Sessions" [ref=e784] [cursor=pointer]:
+      - img [ref=e785]
+      - generic [ref=e787]: Sessions
+    - button "Review" [ref=e788] [cursor=pointer]:
+      - img [ref=e789]
+      - generic [ref=e794]: Review
+    - button "Settings" [ref=e795] [cursor=pointer]:
+      - img [ref=e796]
+      - generic [ref=e799]: Settings
+    - button "Local" [ref=e800] [cursor=pointer]:
+      - img [ref=e801]
+      - generic [ref=e804]: Local

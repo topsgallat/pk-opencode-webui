@@ -1,0 +1,33 @@
+- generic [ref=e247]:
+  - generic [ref=e304]:
+    - generic [ref=e305]:
+      - button "Switch Project" [active] [ref=e306] [cursor=pointer]
+      - button "New" [ref=e313] [cursor=pointer]
+    - generic [ref=e317]:
+      - img [ref=e318]
+      - textbox "Search sessions..." [ref=e321]
+    - generic [ref=e322]:
+      - button "Active (4)" [ref=e323] [cursor=pointer]
+      - button "Archived (0)" [ref=e324] [cursor=pointer]
+    - generic [ref=e326]:
+      - generic [ref=e327]: Yesterday
+      - generic [ref=e328] [cursor=pointer]
+      - generic [ref=e339] [cursor=pointer]
+      - generic [ref=e350] [cursor=pointer]
+      - generic [ref=e361] [cursor=pointer]
+    - generic [ref=e374]:
+      - generic [ref=e377]: Recent Projects
+      - generic [ref=e378]
+  - navigation [ref=e282]:
+    - button "Chat" [ref=e283] [cursor=pointer]:
+      - img [ref=e284]
+      - generic [ref=e286]: Chat
+    - button "Sessions" [ref=e287] [cursor=pointer]:
+      - img [ref=e288]
+      - generic [ref=e290]: Sessions
+    - button "Review" [ref=e291] [cursor=pointer]:
+      - img [ref=e292]
+      - generic [ref=e297]: Review
+    - button "Settings" [ref=e298] [cursor=pointer]:
+      - img [ref=e299]
+      - generic [ref=e302]: Settings

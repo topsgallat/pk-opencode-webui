@@ -1,0 +1,44 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button "Home" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+    - generic [ref=e9]:
+      - generic "opencode" [ref=e10] [cursor=pointer]:
+        - generic [ref=e12]: O
+      - button "Open Project" [ref=e13] [cursor=pointer]:
+        - img [ref=e14]
+    - generic [ref=e15]:
+      - 'button "Terminal (Ctrl+`)" [ref=e16] [cursor=pointer]':
+        - img [ref=e17]
+      - 'button "Server: Local" [ref=e21] [cursor=pointer]':
+        - img [ref=e22]
+      - button "Settings" [ref=e25] [cursor=pointer]:
+        - img [ref=e26]
+      - button "Server Logs" [ref=e29] [cursor=pointer]:
+        - img [ref=e30]
+  - navigation "Session list" [ref=e33]:
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - generic [ref=e37]: O
+        - generic [ref=e38]
+        - button "Collapse Sidebar (Ctrl+B)" [ref=e41] [cursor=pointer]
+      - button "New Session" [ref=e46] [cursor=pointer]:
+        - img [ref=e47]
+        - generic [ref=e48]: New Session
+      - generic [ref=e50]:
+        - img [ref=e51]
+        - textbox "Search sessions" [ref=e54]:
+          - /placeholder: Search sessions...
+        - button "Clear search" [disabled]
+      - listbox "Sessions" [ref=e55]:
+        - generic [ref=e115]
+        - generic [ref=e124]
+        - generic [ref=e140]
+      - generic [ref=e171]: 1 provider(s)
+  - main [ref=e82]:
+    - generic [ref=e84]:
+      - img [ref=e86]
+      - generic [ref=e105]:
+        - button "New Session" [ref=e106] [cursor=pointer]
+        - button "Settings" [ref=e109] [cursor=pointer]
+      - paragraph [ref=e114]: Select a session from the sidebar or start a new one

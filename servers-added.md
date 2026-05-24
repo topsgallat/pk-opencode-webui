@@ -1,0 +1,30 @@
+- generic [ref=e247]:
+  - generic [ref=e386]:
+    - generic [ref=e387]: "PATCH LOADED: Settings patch is active"
+    - generic [ref=e389]:
+      - generic [ref=e390]:
+        - generic [ref=e391]: Settings Menu
+        - generic [ref=e392]
+      - generic [ref=e394]:
+        - img [ref=e395]
+        - generic [ref=e397]: "Project: /home/opencode"
+      - generic [ref=e899]:
+        - banner [ref=e900]
+        - generic [ref=e903]
+        - generic [ref=e923]
+  - navigation [ref=e282]:
+    - button "Chat" [ref=e283] [cursor=pointer]:
+      - img [ref=e284]
+      - generic [ref=e286]: Chat
+    - button "Sessions" [ref=e287] [cursor=pointer]:
+      - img [ref=e288]
+      - generic [ref=e290]: Sessions
+    - button "Review" [ref=e291] [cursor=pointer]:
+      - img [ref=e292]
+      - generic [ref=e297]: Review
+    - button "Settings" [ref=e298] [cursor=pointer]:
+      - img [ref=e299]
+      - generic [ref=e302]: Settings
+    - button "Server" [ref=e978] [cursor=pointer]:
+      - img [ref=e979]
+      - generic [ref=e982]: Server

@@ -1,0 +1,66 @@
+- generic [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e9]:
+      - banner [ref=e10]:
+        - heading "New Session" [level=1] [ref=e14]
+        - generic [ref=e15]:
+          - button "MCP Servers" [ref=e16] [cursor=pointer]:
+            - img [ref=e17]
+          - button "Toggle Review Panel" [ref=e19] [cursor=pointer]:
+            - img [ref=e20]
+          - button "Toggle Terminal" [ref=e25] [cursor=pointer]:
+            - img [ref=e26]
+      - generic [ref=e30]:
+        - img [ref=e31]
+        - paragraph [ref=e48]: Loading chat history...
+      - generic [ref=e52]:
+        - textbox "Type a message... (@ for files, / for commands)" [active] [ref=e55]
+        - generic [ref=e56]:
+          - generic [ref=e58]:
+            - button "Upload image or PDF" [ref=e59] [cursor=pointer]:
+              - img [ref=e60]
+            - button "Attach file from project" [ref=e63] [cursor=pointer]:
+              - img [ref=e64]
+          - generic [ref=e68]:
+            - 'button "Agent: build" [ref=e69] [cursor=pointer]':
+              - generic [ref=e70]: "Agent:"
+              - generic [ref=e71]: build
+            - 'button "Model: big-pickle" [ref=e72] [cursor=pointer]':
+              - generic [ref=e73]: "Model:"
+              - generic [ref=e74]: big-pickle
+    - navigation [ref=e75]:
+      - button "Chat" [ref=e76] [cursor=pointer]:
+        - img [ref=e77]
+        - generic [ref=e79]: Chat
+      - button "Sessions" [ref=e80] [cursor=pointer]:
+        - img [ref=e81]
+        - generic [ref=e83]: Sessions
+      - button "Review" [ref=e84] [cursor=pointer]:
+        - img [ref=e85]
+        - generic [ref=e90]: Review
+      - button "Settings" [ref=e91] [cursor=pointer]:
+        - img [ref=e92]
+        - generic [ref=e95]: Settings
+      - button "Server" [ref=e96] [cursor=pointer]:
+        - img [ref=e97]
+        - generic [ref=e100]: Server
+  - generic [ref=e102]:
+    - button "Review" [ref=e104] [cursor=pointer]:
+      - img [ref=e105]
+      - generic [ref=e110]: Review
+    - generic [ref=e111]:
+      - button "Refresh" [ref=e113] [cursor=pointer]:
+        - img [ref=e114]
+      - button [ref=e119] [cursor=pointer]:
+        - img [ref=e120]
+    - generic [ref=e122]:
+      - tablist [ref=e124]:
+        - tab "0 Changes" [selected] [ref=e126] [cursor=pointer]
+        - tab "All Files" [ref=e128] [cursor=pointer]
+      - tabpanel [ref=e129]:
+        - generic [ref=e131]:
+          - img [ref=e132]
+          - generic [ref=e149]: Loading changes...
+        - generic [ref=e151]:
+          - img [ref=e152]
+          - generic [ref=e157]: No changes in this session

@@ -1,0 +1,35 @@
+- generic [ref=e88]:
+  - generic [ref=e150]:
+    - generic [ref=e151]:
+      - button "Switch Project" [ref=e152] [cursor=pointer]:
+        - img [ref=e153]
+        - generic [ref=e156]: opencode
+        - img [ref=e157]
+      - button "New" [ref=e159] [cursor=pointer]:
+        - img [ref=e160]
+        - generic [ref=e161]: New
+    - generic [ref=e163]:
+      - img [ref=e164]
+      - textbox "Search sessions..." [ref=e167]
+    - generic [ref=e168]:
+      - button "Active (0)" [ref=e169] [cursor=pointer]
+      - button "Archived (0)" [ref=e170] [cursor=pointer]
+    - generic [ref=e172]:
+      - img [ref=e173]
+      - generic [ref=e175]: No sessions yet
+  - navigation [ref=e123]:
+    - button "Chat" [ref=e124] [cursor=pointer]:
+      - img [ref=e125]
+      - generic [ref=e127]: Chat
+    - button "Sessions" [active] [ref=e128] [cursor=pointer]:
+      - img [ref=e129]
+      - generic [ref=e131]: Sessions
+    - button "Review" [ref=e132] [cursor=pointer]:
+      - img [ref=e133]
+      - generic [ref=e138]: Review
+    - button "Settings" [ref=e139] [cursor=pointer]:
+      - img [ref=e140]
+      - generic [ref=e143]: Settings
+    - button "Server" [ref=e144] [cursor=pointer]:
+      - img [ref=e145]
+      - generic [ref=e148]: Server

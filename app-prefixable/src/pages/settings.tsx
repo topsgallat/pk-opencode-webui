@@ -1,4 +1,4 @@
-import { createSignal, For, Show, type JSX, createMemo, onMount, onCleanup, createEffect } from "solid-js"
+import { createSignal, For, Index, Show, type JSX, createMemo, onMount, onCleanup, createEffect } from "solid-js"
 import { Portal } from "solid-js/web"
 import { Spinner } from "../components/ui/spinner"
 import { useProviders } from "../context/providers"
@@ -4159,7 +4159,7 @@ function ProjectProvidersTab() {
                 <div class="rounded-md p-3" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}>
                   <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-medium" style={{ color: "var(--text-strong)" }}>Models</span>
-                    <button onClick={addModelRow} class="text-xs px-2 py-1 rounded flex items-center gap-1" style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}>
+                    <button type="button" onClick={addModelRow} class="text-xs px-2 py-1 rounded flex items-center gap-1" style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}>
                       <Plus class="w-3 h-3" /> Add model
                     </button>
                   </div>
@@ -4167,17 +4167,17 @@ function ProjectProvidersTab() {
                     <p class="text-xs" style={{ color: "var(--text-weak)" }}>No models configured. Models will be fetched from the API if not specified.</p>
                   }>
                     <div class="space-y-2">
-                      <For each={newProviderModels()}>
+                      <Index each={newProviderModels()}>
                         {(m, i) => (
                           <div class="flex flex-col gap-2 md:flex-row md:items-start">
-                            <input value={m.id} onInput={(e) => { setModelId(i(), e.currentTarget.value); clearProviderTestResult() }} placeholder="Model ID, e.g. gpt-4o" class="w-full min-w-0 px-3 py-2 rounded-md text-sm md:flex-1" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                            <input value={m.name} onInput={(e) => { setModelName(i(), e.currentTarget.value); clearProviderTestResult() }} placeholder="Display name, e.g. GPT-4o" class="w-full min-w-0 px-3 py-2 rounded-md text-sm md:flex-1" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                            <button onClick={() => removeModelRow(i())} class="self-end p-2 rounded shrink-0 md:self-auto" style={{ color: "var(--interactive-critical)" }} aria-label="Remove model">
+                            <input value={m().id} onInput={(e) => { setModelId(i, e.currentTarget.value); clearProviderTestResult() }} placeholder="Model ID, e.g. gpt-4o" class="w-full min-w-0 px-3 py-2 rounded-md text-sm md:flex-1" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                            <input value={m().name} onInput={(e) => { setModelName(i, e.currentTarget.value); clearProviderTestResult() }} placeholder="Display name, e.g. GPT-4o" class="w-full min-w-0 px-3 py-2 rounded-md text-sm md:flex-1" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                            <button type="button" onClick={() => removeModelRow(i)} class="self-end p-2 rounded shrink-0 md:self-auto" style={{ color: "var(--interactive-critical)" }} aria-label="Remove model">
                               <X class="w-4 h-4" />
                             </button>
                           </div>
                         )}
-                      </For>
+                      </Index>
                     </div>
                   </Show>
                 </div>

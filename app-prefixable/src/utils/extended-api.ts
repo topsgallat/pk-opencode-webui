@@ -254,6 +254,57 @@ export async function clearProviderAuth(serverUrl: string, providerID: string, t
   }
 }
 
+export type ProviderConnectionTestInput = {
+  providerID?: string
+  baseURL: string
+  apiKey: string
+  models?: Array<{ id: string; name: string }>
+  targetUrl?: string
+}
+
+export type ProviderConnectionTestResult = {
+  ok: boolean
+  reachable?: boolean
+  status?: number
+  error?: string
+  message?: string
+}
+
+export async function validateProviderConnection(serverUrl: string, input: ProviderConnectionTestInput): Promise<ProviderConnectionTestResult> {
+  try {
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/provider-validate`, input.targetUrl), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        providerID: input.providerID,
+        baseURL: input.baseURL,
+        apiKey: input.apiKey,
+        models: input.models ?? [],
+      }),
+    }, EXT_API_TIMEOUT_MS, "extended validateProviderConnection")
+
+    const data = await res.json().catch(() => null)
+    if (data && typeof data === "object") {
+      return {
+        ok: Boolean(data.ok),
+        reachable: typeof data.reachable === "boolean" ? data.reachable : undefined,
+        status: typeof data.status === "number" ? data.status : undefined,
+        error: typeof data.error === "string" ? data.error : undefined,
+        message: typeof data.message === "string" ? data.message : undefined,
+      }
+    }
+
+    return {
+      ok: res.ok,
+      status: res.status,
+      error: res.ok ? undefined : res.statusText || "provider validation failed",
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
+  }
+}
+
 /**
  * List available OpenCode log files
  */

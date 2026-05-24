@@ -17,6 +17,7 @@ import { useTheme } from "../context/theme"
 import { useDevice } from "../context/device"
 import { useServer } from "../context/server"
 import { writeFile } from "../utils/extended-api"
+import { validateProviderConnection } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import {
@@ -3495,11 +3496,14 @@ function ProjectConfigTab() {
 function ProjectProvidersTab() {
   const config = useConfig()
   const providers = useProviders()
-  const { directory } = useSDK()
+  const { directory, url: serverUrl, targetUrl } = useSDK()
   const OPENAI_COMPATIBLE_PROVIDER = "@ai-sdk/openai-compatible"
   const [saving, setSaving] = createSignal(false)
   const [saved, setSaved] = createSignal(false)
   const [saveError, setSaveError] = createSignal<string | null>(null)
+  const [testing, setTesting] = createSignal(false)
+  const [testError, setTestError] = createSignal<string | null>(null)
+  const [testSuccess, setTestSuccess] = createSignal<string | null>(null)
   const [newProviderId, setNewProviderId] = createSignal<string>("")
   const [newProviderName, setNewProviderName] = createSignal<string>("")
   const [newProviderBaseURL, setNewProviderBaseURL] = createSignal<string>("")
@@ -3557,10 +3561,17 @@ function ProjectProvidersTab() {
 
   function addModelRow() {
     setNewProviderModels([...newProviderModels(), { id: "", name: "" }])
+    clearProviderTestResult()
+  }
+
+  function clearProviderTestResult() {
+    setTestError(null)
+    setTestSuccess(null)
   }
 
   function removeModelRow(index: number) {
     setNewProviderModels(newProviderModels().filter((_, i) => i !== index))
+    clearProviderTestResult()
   }
 
   function setModelId(index: number, value: string) {
@@ -3586,6 +3597,8 @@ function ProjectProvidersTab() {
     setNewProviderEnv("")
     setNewProviderModels([])
     setShowProviderAdvanced(false)
+    setTestError(null)
+    setTestSuccess(null)
   }
 
   function globalProviderEnabled(providerID: string) {
@@ -3687,6 +3700,8 @@ function ProjectProvidersTab() {
     setShowProviderAdvanced(Boolean(provider?.api || provider?.env?.length || (provider?.npm && provider.npm !== OPENAI_COMPATIBLE_PROVIDER)))
     const models = Object.entries(provider?.models ?? {}).map(([id, m]) => ({ id, name: m.name ?? "" }))
     setNewProviderModels(models.length > 0 ? models : [{ id: "", name: "" }])
+    setTestError(null)
+    setTestSuccess(null)
   }
 
   async function saveGlobalProvider() {
@@ -3755,6 +3770,48 @@ function ProjectProvidersTab() {
       resetProviderEditor()
       showSaved()
     }
+  }
+
+  async function testGlobalProviderConnection() {
+    const baseURL = newProviderBaseURL().trim()
+    if (!baseURL) {
+      setTestError("Base URL is required")
+      setTestSuccess(null)
+      return
+    }
+
+    const apiKey = newProviderApiKey().trim()
+    if (!apiKey) {
+      setTestError("API key is required")
+      setTestSuccess(null)
+      return
+    }
+
+    const models = newProviderModels()
+      .map((model) => ({ id: model.id.trim(), name: model.name.trim() }))
+      .filter((model) => model.id)
+
+    setTesting(true)
+    setTestError(null)
+    setTestSuccess(null)
+
+    const result = await validateProviderConnection(serverUrl, {
+      providerID: newProviderId().trim() || editingProviderId() || undefined,
+      baseURL,
+      apiKey,
+      models,
+      targetUrl,
+    })
+
+    setTesting(false)
+    if (result.ok) {
+      setTestSuccess(result.message || "Connection succeeded")
+      setTestError(null)
+      return
+    }
+
+    setTestError(result.error || `Connection test failed${result.status ? ` (${result.status})` : ""}`)
+    setTestSuccess(null)
   }
 
   async function removeGlobalProvider() {
@@ -4081,11 +4138,23 @@ function ProjectProvidersTab() {
                   </Show>
                 </div>
               </div>
+              <Show when={testError() || testSuccess()}>
+                <div
+                  class="mb-3 rounded-md px-3 py-2 text-xs"
+                  style={{
+                    background: "var(--background-base)",
+                    border: "1px solid var(--border-base)",
+                    color: testError() ? "var(--interactive-critical)" : "var(--icon-success-base)",
+                  }}
+                >
+                  {testError() || testSuccess()}
+                </div>
+              </Show>
               <div class="space-y-2">
                 <input value={newProviderId()} onInput={(e) => setNewProviderId(e.currentTarget.value)} placeholder="Provider ID" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
                 <input value={newProviderName()} onInput={(e) => setNewProviderName(e.currentTarget.value)} placeholder="Display name" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                <input value={newProviderBaseURL()} onInput={(e) => setNewProviderBaseURL(e.currentTarget.value)} placeholder="Base URL, e.g. https://example.com/v1" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                <input type="password" value={newProviderApiKey()} onInput={(e) => setNewProviderApiKey(e.currentTarget.value)} placeholder="API key" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                <input value={newProviderBaseURL()} onInput={(e) => { setNewProviderBaseURL(e.currentTarget.value); clearProviderTestResult() }} placeholder="Base URL, e.g. https://example.com/v1" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                <input type="password" value={newProviderApiKey()} onInput={(e) => { setNewProviderApiKey(e.currentTarget.value); clearProviderTestResult() }} placeholder="API key" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
 
                 <div class="rounded-md p-3" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}>
                   <div class="flex items-center justify-between mb-2">
@@ -4101,8 +4170,8 @@ function ProjectProvidersTab() {
                       <For each={newProviderModels()}>
                         {(m, i) => (
                           <div class="flex gap-2 items-start">
-                            <input value={m.id} onInput={(e) => setModelId(i(), e.currentTarget.value)} placeholder="Model ID, e.g. gpt-4o" class="flex-1 px-3 py-2 rounded-md text-sm" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                            <input value={m.name} onInput={(e) => setModelName(i(), e.currentTarget.value)} placeholder="Display name, e.g. GPT-4o" class="flex-1 px-3 py-2 rounded-md text-sm" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                            <input value={m.id} onInput={(e) => { setModelId(i(), e.currentTarget.value); clearProviderTestResult() }} placeholder="Model ID, e.g. gpt-4o" class="flex-1 px-3 py-2 rounded-md text-sm" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                            <input value={m.name} onInput={(e) => { setModelName(i(), e.currentTarget.value); clearProviderTestResult() }} placeholder="Display name, e.g. GPT-4o" class="flex-1 px-3 py-2 rounded-md text-sm" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
                             <button onClick={() => removeModelRow(i())} class="p-2 rounded shrink-0" style={{ color: "var(--interactive-critical)" }} aria-label="Remove model">
                               <X class="w-4 h-4" />
                             </button>
@@ -4124,7 +4193,10 @@ function ProjectProvidersTab() {
                   </div>
                 </Show>
                 <div class="flex items-center gap-2 flex-wrap pt-1">
-                  <Button onClick={saveGlobalProvider} variant="primary" size="sm" disabled={saving() || !newProviderId().trim()}>
+                  <Button onClick={testGlobalProviderConnection} variant="secondary" size="sm" disabled={saving() || testing() || !newProviderBaseURL().trim() || !newProviderApiKey().trim()}>
+                    {testing() ? "Testing..." : "Test Connection"}
+                  </Button>
+                  <Button onClick={saveGlobalProvider} variant="primary" size="sm" disabled={saving() || testing() || !newProviderId().trim()}>
                     <Save class="w-3.5 h-3.5" />
                     {editingProviderId() ? "Save Provider" : "Add Provider"}
                   </Button>

@@ -4169,10 +4169,10 @@ function ProjectProvidersTab() {
                     <div class="space-y-2">
                       <For each={newProviderModels()}>
                         {(m, i) => (
-                          <div class="flex gap-2 items-start">
-                            <input value={m.id} onInput={(e) => { setModelId(i(), e.currentTarget.value); clearProviderTestResult() }} placeholder="Model ID, e.g. gpt-4o" class="flex-1 px-3 py-2 rounded-md text-sm" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                            <input value={m.name} onInput={(e) => { setModelName(i(), e.currentTarget.value); clearProviderTestResult() }} placeholder="Display name, e.g. GPT-4o" class="flex-1 px-3 py-2 rounded-md text-sm" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                            <button onClick={() => removeModelRow(i())} class="p-2 rounded shrink-0" style={{ color: "var(--interactive-critical)" }} aria-label="Remove model">
+                          <div class="flex flex-col gap-2 md:flex-row md:items-start">
+                            <input value={m.id} onInput={(e) => { setModelId(i(), e.currentTarget.value); clearProviderTestResult() }} placeholder="Model ID, e.g. gpt-4o" class="w-full min-w-0 px-3 py-2 rounded-md text-sm md:flex-1" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                            <input value={m.name} onInput={(e) => { setModelName(i(), e.currentTarget.value); clearProviderTestResult() }} placeholder="Display name, e.g. GPT-4o" class="w-full min-w-0 px-3 py-2 rounded-md text-sm md:flex-1" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
+                            <button onClick={() => removeModelRow(i())} class="self-end p-2 rounded shrink-0 md:self-auto" style={{ color: "var(--interactive-critical)" }} aria-label="Remove model">
                               <X class="w-4 h-4" />
                             </button>
                           </div>

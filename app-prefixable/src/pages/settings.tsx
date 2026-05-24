@@ -3824,7 +3824,7 @@ function ProjectProvidersTab() {
       if (Object.keys(full.provider).length === 0) delete full.provider
     }
 
-    const result = await config.updateGlobal({ provider: full.provider ?? undefined })
+    const result = await config.updateGlobal({ provider: full.provider ?? {} })
     if (!result) return
     setProviderToRemove(null)
     if (editingProviderId() === providerID) resetProviderEditor()

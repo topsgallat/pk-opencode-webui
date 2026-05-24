@@ -119,6 +119,68 @@ async function syncProviderAuthFromBackend(req: Request, target: string, provide
   return syncProviderAuthSession(req, target, { providerID, authHeader, accountId })
 }
 
+type ProviderValidateModel = {
+  id?: string
+  name?: string
+}
+
+function readResponseErrorBody(body: unknown): string | undefined {
+  if (!body) return undefined
+  if (typeof body === "string") return body.trim() || undefined
+  if (typeof body !== "object") return undefined
+
+  const raw = body as Record<string, unknown>
+  const error = raw.error
+  if (typeof error === "string" && error.trim()) return error.trim()
+  if (error && typeof error === "object") {
+    const nested = error as Record<string, unknown>
+    const message = typeof nested.message === "string" ? nested.message.trim() : ""
+    if (message) return message
+  }
+
+  const message = typeof raw.message === "string" ? raw.message.trim() : ""
+  if (message) return message
+
+  const detail = typeof raw.detail === "string" ? raw.detail.trim() : ""
+  if (detail) return detail
+
+  if (Array.isArray(raw.errors)) {
+    for (const item of raw.errors) {
+      if (!item || typeof item !== "object") continue
+      const nested = item as Record<string, unknown>
+      const nestedMessage = typeof nested.message === "string" ? nested.message.trim() : ""
+      if (nestedMessage) return nestedMessage
+    }
+  }
+
+  return undefined
+}
+
+async function readResponseError(res: Response): Promise<string | undefined> {
+  const text = await res.text().catch(() => "")
+  if (!text) return undefined
+
+  try {
+    return readResponseErrorBody(JSON.parse(text)) || text.trim() || undefined
+  } catch {
+    return text.trim() || undefined
+  }
+}
+
+function buildProviderModelsProbe(baseURL: string): string | undefined {
+  const input = baseURL.trim()
+  if (!input) return undefined
+
+  try {
+    const normalized = input.endsWith("/") ? input : `${input}/`
+    const probe = new URL("models", normalized)
+    if (probe.protocol !== "http:" && probe.protocol !== "https:") return undefined
+    return probe.toString()
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * Validate that a path is safe (within allowed root, no traversal attacks).
  * Returns the normalized absolute path if valid, or null if invalid.
@@ -241,6 +303,75 @@ export async function handleExtendedEndpoint(
     const body = await req.json().catch(() => null)
     const target = url.searchParams.get("target") || ""
     return syncProviderAuthSession(req, target, body)
+  }
+
+  // POST /api/ext/provider-validate - Validate an OpenAI-compatible custom provider without saving it
+  if (path === "/api/ext/provider-validate" && method === "POST") {
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body !== "object") {
+      return Response.json({ ok: false, error: "invalid body" }, { status: 400 })
+    }
+
+    const raw = body as Record<string, unknown>
+    const providerID = typeof raw.providerID === "string" ? raw.providerID.trim() : ""
+    const baseURL = typeof raw.baseURL === "string" ? raw.baseURL.trim() : ""
+    const apiKey = typeof raw.apiKey === "string" ? raw.apiKey.trim() : ""
+    const models = Array.isArray(raw.models)
+      ? raw.models
+          .map((item) => {
+            if (!item || typeof item !== "object") return undefined
+            const model = item as ProviderValidateModel
+            const id = typeof model.id === "string" ? model.id.trim() : ""
+            const name = typeof model.name === "string" ? model.name.trim() : ""
+            if (!id) return undefined
+            return { id, name }
+          })
+          .filter((item): item is { id: string; name: string } => !!item)
+      : []
+
+    if (!baseURL) {
+      return Response.json({ ok: false, error: "baseURL is required" }, { status: 400 })
+    }
+    if (!apiKey) {
+      return Response.json({ ok: false, error: "apiKey is required" }, { status: 400 })
+    }
+
+    const probe = buildProviderModelsProbe(baseURL)
+    if (!probe) {
+      return Response.json({ ok: false, error: "invalid baseURL" }, { status: 400 })
+    }
+
+    try {
+      const headers = new Headers({
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+      })
+
+      const res = await fetch(probe, {
+        signal: AbortSignal.timeout(8000),
+        headers,
+      })
+
+      const error = res.ok ? undefined : await readResponseError(res)
+      return Response.json({
+        ok: res.ok,
+        reachable: true,
+        providerID: providerID || undefined,
+        url: probe,
+        status: res.status,
+        message: res.ok ? "Connection succeeded" : undefined,
+        error: res.ok ? undefined : error || res.statusText || "provider validation failed",
+        modelsChecked: models.length,
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return Response.json({
+        ok: false,
+        reachable: false,
+        providerID: providerID || undefined,
+        error: msg,
+      })
+    }
   }
 
   // POST /api/ext/provider-auth/from-backend - Sync provider auth from the OpenCode backend auth store

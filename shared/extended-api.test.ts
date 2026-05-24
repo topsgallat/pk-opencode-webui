@@ -18,6 +18,70 @@ afterEach(() => {
   __resetProviderAuthSessionsForTests()
 })
 
+test("validates provider connection without saving", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    expect(String(input)).toBe("https://example.com/v1/models")
+    expect(init?.headers instanceof Headers ? init.headers.get("Authorization") : new Headers(init?.headers).get("Authorization")).toBe("Bearer test-key")
+    return new Response(JSON.stringify({ data: [{ id: "gpt-4o" }] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as typeof fetch
+
+  try {
+    const req = new Request("http://localhost/api/ext/provider-validate", {
+      method: "POST",
+      body: JSON.stringify({
+        providerID: "openai-compatible",
+        baseURL: "https://example.com/v1",
+        apiKey: "test-key",
+        models: [{ id: "gpt-4o", name: "GPT-4o" }],
+      }),
+    })
+
+    const res = await handleExtendedEndpoint("/api/ext/provider-validate", "POST", new URL(req.url), req)
+    expect(res).toBeDefined()
+    expect(res!.status).toBe(200)
+
+    const data = await res!.json()
+    expect(data.ok).toBe(true)
+    expect(data.reachable).toBe(true)
+    expect(data.message).toBe("Connection succeeded")
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("surfaces provider validation errors", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => new Response(JSON.stringify({ error: { message: "Unauthorized" } }), {
+    status: 401,
+    headers: { "Content-Type": "application/json" },
+  })) as typeof fetch
+
+  try {
+    const req = new Request("http://localhost/api/ext/provider-validate", {
+      method: "POST",
+      body: JSON.stringify({
+        baseURL: "https://example.com/v1",
+        apiKey: "bad-key",
+      }),
+    })
+
+    const res = await handleExtendedEndpoint("/api/ext/provider-validate", "POST", new URL(req.url), req)
+    expect(res).toBeDefined()
+    expect(res!.status).toBe(200)
+
+    const data = await res!.json()
+    expect(data.ok).toBe(false)
+    expect(data.status).toBe(401)
+    expect(data.error).toBe("Unauthorized")
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("syncs oauth provider auth from backend auth file", async () => {
   const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-auth-"))
   process.env.XDG_DATA_HOME = root

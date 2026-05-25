@@ -17,7 +17,7 @@ import { useTheme } from "../context/theme"
 import { useDevice } from "../context/device"
 import { useServer } from "../context/server"
 import { writeFile } from "../utils/extended-api"
-import { validateProviderConnection } from "../utils/extended-api"
+import { deleteGlobalProvider, validateProviderConnection } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import {
@@ -3818,16 +3818,18 @@ function ProjectProvidersTab() {
     const providerID = providerToRemove()
     if (!providerID) return
 
-    const full = JSON.parse(JSON.stringify(config.global)) as Config
-    if (full.provider) {
-      delete full.provider[providerID]
-      if (Object.keys(full.provider).length === 0) delete full.provider
+    setSaving(true)
+    const ok = await deleteGlobalProvider(serverUrl, providerID)
+    setSaving(false)
+    if (!ok) {
+      setSaveError(`Failed to remove provider '${providerID}' from global config`)
+      return
     }
 
-    const result = await config.updateGlobal({ provider: full.provider ?? {} })
-    if (!result) return
+    await config.refresh()
     setProviderToRemove(null)
     if (editingProviderId() === providerID) resetProviderEditor()
+    showSaved()
   }
 
 

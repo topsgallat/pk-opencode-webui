@@ -254,6 +254,19 @@ export async function clearProviderAuth(serverUrl: string, providerID: string, t
   }
 }
 
+export async function deleteGlobalProvider(serverUrl: string, providerID: string): Promise<boolean> {
+  try {
+    const params = new URLSearchParams({ providerID })
+    const res = await fetchWithTimeout(`${serverUrl}/api/ext/global-provider?${params}`, {
+      method: "DELETE",
+    }, EXT_API_TIMEOUT_MS, "extended deleteGlobalProvider")
+    return res.ok && (await res.json())?.success === true
+  } catch (e) {
+    console.error("[extended-api] deleteGlobalProvider failed:", e)
+    return false
+  }
+}
+
 export type ProviderConnectionTestInput = {
   providerID?: string
   baseURL: string

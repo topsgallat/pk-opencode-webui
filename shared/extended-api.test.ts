@@ -89,7 +89,7 @@ test("deletes a global custom provider from config file", async () => {
   const dir = nodePath.join(root, ".config", "opencode")
   await fs.mkdir(dir, { recursive: true })
   await fs.writeFile(
-    nodePath.join(dir, "opencode.json"),
+    nodePath.join(dir, "config.json"),
     JSON.stringify({ provider: { foo: { name: "Foo", npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://example.com/v1" } }, bar: { name: "Bar" } } }, null, 2),
     "utf-8",
   )
@@ -102,7 +102,7 @@ test("deletes a global custom provider from config file", async () => {
   expect(res).toBeDefined()
   expect(res!.status).toBe(200)
 
-  const saved = JSON.parse(await fs.readFile(nodePath.join(dir, "opencode.json"), "utf-8")) as { provider?: Record<string, unknown> }
+  const saved = JSON.parse(await fs.readFile(nodePath.join(dir, "config.json"), "utf-8")) as { provider?: Record<string, unknown> }
   expect(saved.provider?.foo).toBeUndefined()
   expect(saved.provider?.bar).toBeDefined()
 })

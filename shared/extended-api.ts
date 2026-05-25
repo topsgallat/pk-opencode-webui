@@ -122,7 +122,7 @@ async function syncProviderAuthFromBackend(req: Request, target: string, provide
 function getGlobalConfigCandidates(): string[] {
   const homeDir = process.env.HOME || os.homedir()
   const configDir = process.env.OPENCODE_CONFIG_DIR || nodePath.join(homeDir, ".config", "opencode")
-  return [nodePath.join(configDir, "opencode.jsonc"), nodePath.join(configDir, "opencode.json")]
+  return [nodePath.join(configDir, "opencode.jsonc"), nodePath.join(configDir, "opencode.json"), nodePath.join(configDir, "config.json")]
 }
 
 function parseGlobalConfig(text: string): Record<string, unknown> {
@@ -145,11 +145,8 @@ function parseGlobalConfig(text: string): Record<string, unknown> {
 
 async function deleteGlobalProviderFromFile(providerID: string): Promise<Response> {
   const candidates = getGlobalConfigCandidates()
-  let configPath = candidates[0]
-  if (!fs.existsSync(configPath)) {
-    configPath = candidates[1]
-  }
-  if (!fs.existsSync(configPath)) {
+  const configPath = candidates.find((file) => fs.existsSync(file))
+  if (!configPath) {
     return Response.json({ error: "Config file not found" }, { status: 404 })
   }
 

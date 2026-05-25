@@ -1436,172 +1436,6 @@ Add your project-specific instructions here.
                 </div>
               </section>
 
-              {/* Global Custom Providers - moved here to sit directly under Add Provider */}
-              <section
-                class="rounded-lg overflow-hidden"
-                style={{
-                  background: "var(--background-base)",
-                  border: "1px solid var(--border-base)",
-                }}
-              >
-                <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
-                  <Settings2 class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
-                  <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-                    Global Custom Providers
-                  </h2>
-                </div>
-                <div class="p-4">
-                  <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                    <div class="rounded-md p-3" style={{ background: "var(--surface-inset)" }}>
-                      <div class="flex items-start justify-between gap-2 mb-3">
-                        <div class="min-w-0">
-                          <div class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-                            {editingProviderId() ? `Edit ${editingProviderId()}` : "Add custom provider"}
-                          </div>
-                          <div class="text-xs mt-0.5" style={{ color: "var(--text-weak)" }}>
-                            OpenAI-compatible providers only.
-                          </div>
-                        </div>
-                        <div class="flex items-center gap-2 shrink-0">
-                          <span class="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--background-base)", color: "var(--text-weak)" }}>
-                            {OPENAI_COMPATIBLE_PROVIDER}
-                          </span>
-                          <button
-                            onClick={() => setShowProviderAdvanced((current) => !current)}
-                            class="text-xs px-2 py-1 rounded"
-                            style={{ background: "var(--background-base)", color: "var(--text-base)" }}
-                          >
-                            {showProviderAdvanced() ? "Hide advanced" : "Advanced"}
-                          </button>
-                          <Show when={editingProviderId()}>
-                            <button
-                              onClick={resetProviderEditor}
-                              class="text-xs hover:underline"
-                              style={{ color: "var(--text-interactive-base)" }}
-                            >
-                              Clear
-                            </button>
-                          </Show>
-                        </div>
-                      </div>
-                      <Show when={testError() || testSuccess()}>
-                        <div
-                          class="mb-3 rounded-md px-3 py-2 text-xs"
-                          style={{
-                            background: "var(--background-base)",
-                            border: "1px solid var(--border-base)",
-                            color: testError() ? "var(--interactive-critical)" : "var(--icon-success-base)",
-                          }}
-                        >
-                          {testError() || testSuccess()}
-                        </div>
-                      </Show>
-                      <div class="space-y-2">
-                        <input value={newProviderId()} onInput={(e) => setNewProviderId(e.currentTarget.value)} placeholder="Provider ID" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                        <input value={newProviderName()} onInput={(e) => setNewProviderName(e.currentTarget.value)} placeholder="Display name" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                        <input value={newProviderBaseURL()} onInput={(e) => { setNewProviderBaseURL(e.currentTarget.value); clearProviderTestResult() }} placeholder="Base URL, e.g. https://example.com/v1" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                        <input type="password" value={newProviderApiKey()} onInput={(e) => { setNewProviderApiKey(e.currentTarget.value); clearProviderTestResult() }} placeholder="API key" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-
-                        <div class="rounded-md p-3" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}>
-                          <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-medium" style={{ color: "var(--text-strong)" }}>Models</span>
-                            <button type="button" onClick={addModelRow} class="text-xs px-2 py-1 rounded flex items-center gap-1" style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}>
-                              <Plus class="w-3 h-3" /> Add model
-                            </button>
-                          </div>
-                          <Show when={newProviderModels().length > 0} fallback={
-                            <p class="text-xs" style={{ color: "var(--text-weak)" }}>No models configured. Models will be fetched from the API if not specified.</p>
-                          }>
-                            <div class="space-y-2">
-                              <Index each={newProviderModels()}>
-                                {(m, i) => (
-                                  <div class="flex flex-col gap-2 md:flex-row md:items-start">
-                                    <input value={m().id} onInput={(e) => { setModelId(i, e.currentTarget.value); clearProviderTestResult() }} placeholder="Model ID, e.g. gpt-4o" class="w-full min-w-0 px-3 py-2 rounded-md text-sm md:flex-1" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                                    <input value={m().name} onInput={(e) => { setModelName(i, e.currentTarget.value); clearProviderTestResult() }} placeholder="Display name, e.g. GPT-4o" class="w-full min-w-0 px-3 py-2 rounded-md text-sm md:flex-1" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                                    <button type="button" onClick={() => removeModelRow(i)} class="self-end p-2 rounded shrink-0 md:self-auto" style={{ color: "var(--interactive-critical)" }} aria-label="Remove model">
-                                      <X class="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                )}
-                              </Index>
-                            </div>
-                          </Show>
-                        </div>
-
-                        <p class="text-xs" style={{ color: "var(--text-weak)" }}>
-                          Most providers only need a base URL and API key. The adapter package is prefilled for OpenAI-compatible providers.
-                        </p>
-                        <Show when={showProviderAdvanced()}>
-                          <div class="space-y-2 rounded-md p-3" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}>
-                            <input value={newProviderNpm()} onInput={(e) => setNewProviderNpm(e.currentTarget.value)} placeholder="Adapter package" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                            <input value={newProviderApi()} onInput={(e) => setNewProviderApi(e.currentTarget.value)} placeholder="Adapter API (optional)" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                            <textarea value={newProviderEnv()} onInput={(e) => setNewProviderEnv(e.currentTarget.value)} rows={4} placeholder="Environment variables, one per line (optional)" class="w-full px-3 py-2 rounded-md text-sm" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }} />
-                          </div>
-                        </Show>
-                        <div class="flex items-center gap-2 flex-wrap pt-1">
-                          <Button onClick={testGlobalProviderConnection} variant="secondary" size="sm" disabled={saving() || testing() || !newProviderBaseURL().trim() || !newProviderApiKey().trim()}>
-                            {testing() ? "Testing..." : "Test Connection"}
-                          </Button>
-                          <Button onClick={saveGlobalProvider} variant="primary" size="sm" disabled={saving() || testing() || !newProviderId().trim()}>
-                            <Save class="w-3.5 h-3.5" />
-                            {editingProviderId() ? "Save Provider" : "Add Provider"}
-                          </Button>
-                          <Show when={editingProviderId()}>
-                            <Button onClick={resetProviderEditor} variant="secondary" size="sm" disabled={saving()}>
-                              Cancel
-                            </Button>
-                          </Show>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="rounded-md p-3" style={{ background: "var(--surface-inset)" }}>
-                      <div class="text-sm font-medium mb-3" style={{ color: "var(--text-strong)" }}>
-                        Global custom providers ({Object.keys(globalProviderConfigMap()).length})
-                      </div>
-                      <Show when={Object.keys(globalProviderConfigMap()).length > 0} fallback={<p class="text-sm" style={{ color: "var(--text-weak)" }}>No global custom providers yet.</p>}>
-                        <div class="space-y-2">
-                          <For each={Object.entries(globalProviderConfigMap()).sort((a, b) => a[0].localeCompare(b[0]))}>
-                            {([providerID, provider]) => (
-                              <div class="rounded-md px-3 py-2" style={{ background: "var(--background-base)" }}>
-                                <div class="flex items-start justify-between gap-3">
-                                  <div class="min-w-0">
-                                    <div class="text-sm font-medium truncate" style={{ color: "var(--text-strong)" }}>
-                                      {provider.name || providerID}
-                                    </div>
-                                    <div class="text-xs truncate" style={{ color: "var(--text-weak)" }}>{providerID}</div>
-                                     <div class="text-[11px] truncate mt-0.5" style={{ color: "var(--text-weak)" }}>
-                                        {provider.npm || OPENAI_COMPATIBLE_PROVIDER}
-                                        <Show when={provider.options?.baseURL}>
-                                          {(baseURL) => <span> · {baseURL()}</span>}
-                                        </Show>
-                                      </div>
-                                      <Show when={provider.models && Object.keys(provider.models).length > 0}>
-                                        {(models) => (
-                                          <div class="text-[11px] truncate mt-0.5" style={{ color: "var(--text-weak)" }}>
-                                            {Object.keys(models()).length} model{Object.keys(models()).length !== 1 ? "s" : ""}
-                                          </div>
-                                        )}
-                                      </Show>
-                                  </div>
-                                  <div class="flex items-center gap-2 shrink-0">
-                                    <button onClick={() => editGlobalProvider(providerID)} class="text-xs px-2 py-1 rounded" style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}>
-                                      Edit
-                                    </button>
-                                    <button onClick={() => setProviderToRemove(providerID)} class="text-xs px-2 py-1 rounded" style={{ background: "var(--surface-inset)", color: "var(--interactive-critical)" }}>
-                                      Remove
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </For>
-                        </div>
-                      </Show>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
               <ProjectProvidersTab />
             </div>
           </Show>
@@ -3664,10 +3498,6 @@ function ProjectProvidersTab() {
   const providers = useProviders()
   const { directory, url: serverUrl, targetUrl } = useSDK()
   const OPENAI_COMPATIBLE_PROVIDER = "@ai-sdk/openai-compatible"
-  const [saving, setSaving] = createSignal(false)
-  const [saved, setSaved] = createSignal(false)
-  const [saveError, setSaveError] = createSignal<string | null>(null)
-  const [testing, setTesting] = createSignal(false)
   const [testError, setTestError] = createSignal<string | null>(null)
   const [testSuccess, setTestSuccess] = createSignal<string | null>(null)
   const [newProviderId, setNewProviderId] = createSignal<string>("")
@@ -3680,6 +3510,10 @@ function ProjectProvidersTab() {
   const [newProviderModels, setNewProviderModels] = createSignal<Array<{ id: string; name: string }>>([])
   const [showProviderAdvanced, setShowProviderAdvanced] = createSignal(false)
   const [editingProviderId, setEditingProviderId] = createSignal<string | null>(null)
+  const [saving, setSaving] = createSignal(false)
+  const [saved, setSaved] = createSignal(false)
+  const [saveError, setSaveError] = createSignal<string | null>(null)
+  const [testing, setTesting] = createSignal(false)
   const [providerToRemove, setProviderToRemove] = createSignal<string | null>(null)
   const [providerSearch, setProviderSearch] = createSignal("")
   const [expandedModelProviders, setExpandedModelProviders] = createSignal<Record<string, boolean>>({})

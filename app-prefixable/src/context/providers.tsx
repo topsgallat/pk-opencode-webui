@@ -447,11 +447,25 @@ export function ProviderProvider(props: ParentProps) {
         }
       }
 
-      // Remove from OpenCode backend (provider-level or account-level)
-      await client.auth.remove({ providerID })
-      await clearProviderAuth(serverUrl, providerID, targetUrl)
-      refetch()
-      return true
+    // Remove from OpenCode backend (provider-level or account-level)
+    await client.auth.remove({ providerID })
+    await clearProviderAuth(serverUrl, providerID, targetUrl)
+
+    // Ensure the SDK instance reloads provider state before we refetch the
+    // provider list. Connecting calls client.instance.dispose() to force a
+    // fresh read; do the same on disconnect so the UI sees the update
+    // immediately instead of requiring a container restart.
+    try {
+      await client.instance.dispose()
+    } catch (e) {
+      // Dispose failures are non-fatal for UI refresh; log and continue.
+      console.error("Failed to dispose client instance during disconnect:", e)
+    }
+
+    // Refetch providers and agents to update any connected lists shown in the UI
+    await refetchProviders()
+    await refetchAgents()
+    return true
     } catch (e) {
       console.error("Failed to disconnect provider:", e)
       return false

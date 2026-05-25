@@ -119,6 +119,61 @@ async function syncProviderAuthFromBackend(req: Request, target: string, provide
   return syncProviderAuthSession(req, target, { providerID, authHeader, accountId })
 }
 
+function getGlobalConfigCandidates(): string[] {
+  const homeDir = process.env.HOME || os.homedir()
+  const configDir = process.env.OPENCODE_CONFIG_DIR || nodePath.join(homeDir, ".config", "opencode")
+  return [nodePath.join(configDir, "opencode.jsonc"), nodePath.join(configDir, "opencode.json")]
+}
+
+function parseGlobalConfig(text: string): Record<string, unknown> {
+  try {
+    return JSON.parse(text) as Record<string, unknown>
+  } catch {
+    const jsonContent = text
+      .split("\n")
+      .map((line) => {
+        const commentMatch = line.match(/^([^"]*(?:"[^"]*"[^"]*)*)\s*\/\//)
+        if (commentMatch) return commentMatch[1]
+        return line
+      })
+      .join("\n")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+
+    return JSON.parse(jsonContent) as Record<string, unknown>
+  }
+}
+
+async function deleteGlobalProviderFromFile(providerID: string): Promise<Response> {
+  const candidates = getGlobalConfigCandidates()
+  let configPath = candidates[0]
+  if (!fs.existsSync(configPath)) {
+    configPath = candidates[1]
+  }
+  if (!fs.existsSync(configPath)) {
+    return Response.json({ error: "Config file not found" }, { status: 404 })
+  }
+
+  try {
+    const content = await fs.promises.readFile(configPath, "utf-8")
+    const config = parseGlobalConfig(content)
+    const provider = config.provider as Record<string, unknown> | undefined
+    if (!provider || !provider[providerID]) {
+      return Response.json({ error: "Provider not found in config" }, { status: 404 })
+    }
+
+    delete provider[providerID]
+    if (Object.keys(provider).length === 0) {
+      delete config.provider
+    }
+
+    await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2))
+    return Response.json({ success: true })
+  } catch (e) {
+    console.error("[ExtAPI] global provider delete error:", e)
+    return Response.json({ error: String(e) }, { status: 500 })
+  }
+}
+
 type ProviderValidateModel = {
   id?: string
   name?: string
@@ -303,6 +358,15 @@ export async function handleExtendedEndpoint(
     const body = await req.json().catch(() => null)
     const target = url.searchParams.get("target") || ""
     return syncProviderAuthSession(req, target, body)
+  }
+
+  // DELETE /api/ext/global-provider?providerID=<id> - Remove a custom provider from global config
+  if (path === "/api/ext/global-provider" && method === "DELETE") {
+    const providerID = url.searchParams.get("providerID") || ""
+    if (!providerID) {
+      return Response.json({ error: "providerID parameter is required" }, { status: 400 })
+    }
+    return deleteGlobalProviderFromFile(providerID)
   }
 
   // POST /api/ext/provider-validate - Validate an OpenAI-compatible custom provider without saving it

@@ -27,7 +27,7 @@ test("validates provider connection without saving", async () => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     })
-  }) as typeof fetch
+  }) as unknown as typeof fetch
 
   try {
     const req = new Request("http://localhost/api/ext/provider-validate", {
@@ -58,7 +58,7 @@ test("surfaces provider validation errors", async () => {
   globalThis.fetch = (async () => new Response(JSON.stringify({ error: { message: "Unauthorized" } }), {
     status: 401,
     headers: { "Content-Type": "application/json" },
-  })) as typeof fetch
+  })) as unknown as typeof fetch
 
   try {
     const req = new Request("http://localhost/api/ext/provider-validate", {
@@ -80,6 +80,31 @@ test("surfaces provider validation errors", async () => {
   } finally {
     globalThis.fetch = originalFetch
   }
+})
+
+test("deletes a global custom provider from config file", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-global-provider-"))
+  process.env.HOME = root
+
+  const dir = nodePath.join(root, ".config", "opencode")
+  await fs.mkdir(dir, { recursive: true })
+  await fs.writeFile(
+    nodePath.join(dir, "opencode.json"),
+    JSON.stringify({ provider: { foo: { name: "Foo", npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://example.com/v1" } }, bar: { name: "Bar" } } }, null, 2),
+    "utf-8",
+  )
+
+  const req = new Request("http://localhost/api/ext/global-provider?providerID=foo", {
+    method: "DELETE",
+  })
+
+  const res = await handleExtendedEndpoint("/api/ext/global-provider", "DELETE", new URL(req.url), req)
+  expect(res).toBeDefined()
+  expect(res!.status).toBe(200)
+
+  const saved = JSON.parse(await fs.readFile(nodePath.join(dir, "opencode.json"), "utf-8")) as { provider?: Record<string, unknown> }
+  expect(saved.provider?.foo).toBeUndefined()
+  expect(saved.provider?.bar).toBeDefined()
 })
 
 test("syncs oauth provider auth from backend auth file", async () => {

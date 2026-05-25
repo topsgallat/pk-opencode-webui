@@ -751,14 +751,10 @@ export function SessionInfo(props: SessionInfoProps) {
 
       <Show when={!props.loading()}>
         <Show when={actionMode()}>
-          {/* Right-side action column: ensure vertical centering on mobile and desktop */}
-          <div class="flex items-center h-full">
-          {/* Absolute-position the Send button so it's always vertically centered relative to this container */}
-          <button
-            type="button"
-            class="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2 text-[11px] font-medium transition-opacity hover:opacity-100 touch-manipulation absolute right-2 top-1/2 -translate-y-1/2"
+          <div class="flex h-full items-center justify-end">
+            <button
               type="button"
-              class="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2 text-[11px] font-medium transition-opacity hover:opacity-100 touch-manipulation self-center"
+              class="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2 text-[11px] font-medium transition-opacity hover:opacity-100 touch-manipulation"
               style={actionMode() === "stop"
                 ? {
                   background: "var(--status-danger-dim)",

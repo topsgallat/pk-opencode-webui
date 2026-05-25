@@ -164,7 +164,9 @@ async function deleteGlobalProviderFromFile(providerID: string): Promise<Respons
         delete config.provider
       }
 
-      await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2))
+      // Write with trailing newline so backend detects change when updateGlobal({}) is called,
+      // which triggers cache invalidation and instance disposal.
+      await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2) + "\n")
       updated = true
     }
 

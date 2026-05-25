@@ -3496,7 +3496,7 @@ function ProjectConfigTab() {
 function ProjectProvidersTab() {
   const config = useConfig()
   const providers = useProviders()
-  const { directory, url: serverUrl, targetUrl } = useSDK()
+  const { client, directory, url: serverUrl, targetUrl } = useSDK()
   const OPENAI_COMPATIBLE_PROVIDER = "@ai-sdk/openai-compatible"
   const [saving, setSaving] = createSignal(false)
   const [saved, setSaved] = createSignal(false)
@@ -3826,9 +3826,13 @@ function ProjectProvidersTab() {
       return
     }
 
-    await config.refresh()
+    await client.global.dispose()
+
     setProviderToRemove(null)
     if (editingProviderId() === providerID) resetProviderEditor()
+
+    await config.refresh()
+    providers.refetch()
     showSaved()
   }
 

@@ -82,15 +82,20 @@ test("surfaces provider validation errors", async () => {
   }
 })
 
-test("deletes a global custom provider from config file", async () => {
+test("deletes a global custom provider from merged config files", async () => {
   const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-global-provider-"))
   process.env.HOME = root
 
   const dir = nodePath.join(root, ".config", "opencode")
   await fs.mkdir(dir, { recursive: true })
   await fs.writeFile(
+    nodePath.join(dir, "opencode.json"),
+    JSON.stringify({ provider: { foo: { name: "Foo", npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://example.com/v1" } } } }, null, 2),
+    "utf-8",
+  )
+  await fs.writeFile(
     nodePath.join(dir, "config.json"),
-    JSON.stringify({ provider: { foo: { name: "Foo", npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://example.com/v1" } }, bar: { name: "Bar" } } }, null, 2),
+    JSON.stringify({ provider: { foo: { name: "Foo copy", npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://example.com/v1" } }, bar: { name: "Bar" } } }, null, 2),
     "utf-8",
   )
 
@@ -102,9 +107,11 @@ test("deletes a global custom provider from config file", async () => {
   expect(res).toBeDefined()
   expect(res!.status).toBe(200)
 
-  const saved = JSON.parse(await fs.readFile(nodePath.join(dir, "config.json"), "utf-8")) as { provider?: Record<string, unknown> }
-  expect(saved.provider?.foo).toBeUndefined()
-  expect(saved.provider?.bar).toBeDefined()
+  const savedConfig = JSON.parse(await fs.readFile(nodePath.join(dir, "config.json"), "utf-8")) as { provider?: Record<string, unknown> }
+  const savedProvider = JSON.parse(await fs.readFile(nodePath.join(dir, "opencode.json"), "utf-8")) as { provider?: Record<string, unknown> }
+  expect(savedConfig.provider?.foo).toBeUndefined()
+  expect(savedConfig.provider?.bar).toBeDefined()
+  expect(savedProvider.provider?.foo).toBeUndefined()
 })
 
 test("syncs oauth provider auth from backend auth file", async () => {

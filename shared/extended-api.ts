@@ -145,25 +145,33 @@ function parseGlobalConfig(text: string): Record<string, unknown> {
 
 async function deleteGlobalProviderFromFile(providerID: string): Promise<Response> {
   const candidates = getGlobalConfigCandidates()
-  const configPath = candidates.find((file) => fs.existsSync(file))
-  if (!configPath) {
+  const existing = candidates.filter((file) => fs.existsSync(file))
+  if (existing.length === 0) {
     return Response.json({ error: "Config file not found" }, { status: 404 })
   }
 
   try {
-    const content = await fs.promises.readFile(configPath, "utf-8")
-    const config = parseGlobalConfig(content)
-    const provider = config.provider as Record<string, unknown> | undefined
-    if (!provider || !provider[providerID]) {
+    let updated = false
+
+    for (const configPath of existing) {
+      const content = await fs.promises.readFile(configPath, "utf-8")
+      const config = parseGlobalConfig(content)
+      const provider = config.provider as Record<string, unknown> | undefined
+      if (!provider || !provider[providerID]) continue
+
+      delete provider[providerID]
+      if (Object.keys(provider).length === 0) {
+        delete config.provider
+      }
+
+      await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2))
+      updated = true
+    }
+
+    if (!updated) {
       return Response.json({ error: "Provider not found in config" }, { status: 404 })
     }
 
-    delete provider[providerID]
-    if (Object.keys(provider).length === 0) {
-      delete config.provider
-    }
-
-    await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2))
     return Response.json({ success: true })
   } catch (e) {
     console.error("[ExtAPI] global provider delete error:", e)

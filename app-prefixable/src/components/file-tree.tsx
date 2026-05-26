@@ -34,6 +34,7 @@ const [confirmOpen, setConfirmOpen] = createSignal(false)
 const scrollStore = new Map<string, number>()
 let dragDepth = 0
 const MOVE_DATA_TYPE = "application/x-opencode-file-path"
+const FILE_TREE_KIND_DATA = "application/x-opencode-file-kind"
 const AUTO_EXPAND_DELAY = 500
 const LONG_PRESS_DELAY = 450
 let autoExpandTimer: number | undefined
@@ -67,6 +68,11 @@ function handleDragStart(e: DragEvent, path: string) {
   setDragSourcePath(path)
   setDragInternal(true)
   setDragInvalid(false)
+}
+
+function handleTreeDragStart(e: DragEvent, path: string, kind: "file" | "directory") {
+  handleDragStart(e, path)
+  e.dataTransfer?.setData(FILE_TREE_KIND_DATA, kind)
 }
 
 function parentPath(path: string) {
@@ -705,7 +711,7 @@ function handleDragOverTarget(e: DragEvent, path: string) {
                        }}
                        aria-expanded={expanded()}
                        classList={{ "cursor-not-allowed": targetInvalid(node.path) }}
-                        onDragStart={(e) => { clearLongPress(); handleDragStart(e, node.path) }}
+                       onDragStart={(e) => { clearLongPress(); handleTreeDragStart(e, node.path, "directory") }}
                         onDragEnd={handleDragEnd}
                         onDragEnter={(e) => handleDragEnter(e, node.path)}
                         onDragOver={(e) => handleDirectoryDragHover(e, node.path, expanded())}
@@ -792,7 +798,7 @@ function handleDragOverTarget(e: DragEvent, path: string) {
                     }
                     props.onFileClick?.(node)
                   }}
-                  onDragStart={(e) => { clearLongPress(); handleDragStart(e, node.path) }}
+                   onDragStart={(e) => { clearLongPress(); handleTreeDragStart(e, node.path, "file") }}
                   onDragEnd={handleDragEnd}
                   onContextMenu={(e) => handleContextMenu(e, node)}
                   onTouchStart={(e) => handleTouchStart(e, node)}

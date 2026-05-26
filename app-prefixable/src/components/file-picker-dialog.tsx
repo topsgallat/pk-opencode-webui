@@ -5,7 +5,7 @@ import { useSDK } from "../context/sdk"
 import { createBackdropDismiss } from "../utils/backdrop"
 import { withTimeout } from "../utils/request-timeout"
 
-const FILE_SEARCH_TIMEOUT_MS = 10_000
+const FILE_SEARCH_TIMEOUT_MS = 30_000
 
 interface Props {
   onSelect: (path: string) => void

@@ -20,7 +20,7 @@ import { Tabs } from "./ui/tabs";
 import { Spinner } from "./ui/spinner";
 import { ChevronRight, FileCode, GitBranch, RefreshCw, Search, X } from "lucide-solid";
 
-const FILE_SEARCH_TIMEOUT_MS = 10_000;
+const FILE_SEARCH_TIMEOUT_MS = 30_000;
 
 // Helper to create unified diff patch string
 function createPatch(filename: string, before: string, after: string): string {

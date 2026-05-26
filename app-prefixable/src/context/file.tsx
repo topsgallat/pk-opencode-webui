@@ -8,7 +8,7 @@ import { readFile, mkdir, createFile as apiCreateFile, deleteFile as apiDeleteFi
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { withTimeout, errorMessage } from "../utils/request-timeout"
 
-const FILE_LIST_TIMEOUT_MS = 10_000
+const FILE_LIST_TIMEOUT_MS = 30_000
 const FILE_READ_TIMEOUT_MS = 15_000
 
 type DirState = {

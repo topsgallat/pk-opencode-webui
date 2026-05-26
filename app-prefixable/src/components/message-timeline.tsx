@@ -31,6 +31,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
   let observedContent: HTMLElement | undefined
   let suppressScroll = false
   let smoothScrolling = false
+  let userIntent = false
 
   const threshold = options.bottomThreshold ?? 24
 
@@ -118,16 +119,19 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     const target = e.target instanceof Element ? e.target : undefined
     const nested = target?.closest("[data-scrollable]")
     if (el && nested && nested !== el) return
+    userIntent = true
     cancelSmoothScroll()
   }
 
   const handlePointerDown = () => {
+    userIntent = true
     cancelSmoothScroll()
   }
 
   const handleWindowKeyDown = (e: KeyboardEvent) => {
     if (!smoothScrolling) return
     if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " ", "Spacebar"].includes(e.key)) {
+      userIntent = true
       cancelSmoothScroll()
     }
   }
@@ -153,10 +157,17 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
 
     if (bottom <= threshold) {
       if (!store.pinned) setStore("pinned", true)
+      userIntent = false
+      return
+    }
+
+    if (!userIntent) {
+      queueScrollToBottom()
       return
     }
 
     if (store.pinned) setStore("pinned", false)
+    userIntent = false
   }
 
   const updateOverflowAnchor = (el: HTMLElement) => {

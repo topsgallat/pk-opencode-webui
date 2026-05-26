@@ -68,6 +68,8 @@ const ACCEPTED_TYPES = [
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
 const SESSION_STATUS_TIMEOUT_MS = 8_000;
 const SERVER_SWITCH_HOME_KEY = "opencode.serverSwitchHome";
+const FILE_TREE_DRAG_DATA = "application/x-opencode-file-path";
+const FILE_TREE_KIND_DATA = "application/x-opencode-file-kind";
 
 interface Command {
   id: string;
@@ -1886,29 +1888,45 @@ export function Session() {
 
   // Drag & Drop state and handlers
   const [isDragging, setIsDragging] = createSignal(false);
+  const [dragMode, setDragMode] = createSignal<"upload" | "mention" | null>(null);
   let dragCounter = 0; // Track nested drag events
+
+  function clearDragState() {
+    dragCounter = 0;
+    setIsDragging(false);
+    setDragMode(null);
+  }
+
+  function getDragMode(e: DragEvent) {
+    const types = Array.from(e.dataTransfer?.types ?? []);
+    if (types.includes("Files")) return "upload" as const;
+    if (!types.includes(FILE_TREE_DRAG_DATA)) return null;
+
+    const kind = e.dataTransfer?.getData(FILE_TREE_KIND_DATA);
+    if (kind !== "file") return null;
+    return "mention" as const;
+  }
 
   function handleDragEnter(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
     if (inputBlocked()) return;
-    // Only track drag events that include files
-    if (!e.dataTransfer?.types.includes("Files")) return;
+    const mode = getDragMode(e);
+    if (!mode) return;
     dragCounter++;
     setIsDragging(true);
+    setDragMode(mode);
   }
 
   function handleDragLeave(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
-    // Only track drag events that include files (consistent with handleDragEnter)
-    if (!e.dataTransfer?.types.includes("Files")) return;
     // Only decrement if counter is positive to prevent negative values
     if (dragCounter > 0) {
       dragCounter--;
     }
     if (dragCounter === 0) {
-      setIsDragging(false);
+      clearDragState();
     }
   }
 
@@ -1916,15 +1934,31 @@ export function Session() {
     e.preventDefault();
     e.stopPropagation();
     if (inputBlocked()) return;
+    if (!dragMode()) {
+      const mode = getDragMode(e);
+      if (!mode) return;
+      setDragMode(mode);
+      setIsDragging(true);
+      if (dragCounter === 0) dragCounter = 1;
+    }
+    if (e.dataTransfer) e.dataTransfer.dropEffect = dragMode() === "mention" ? "copy" : "copy";
   }
 
   function handleDrop(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
-    dragCounter = 0;
-    setIsDragging(false);
+    const mode = dragMode() ?? getDragMode(e);
+    clearDragState();
 
     if (inputBlocked()) return;
+    if (mode === "mention") {
+      const path = e.dataTransfer?.getData(FILE_TREE_DRAG_DATA);
+      if (path) {
+        addFileToContext(path);
+        requestAnimationFrame(() => inputRef?.focus());
+      }
+      return;
+    }
 
     const files = e.dataTransfer?.files;
     if (!files) return;
@@ -2741,7 +2775,7 @@ export function Session() {
                       class="text-sm font-medium"
                       style={{ color: "var(--text-interactive-base)" }}
                     >
-                      Drop files here
+                      {dragMode() === "mention" ? "Drop to mention file" : "Drop files here"}
                     </span>
                   </div>
                 </Show>

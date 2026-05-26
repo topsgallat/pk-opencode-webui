@@ -1,18 +1,5 @@
-Timestamp: 2026-03-30
-- Primary fix approach: strip Accept-Encoding from proxied requests and materialize upstream response bodies before returning them to avoid Bun re-compressing streamed responses.
-- Added gzip magic check before gunzip; wrapped deflate/br in try/catch.
-- Verified via curl that Content-Encoding is no longer present for JSON endpoints in many cases.
-- Browser verification (Playwright) confirmed the fix works: no ERR_CONTENT_DECODING_FAILED errors were observed.
-- The proxied endpoints (/session, /provider, /path, /mcp) load successfully with correct Content-Length and no Content-Encoding.
+## Learnings
 
-Proxy strips Accept-Encoding and materializes upstream bodies; ensure Brotli/deflate fallbacks do not remove Content-Encoding when forwarding compressed bytes.
-Static file serving builds filePath by concatenation; use path.resolve and prefix check to enforce DIST_DIR boundary.
+- [TIMESTAMP] Initial orchestration: found settings.tsx runtime ReferenceError due to moved UI block referencing signals before they're declared.
+- [2026-05-25T19:47 UTC] fix(settings): hoist provider editor signals before usage to prevent runtime ReferenceError (commit bc6c9f9). Root cause: commit 943d920 moved the Global Custom Providers JSX block directly into the Settings() function, but the createSignal declarations for editingProviderId, newProviderId, testError, testSuccess, showProviderAdvanced, newProviderModels remained in the ProjectProvidersTab() function scope. When Settings() rendered, it tried to call editingProviderId() etc. which didn't exist in its scope → ReferenceError. Fix: restored the Global Custom Providers JSX into ProjectProvidersTab() (where the signals live) and reordered signal declarations so provider-editor signals are declared before other signals. LSP diagnostics: 0 errors. Build: passes (698 files). Playwright smoke test: 0 runtime errors on /settings page. Test server SSE errors are expected (simple static server limitation), not code bugs.
 
-- High-impact: proxy in docker/serve-ui.ts materializes upstream bodies, strips Accept-Encoding, and applies gzip magic guard; ensure Brotli/deflate fallbacks preserve Content-Encoding or fail explicitly.
-- High-impact: static file serving concatenates DIST_DIR + path without path.resolve guard; add normalization and prefix-check to prevent traversal.
-
-Verification note: Playwright verification completed successfully on 2026-03-30 — the SSE/API decoding test passed and no ERR_CONTENT_DECODING_FAILED was observed. Smoke curl checks confirm Content-Length is set for /provider, entry.js is served gzipped when requested, and hashed chunks return immutable cache headers.
-Healthcheck switched from wget to curl -fsS -o /dev/null for ui-only compose
-- Browser smoke check on http://localhost:8080 passed: Root element (#app-root) rendered successfully without uncaught exceptions; screenshot captured to /tmp/opencode-smoke.png.
-2026-03-31 14:57:02 - Moved ConfigProvider inside EventProvider in app-prefixable/src/pages/directory-layout.tsx so useEvents() runs with EventContext available.
-Reverted sub-agent session filter in layout.tsx due to mobile list regression.

@@ -32,6 +32,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
   let suppressScroll = false
   let smoothScrolling = false
   let userIntent = false
+  let lastScrollTop = 0
 
   const threshold = options.bottomThreshold ?? 24
 
@@ -141,6 +142,10 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
     if (!el) return
     if (suppressScroll) return
 
+    const currentTop = el.scrollTop
+    const delta = currentTop - lastScrollTop
+    lastScrollTop = currentTop
+
     if (!canScroll(el)) {
       cancelSmoothScroll()
       if (!store.pinned) setStore("pinned", true)
@@ -152,6 +157,12 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
       if (bottom <= threshold) {
         finishSmoothScroll()
       }
+      return
+    }
+
+    if (delta < 0) {
+      if (store.pinned) setStore("pinned", false)
+      userIntent = false
       return
     }
 
@@ -223,9 +234,10 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
         scroll.removeEventListener("wheel", handleWheel)
         scroll.removeEventListener("pointerdown", handlePointerDown)
       }
-      scroll = el
-      if (!el) return
-      updateOverflowAnchor(el)
+    scroll = el
+    if (!el) return
+    lastScrollTop = el.scrollTop
+    updateOverflowAnchor(el)
       el.addEventListener("wheel", handleWheel, { passive: true })
       el.addEventListener("pointerdown", handlePointerDown, { passive: true })
       if (typeof window !== "undefined") {

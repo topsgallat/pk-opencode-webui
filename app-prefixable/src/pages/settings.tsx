@@ -19,6 +19,7 @@ import { useServer } from "../context/server"
 import { writeFile } from "../utils/extended-api"
 import { deleteGlobalProvider, validateProviderConnection } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
+import { extractOAuthCode } from "../utils/oauth"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import {
   getServers,
@@ -648,6 +649,8 @@ Add your project-specific instructions here.
       const code = codeMatch ? codeMatch[1] : ""
 
       const providerName = getProviderDisplayName(providerID)
+      setOauthCode("")
+      setCodeCopied(false)
 
       if (result.method === "code") {
         // User needs to enter a code manually
@@ -705,7 +708,13 @@ Add your project-specific instructions here.
     setConnecting(true)
     setError(null)
 
-    const code = pending.method === "code" ? oauthCode().trim() : undefined
+    const code = pending.method === "code" ? extractOAuthCode(oauthCode()) : undefined
+    if (pending.method === "code" && !code) {
+      setConnecting(false)
+      setError("Paste a callback URL or authorization code.")
+      return
+    }
+
     const ok = await providers.completeOAuth(pending.providerID, pending.methodIndex, code)
 
     setConnecting(false)
@@ -1135,7 +1144,7 @@ Add your project-specific instructions here.
                         <Show when={pending().code}>
                           <div class="mb-3">
                             <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
-                              Enter this code on GitHub:
+                              Use this code or paste the callback URL:
                             </div>
                             <div class="flex items-center gap-2">
                               <code
@@ -1176,14 +1185,14 @@ Add your project-specific instructions here.
                           </div>
                         </Show>
 
-                        {/* Code method - show input */}
+                        {/* Code method - show callback URL input */}
                         <Show when={pending().method === "code"}>
                           <div class="space-y-2">
                             <input
                               type="text"
                               value={oauthCode()}
                               onInput={(e) => setOauthCode(e.currentTarget.value)}
-                              placeholder="Paste authorization code here..."
+                              placeholder="Paste callback URL or code here..."
                               class="w-full px-3 py-2 rounded-md text-sm font-mono"
                               style={{
                                 background: "var(--background-base)",
@@ -1191,6 +1200,9 @@ Add your project-specific instructions here.
                                 color: "var(--text-base)",
                               }}
                             />
+                            <p class="text-xs" style={{ color: "var(--text-weak)" }}>
+                              Paste the full redirect URL from your browser if that is what the provider gave you.
+                            </p>
                             <button
                               type="button"
                               disabled={connecting() || !oauthCode().trim()}

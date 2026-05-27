@@ -82,7 +82,7 @@ RUN case $(uname -m) in \
     chmod +x /usr/local/bin/gh && \
     rm -rf /tmp/gh*
 
-ARG NODE_VERSION=20.18.3
+ARG NODE_VERSION=20.19.0
 RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz && \
     tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 && \
     rm -f /tmp/node.tar.xz && \

@@ -644,6 +644,8 @@ Add your project-specific instructions here.
     const result = await providers.startOAuth(providerID, methodIndex)
 
     if (result) {
+      const isOpenAI = providerID === "openai" || providerID.startsWith("openai:")
+
       // Extract code from instructions (e.g., "Enter code: XXXX-YYYY" -> "XXXX-YYYY")
       const codeMatch = result.instructions.match(/:\s*([A-Z0-9]{4}-[A-Z0-9]{4})/i)
       const code = codeMatch ? codeMatch[1] : ""
@@ -652,7 +654,7 @@ Add your project-specific instructions here.
       setOauthCode("")
       setCodeCopied(false)
 
-      if (result.method === "code") {
+      if (result.method === "code" || isOpenAI) {
         // User needs to enter a code manually
         setOauthPending({
           providerID,
@@ -664,6 +666,7 @@ Add your project-specific instructions here.
         })
         // Open the authorization URL
         window.open(result.url, "_blank")
+        return
       } else {
         // Auto method (device flow) - show code immediately, then start polling
         setOauthPending({

@@ -267,6 +267,26 @@ export async function deleteGlobalProvider(serverUrl: string, providerID: string
   }
 }
 
+export async function replayProviderOAuthCallback(
+  serverUrl: string,
+  providerID: string,
+  callbackUrl: string,
+  targetUrl?: string,
+): Promise<boolean> {
+  try {
+    const params = new URLSearchParams({ providerID })
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/provider-oauth/replay?${params}`, targetUrl), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callbackUrl }),
+    }, EXT_API_TIMEOUT_MS, "extended replayProviderOAuthCallback")
+    const data = await res.json().catch(() => null)
+    return res.ok && !!data && typeof data === "object" && (data as { ok?: boolean }).ok === true
+  } catch (e) {
+    console.error("[extended-api] replayProviderOAuthCallback failed:", e)
+    return false
+  }
+}
 export type ProviderConnectionTestInput = {
   providerID?: string
   baseURL: string

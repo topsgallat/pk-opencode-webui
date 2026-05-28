@@ -17,9 +17,9 @@ import { useTheme } from "../context/theme"
 import { useDevice } from "../context/device"
 import { useServer } from "../context/server"
 import { writeFile } from "../utils/extended-api"
-import { deleteGlobalProvider, validateProviderConnection } from "../utils/extended-api"
+import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCallback } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
-import { extractOAuthCode } from "../utils/oauth"
+import { extractOAuthCode, normalizeOAuthCallbackUrl } from "../utils/oauth"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import {
   getServers,
@@ -238,10 +238,12 @@ export function Settings() {
     providerName: string
     methodIndex: number
     method: "auto" | "code"
+    requiresReplay: boolean
     instructions: string
     code: string // Extracted code from instructions (e.g., "XXXX-YYYY")
   } | null>(null)
   const [oauthCode, setOauthCode] = createSignal("")
+  const needsOAuthReplay = (providerID: string) => providerID === "openai" || providerID.startsWith("openai:")
   const [codeCopied, setCodeCopied] = createSignal(false)
 
   // Git SSH Key state - read-only, display all existing keys
@@ -662,6 +664,7 @@ Add your project-specific instructions here.
           methodIndex,
           method: "code",
           instructions: result.instructions,
+          requiresReplay: isOpenAI,
           code,
         })
         // Open the authorization URL
@@ -675,6 +678,7 @@ Add your project-specific instructions here.
           methodIndex,
           method: "auto",
           instructions: result.instructions,
+          requiresReplay: false,
           code,
         })
 
@@ -711,14 +715,31 @@ Add your project-specific instructions here.
     setConnecting(true)
     setError(null)
 
-    const code = pending.method === "code" ? extractOAuthCode(oauthCode()) : undefined
-    if (pending.method === "code" && !code) {
+    const replay = needsOAuthReplay(pending.providerID)
+    const callbackUrl = replay ? normalizeOAuthCallbackUrl(oauthCode()) : undefined
+    if (replay && !callbackUrl) {
+      setConnecting(false)
+      setError("Paste the full callback URL from your browser.")
+      return
+    }
+
+    if (replay) {
+      const replayed = await replayProviderOAuthCallback(url, pending.providerID, callbackUrl!, targetUrl)
+      if (!replayed) {
+        setConnecting(false)
+        setError("Failed to replay the callback URL. Please copy the full browser URL and try again.")
+        return
+      }
+    }
+
+    const code = replay ? extractOAuthCode(callbackUrl!) : extractOAuthCode(oauthCode())
+    if (!replay && !code) {
       setConnecting(false)
       setError("Paste a callback URL or authorization code.")
       return
     }
 
-    const ok = await providers.completeOAuth(pending.providerID, pending.methodIndex, code)
+    const ok = await providers.completeOAuth(pending.providerID, pending.methodIndex, code || undefined)
 
     setConnecting(false)
 
@@ -1144,7 +1165,7 @@ Add your project-specific instructions here.
                         </div>
 
                         {/* Show the code prominently with copy button */}
-                        <Show when={pending().code}>
+                        <Show when={pending().code && !needsOAuthReplay(pending().providerID)}>
                           <div class="mb-3">
                             <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
                               Use this code or paste the callback URL:
@@ -1188,14 +1209,17 @@ Add your project-specific instructions here.
                           </div>
                         </Show>
 
-                        {/* Code method - show callback URL input */}
+                        {/* Code / replay method - show callback URL input */}
                         <Show when={pending().method === "code"}>
                           <div class="space-y-2">
+                            <div class="text-xs" style={{ color: "var(--text-weak)" }}>
+                              {needsOAuthReplay(pending().providerID) ? "Paste the full callback URL from your browser:" : "Paste callback URL or code here:"}
+                            </div>
                             <input
                               type="text"
                               value={oauthCode()}
                               onInput={(e) => setOauthCode(e.currentTarget.value)}
-                              placeholder="Paste callback URL or code here..."
+                              placeholder={needsOAuthReplay(pending().providerID) ? "Paste callback URL here..." : "Paste callback URL or code here..."}
                               class="w-full px-3 py-2 rounded-md text-sm font-mono"
                               style={{
                                 background: "var(--background-base)",
@@ -1204,11 +1228,13 @@ Add your project-specific instructions here.
                               }}
                             />
                             <p class="text-xs" style={{ color: "var(--text-weak)" }}>
-                              Paste the full redirect URL from your browser if that is what the provider gave you.
+                              {needsOAuthReplay(pending().providerID)
+                                ? "We will replay the callback URL to the backend listener, including state."
+                                : "Paste the full redirect URL from your browser if that is what the provider gave you."}
                             </p>
                             <button
                               type="button"
-                              disabled={connecting() || !oauthCode().trim()}
+                              disabled={connecting() || (needsOAuthReplay(pending().providerID) ? !normalizeOAuthCallbackUrl(oauthCode()) : !oauthCode().trim())}
                               onClick={handleOAuthComplete}
                               class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
                               style={{

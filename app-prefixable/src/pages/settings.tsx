@@ -239,12 +239,19 @@ export function Settings() {
     methodIndex: number
     method: "auto" | "code"
     requiresReplay: boolean
+    authUrl: string
     instructions: string
     code: string // Extracted code from instructions (e.g., "XXXX-YYYY")
   } | null>(null)
   const [oauthCode, setOauthCode] = createSignal("")
   const needsOAuthReplay = (providerID: string) => providerID === "openai" || providerID.startsWith("openai:")
   const [codeCopied, setCodeCopied] = createSignal(false)
+
+  function openOAuthTab() {
+    const pending = oauthPending()
+    if (!pending?.authUrl) return
+    window.open(pending.authUrl, "_blank")
+  }
 
   // Git SSH Key state - read-only, display all existing keys
   interface SshKey {
@@ -665,10 +672,9 @@ Add your project-specific instructions here.
           method: "code",
           instructions: result.instructions,
           requiresReplay: isOpenAI,
+          authUrl: result.url,
           code,
         })
-        // Open the authorization URL
-        window.open(result.url, "_blank")
         return
       } else {
         // Auto method (device flow) - show code immediately, then start polling
@@ -679,6 +685,7 @@ Add your project-specific instructions here.
           method: "auto",
           instructions: result.instructions,
           requiresReplay: false,
+          authUrl: result.url,
           code,
         })
 
@@ -1163,6 +1170,25 @@ Add your project-specific instructions here.
                             </button>
                           </Show>
                         </div>
+
+                        <Show when={pending().requiresReplay}>
+                          <div class="mb-3 space-y-2">
+                            <p class="text-xs" style={{ color: "var(--text-weak)" }}>
+                              After you sign in, copy the full callback URL from your browser and paste it below.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={openOAuthTab}
+                              class="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                              style={{
+                                background: "var(--interactive-base)",
+                                color: "white",
+                              }}
+                            >
+                              Open auth tab
+                            </button>
+                          </div>
+                        </Show>
 
                         {/* Show the code prominently with copy button */}
                         <Show when={pending().code && !needsOAuthReplay(pending().providerID)}>

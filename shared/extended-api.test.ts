@@ -145,6 +145,57 @@ test("syncs oauth provider auth from backend auth file", async () => {
   expect(resolveProviderAuthAccountId(lookup, target, "openai")).toBe("acct_openai")
 })
 
+test("replays oauth callback urls to the backend listener host", async () => {
+  const originalFetch = globalThis.fetch
+  const calls: Array<{ input: string; init?: RequestInit }> = []
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({ input: String(input), init })
+    expect(String(input)).toBe("http://127.0.0.1:1455/auth/callback?code=abc123&state=xyz")
+    return new Response("<html><body>ok</body></html>", {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    })
+  }) as unknown as typeof fetch
+
+  try {
+    const req = new Request("http://localhost/api/ext/provider-oauth/replay?target=http://127.0.0.1:4096", {
+      method: "POST",
+      body: JSON.stringify({
+        providerID: "openai",
+        callbackUrl: "http://localhost:1455/auth/callback#code=abc123&state=xyz",
+      }),
+    })
+
+    const res = await handleExtendedEndpoint("/api/ext/provider-oauth/replay", "POST", new URL(req.url), req)
+    expect(res).toBeDefined()
+    expect(res!.status).toBe(200)
+
+    const data = await res!.json()
+    expect(data.ok).toBe(true)
+    expect(data.providerID).toBe("openai")
+    expect(data.status).toBe(200)
+    expect(calls).toHaveLength(1)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("rejects invalid oauth callback urls for replay", async () => {
+  const req = new Request("http://localhost/api/ext/provider-oauth/replay?target=http://127.0.0.1:4096", {
+    method: "POST",
+    body: JSON.stringify({
+      providerID: "openai",
+      callbackUrl: "https://example.com/auth/callback?code=abc123&state=xyz",
+    }),
+  })
+
+  const res = await handleExtendedEndpoint("/api/ext/provider-oauth/replay", "POST", new URL(req.url), req)
+  expect(res).toBeDefined()
+  expect(res!.status).toBe(400)
+  const data = await res!.json()
+  expect(data.ok).toBe(false)
+})
+
 test("syncs copilot auth from backend auth file using github alias", async () => {
   const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-auth-"))
   process.env.XDG_DATA_HOME = root

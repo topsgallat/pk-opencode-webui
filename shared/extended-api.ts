@@ -119,6 +119,84 @@ async function syncProviderAuthFromBackend(req: Request, target: string, provide
   return syncProviderAuthSession(req, target, { providerID, authHeader, accountId })
 }
 
+const OAUTH_CALLBACK_PORT = 1455
+
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.trim().toLowerCase()
+  return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "host.docker.internal"
+}
+
+function mergeFragmentParams(url: URL): void {
+  if (!url.hash) return
+
+  const fragment = url.hash.startsWith("#") ? url.hash.slice(1) : url.hash
+  if (!fragment) {
+    url.hash = ""
+    return
+  }
+
+  const fragmentParams = new URLSearchParams(fragment)
+  for (const [key, value] of fragmentParams) {
+    if (!url.searchParams.has(key)) {
+      url.searchParams.set(key, value)
+    }
+  }
+
+  url.hash = ""
+}
+
+function buildOAuthReplayUrl(callbackUrl: string, target?: string): string | null {
+  try {
+    const callback = new URL(callbackUrl.trim())
+    const targetUrl = target ? new URL(target.trim()) : undefined
+    if (callback.protocol !== "http:" && callback.protocol !== "https:") {
+      return null
+    }
+    if (targetUrl && targetUrl.protocol !== "http:" && targetUrl.protocol !== "https:") {
+      return null
+    }
+    if (!isLoopbackHost(callback.hostname)) return null
+
+    mergeFragmentParams(callback)
+    if (!callback.searchParams.get("code")) return null
+    if (!callback.searchParams.get("state")) return null
+
+    callback.protocol = "http:"
+    callback.hostname = targetUrl?.hostname || callback.hostname
+    callback.port = callback.port || String(OAUTH_CALLBACK_PORT)
+    return callback.toString()
+  } catch {
+    return null
+  }
+}
+
+async function replayProviderOAuthCallback(target: string | undefined, providerID: string, callbackUrl: string): Promise<Response> {
+  const replayUrl = buildOAuthReplayUrl(callbackUrl, target)
+  if (!replayUrl) {
+    return Response.json({ ok: false, error: "invalid callbackUrl" }, { status: 400 })
+  }
+
+  try {
+    const res = await fetch(replayUrl, {
+      signal: AbortSignal.timeout(8000),
+      headers: { Accept: "text/html,application/xhtml+xml" },
+    })
+    const error = res.ok ? undefined : await readResponseError(res)
+    return Response.json(
+      {
+        ok: res.ok,
+        providerID,
+        status: res.status,
+        error: error || undefined,
+      },
+      { status: res.ok ? 200 : res.status },
+    )
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    return Response.json({ ok: false, providerID, error: message }, { status: message.includes("timed out") ? 504 : 502 })
+  }
+}
+
 function getGlobalConfigCandidates(): string[] {
   const homeDir = process.env.HOME || os.homedir()
   const configDir = process.env.OPENCODE_CONFIG_DIR || nodePath.join(homeDir, ".config", "opencode")
@@ -365,6 +443,25 @@ export async function handleExtendedEndpoint(
     const body = await req.json().catch(() => null)
     const target = url.searchParams.get("target") || ""
     return syncProviderAuthSession(req, target, body)
+  }
+
+  // POST /api/ext/provider-oauth/replay - Replay a pasted OAuth callback URL to the backend listener
+  if (path === "/api/ext/provider-oauth/replay" && method === "POST") {
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body !== "object") {
+      return Response.json({ ok: false, error: "invalid body" }, { status: 400 })
+    }
+
+    const raw = body as Record<string, unknown>
+    const providerID = typeof raw.providerID === "string" ? raw.providerID.trim() : ""
+    const callbackUrl = typeof raw.callbackUrl === "string" ? raw.callbackUrl.trim() : ""
+    const target = url.searchParams.get("target") || undefined
+
+    if (!providerID || !callbackUrl) {
+      return Response.json({ ok: false, error: "providerID and callbackUrl are required" }, { status: 400 })
+    }
+
+    return replayProviderOAuthCallback(target, providerID, callbackUrl)
   }
 
   // DELETE /api/ext/global-provider?providerID=<id> - Remove a custom provider from global config

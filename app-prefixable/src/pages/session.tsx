@@ -1890,6 +1890,24 @@ export function Session() {
   const [isDragging, setIsDragging] = createSignal(false);
   const [dragMode, setDragMode] = createSignal<"upload" | "mention" | null>(null);
   let dragCounter = 0; // Track nested drag events
+  const dragLabel = createMemo(() =>
+    dragMode() === "mention" ? "Drop to mention file" : "Drop files to upload",
+  );
+  const dragSurface = createMemo(() =>
+    dragMode() === "mention"
+      ? "color-mix(in srgb, var(--surface-inset) 84%, var(--interactive-base) 16%)"
+      : "color-mix(in srgb, var(--surface-inset) 90%, var(--interactive-base) 10%)",
+  );
+  const dragBorder = createMemo(() =>
+    dragMode() === "mention"
+      ? "color-mix(in srgb, var(--border-base) 48%, var(--interactive-base) 52%)"
+      : "color-mix(in srgb, var(--border-base) 72%, var(--interactive-base) 28%)",
+  );
+  const dragLabelSurface = createMemo(() =>
+    dragMode() === "mention"
+      ? "color-mix(in srgb, var(--background-base) 72%, var(--surface-inset) 28%)"
+      : "color-mix(in srgb, var(--background-base) 82%, var(--surface-inset) 18%)",
+  );
 
   function clearDragState() {
     dragCounter = 0;
@@ -2732,10 +2750,13 @@ export function Session() {
                 inert={inputBlocked() || undefined}
                 style={
                   {
-                    background: "var(--background-base)",
+                    background: isDragging() ? dragSurface() : "var(--background-base)",
                     border: isDragging()
-                      ? "2px dashed var(--interactive-base)"
+                      ? `1px solid ${dragBorder()}`
                       : "1px solid var(--border-base)",
+                    "box-shadow": isDragging()
+                      ? `0 0 0 1px ${dragBorder()} inset`
+                      : "none",
                     "--tw-ring-color": "var(--interactive-base)",
                     opacity: inputBlocked() ? "0.5" : "1",
                   } as any
@@ -2766,17 +2787,21 @@ export function Session() {
                 {/* Drag overlay */}
                 <Show when={isDragging()}>
                   <div
-                    class="absolute inset-0 flex items-center justify-center rounded-lg z-10 pointer-events-none"
+                    class="absolute inset-0 z-10 flex items-center justify-center rounded-lg pointer-events-none"
                     style={{
-                      background: "color-mix(in srgb, var(--interactive-base) 10%, transparent)",
+                      background: "color-mix(in srgb, var(--background-base) 24%, transparent)",
                     }}
                   >
-                    <span
-                      class="text-sm font-medium"
-                      style={{ color: "var(--text-interactive-base)" }}
+                    <div
+                      class="rounded-full px-3 py-1.5 text-sm font-medium shadow-sm"
+                      style={{
+                        color: "var(--text-strong)",
+                        background: dragLabelSurface(),
+                        border: `1px solid ${dragBorder()}`,
+                      }}
                     >
-                      {dragMode() === "mention" ? "Drop to mention file" : "Drop files here"}
-                    </span>
+                      {dragLabel()}
+                    </div>
                   </div>
                 </Show>
 

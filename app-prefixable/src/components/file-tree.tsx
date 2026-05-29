@@ -75,6 +75,12 @@ function handleTreeDragStart(e: DragEvent, path: string, kind: "file" | "directo
   e.dataTransfer?.setData(FILE_TREE_KIND_DATA, kind)
 }
 
+function dispatchLongPressPreview(kind: "file" | "directory", path: string, active: boolean) {
+  window.dispatchEvent(new CustomEvent(active ? "opencode-filetree-preview-start" : "opencode-filetree-preview-end", {
+    detail: { kind, path },
+  }))
+}
+
 function parentPath(path: string) {
   const idx = path.lastIndexOf("/")
   return idx === -1 ? "" : path.slice(0, idx)
@@ -416,12 +422,14 @@ async function readDirectory(entry: DropEntry): Promise<UploadEntry[]> {
       longPressTimer = undefined
       const opened = openContextMenu(touch.clientX, touch.clientY, node)
       if (!opened) return
+      if (node.type === "file") dispatchLongPressPreview(node.type, node.path, true)
       suppressClickPath = node.path
     }, LONG_PRESS_DELAY)
   }
 
   const handleTouchEnd = (path: string) => {
     clearLongPress()
+    dispatchLongPressPreview("file", path, false)
     window.setTimeout(() => {
       if (suppressClickPath === path) suppressClickPath = null
     }, LONG_PRESS_DELAY)

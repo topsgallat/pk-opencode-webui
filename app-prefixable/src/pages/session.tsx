@@ -1889,30 +1889,25 @@ export function Session() {
   // Drag & Drop state and handlers
   const [isDragging, setIsDragging] = createSignal(false);
   const [dragMode, setDragMode] = createSignal<"upload" | "mention" | null>(null);
+  const [treePreview, setTreePreview] = createSignal<"mention" | null>(null);
   let dragCounter = 0; // Track nested drag events
   const dragLabel = createMemo(() =>
-    dragMode() === "mention" ? "Drop to mention file" : "Drop files to upload",
+    (dragMode() ?? treePreview()) === "mention" ? "Drop to mention file" : "Drop files to upload",
   );
-  const dragSurface = createMemo(() =>
-    dragMode() === "mention"
-      ? "color-mix(in srgb, var(--surface-inset) 84%, var(--interactive-base) 16%)"
-      : "color-mix(in srgb, var(--surface-inset) 90%, var(--interactive-base) 10%)",
-  );
-  const dragBorder = createMemo(() =>
-    dragMode() === "mention"
-      ? "color-mix(in srgb, var(--border-base) 48%, var(--interactive-base) 52%)"
-      : "color-mix(in srgb, var(--border-base) 72%, var(--interactive-base) 28%)",
-  );
-  const dragLabelSurface = createMemo(() =>
-    dragMode() === "mention"
-      ? "color-mix(in srgb, var(--background-base) 72%, var(--surface-inset) 28%)"
-      : "color-mix(in srgb, var(--background-base) 82%, var(--surface-inset) 18%)",
-  );
+  const dropMode = createMemo(() => dragMode() ?? treePreview());
+  const dropActive = createMemo(() => isDragging() || treePreview() !== null);
+  const dragSurface = "color-mix(in srgb, var(--surface-inset) 90%, var(--interactive-base) 10%)";
+  const dragBorder = "color-mix(in srgb, var(--border-base) 72%, var(--interactive-base) 28%)";
+  const dragLabelSurface = "color-mix(in srgb, var(--background-base) 82%, var(--surface-inset) 18%)";
 
   function clearDragState() {
     dragCounter = 0;
     setIsDragging(false);
     setDragMode(null);
+  }
+
+  function clearTreePreview() {
+    setTreePreview(null);
   }
 
   function getDragMode(e: DragEvent) {
@@ -1985,6 +1980,26 @@ export function Session() {
       addUpload(file);
     }
   }
+
+  onMount(() => {
+    const start = (e: Event) => {
+      const detail = (e as CustomEvent<{ kind?: string }>).detail;
+      if (detail?.kind !== "file") return;
+      setTreePreview("mention");
+    };
+
+    const end = () => {
+      clearTreePreview();
+    };
+
+    window.addEventListener("opencode-filetree-preview-start", start as EventListener);
+    window.addEventListener("opencode-filetree-preview-end", end as EventListener);
+
+    onCleanup(() => {
+      window.removeEventListener("opencode-filetree-preview-start", start as EventListener);
+      window.removeEventListener("opencode-filetree-preview-end", end as EventListener);
+    });
+  });
 
   async function sendMessage(e: SubmitEvent) {
     e.preventDefault();
@@ -2750,12 +2765,12 @@ export function Session() {
                 inert={inputBlocked() || undefined}
                 style={
                   {
-                    background: isDragging() ? dragSurface() : "var(--background-base)",
-                    border: isDragging()
-                      ? `1px solid ${dragBorder()}`
+                    background: dropActive() ? dragSurface : "var(--background-base)",
+                    border: dropActive()
+                      ? `1px solid ${dragBorder}`
                       : "1px solid var(--border-base)",
-                    "box-shadow": isDragging()
-                      ? `0 0 0 1px ${dragBorder()} inset`
+                    "box-shadow": dropActive()
+                      ? `0 0 0 1px ${dragBorder} inset`
                       : "none",
                     "--tw-ring-color": "var(--interactive-base)",
                     opacity: inputBlocked() ? "0.5" : "1",
@@ -2785,7 +2800,7 @@ export function Session() {
                 />
 
                 {/* Drag overlay */}
-                <Show when={isDragging()}>
+                <Show when={dropActive()}>
                   <div
                     class="absolute inset-0 z-10 flex items-center justify-center rounded-lg pointer-events-none"
                     style={{
@@ -2796,8 +2811,8 @@ export function Session() {
                       class="rounded-full px-3 py-1.5 text-sm font-medium shadow-sm"
                       style={{
                         color: "var(--text-strong)",
-                        background: dragLabelSurface(),
-                        border: `1px solid ${dragBorder()}`,
+                        background: dragLabelSurface,
+                        border: `1px solid ${dragBorder}`,
                       }}
                     >
                       {dragLabel()}

@@ -253,6 +253,13 @@ export function GlobalEventsProvider(props: ParentProps & {
         }
         recalcAlerts(dir)
       }
+
+      if (event.type === "session.error") {
+        const sid = (event.properties as { sessionID?: string })?.sessionID
+        if (!sid) return
+        tracking.busySessions.delete(sid)
+        recalcAlerts(dir)
+      }
     }
 
     source.onmessage = handleMessage

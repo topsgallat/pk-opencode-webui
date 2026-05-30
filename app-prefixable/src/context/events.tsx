@@ -59,6 +59,11 @@ export function EventProvider(props: ParentProps) {
       }
     }
 
+    if (e.type === "session.error") {
+      const p = e.properties as { sessionID?: string }
+      if (p?.sessionID) setStatus(p.sessionID, { type: "idle" })
+    }
+
     if (e.type === "question.asked") {
       const q = e.properties as QuestionRequest
       if (q?.sessionID) {

@@ -8,6 +8,7 @@ interface QuotaProviderCardProps {
 
 export function QuotaProviderCard(props: QuotaProviderCardProps) {
   const hasAccounts = () => Boolean(props.provider.accounts?.length)
+  const issue = () => props.provider.reason || props.provider.error || props.provider.warning
 
   const statusTheme = () => {
     switch (props.provider.status) {
@@ -113,31 +114,15 @@ export function QuotaProviderCard(props: QuotaProviderCardProps) {
       </div>
 
       <div class="px-4 pb-4 space-y-3">
-        <Show when={props.provider.error}>
+        <Show when={issue()}>
           {(message) => (
             <div
               class="rounded-md px-3 py-2 text-sm"
               style={{
-                background: alertTheme('error').background,
-                border: alertTheme('error').border,
-                'border-left': alertTheme('error').accent,
-                color: alertTheme('error').color,
-              }}
-            >
-              {message()}
-            </div>
-          )}
-        </Show>
-
-        <Show when={props.provider.warning}>
-          {(message) => (
-            <div
-              class="rounded-md px-3 py-2 text-sm"
-              style={{
-                background: alertTheme('warning').background,
-                border: alertTheme('warning').border,
-                'border-left': alertTheme('warning').accent,
-                color: alertTheme('warning').color,
+                background: props.provider.status === 'error' ? alertTheme('error').background : alertTheme('warning').background,
+                border: props.provider.status === 'error' ? alertTheme('error').border : alertTheme('warning').border,
+                'border-left': props.provider.status === 'error' ? alertTheme('error').accent : alertTheme('warning').accent,
+                color: props.provider.status === 'error' ? alertTheme('error').color : alertTheme('warning').color,
               }}
             >
               {message()}

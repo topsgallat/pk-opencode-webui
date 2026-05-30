@@ -249,6 +249,12 @@ export function SessionInfo(props: SessionInfoProps) {
     return findQuotaProviderBySelectedModel(data.providers, selected?.providerID)
   })
 
+  const quotaProviderIssue = createMemo(() => {
+    const provider = quotaProvider()
+    if (!provider) return null
+    return provider.reason || provider.error || provider.warning || null
+  })
+
   const quotaStatus = (status?: string) => {
     switch (status) {
       case "ok":
@@ -646,13 +652,16 @@ export function SessionInfo(props: SessionInfoProps) {
                                   </span>
                                 </div>
 
-                                <Show when={quotaProvider()!.warning}>
-                                  {(message) => (
-                                    <div class="text-[10px] leading-snug" style={{ color: "var(--status-warning-text)" }}>
-                                      {message()}
-                                    </div>
-                                  )}
-                                </Show>
+                              <Show when={quotaProviderIssue()}>
+                                {(message) => (
+                                  <div
+                                    class="text-[10px] leading-snug"
+                                    style={{ color: quotaProvider()!.status === "error" ? "var(--text-critical-base)" : "var(--status-warning-text)" }}
+                                  >
+                                    {message()}
+                                  </div>
+                                )}
+                              </Show>
 
                                 <Show when={quotaProvider()!.entries.length > 0} fallback={
                                   <div class="text-[11px]" style={{ color: "var(--text-weak)" }}>

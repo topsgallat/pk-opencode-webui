@@ -1,4 +1,4 @@
-import { QuotaEntryView } from "./quota/types"
+import { QuotaAccountView, QuotaEntryView } from "./quota/types"
 
 type AnthropicQuotaWindow = {
   id: string
@@ -16,6 +16,7 @@ export type AnthropicQuotaOps = {
 
 type AnthropicQuotaSource = {
   entries: QuotaEntryView[]
+  accounts?: QuotaAccountView[]
   warning?: string
   error?: string
 }
@@ -218,6 +219,27 @@ function extractToken(data: unknown): string | undefined {
   return undefined
 }
 
+function extractAccount(data: unknown): QuotaAccountView | undefined {
+  if (!isObject(data)) return undefined
+
+  const email = asString(data.email)
+  const orgName = asString(data.orgName)
+  const orgId = asString(data.orgId)
+  const subscriptionType = asString(data.subscriptionType)
+  const loggedIn = data.loggedIn === true
+
+  if (!loggedIn && !email && !orgName && !orgId) return undefined
+
+  const label = orgName || email || subscriptionType || "Claude account"
+
+  return {
+    id: orgId || email || label,
+    label,
+    email,
+    entries: [],
+  }
+}
+
 async function loadOAuthUsage(token: string, ops?: AnthropicQuotaOps): Promise<AnthropicQuotaSource> {
   const fetchFn = ops?.fetch || fetch
   const res = await fetchFn("https://api.anthropic.com/api/oauth/usage", {
@@ -279,14 +301,17 @@ export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh
 
   const ops = options?.ops
   const result: AnthropicQuotaSource = { entries: [] }
+  let account: QuotaAccountView | undefined
 
   const status = await runCommand(["auth", "status", "--json"], ops)
   if (status?.stdout) {
     try {
       const parsed = JSON.parse(status.stdout) as unknown
+      account = extractAccount(parsed)
       const entries = parseQuota(parsed)
       if (entries.length > 0) {
         result.entries = entries
+        if (account) result.accounts = [{ ...account, entries }]
         result.warning = isRemoteTarget(options?.targetUrl)
           ? "Claude.ai quota is read from the UI server host, not the selected remote target"
           : undefined
@@ -296,6 +321,7 @@ export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh
       const token = extractToken(parsed)
       if (token) {
         const usage = await loadOAuthUsage(token, ops)
+        if (account) usage.accounts = [{ ...account, entries: usage.entries }]
         usage.warning = isRemoteTarget(options?.targetUrl)
           ? "Claude.ai quota is read from the UI server host, not the selected remote target"
           : undefined
@@ -317,6 +343,7 @@ export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh
   }
 
   const usage = await loadOAuthUsage(token, ops)
+  if (account) usage.accounts = [{ ...account, entries: usage.entries }]
   usage.warning = isRemoteTarget(options?.targetUrl)
     ? "Claude.ai quota is read from the UI server host, not the selected remote target"
     : undefined

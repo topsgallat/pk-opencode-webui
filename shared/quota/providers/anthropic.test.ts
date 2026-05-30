@@ -72,6 +72,31 @@ describe("AnthropicProvider", () => {
     expect(result.warning).toContain("remote target")
   })
 
+  it("exposes account identity from claude auth status", async () => {
+    clearEnv()
+    const provider = new AnthropicProvider({
+      run: mockCliStatus({
+        loggedIn: true,
+        authMethod: "claude.ai",
+        apiProvider: "firstParty",
+        email: "consult@secstrike.ai",
+        orgId: "871cd9b8-8707-4a9a-87fa-1154327c38a7",
+        orgName: "Secstrike Team",
+        subscriptionType: "team",
+        quota: {
+          five_hour: { used_percentage: 12, resets_at: "2026-05-15T10:00:00.000Z" },
+        },
+      }),
+    })
+
+    const result = await provider.fetch({})
+
+    expect(result.status).toBe("ok")
+    expect(result.accounts).toHaveLength(1)
+    expect(result.accounts?.[0].label).toBe("Secstrike Team")
+    expect(result.accounts?.[0].email).toBe("consult@secstrike.ai")
+  })
+
   it("warns when Claude CLI is missing", async () => {
     clearEnv()
     const home = `/tmp/anthropic-home-${crypto.randomUUID()}`

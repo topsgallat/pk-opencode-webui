@@ -1,13 +1,6 @@
 import { QuotaFetchOptions, QuotaProvider, QuotaProviderView } from "../types"
 import { loadAnthropicQuota, type AnthropicQuotaOps } from "../../anthropic-quota"
 
-type AnthropicOps = {
-  run?: (args: string[]) => Promise<{ code: number; stdout: string; stderr: string } | null>
-  readText?: (path: string) => Promise<string | undefined>
-  fetch?: typeof fetch
-  now?: () => number
-}
-
 export class AnthropicProvider implements QuotaProvider {
   id = "anthropic"
   name = "Anthropic / Claude.ai"
@@ -31,6 +24,7 @@ export class AnthropicProvider implements QuotaProvider {
           available: false,
           fetchedAt: new Date().toISOString(),
           entries: [],
+          accounts: quota.accounts,
           warning: quota.warning || "Claude.ai quota data was not available",
         }
       }
@@ -42,6 +36,7 @@ export class AnthropicProvider implements QuotaProvider {
         available: true,
         fetchedAt: new Date().toISOString(),
         entries: quota.entries,
+        accounts: quota.accounts,
         warning: quota.warning,
       }
     } catch (error) {

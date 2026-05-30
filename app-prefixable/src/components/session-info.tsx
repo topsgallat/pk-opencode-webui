@@ -663,6 +663,21 @@ export function SessionInfo(props: SessionInfoProps) {
                                 )}
                               </Show>
 
+                              <Show when={quotaProvider()!.accounts && quotaProvider()!.accounts.length > 0}>
+                                <div class="space-y-1 text-[10px]" style={{ color: "var(--text-weak)" }}>
+                                  <For each={quotaProvider()!.accounts}>
+                                    {(account) => (
+                                      <div class="space-y-0.5">
+                                        <div class="font-medium" style={{ color: "var(--text-base)" }}>{account.label}</div>
+                                        <Show when={account.email}>
+                                          {(email) => <div class="truncate">{email()}</div>}
+                                        </Show>
+                                      </div>
+                                    )}
+                                  </For>
+                                </div>
+                              </Show>
+
                                 <Show when={quotaProvider()!.entries.length > 0} fallback={
                                   <div class="text-[11px]" style={{ color: "var(--text-weak)" }}>
                                     No quota limits reported.

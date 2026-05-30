@@ -39,6 +39,7 @@ export type QuotaProviderView = {
   accounts?: QuotaAccountView[]
   error?: string
   warning?: string
+  reason?: string
 }
 
 export type QuotaEntryView = {

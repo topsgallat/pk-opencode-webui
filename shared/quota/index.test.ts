@@ -71,6 +71,15 @@ describe('getQuotaData', () => {
     expect(result.refreshed).toBe(true)
     expect(result.source).toBe('live')
   })
+
+  it('exposes unavailable provider reasons', async () => {
+    const result = await getQuotaData({ resolveProviderAuthHeader: () => undefined })
+
+    const copilot = result.providers.find(provider => provider.id === 'copilot')
+    expect(copilot?.status).toBe('unavailable')
+    expect(copilot?.reason).toContain('GitHub auth')
+    expect(result.summary.unavailableProviders.find(provider => provider.id === 'copilot')?.reason).toContain('GitHub auth')
+  })
 })
 
 describe('CopilotProvider', () => {

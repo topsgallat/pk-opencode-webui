@@ -30,14 +30,15 @@ export async function getQuotaData(options: {
 
     try {
       const view = await provider.fetch(options)
-      providerViews.push(view)
+      const reason = view.error || view.warning || (view.status !== 'ok' ? 'Provider unavailable' : undefined)
+      providerViews.push(reason ? { ...view, reason } : view)
 
       if (view.status === 'ok' && view.available) {
         availableProviders.push(provider.id)
       } else {
         unavailableProviders.push({
           id: provider.id,
-          reason: view.error || view.warning || 'Provider unavailable',
+          reason: reason || 'Provider unavailable',
         })
       }
 
@@ -45,6 +46,15 @@ export async function getQuotaData(options: {
       if (view.error) warnings.push(`${provider.name}: ${view.error}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      providerViews.push({
+        id: provider.id,
+        name: provider.name,
+        status: 'error',
+        available: false,
+        entries: [],
+        error: message,
+        reason: message,
+      })
       unavailableProviders.push({ id: provider.id, reason: message })
       warnings.push(`${provider.name}: ${message}`)
     }

@@ -1460,7 +1460,7 @@ export function Session() {
       );
       const statuses = res.data;
       const status = statuses?.[sessionID];
-      const isBusy = status?.type === "busy" || status?.type === "retry";
+      const isBusy = !error() && (status?.type === "busy" || status?.type === "retry");
 
       if (isBusy) {
         wasProcessing.value = true;
@@ -1585,10 +1585,29 @@ export function Session() {
             // Reset local processing tracker (notifications now handled globally in Layout)
             wasProcessing.value = false;
             setProcessing(false);
-          } else if (props.sessionID === id) {
+          } else if (props.sessionID === id && !error()) {
             wasProcessing.value = true;
             setProcessing(true);
           }
+        }
+
+        if (event.type === "session.error") {
+          const props = event.properties as {
+            sessionID?: string;
+            error?: unknown;
+          };
+
+          if (props.sessionID !== id) return;
+
+          batch(() => {
+            setError(errorMessage(props.error, "The selected model hit a limit. Please choose another model or try again later."));
+            setActivePrompt(null);
+            wasProcessing.value = false;
+            setProcessing(false);
+          });
+
+          void sync.session.sync(id).catch(() => {});
+          return;
         }
 
         // Handle global TUI events

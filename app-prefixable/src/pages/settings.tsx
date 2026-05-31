@@ -21,6 +21,7 @@ import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCa
 import { appendTargetParam } from "../utils/path"
 import { extractOAuthCode, normalizeOAuthCallbackUrl } from "../utils/oauth"
 import { getServerCapabilities } from "../utils/server-capabilities"
+import { modelPolicyEnabled, providerBaseID, providerModelConfig } from "../utils/model-policy"
 import {
   getServers,
   saveServer,
@@ -650,11 +651,11 @@ Add your project-specific instructions here.
     setError(null)
     setSuccess(null)
 
+    const isOpenAI = providerID === "openai" || providerID.startsWith("openai:")
+
     const result = await providers.startOAuth(providerID, methodIndex)
 
     if (result) {
-      const isOpenAI = providerID === "openai" || providerID.startsWith("openai:")
-
       // Extract code from instructions (e.g., "Enter code: XXXX-YYYY" -> "XXXX-YYYY")
       const codeMatch = result.instructions.match(/:\s*([A-Z0-9]{4}-[A-Z0-9]{4})/i)
       const code = codeMatch ? codeMatch[1] : ""
@@ -722,6 +723,8 @@ Add your project-specific instructions here.
     setConnecting(true)
     setError(null)
 
+    // Keep this path rebuild-stable while we debug the browser replay flow.
+
     const replay = needsOAuthReplay(pending.providerID)
     const callbackUrl = replay ? normalizeOAuthCallbackUrl(oauthCode()) : undefined
     if (replay && !callbackUrl) {
@@ -732,10 +735,15 @@ Add your project-specific instructions here.
 
     if (replay) {
       const replayed = await replayProviderOAuthCallback(url, pending.providerID, callbackUrl!, targetUrl)
-      if (!replayed) {
-        setConnecting(false)
-        setError("Failed to replay the callback URL. Please copy the full browser URL and try again.")
-        return
+      if (!replayed.ok) {
+        const retryable = replayed.status === 502 || replayed.status === 504 || (replayed.error && /connect|reachable|reset/i.test(replayed.error))
+        if (!retryable) {
+          setConnecting(false)
+          setError(replayed.error ? (replayed.status ? `${replayed.error} (HTTP ${replayed.status})` : replayed.error) : "Failed to replay the callback URL. Please copy the full browser URL and try again.")
+          return
+        }
+
+        console.warn("[OAuth] replay listener unreachable, continuing with code exchange", replayed)
       }
     }
 
@@ -3587,17 +3595,13 @@ function ProjectProvidersTab() {
   const projectProviderConfigMap = createMemo<Record<string, ProviderConfig>>(() => config.project.provider ?? {})
   const globalProviderConfigMap = createMemo<Record<string, ProviderConfig>>(() => config.global.provider ?? {})
 
-  function providerBaseID(providerID: string) {
-    const idx = providerID.indexOf(":")
-    return idx > 0 ? providerID.slice(0, idx) : providerID
-  }
-
   const availableModels = createMemo(() => {
     const seen = new Set<string>()
     const result: Array<{ id: string; provider: string; name: string }> = []
 
     for (const provider of providers.rawProviders) {
       for (const model of Object.keys(provider.models)) {
+        if (!modelPolicyEnabled(provider.id, model, globalProviderConfigMap(), projectProviderConfigMap())) continue
         const id = `${provider.id}/${model}`
         if (seen.has(id)) continue
         seen.add(id)
@@ -3606,6 +3610,22 @@ function ProjectProvidersTab() {
     }
 
     return result.sort((a, b) => a.id.localeCompare(b.id))
+  })
+
+  function defaultModelAllowed(model: string) {
+    const slash = model.indexOf("/")
+    if (slash <= 0 || slash === model.length - 1) return false
+    const providerID = model.slice(0, slash)
+    const modelID = model.slice(slash + 1)
+    const provider = providers.rawProviders.find((item) => item.id === providerID)
+    if (!provider?.models[modelID]) return false
+    return modelPolicyEnabled(providerID, modelID, globalProviderConfigMap(), projectProviderConfigMap())
+  }
+
+  const selectedDefaultModel = createMemo(() => {
+    const model = config.global.model
+    if (!model) return ""
+    return defaultModelAllowed(model) ? model : ""
   })
 
   const providerOptions = createMemo(() => {
@@ -3668,9 +3688,10 @@ function ProjectProvidersTab() {
     setTestSuccess(null)
   }
 
-  function globalProviderEnabled(providerID: string) {
-    if (config.project.enabled_providers) return config.project.enabled_providers.includes(providerID)
-    if (config.project.disabled_providers) return !config.project.disabled_providers.includes(providerID)
+  function projectProviderEnabled(providerID: string) {
+    const base = providerBaseID(providerID)
+    if (config.project.enabled_providers) return config.project.enabled_providers.includes(base)
+    if (config.project.disabled_providers) return !config.project.disabled_providers.includes(base)
     return true
   }
 
@@ -3683,6 +3704,10 @@ function ProjectProvidersTab() {
   }
 
   async function setDefaultModel(model: string) {
+    if (model && !defaultModelAllowed(model)) {
+      setSaveError("Default model is disabled by the active global model policy")
+      return
+    }
     setSaving(true)
     const result = await config.updateGlobal({ model: model || undefined })
     setSaving(false)
@@ -3696,12 +3721,13 @@ function ProjectProvidersTab() {
     if (result) showSaved()
   }
 
-  async function toggleGlobalProvider(providerID: string) {
+  async function toggleProjectProvider(providerID: string) {
+    const base = providerBaseID(providerID)
     setSaving(true)
     if (config.project.enabled_providers) {
-      const next = config.project.enabled_providers.includes(providerID)
-        ? config.project.enabled_providers.filter((item) => item !== providerID)
-        : [...config.project.enabled_providers, providerID]
+      const next = config.project.enabled_providers.includes(base)
+        ? config.project.enabled_providers.filter((item) => item !== base)
+        : [...config.project.enabled_providers, base]
       const result = await config.updateProject({ enabled_providers: next })
       setSaving(false)
       if (result) showSaved()
@@ -3709,29 +3735,31 @@ function ProjectProvidersTab() {
     }
 
     const disabled = config.project.disabled_providers ?? []
-    const next = disabled.includes(providerID)
-      ? disabled.filter((item) => item !== providerID)
-      : [...disabled, providerID]
+    const next = disabled.includes(base)
+      ? disabled.filter((item) => item !== base)
+      : [...disabled, base]
     const result = await config.updateProject({ disabled_providers: next })
     setSaving(false)
     if (result) showSaved()
   }
 
   function globalProviderModelConfig(providerID: string) {
-    return projectProviderConfigMap()[providerID] ?? {}
+    return providerModelConfig(providerID, globalProviderConfigMap(), projectProviderConfigMap()) ?? {}
   }
 
   function globalModelEnabled(providerID: string, modelID: string) {
-    const provider = globalProviderModelConfig(providerID)
-    if (provider.whitelist) return provider.whitelist.includes(modelID)
-    if (provider.blacklist) return !provider.blacklist.includes(modelID)
-    return true
+    return modelPolicyEnabled(providerID, modelID, globalProviderConfigMap(), projectProviderConfigMap())
   }
 
   async function toggleGlobalModel(providerID: string, modelID: string) {
+    const policyProviderID = providerBaseID(providerID)
     setSaving(true)
-    const current = globalProviderModelConfig(providerID)
-    const nextProvider: ProviderConfig = { ...current }
+    const current = globalProviderModelConfig(policyProviderID)
+    const existing = globalProviderConfigMap()[policyProviderID]
+    const nextProvider: ProviderConfig = {
+      ...(current.whitelist ? { whitelist: [...current.whitelist] } : {}),
+      ...(current.blacklist ? { blacklist: [...current.blacklist] } : {}),
+    }
 
     if (nextProvider.whitelist) {
       nextProvider.whitelist = nextProvider.whitelist.includes(modelID)
@@ -3744,10 +3772,13 @@ function ProjectProvidersTab() {
         : [...blacklist, modelID]
     }
 
-    const result = await config.updateProject({
+    const result = await config.updateGlobal({
       provider: {
-        ...projectProviderConfigMap(),
-        [providerID]: nextProvider,
+        ...globalProviderConfigMap(),
+        [policyProviderID]: {
+          ...existing,
+          ...nextProvider,
+        },
       },
     })
     setSaving(false)
@@ -3948,8 +3979,10 @@ function ProjectProvidersTab() {
         >
           <Info class="w-3.5 h-3.5 shrink-0" />
           <span>
-            Saved to <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code> for this project
-            {directory ? ` (${directory})` : ""}
+            Model defaults and model access save to global <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>~/.config/opencode/opencode.json</code>.
+            <Show when={directory}>
+              <span> Project provider access still saves to this project&apos;s <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code> ({directory}).</span>
+            </Show>
           </span>
         </div>
       </header>
@@ -3987,7 +4020,7 @@ function ProjectProvidersTab() {
               Default Model
             </label>
             <select
-              value={config.global.model ?? ""}
+              value={selectedDefaultModel()}
               onChange={(e) => setDefaultModel(e.currentTarget.value)}
               disabled={saving()}
               class="w-full px-3 py-2 rounded-md text-sm disabled:opacity-50"
@@ -4100,20 +4133,20 @@ function ProjectProvidersTab() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          toggleGlobalProvider(provider.id)
+                          toggleProjectProvider(provider.id)
                         }}
                         disabled={saving()}
                         class="relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 shrink-0"
                         role="switch"
-                        aria-checked={globalProviderEnabled(provider.id)}
+                        aria-checked={projectProviderEnabled(provider.id)}
                         aria-label={`Toggle ${provider.name} provider access`}
-                        style={{ background: globalProviderEnabled(provider.id) ? "var(--interactive-base)" : "var(--surface-inset)" }}
+                        style={{ background: projectProviderEnabled(provider.id) ? "var(--interactive-base)" : "var(--surface-inset)" }}
                       >
                         <div
                           class="absolute top-0.5 w-4 h-4 rounded-full transition-all"
                           style={{
                             background: "var(--background-base)",
-                            left: globalProviderEnabled(provider.id) ? "calc(100% - 18px)" : "2px",
+                            left: projectProviderEnabled(provider.id) ? "calc(100% - 18px)" : "2px",
                           }}
                         />
                       </button>
@@ -4126,7 +4159,7 @@ function ProjectProvidersTab() {
                   <Show when={globalModelListExpanded(provider.id) && provider.modelIDs.length > 0}>
                     <div class="px-3 pb-3 space-y-2">
                       <div class="text-xs" style={{ color: "var(--text-weak)" }}>
-                        Model toggles use project whitelist or blacklist config. If neither exists yet, this UI starts a blacklist for the selected provider.
+                        Model toggles save to global provider config. Legacy project whitelist or blacklist rules are still read when no global model policy exists yet.
                       </div>
                       <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
                         <For each={provider.modelIDs.sort((a, b) => a.localeCompare(b))}>

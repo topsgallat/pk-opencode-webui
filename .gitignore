@@ -42,3 +42,6 @@ app-prefixable/core.*
 docker-compose.test.yml
 docker/Dockerfile.test
 .test-home/
+
+# Generated agent notes
+.sisyphus/notepads/

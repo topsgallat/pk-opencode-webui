@@ -6,6 +6,7 @@ import { useServer } from "./server"
 import { getAnthropicModelPricing, getCopilotModelMultipliers, getOpenAIModelPricing, normalizeCopilotModelKey } from "../utils/path"
 import { clearProviderAuth, getProviderAccounts, saveProviderAccounts, removeProviderAccount, syncProviderAuth, syncProviderAuthFromBackend, type ProviderAccount } from "../utils/extended-api"
 import { withTimeout } from "../utils/request-timeout"
+import { modelPolicyEnabled, providerBaseID } from "../utils/model-policy"
 
 // Storage key
 const MODELS_BY_AGENT_KEY = "opencode.modelsByAgent"
@@ -219,11 +220,6 @@ export function ProviderProvider(props: ParentProps) {
   const rawProviders = createMemo(() => providerData()?.all ?? [])
   const rawConnected = createMemo(() => getConnectedProviderIDs(providerData()))
 
-  function providerBaseID(providerID: string) {
-    const idx = providerID.indexOf(":")
-    return idx > 0 ? providerID.slice(0, idx) : providerID
-  }
-
   function providerAllowed(providerID: string) {
     const base = providerBaseID(providerID)
     if (cfg.project.enabled_providers) return cfg.project.enabled_providers.includes(base)
@@ -231,7 +227,19 @@ export function ProviderProvider(props: ParentProps) {
     return true
   }
 
-  const providersView = createMemo(() => rawProviders().filter((provider) => providerAllowed(provider.id)))
+  const providersView = createMemo(() => rawProviders()
+    .filter((provider) => providerAllowed(provider.id))
+    .map((provider) => ({
+      ...provider,
+      models: Object.fromEntries(
+        Object.entries(provider.models).filter(([modelID]) => modelPolicyEnabled(
+          provider.id,
+          modelID,
+          cfg.global.provider ?? {},
+          cfg.project.provider ?? {},
+        ))
+      ),
+    })))
   const connectedView = createMemo(() => rawConnected().filter((providerID) => providerAllowed(providerID)))
 
   function providerFor(model: ModelKey | null, list = providersView()) {

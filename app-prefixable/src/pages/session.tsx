@@ -410,13 +410,24 @@ export function Session() {
 
   function applySelection(next: SessionSelection) {
     batch(() => {
-      setSessionSelection(next);
       providers.setSelectedAgent(next.agent);
       providers.setSelectedModel({
         providerID: next.model.providerID,
         modelID: next.model.modelID,
       });
       providers.setSelectedVariant(next.variant ?? null);
+
+      const model = providers.selectedModel
+      if (!model) {
+        setSessionSelection(null)
+        return
+      }
+
+      setSessionSelection({
+        agent: providers.selectedAgent,
+        model: { providerID: model.providerID, modelID: model.modelID },
+        variant: providers.selectedVariant,
+      })
     });
   }
 

@@ -37,3 +37,8 @@ worktrees/
 .opencode/
 .claude/
 app-prefixable/core.*
+
+# Test-only Docker files
+docker-compose.test.yml
+docker/Dockerfile.test
+.test-home/

@@ -180,6 +180,68 @@ test("replays oauth callback urls to the backend listener host", async () => {
   }
 })
 
+test("accepts replay providerID from query for compatibility", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    expect(String(input)).toBe("http://127.0.0.1:1455/auth/callback?code=abc123&state=xyz")
+    return new Response("ok", { status: 200 })
+  }) as unknown as typeof fetch
+
+  try {
+    const req = new Request("http://localhost/api/ext/provider-oauth/replay?providerID=openai&target=http://127.0.0.1:4096", {
+      method: "POST",
+      body: JSON.stringify({
+        callbackUrl: "http://localhost:1455/auth/callback#code=abc123&state=xyz",
+      }),
+    })
+
+    const res = await handleExtendedEndpoint("/api/ext/provider-oauth/replay", "POST", new URL(req.url), req)
+    expect(res).toBeDefined()
+    expect(res!.status).toBe(200)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("retries replay through host.docker.internal after loopback connection failure", async () => {
+  const originalFetch = globalThis.fetch
+  const calls: string[] = []
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input)
+    calls.push(url)
+    if (calls.length === 1) {
+      throw new Error("Unable to connect. Is the computer able to access the url?")
+    }
+    expect(url).toBe("http://host.docker.internal:1455/auth/callback?code=abc123&state=xyz")
+    return new Response("<html><body>ok</body></html>", {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    })
+  }) as unknown as typeof fetch
+
+  try {
+    const req = new Request("http://localhost/api/ext/provider-oauth/replay?providerID=openai&target=http://127.0.0.1:4096", {
+      method: "POST",
+      body: JSON.stringify({
+        providerID: "openai",
+        callbackUrl: "http://localhost:1455/auth/callback#code=abc123&state=xyz",
+      }),
+    })
+
+    const res = await handleExtendedEndpoint("/api/ext/provider-oauth/replay", "POST", new URL(req.url), req)
+    expect(res).toBeDefined()
+    expect(res!.status).toBe(200)
+
+    const data = await res!.json()
+    expect(data.ok).toBe(true)
+    expect(data.providerID).toBe("openai")
+    expect(data.status).toBe(200)
+    expect(calls).toHaveLength(2)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("rejects invalid oauth callback urls for replay", async () => {
   const req = new Request("http://localhost/api/ext/provider-oauth/replay?target=http://127.0.0.1:4096", {
     method: "POST",

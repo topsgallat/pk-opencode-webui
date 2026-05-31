@@ -4,6 +4,29 @@ import type { QuotaApiResponse } from "../../../shared/quota/types"
 
 const EXT_API_TIMEOUT_MS = 15_000
 
+function readErrorMessage(value: unknown): string | undefined {
+  if (!value) return undefined
+  if (typeof value === "string") return value.trim() || undefined
+  if (typeof value !== "object") return undefined
+
+  const raw = value as Record<string, unknown>
+  const error = raw.error
+  if (typeof error === "string" && error.trim()) return error.trim()
+  if (error && typeof error === "object") {
+    const nested = error as Record<string, unknown>
+    const message = typeof nested.message === "string" ? nested.message.trim() : ""
+    if (message) return message
+  }
+
+  const message = typeof raw.message === "string" ? raw.message.trim() : ""
+  if (message) return message
+
+  const detail = typeof raw.detail === "string" ? raw.detail.trim() : ""
+  if (detail) return detail
+
+  return undefined
+}
+
 /**
  * Create a directory recursively
  */
@@ -267,24 +290,37 @@ export async function deleteGlobalProvider(serverUrl: string, providerID: string
   }
 }
 
+export type ReplayProviderOAuthCallbackResult = {
+  ok: boolean
+  status?: number
+  error?: string
+}
+
 export async function replayProviderOAuthCallback(
   serverUrl: string,
   providerID: string,
   callbackUrl: string,
   targetUrl?: string,
-): Promise<boolean> {
+): Promise<ReplayProviderOAuthCallbackResult> {
   try {
     const params = new URLSearchParams({ providerID })
     const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/provider-oauth/replay?${params}`, targetUrl), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ callbackUrl }),
+      body: JSON.stringify({ providerID, callbackUrl }),
     }, EXT_API_TIMEOUT_MS, "extended replayProviderOAuthCallback")
     const data = await res.json().catch(() => null)
-    return res.ok && !!data && typeof data === "object" && (data as { ok?: boolean }).ok === true
+    const ok = res.ok && !!data && typeof data === "object" && (data as { ok?: boolean }).ok === true
+    return ok
+      ? { ok: true, status: res.status }
+      : {
+          ok: false,
+          status: res.status,
+          error: readErrorMessage(data) || res.statusText || `HTTP ${res.status}`,
+        }
   } catch (e) {
     console.error("[extended-api] replayProviderOAuthCallback failed:", e)
-    return false
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
 export type ProviderConnectionTestInput = {

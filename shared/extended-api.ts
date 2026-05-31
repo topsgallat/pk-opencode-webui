@@ -176,8 +176,8 @@ async function replayProviderOAuthCallback(target: string | undefined, providerI
     return Response.json({ ok: false, error: "invalid callbackUrl" }, { status: 400 })
   }
 
-  try {
-    const res = await fetch(replayUrl, {
+  const fetchReplay = async (url: string): Promise<Response> => {
+    const res = await fetch(url, {
       signal: AbortSignal.timeout(8000),
       headers: { Accept: "text/html,application/xhtml+xml" },
     })
@@ -191,7 +191,21 @@ async function replayProviderOAuthCallback(target: string | undefined, providerI
       },
       { status: res.ok ? 200 : res.status },
     )
+  }
+
+  try {
+    return await fetchReplay(replayUrl)
   } catch (e) {
+    try {
+      const fallback = new URL(replayUrl)
+      if (isLoopbackHost(fallback.hostname)) {
+        fallback.hostname = "host.docker.internal"
+        return await fetchReplay(fallback.toString())
+      }
+    } catch {
+      // Fall through to original error handling.
+    }
+
     const message = e instanceof Error ? e.message : String(e)
     return Response.json({ ok: false, providerID, error: message }, { status: message.includes("timed out") ? 504 : 502 })
   }
@@ -453,7 +467,7 @@ export async function handleExtendedEndpoint(
     }
 
     const raw = body as Record<string, unknown>
-    const providerID = typeof raw.providerID === "string" ? raw.providerID.trim() : ""
+    const providerID = typeof raw.providerID === "string" ? raw.providerID.trim() : (url.searchParams.get("providerID") || "").trim()
     const callbackUrl = typeof raw.callbackUrl === "string" ? raw.callbackUrl.trim() : ""
     const target = url.searchParams.get("target") || undefined
 

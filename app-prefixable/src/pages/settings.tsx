@@ -19,7 +19,7 @@ import { useServer } from "../context/server"
 import { writeFile } from "../utils/extended-api"
 import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCallback } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
-import { extractOAuthCode, normalizeOAuthCallbackUrl } from "../utils/oauth"
+import { extractOAuthCode, extractOAuthInstructionCode, needsOAuthReplay, normalizeOAuthCallbackUrl } from "../utils/oauth"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { modelPolicyEnabled, providerBaseID, providerModelConfig } from "../utils/model-policy"
 import {
@@ -245,7 +245,6 @@ export function Settings() {
     code: string // Extracted code from instructions (e.g., "XXXX-YYYY")
   } | null>(null)
   const [oauthCode, setOauthCode] = createSignal("")
-  const needsOAuthReplay = (providerID: string) => providerID === "openai" || providerID.startsWith("openai:")
   const [codeCopied, setCodeCopied] = createSignal(false)
 
   function openOAuthTab() {
@@ -652,33 +651,35 @@ Add your project-specific instructions here.
     setSuccess(null)
 
     const isOpenAI = providerID === "openai" || providerID.startsWith("openai:")
+    const isCopilot = providerID === "github-copilot" || providerID.startsWith("github-copilot:")
+    const methodLabel = providers.authMethods[providerID]?.[methodIndex]?.label ?? ""
 
     const result = await providers.startOAuth(providerID, methodIndex)
 
     if (result) {
-      // Extract code from instructions (e.g., "Enter code: XXXX-YYYY" -> "XXXX-YYYY")
-      const codeMatch = result.instructions.match(/:\s*([A-Z0-9]{4}-[A-Z0-9]{4})/i)
-      const code = codeMatch ? codeMatch[1] : ""
+      const code = extractOAuthInstructionCode(result.instructions)
+      const replay = needsOAuthReplay(providerID, methodLabel, result.url)
 
       const providerName = getProviderDisplayName(providerID)
       setOauthCode("")
       setCodeCopied(false)
 
-      if (result.method === "code" || isOpenAI) {
-        // User needs to enter a code manually
+      if (replay) {
+        // Browser OAuth needs the callback URL replayed back to the local listener.
+        // OpenAI stays on the modal so the user can explicitly open the auth page.
         setOauthPending({
           providerID,
           providerName,
           methodIndex,
           method: "code",
           instructions: result.instructions,
-          requiresReplay: isOpenAI,
+          requiresReplay: replay,
           authUrl: result.url,
           code,
         })
         return
       } else {
-        // Auto method (device flow) - show code immediately, then start polling
+        // Device/headless flow - show the code and keep polling. Open the auth page only when the user clicks the button.
         setOauthPending({
           providerID,
           providerName,
@@ -690,8 +691,10 @@ Add your project-specific instructions here.
           code,
         })
 
-        // Open the authorization URL
-        window.open(result.url, "_blank")
+        if (!isOpenAI && !isCopilot) {
+          // Keep the old auto-open for non-OpenAI providers that expect it.
+          window.open(result.url, "_blank")
+        }
 
         // Start the callback immediately - it will poll until user authorizes
         // This call blocks until authorization succeeds or fails
@@ -725,7 +728,7 @@ Add your project-specific instructions here.
 
     // Keep this path rebuild-stable while we debug the browser replay flow.
 
-    const replay = needsOAuthReplay(pending.providerID)
+    const replay = pending.requiresReplay === true
     const callbackUrl = replay ? normalizeOAuthCallbackUrl(oauthCode()) : undefined
     if (replay && !callbackUrl) {
       setConnecting(false)
@@ -750,7 +753,7 @@ Add your project-specific instructions here.
     const code = replay ? extractOAuthCode(callbackUrl!) : extractOAuthCode(oauthCode())
     if (!replay && !code) {
       setConnecting(false)
-      setError("Paste a callback URL or authorization code.")
+      setError("Paste the code from the auth page.")
       return
     }
 
@@ -780,8 +783,9 @@ Add your project-specific instructions here.
     const pending = oauthPending()
     if (!pending?.code) return
     try {
-      await navigator.clipboard.writeText(pending.code)
-      setCodeCopied(true)
+      if (await copyToClipboard(pending.code)) {
+        setCodeCopied(true)
+      }
       setTimeout(() => setCodeCopied(false), 2000)
     } catch (e) {
       console.error("Failed to copy code:", e)
@@ -1179,11 +1183,47 @@ Add your project-specific instructions here.
                           </Show>
                         </div>
 
-                        <Show when={pending().requiresReplay}>
+                        <Show when={pending().authUrl}>
                           <div class="mb-3 space-y-2">
                             <p class="text-xs" style={{ color: "var(--text-weak)" }}>
-                              After you sign in, copy the full callback URL from your browser and paste it below.
+                              {pending().requiresReplay
+                                ? "After you sign in, copy the full callback URL from your browser and paste it below."
+                                : "Open the auth page, enter the code shown there, and paste the code on auth page."}
                             </p>
+                            <Show when={pending().code && !pending().requiresReplay}>
+                              <div>
+                                <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
+                                  Use this code on the auth page.
+                                </div>
+                                <div class="flex items-center gap-2">
+                                  <code
+                                    class="text-2xl font-mono font-bold tracking-wider px-4 py-2 rounded"
+                                    style={{
+                                      background: "var(--background-base)",
+                                      color: "var(--text-strong)",
+                                      border: "1px solid var(--border-base)",
+                                    }}
+                                  >
+                                    {pending().code}
+                                  </code>
+                                  <button
+                                    onClick={copyCode}
+                                    class="p-2 rounded transition-colors"
+                                    style={{
+                                      background: "var(--background-base)",
+                                      border: "1px solid var(--border-base)",
+                                      color: codeCopied() ? "var(--icon-success-base)" : "var(--icon-base)",
+                                    }}
+                                    title="Copy code"
+                                  >
+                                    <Show when={codeCopied()} fallback={<Copy class="w-4 h-4" />}>
+                                      <Check class="w-4 h-4" />
+                                    </Show>
+                                  </button>
+                                </div>
+                              </div>
+                            </Show>
+
                             <button
                               type="button"
                               onClick={openOAuthTab}
@@ -1193,43 +1233,8 @@ Add your project-specific instructions here.
                                 color: "white",
                               }}
                             >
-                              Open auth tab
+                              {pending().requiresReplay ? "Open auth tab" : "Open auth page"}
                             </button>
-                          </div>
-                        </Show>
-
-                        {/* Show the code prominently with copy button */}
-                        <Show when={pending().code && !needsOAuthReplay(pending().providerID)}>
-                          <div class="mb-3">
-                            <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
-                              Use this code or paste the callback URL:
-                            </div>
-                            <div class="flex items-center gap-2">
-                              <code
-                                class="text-2xl font-mono font-bold tracking-wider px-4 py-2 rounded"
-                                style={{
-                                  background: "var(--background-base)",
-                                  color: "var(--text-strong)",
-                                  border: "1px solid var(--border-base)",
-                                }}
-                              >
-                                {pending().code}
-                              </code>
-                              <button
-                                onClick={copyCode}
-                                class="p-2 rounded transition-colors"
-                                style={{
-                                  background: "var(--background-base)",
-                                  border: "1px solid var(--border-base)",
-                                  color: codeCopied() ? "var(--icon-success-base)" : "var(--icon-base)",
-                                }}
-                                title="Copy code"
-                              >
-                                <Show when={codeCopied()} fallback={<Copy class="w-4 h-4" />}>
-                                  <Check class="w-4 h-4" />
-                                </Show>
-                              </button>
-                            </div>
                           </div>
                         </Show>
 
@@ -1247,13 +1252,13 @@ Add your project-specific instructions here.
                         <Show when={pending().method === "code"}>
                           <div class="space-y-2">
                             <div class="text-xs" style={{ color: "var(--text-weak)" }}>
-                              {needsOAuthReplay(pending().providerID) ? "Paste the full callback URL from your browser:" : "Paste callback URL or code here:"}
+                              {pending().requiresReplay ? "Paste the full callback URL from your browser:" : "Paste the code from the auth page:"}
                             </div>
                             <input
                               type="text"
                               value={oauthCode()}
                               onInput={(e) => setOauthCode(e.currentTarget.value)}
-                              placeholder={needsOAuthReplay(pending().providerID) ? "Paste callback URL here..." : "Paste callback URL or code here..."}
+                              placeholder={pending().requiresReplay ? "Paste callback URL here..." : "Paste code here..."}
                               class="w-full px-3 py-2 rounded-md text-sm font-mono"
                               style={{
                                 background: "var(--background-base)",
@@ -1262,13 +1267,13 @@ Add your project-specific instructions here.
                               }}
                             />
                             <p class="text-xs" style={{ color: "var(--text-weak)" }}>
-                              {needsOAuthReplay(pending().providerID)
+                              {pending().requiresReplay
                                 ? "We will replay the callback URL to the backend listener, including state."
-                                : "Paste the full redirect URL from your browser if that is what the provider gave you."}
+                                : "Paste the code shown on the auth page to complete authentication."}
                             </p>
                             <button
                               type="button"
-                              disabled={connecting() || (needsOAuthReplay(pending().providerID) ? !normalizeOAuthCallbackUrl(oauthCode()) : !oauthCode().trim())}
+                              disabled={connecting() || (pending().requiresReplay ? !normalizeOAuthCallbackUrl(oauthCode()) : !oauthCode().trim())}
                               onClick={handleOAuthComplete}
                               class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
                               style={{

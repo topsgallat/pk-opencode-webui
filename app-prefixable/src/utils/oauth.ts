@@ -56,3 +56,24 @@ export function normalizeOAuthCallbackUrl(input: string): string | null {
     return null
   }
 }
+
+export function needsOAuthReplay(providerID: string, methodLabel: string, authUrl?: string): boolean {
+  if (providerID !== "openai" && !providerID.startsWith("openai:")) return false
+  if (authUrl && /\/device(?:\?|$)/i.test(authUrl)) return false
+  return /\b(browser|local)\b/i.test(methodLabel)
+}
+
+export function isOAuthCodeOnly(providerID: string, methodLabel: string, authUrl?: string): boolean {
+  if (providerID !== "openai" && !providerID.startsWith("openai:")) return false
+  if (authUrl && /\/deviceauth\/usercode(?:\?|$)/i.test(authUrl)) return true
+  return /\b(headless|code)\b/i.test(methodLabel)
+}
+
+export function extractOAuthInstructionCode(instructions: string): string {
+  const text = instructions.replace(/https?:\/\/\S+/gi, " ")
+  const labeled = text.match(/:\s*([A-Z0-9][A-Z0-9-]{5,20}[A-Z0-9])/i)
+  if (labeled) return labeled[1].toUpperCase()
+
+  const fallback = text.match(/\b[A-Z0-9]{4}-[A-Z0-9]{4}\b|\b[A-Z0-9]{9}\b/i)
+  return fallback ? fallback[0].toUpperCase() : ""
+}

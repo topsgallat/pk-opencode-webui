@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { extractOAuthCode, normalizeOAuthCallbackUrl } from "./oauth"
+import { extractOAuthCode, extractOAuthInstructionCode, isOAuthCodeOnly, needsOAuthReplay, normalizeOAuthCallbackUrl } from "./oauth"
 
 describe("oauth", () => {
   test("extracts code from callback url query", () => {
@@ -30,5 +30,22 @@ describe("oauth", () => {
 
   test("returns null for empty input", () => {
     expect(extractOAuthCode("   ")).toBeNull()
+  })
+
+  test("only replays OpenAI browser methods", () => {
+    expect(needsOAuthReplay("openai", "Browser login", "https://auth.openai.com/oauth/authorize")).toBe(true)
+    expect(needsOAuthReplay("openai", "Headless login", "https://auth.openai.com/api/accounts/deviceauth/usercode")).toBe(false)
+    expect(needsOAuthReplay("anthropic", "Browser login", "https://example.com/oauth/authorize")).toBe(false)
+  })
+
+  test("treats OpenAI device auth as code only", () => {
+    expect(isOAuthCodeOnly("openai", "Headless login", "https://auth.openai.com/api/accounts/deviceauth/usercode")).toBe(true)
+    expect(isOAuthCodeOnly("openai", "Browser login", "https://auth.openai.com/oauth/authorize")).toBe(false)
+    expect(isOAuthCodeOnly("anthropic", "Headless login", "https://example.com/deviceauth/usercode")).toBe(false)
+  })
+
+  test("extracts openai instruction codes", () => {
+    expect(extractOAuthInstructionCode("Enter this code when prompted: A1B2C3D4E")).toBe("A1B2C3D4E")
+    expect(extractOAuthInstructionCode("Enter code: ABCD-EFGH")).toBe("ABCD-EFGH")
   })
 })

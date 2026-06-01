@@ -127,7 +127,7 @@ RUN for i in 1 2 3 4 5; do \
     done | BUN_INSTALL=/usr/local bash
 
 ENV SHELL=/bin/bash
-RUN curl -fsSL https://opencode.ai/install | bash -s -- --version 1.14.28 && \
+RUN curl -fsSL https://opencode.ai/install | bash -s -- && \
     mv ${HOME}/.opencode/bin/opencode /usr/local/bin/opencode && \
     rm -rf ${HOME}/.opencode
 

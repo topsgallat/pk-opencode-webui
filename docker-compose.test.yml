@@ -1,3 +1,4 @@
+name: opencode-test-local-project
 services:
   opencode-test-local:
     build:

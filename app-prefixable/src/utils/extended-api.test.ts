@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { replayProviderOAuthCallback } from "./extended-api"
+import { replayProviderOAuthCallback, syncProviderAuthFromBackend } from "./extended-api"
 
 test("preserves replay endpoint error details", async () => {
   const originalFetch = globalThis.fetch
@@ -30,6 +30,23 @@ test("reads nested replay endpoint error objects", async () => {
     expect(result.ok).toBe(false)
     expect(result.status).toBe(401)
     expect(result.error).toBe("Unauthorized")
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("preserves backend auth sync error details", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => new Response(JSON.stringify({ ok: false, error: { message: "callback timed out" } }), {
+    status: 504,
+    headers: { "Content-Type": "application/json" },
+  })) as unknown as typeof fetch
+
+  try {
+    const result = await syncProviderAuthFromBackend("http://127.0.0.1:4096", "openai")
+    expect(result.ok).toBe(false)
+    expect(result.status).toBe(504)
+    expect(result.error).toBe("callback timed out")
   } finally {
     globalThis.fetch = originalFetch
   }

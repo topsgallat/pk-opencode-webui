@@ -4,7 +4,7 @@ import type { QuotaApiResponse } from "../../../shared/quota/types"
 
 const EXT_API_TIMEOUT_MS = 15_000
 
-function readErrorMessage(value: unknown): string | undefined {
+export function readErrorMessage(value: unknown): string | undefined {
   if (!value) return undefined
   if (typeof value === "string") return value.trim() || undefined
   if (typeof value !== "object") return undefined
@@ -251,16 +251,30 @@ export async function syncProviderAuth(serverUrl: string, providerID: string, au
   }
 }
 
-export async function syncProviderAuthFromBackend(serverUrl: string, providerID: string, targetUrl?: string): Promise<boolean> {
+export type ProviderAuthSyncResult = {
+  ok: boolean
+  status?: number
+  error?: string
+}
+
+export async function syncProviderAuthFromBackend(serverUrl: string, providerID: string, targetUrl?: string): Promise<ProviderAuthSyncResult> {
   try {
     const params = new URLSearchParams({ providerID })
     const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/provider-auth/from-backend?${params}`, targetUrl), {
       method: "POST",
     }, EXT_API_TIMEOUT_MS, "extended syncProviderAuthFromBackend")
-    return res.ok && (await res.json())?.ok === true
+    const data = await res.json().catch(() => null)
+    const ok = res.ok && !!data && typeof data === "object" && (data as { ok?: boolean }).ok === true
+    return ok
+      ? { ok: true, status: res.status }
+      : {
+          ok: false,
+          status: res.status,
+          error: readErrorMessage(data) || res.statusText || `HTTP ${res.status}`,
+        }
   } catch (e) {
     console.error("[extended-api] syncProviderAuthFromBackend failed:", e)
-    return false
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
 

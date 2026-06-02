@@ -700,17 +700,23 @@ Add your project-specific instructions here.
         // This call blocks until authorization succeeds or fails
         if (import.meta.env.DEV) console.debug("[OAuth] Starting auto callback for", providerID, "with code:", code)
         setConnecting(true)
-        const ok = await providers.completeOAuth(providerID, methodIndex)
-        if (import.meta.env.DEV) console.debug("[OAuth] Callback result:", ok)
+        const result = await providers.completeOAuth(providerID, methodIndex)
+        if (import.meta.env.DEV) console.debug("[OAuth] Callback result:", result)
         setConnecting(false)
 
-        if (ok) {
+        if (result.ok) {
           setSuccess(`Connected to ${providerName}!`)
           setOauthPending(null)
           setSelectedProvider(null)
           setProviderSearch("")
         } else {
-          setError("Authentication failed or was cancelled. Please try again.")
+          const where = result.stage === "callback"
+            ? "while completing the provider callback"
+            : result.stage === "sync"
+              ? "while syncing the provider auth back into the UI"
+              : "while refreshing provider state"
+          const details = result.status ? ` (HTTP ${result.status})` : ""
+          setError(`${where}: ${result.error}${details}`)
           setOauthPending(null)
         }
       }
@@ -757,18 +763,24 @@ Add your project-specific instructions here.
       return
     }
 
-    const ok = await providers.completeOAuth(pending.providerID, pending.methodIndex, code || undefined)
+    const result = await providers.completeOAuth(pending.providerID, pending.methodIndex, code || undefined)
 
     setConnecting(false)
 
-    if (ok) {
+    if (result.ok) {
       setSuccess(`Connected to ${pending.providerName}!`)
       setOauthPending(null)
       setOauthCode("")
       setSelectedProvider(null)
       setProviderSearch("")
     } else {
-      setError("Failed to complete authentication. Please try again.")
+      const where = result.stage === "callback"
+        ? "while completing the provider callback"
+        : result.stage === "sync"
+          ? "while syncing the provider auth back into the UI"
+          : "while refreshing provider state"
+      const details = result.status ? ` (HTTP ${result.status})` : ""
+      setError(`${where}: ${result.error}${details}`)
     }
   }
 

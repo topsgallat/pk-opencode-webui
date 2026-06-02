@@ -4,7 +4,7 @@ import { useSDK } from "./sdk"
 import { useConfig } from "./config"
 import { useServer } from "./server"
 import { getAnthropicModelPricing, getCopilotModelMultipliers, getOpenAIModelPricing, normalizeCopilotModelKey } from "../utils/path"
-import { clearProviderAuth, getProviderAccounts, saveProviderAccounts, removeProviderAccount, syncProviderAuth, syncProviderAuthFromBackend, type ProviderAccount } from "../utils/extended-api"
+import { clearProviderAuth, getProviderAccounts, readErrorMessage, removeProviderAccount, saveProviderAccounts, syncProviderAuth, syncProviderAuthFromBackend, type ProviderAccount } from "../utils/extended-api"
 import { withTimeout } from "../utils/request-timeout"
 import { modelPolicyEnabled, providerBaseID } from "../utils/model-policy"
 
@@ -86,6 +86,10 @@ interface OAuthAuthorization {
   instructions: string
 }
 
+type OAuthCompletionResult =
+  | { ok: true }
+  | { ok: false; stage: "callback" | "sync" | "refresh"; status?: number; error: string }
+
 function getConnectedProviderIDs(data?: ProviderListData): string[] {
   const connected = data?.connected ?? []
   const accounts = getProviderAccounts()
@@ -120,7 +124,7 @@ interface ProviderContextValue {
   connectProvider: (providerID: string, apiKey: string, accountName?: string) => Promise<boolean>
   disconnectProvider: (providerID: string) => Promise<boolean>
   startOAuth: (providerID: string, methodIndex: number) => Promise<OAuthAuthorization | undefined>
-  completeOAuth: (providerID: string, methodIndex: number, code?: string) => Promise<boolean>
+  completeOAuth: (providerID: string, methodIndex: number, code?: string) => Promise<OAuthCompletionResult>
   getAccounts: () => Record<string, ProviderAccount>
 }
 
@@ -144,6 +148,21 @@ export function ProviderProvider(props: ParentProps) {
 
   // Track whether the user has manually changed the agent via setSelectedAgent
   let userChangedAgent = false
+
+  function formatOAuthError(error: unknown): { status?: number; error: string } {
+    const status = typeof error === "object" && error !== null && "status" in error && typeof (error as { status?: unknown }).status === "number"
+      ? (error as { status: number }).status
+      : typeof error === "object" && error !== null && "data" in error && typeof (error as { data?: { status?: unknown } }).data?.status === "number"
+        ? (error as { data: { status: number } }).data.status
+        : undefined
+
+    const message = readErrorMessage(error)
+      ?? (typeof error === "object" && error !== null && "data" in error ? readErrorMessage((error as { data?: unknown }).data) : undefined)
+      ?? (error instanceof Error ? error.message : typeof error === "string" ? error : undefined)
+      ?? "Authentication failed"
+
+    return { status, error: message }
+  }
 
   // Load models from localStorage
   onMount(() => {
@@ -493,21 +512,38 @@ export function ProviderProvider(props: ParentProps) {
     }
   }
 
-  async function completeOAuth(providerID: string, methodIndex: number, code?: string): Promise<boolean> {
+  async function completeOAuth(providerID: string, methodIndex: number, code?: string): Promise<OAuthCompletionResult> {
     try {
       await client.provider.oauth.callback({
         providerID,
         method: methodIndex,
         code,
       })
-      await syncProviderAuthFromBackend(serverUrl, providerID, targetUrl)
+    } catch (e) {
+      console.error("Failed to complete OAuth callback:", e)
+      const failure = formatOAuthError(e)
+      return { ok: false, stage: "callback", ...failure }
+    }
+
+    const synced = await syncProviderAuthFromBackend(serverUrl, providerID, targetUrl)
+    if (!synced.ok) {
+      return {
+        ok: false,
+        stage: "sync",
+        status: synced.status,
+        error: synced.error || "Failed to sync provider auth from backend",
+      }
+    }
+
+    try {
       // Dispose instance to reload provider state, then refresh
       await client.instance.dispose()
       await refetchProviders()
-      return true
+      return { ok: true }
     } catch (e) {
-      console.error("Failed to complete OAuth:", e)
-      return false
+      console.error("Failed to refresh provider state after OAuth:", e)
+      const failure = formatOAuthError(e)
+      return { ok: false, stage: "refresh", ...failure }
     }
   }
 

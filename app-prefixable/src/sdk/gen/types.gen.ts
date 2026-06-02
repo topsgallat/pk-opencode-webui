@@ -586,6 +586,14 @@ export type SessionStatus =
       attempt: number
       message: string
       next: number
+      action?: {
+        reason: string
+        provider: string
+        title: string
+        message: string
+        label: string
+        link?: string
+      }
     }
   | {
       type: "busy"

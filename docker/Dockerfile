@@ -159,20 +159,8 @@ RUN for i in 1 2 3 4 5; do \
     done | BUN_INSTALL=/usr/local bash
 
 # Install OpenCode CLI
-# -----------------------------------------------------------------------------
-# PINNED TO 1.14.28 - DO NOT UPGRADE without testing plugin loading first!
-#
-# Root cause: opencode 1.14.32 has a regression where plugin loading is
-# completely broken — no agents from oh-my-openagent (or any plugin) appear
-# in the agent selector, and there are zero plugin-related log entries on
-# startup. Downgrading to 1.14.28 restores plugin functionality.
-#
-# Before upgrading, verify that oh-my-openagent agents appear in /agent API:
-#   curl http://localhost:8080/agent | python3 -m json.tool
-# Expected: agents beyond the 7 built-ins (build, compaction, explore, etc.)
-# -----------------------------------------------------------------------------
 ENV SHELL=/bin/bash
-RUN curl -fsSL https://opencode.ai/install | bash -s -- --version 1.14.28 && \
+RUN curl -fsSL https://opencode.ai/install | bash -s -- && \
     mv ${HOME}/.opencode/bin/opencode /usr/local/bin/opencode && \
     rm -rf ${HOME}/.opencode
 

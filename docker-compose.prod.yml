@@ -1,0 +1,37 @@
+services:
+  opencode-solo-prod:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.local
+      args:
+        - ENABLE_SUDO=1
+    image: opencode-web-solo-prod
+    container_name: opencode-web-solo-prod
+    ports:
+      - "8681:8080"
+      - "4097:4096"
+      - "1455:1455"
+      - "8085:8085"
+      - "19876:19876"
+    environment:
+      - OPERATION_MODE=solo
+      - BASE_PATH=/
+      - API_HOSTNAME=0.0.0.0
+      - OPENCODE_SERVE_ARGS=--mdns
+      - HOME=/home/sgallat # Do not change this!
+      - OPENCODE_WORKSPACE_ROOT=/home/sgallat # Do not change this!
+      - XDG_CACHE_HOME=/home/sgallat/.cache
+      - OPENCODE_SERVER_PASSWORD=RnM1t61kfO6tG7
+    volumes: # Do not change this!
+      - /home/sgallat/syncthing/Ubuntu-24.04:/home/sgallat
+      - /DATA/AppData/Opencode/data:/home/sgallat/.local/share/opencode
+      #- /DATA/AppData/Opencode/opencode_cache:/home/sgallat/.cache
+      - /home/sgallat/syncthing/opencode-config:/home/sgallat/Syncthing/opencode-config
+      - /home/sgallat/syncthing/opencode-config/opencode:/home/sgallat/.config/opencode
+      - /DATA/AppData:/home/sgallat/AppData
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/local/bin/docker-compose:/usr/local/bin/docker-compose:ro
+    user: "1000:1000" # Match your host user ID to avoid permission issues
+    group_add:
+      - "144" # docker group GID on host — allows Docker socket access without sudo
+    restart: unless-stopped 

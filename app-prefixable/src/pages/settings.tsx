@@ -37,6 +37,7 @@ import {
   clearServerAuthRevalidation,
 } from "../utils/server-auth"
 import { QuotaContent } from "../components/quota/quota-panel"
+import { SkillSourcesTab } from "../components/skill-sources-tab"
 
 export function Settings() {
   const providers = useProviders()
@@ -56,8 +57,8 @@ export function Settings() {
   const getInitialTab = () => {
     const hash = window.location.hash.slice(1)
     const validTabs = directory
-      ? ["providers", "git", "mcp", "prompts", "instructions", "config", "appearance", "sounds", "servers", "quota"]
-      : ["providers", "git", "mcp", "prompts", "instructions", "appearance", "sounds", "servers", "quota"]
+      ? ["providers", "git", "mcp", "prompts", "instructions", "skills", "config", "appearance", "sounds", "servers", "quota"]
+      : ["providers", "git", "mcp", "prompts", "instructions", "skills", "appearance", "sounds", "servers", "quota"]
     return validTabs.includes(hash) ? hash : "providers"
   }
   const [activeTab, setActiveTab] = createSignal(getInitialTab())
@@ -876,6 +877,7 @@ Add your project-specific instructions here.
       { id: "mcp", label: "MCP Servers", icon: () => <Server class="w-4 h-4" />, scope: "Global + Project" },
       { id: "prompts", label: "Prompts", icon: () => <BookmarkPlus class="w-4 h-4" />, scope: directory ? "Project" : null },
       { id: "instructions", label: "Instructions", icon: () => <BookOpen class="w-4 h-4" />, scope: directory ? "Project" : null },
+      { id: "skills", label: "Skills", icon: () => <Wrench class="w-4 h-4" />, scope: "Global + Project" },
     ]
     if (directory) {
       base.push({ id: "config", label: "Project Config", icon: () => <Settings2 class="w-4 h-4" />, scope: "Project" })
@@ -2388,6 +2390,11 @@ Add your project-specific instructions here.
           {/* Project Config Tab */}
           <Show when={activeTab() === "config"}>
             <ProjectConfigTab />
+          </Show>
+
+          {/* Skills Tab */}
+          <Show when={activeTab() === "skills"}>
+            <SkillSourcesTab />
           </Show>
 
           {/* Appearance Tab */}

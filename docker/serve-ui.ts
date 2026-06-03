@@ -194,7 +194,7 @@ if (OPERATION_MODE === "solo") {
     if (proxyAuthHeader) headers["Authorization"] = proxyAuthHeader
     for (let i = 0; i < 30; i++) {
       try {
-        const res = await fetch(`http://127.0.0.1:${API_PORT}/health`, { headers })
+        const res = await fetch(`http://127.0.0.1:${API_PORT}/global/health`, { headers })
         if (res.ok) return true
       } catch (_) { void _ }
       await Bun.sleep(1000)

@@ -49,9 +49,8 @@ RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}" && \
     rm -rf /root/.bun
 
 # Install OpenCode CLI
-ARG OPENCODE_VERSION=1.2.6
 ENV SHELL=/bin/bash
-RUN curl -fsSL https://opencode.ai/install | bash -s -- --version "${OPENCODE_VERSION}" && \
+RUN curl -fsSL https://opencode.ai/install | bash -s -- && \
     mv /root/.opencode/bin/opencode /usr/local/bin/opencode && \
     rm -rf /root/.opencode
 

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { replayProviderOAuthCallback, syncProviderAuthFromBackend } from "./extended-api"
+import { checkOpencodeHealth, replayProviderOAuthCallback, restartOpencode, syncProviderAuthFromBackend } from "./extended-api"
 
 test("preserves replay endpoint error details", async () => {
   const originalFetch = globalThis.fetch
@@ -47,6 +47,57 @@ test("preserves backend auth sync error details", async () => {
     expect(result.ok).toBe(false)
     expect(result.status).toBe(504)
     expect(result.error).toBe("callback timed out")
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("preserves opencode restart error details", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => new Response(JSON.stringify({ ok: false, error: "restart is local-only" }), {
+    status: 400,
+    headers: { "Content-Type": "application/json" },
+  })) as unknown as typeof fetch
+
+  try {
+    const result = await restartOpencode("http://127.0.0.1:4096")
+    expect(result.ok).toBe(false)
+    expect(result.status).toBe(400)
+    expect(result.error).toBe("restart is local-only")
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("reads opencode health responses", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => new Response(JSON.stringify({ healthy: true, version: "1.2.3" }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  })) as unknown as typeof fetch
+
+  try {
+    const result = await checkOpencodeHealth("http://127.0.0.1:4096")
+    expect(result.ok).toBe(true)
+    expect(result.healthy).toBe(true)
+    expect(result.status).toBe(200)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("reads opencode health through the ext endpoint", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => new Response(JSON.stringify({ ok: true, healthy: true, status: 200 }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  })) as unknown as typeof fetch
+
+  try {
+    const result = await checkOpencodeHealth("http://127.0.0.1:4096")
+    expect(result.ok).toBe(true)
+    expect(result.healthy).toBe(true)
+    expect(result.status).toBe(200)
   } finally {
     globalThis.fetch = originalFetch
   }

@@ -11,6 +11,17 @@ export function skillSourcePathFromLocation(location: string): string | null {
   const value = location.trim()
   if (!value || isHttpSkillLocation(value)) return null
 
+  if (value.startsWith("file://")) {
+    try {
+      const url = new URL(value)
+      const path = decodeURIComponent(url.pathname).replace(/[\\/]+$/, "")
+      if (!path) return null
+      return path.replace(/[\\/]SKILL\.md$/i, "") || path
+    } catch {
+      return null
+    }
+  }
+
   const normalized = value.replace(/[\\/]+$/, "")
   if (!normalized) return null
 

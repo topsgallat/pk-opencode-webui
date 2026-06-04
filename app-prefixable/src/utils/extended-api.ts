@@ -304,6 +304,60 @@ export async function deleteGlobalProvider(serverUrl: string, providerID: string
   }
 }
 
+export type RestartOpencodeResult = {
+  ok: boolean
+  status?: number
+  error?: string
+  message?: string
+}
+
+export type OpencodeHealthResult = {
+  ok: boolean
+  healthy?: boolean
+  status?: number
+  error?: string
+}
+
+export async function checkOpencodeHealth(serverUrl: string, targetUrl?: string): Promise<OpencodeHealthResult> {
+  try {
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/opencode/health`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended checkOpencodeHealth")
+    const data = await res.json().catch(() => null)
+    if (res.ok && data && typeof data === "object" && (data as { healthy?: boolean }).healthy === true) {
+      return { ok: true, healthy: true, status: res.status }
+    }
+
+    return {
+      ok: false,
+      healthy: false,
+      status: res.status,
+      error: readErrorMessage(data) || res.statusText || `HTTP ${res.status}`,
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
+  }
+}
+
+export async function restartOpencode(serverUrl: string, targetUrl?: string): Promise<RestartOpencodeResult> {
+  try {
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/opencode/restart`, targetUrl), {
+      method: "POST",
+    }, EXT_API_TIMEOUT_MS, "extended restartOpencode")
+    const data = await res.json().catch(() => null)
+    const ok = res.ok && !!data && typeof data === "object" && (data as { ok?: boolean }).ok === true
+    return ok
+      ? { ok: true, status: res.status, message: typeof (data as { message?: unknown }).message === "string" ? (data as { message: string }).message : undefined }
+      : {
+          ok: false,
+          status: res.status,
+          error: readErrorMessage(data) || res.statusText || `HTTP ${res.status}`,
+        }
+  } catch (e) {
+    console.error("[extended-api] restartOpencode failed:", e)
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 export type ReplayProviderOAuthCallbackResult = {
   ok: boolean
   status?: number

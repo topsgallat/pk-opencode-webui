@@ -12,6 +12,9 @@ test("derives local source paths from SKILL.md locations", () => {
   )
   expect(skillSourcePathFromLocation("/home/user/.config/opencode/skills/test-helper/"))
     .toBe("/home/user/.config/opencode/skills/test-helper")
+  expect(skillSourcePathFromLocation("file:///home/user/.config/opencode/skills/test-helper/SKILL.md")).toBe(
+    "/home/user/.config/opencode/skills/test-helper",
+  )
 })
 
 test("identifies locally managed skill locations", () => {

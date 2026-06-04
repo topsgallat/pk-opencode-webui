@@ -248,7 +248,7 @@ export function Settings() {
     setRestartLoading(false)
     setRestartChecking(true)
     setRestartState("checking")
-    setRestartInfo("กำลังรอให้ backend ปิดและกลับมาออนไลน์...")
+    setRestartInfo("Waiting for the backend to go down and come back online...")
     setShowRestartConfirm(false)
     void waitForRestartHealth()
   }

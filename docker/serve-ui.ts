@@ -21,7 +21,7 @@
 // avoid spurious diagnostics while keeping runtime behavior unchanged.
 
 
-import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
+import { handleExtendedEndpoint, handleSkillEndpoint, isApiPath } from "../shared/extended-api"
 import { loadCopilotModelMultipliers } from "../shared/copilot-model-multipliers"
 import { loadAnthropicPricing } from "../shared/anthropic-pricing"
 import { loadOpenAIPricing } from "../shared/openai-pricing"
@@ -456,6 +456,11 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       },
     })
     if (extResponse) return extResponse
+
+    const skillResponse = await handleSkillEndpoint(path, req.method, url, {
+      fetchUpstreamSkills: () => fetch(buildUpstreamUrl(path, url, req).toString()),
+    })
+    if (skillResponse) return skillResponse
 
     // Check if this is an API request (after stripping prefix)
     if (isApiPath(path)) {

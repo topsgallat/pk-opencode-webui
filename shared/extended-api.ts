@@ -11,9 +11,64 @@ import * as nodePath from "node:path"
 import * as os from "node:os"
 import { clearProxyAuthSession, syncProxyAuthSession } from "./proxy-auth-session"
 import { clearProviderAuthSession, getProviderIDCandidates, resolveProviderAuthAccountId, resolveProviderAuthHeader, syncProviderAuthSession } from "./provider-auth-session"
+import { readLocalSkills } from "./skill-discovery"
+import { skillSourcePathFromLocation } from "../app-prefixable/src/utils/skill-discovery"
+
+const OPENCODE_RESTART_COMMAND = ["/package/admin/s6/command/s6-svc", "-r", "/run/service/opencode/"]
 
 type ExtendedEndpointOptions = {
   resolveUpstreamAuthHeader?: (target: string) => string | undefined
+  getUpstreamBaseUrl?: () => string | undefined
+}
+
+type SkillEndpointOptions = {
+  fetchUpstreamSkills: () => Promise<Response>
+}
+
+function isLocalSkillLocation(location: string): boolean {
+  const value = location.trim()
+  if (!value || value === "<built-in>") return false
+  if (value.startsWith("http://") || value.startsWith("https://")) return false
+  if (value.startsWith("file://")) return true
+  return true
+}
+
+function uniqueSkillList(items: { location: string; name: string; description: string }[]): { location: string; name: string; description: string }[] {
+  const seen = new Set<string>()
+  const next: { location: string; name: string; description: string }[] = []
+
+  for (const item of items) {
+    const key = item.location.trim() || `${item.name}:${item.description}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    next.push(item)
+  }
+
+  return next
+}
+
+export async function handleSkillEndpoint(
+  path: string,
+  method: string,
+  url: URL,
+  options: SkillEndpointOptions,
+): Promise<Response | undefined> {
+  if (path !== "/skill" || method !== "GET") return undefined
+
+  const upstream = await options.fetchUpstreamSkills().catch(() => null)
+  const upstreamSkills = upstream?.ok ? await upstream.json().catch(() => []) : []
+  const localSkills = await readLocalSkills(url.searchParams.get("directory") || undefined)
+
+  const remoteSkills = Array.isArray(upstreamSkills)
+    ? upstreamSkills.filter((skill): skill is { name: string; description: string; location: string; content: string } => {
+      if (!skill || typeof skill !== "object") return false
+      const item = skill as Record<string, unknown>
+      const location = typeof item.location === "string" ? item.location : ""
+      return !isLocalSkillLocation(location)
+    })
+    : []
+
+  return Response.json(uniqueSkillList([...remoteSkills, ...localSkills]))
 }
 
 function getAuthFileCandidates(): string[] {
@@ -378,6 +433,64 @@ function isValidServerName(name: string): boolean {
   return /^[a-zA-Z0-9][a-zA-Z0-9_\-\.]*$/.test(name)
 }
 
+function restartOpencodeService(): Response {
+  try {
+    setTimeout(() => {
+      try {
+        const proc = Bun.spawn(OPENCODE_RESTART_COMMAND, {
+          stdout: "ignore",
+          stderr: "ignore",
+          env: process.env,
+        })
+        proc.exited.catch(() => {})
+      } catch (e) {
+        console.error("[ExtAPI] restart scheduling failed:", e)
+      }
+    }, 1500)
+
+    return Response.json({ ok: true, message: "Restart scheduled" }, { status: 202 })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    return Response.json(
+      {
+        ok: false,
+        error: message.includes("ENOENT")
+          ? "restart command is unavailable in this runtime"
+          : message,
+      },
+      { status: 501 },
+    )
+  }
+}
+
+async function readOpencodeHealth(options?: ExtendedEndpointOptions): Promise<Response> {
+  const baseUrl = options?.getUpstreamBaseUrl?.()?.trim() || process.env.API_URL || "http://127.0.0.1:4096"
+  const target = new URL("/global/health", baseUrl)
+  const headers = new Headers()
+  const auth = options?.resolveUpstreamAuthHeader?.(baseUrl)
+  if (auth) headers.set("Authorization", auth)
+
+  try {
+    const res = await fetch(target, {
+      signal: AbortSignal.timeout(8000),
+      headers,
+    })
+    const data = await res.json().catch(() => null)
+    return Response.json(
+      {
+        ok: res.ok && !!data && typeof data === "object" && (data as { healthy?: boolean }).healthy === true,
+        healthy: !!data && typeof data === "object" && (data as { healthy?: boolean }).healthy === true,
+        status: res.status,
+        error: res.ok ? undefined : readResponseErrorBody(data) || res.statusText || `HTTP ${res.status}`,
+      },
+      { status: res.ok ? 200 : res.status },
+    )
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    return Response.json({ ok: false, healthy: false, error: message }, { status: message.includes("timed out") ? 504 : 502 })
+  }
+}
+
 /**
  * Get the allowed root directory for filesystem operations.
  * Defaults to HOME directory.
@@ -485,6 +598,24 @@ export async function handleExtendedEndpoint(
       return Response.json({ error: "providerID parameter is required" }, { status: 400 })
     }
     return deleteGlobalProviderFromFile(providerID)
+  }
+
+  // POST /api/ext/opencode/restart - Restart the local s6-managed OpenCode service
+  if (path === "/api/ext/opencode/restart" && method === "POST") {
+    if (url.searchParams.has("target")) {
+      return Response.json({ ok: false, error: "restart is local-only" }, { status: 400 })
+    }
+
+    return restartOpencodeService()
+  }
+
+  // GET /api/ext/opencode/health - Probe the real OpenCode backend health
+  if (path === "/api/ext/opencode/health" && method === "GET") {
+    if (url.searchParams.has("target")) {
+      return Response.json({ ok: false, error: "health is local-only" }, { status: 400 })
+    }
+
+    return readOpencodeHealth(options)
   }
 
   // POST /api/ext/provider-validate - Validate an OpenAI-compatible custom provider without saving it

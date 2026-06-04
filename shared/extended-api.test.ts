@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test"
 import * as fs from "node:fs/promises"
 import * as os from "node:os"
 import * as nodePath from "node:path"
-import { handleExtendedEndpoint } from "./extended-api"
+import { handleExtendedEndpoint, handleSkillEndpoint } from "./extended-api"
 import { __resetProviderAuthSessionsForTests, resolveProviderAuthAccountId, resolveProviderAuthHeader } from "./provider-auth-session"
 
 const env = {
@@ -16,6 +16,35 @@ afterEach(() => {
   process.env.XDG_DATA_HOME = env.XDG_DATA_HOME
   process.env.OPENCODE_WORKSPACE_ROOT = env.OPENCODE_WORKSPACE_ROOT
   __resetProviderAuthSessionsForTests()
+})
+
+test("discovers local skills alongside upstream skills", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-skills-"))
+  process.env.HOME = root
+
+  const config = nodePath.join(root, ".config", "opencode", "skills", "local-skill")
+  await fs.mkdir(config, { recursive: true })
+  await fs.writeFile(
+    nodePath.join(config, "SKILL.md"),
+    `---\ndescription: Local skill description\n---\n# Local Skill\n`,
+    "utf-8",
+  )
+
+  const req = new Request("http://localhost/skill?directory=/project")
+  const res = await handleSkillEndpoint("/skill", "GET", new URL(req.url), {
+    fetchUpstreamSkills: async () => new Response(JSON.stringify([
+      { name: "builtin", description: "Built-in", location: "<built-in>", content: "" },
+    ]), { headers: { "Content-Type": "application/json" } }),
+  })
+
+  expect(res).toBeDefined()
+  expect(res!.status).toBe(200)
+
+  const skills = await res!.json() as Array<{ name: string; description: string; location: string; content: string }>
+  expect(skills.map((skill) => skill.name)).toContain("builtin")
+  const local = skills.find((skill) => skill.name === "local-skill")
+  expect(local?.description).toBe("Local skill description")
+  expect(local?.location).toBe(nodePath.join(config, "SKILL.md"))
 })
 
 test("validates provider connection without saving", async () => {
@@ -201,6 +230,104 @@ test("accepts replay providerID from query for compatibility", async () => {
   } finally {
     globalThis.fetch = originalFetch
   }
+})
+
+test("rejects remote targets for opencode restart", async () => {
+  const req = new Request("http://localhost/api/ext/opencode/restart?target=http://127.0.0.1:4096", {
+    method: "POST",
+  })
+
+  const res = await handleExtendedEndpoint("/api/ext/opencode/restart", "POST", new URL(req.url), req)
+  expect(res).toBeDefined()
+  expect(res!.status).toBe(400)
+  const data = await res!.json()
+  expect(data.ok).toBe(false)
+  expect(data.error).toBe("restart is local-only")
+})
+
+test("restarts the local opencode service", async () => {
+  const originalSpawn = Bun.spawn
+  let called = false
+  Bun.spawn = ((command: string[], options?: Parameters<typeof Bun.spawn>[1]) => {
+    called = true
+    expect(command).toEqual(["/package/admin/s6/command/s6-svc", "-r", "/run/service/opencode/"])
+    expect(options?.stdout).toBe("ignore")
+    expect(options?.stderr).toBe("ignore")
+    return {
+      stdout: new ReadableStream({ start(controller) { controller.close() } }),
+      stderr: new ReadableStream({ start(controller) { controller.close() } }),
+      exited: Promise.resolve(0),
+    } as unknown as ReturnType<typeof Bun.spawn>
+  }) as typeof Bun.spawn
+
+  try {
+    const req = new Request("http://localhost/api/ext/opencode/restart", {
+      method: "POST",
+    })
+
+    const res = await handleExtendedEndpoint("/api/ext/opencode/restart", "POST", new URL(req.url), req)
+    expect(res).toBeDefined()
+    expect(res!.status).toBe(202)
+    const data = await res!.json()
+    expect(data.ok).toBe(true)
+    expect(data.message).toBe("Restart scheduled")
+    await new Promise((resolve) => setTimeout(resolve, 1600))
+    expect(called).toBe(true)
+  } finally {
+    Bun.spawn = originalSpawn
+  }
+})
+
+test("still returns accepted when restart spawn later fails", async () => {
+  const originalSpawn = Bun.spawn
+  Bun.spawn = (() => {
+    throw new Error("ENOENT: command not found")
+  }) as typeof Bun.spawn
+
+  try {
+    const req = new Request("http://localhost/api/ext/opencode/restart", {
+      method: "POST",
+    })
+
+    const res = await handleExtendedEndpoint("/api/ext/opencode/restart", "POST", new URL(req.url), req)
+    expect(res).toBeDefined()
+    expect(res!.status).toBe(202)
+    const data = await res!.json()
+    expect(data.ok).toBe(true)
+    expect(data.message).toBe("Restart scheduled")
+  } finally {
+    Bun.spawn = originalSpawn
+  }
+})
+
+test("probes local opencode health", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => new Response(JSON.stringify({ healthy: true, version: "1.2.3" }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  })) as unknown as typeof fetch
+
+  try {
+    const req = new Request("http://localhost/api/ext/opencode/health")
+    const res = await handleExtendedEndpoint("/api/ext/opencode/health", "GET", new URL(req.url), req)
+    expect(res).toBeDefined()
+    expect(res!.status).toBe(200)
+    const data = await res!.json()
+    expect(data.ok).toBe(true)
+    expect(data.healthy).toBe(true)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("rejects remote targets for opencode health", async () => {
+  const req = new Request("http://localhost/api/ext/opencode/health?target=http://127.0.0.1:4096")
+  const res = await handleExtendedEndpoint("/api/ext/opencode/health", "GET", new URL(req.url), req)
+  expect(res).toBeDefined()
+  expect(res!.status).toBe(400)
+  const data = await res!.json()
+  expect(data.ok).toBe(false)
+  expect(data.error).toBe("health is local-only")
 })
 
 test("retries replay through host.docker.internal after loopback connection failure", async () => {

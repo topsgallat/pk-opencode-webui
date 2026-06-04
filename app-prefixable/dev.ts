@@ -1,5 +1,5 @@
 import { watch } from "fs"
-import { handleExtendedEndpoint, isApiPath } from "../shared/extended-api"
+import { handleExtendedEndpoint, handleSkillEndpoint, isApiPath } from "../shared/extended-api"
 import { loadCopilotModelMultipliers } from "../shared/copilot-model-multipliers"
 import { loadAnthropicPricing } from "../shared/anthropic-pricing"
 import { loadOpenAIPricing } from "../shared/openai-pricing"
@@ -102,6 +102,11 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       resolveUpstreamAuthHeader: (target) => resolveProxyAuthHeader(req, target),
     })
     if (extResponse) return extResponse
+
+    const skillResponse = await handleSkillEndpoint(strippedPath, req.method, url, {
+      fetchUpstreamSkills: () => fetch(buildUpstreamUrl(strippedPath, url, req).toString()),
+    })
+    if (skillResponse) return skillResponse
 
     // API requests go directly to the backend
     if (isApiPath(strippedPath)) {

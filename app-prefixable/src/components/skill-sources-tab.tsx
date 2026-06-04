@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, Show, onCleanup, onMount } from "solid-js"
+import { createMemo, createSignal, For, Show, onCleanup, onMount } from "solid-js"
 import { Check, Folder, Link2, RefreshCw } from "lucide-solid"
 import { Button } from "./ui/button"
 import { useSDK } from "../context/sdk"
@@ -115,16 +115,6 @@ export function SkillSourcesTab() {
     }
     window.addEventListener("storage", handleStorage)
     onCleanup(() => window.removeEventListener("storage", handleStorage))
-  })
-
-  createEffect(() => {
-    const activeGlobal = new Set(active().global.map((skill) => skillSourceKey({ kind: "path", value: skillSourcePathFromLocation(skill.location) ?? skill.location })))
-    const activeProject = new Set(active().project.map((skill) => skillSourceKey({ kind: "path", value: skillSourcePathFromLocation(skill.location) ?? skill.location })))
-
-    const nextGlobal = disabled().global.filter((item) => !activeGlobal.has(skillSourceKey(item)))
-    const nextProject = disabled().project.filter((item) => !activeProject.has(skillSourceKey(item)))
-    if (nextGlobal.length !== disabled().global.length) writeDisabled("global", nextGlobal)
-    if (nextProject.length !== disabled().project.length) writeDisabled("project", nextProject)
   })
 
   function views(scope: Scope): SkillView[] {

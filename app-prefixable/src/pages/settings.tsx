@@ -2771,13 +2771,16 @@ Add your project-specific instructions here.
                   <div class="flex items-center gap-2">
                     <Show when={restartState() !== "idle"}>
                       <span
-                        class="text-xs px-2 py-1 rounded-full"
+                        class="text-xs px-2 py-1 rounded-full inline-flex items-center gap-1 font-medium"
                         style={{
-                          background: restartState() === "error" ? "var(--surface-inset)" : "var(--background-base)",
-                          color: restartState() === "error" ? "var(--interactive-critical)" : "var(--text-weak)",
-                          border: "1px solid var(--border-base)",
+                          background: restartState() === "ready" ? "var(--icon-success-base)" : restartState() === "error" ? "var(--surface-inset)" : "var(--background-base)",
+                          color: restartState() === "ready" ? "white" : restartState() === "error" ? "var(--interactive-critical)" : "var(--text-weak)",
+                          border: restartState() === "ready" ? "1px solid var(--icon-success-base)" : "1px solid var(--border-base)",
                         }}
                       >
+                        <Show when={restartState() === "ready"}>
+                          <Check class="w-3 h-3" />
+                        </Show>
                         {restartState() === "restarting"
                           ? "Restarting"
                           : restartState() === "checking"
@@ -2788,7 +2791,7 @@ Add your project-specific instructions here.
                       </span>
                     </Show>
                     <Button
-                      variant="primary"
+                      variant="danger"
                       size="sm"
                       onClick={() => setShowRestartConfirm(true)}
                       disabled={restartLoading() || restartChecking()}

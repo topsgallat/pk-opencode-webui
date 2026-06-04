@@ -213,6 +213,48 @@ export function SkillSourcesTab() {
     await refresh()
   }
 
+  async function disableAll(scope: Scope) {
+    const list = views(scope).filter((skill) => skill.sourcePath && !skill.disabled)
+    if (list.length === 0 || savingKey()) return
+
+    setSavingKey(`${scope}:disable-all`)
+    setSaveError(null)
+
+    const next = [...disabled()[scope]]
+    for (const skill of list) {
+      const source = { kind: "path" as const, value: skill.sourcePath! }
+      const hiddenPath = buildDisabledSkillPath(source.value)
+      const hiddenDir = hiddenPath.replace(/[\\/][^\\/]+$/, "")
+      const made = await mkdir(serverUrl, hiddenDir, targetUrl)
+      if (!made) {
+        setSaveError(`Could not create hidden folder for ${source.value}`)
+        setSavingKey(null)
+        return
+      }
+
+      const moved = await moveItem(serverUrl, source.value, hiddenPath, targetUrl)
+      if (!moved) {
+        setSaveError(`Could not move ${source.value}`)
+        setSavingKey(null)
+        return
+      }
+
+      next.push({ ...source, hiddenPath })
+    }
+
+    writeDisabled(scope, next)
+    setActive((currentActive) => ({
+      ...currentActive,
+      [scope]: currentActive[scope].filter((skill) => {
+        const source = skillSourcePathFromLocation(skill.location)
+        return !source || !list.some((item) => item.sourcePath === source)
+      }),
+    }))
+    showSaved()
+    setSavingKey(null)
+    await refresh()
+  }
+
   async function restoreAll(scope: Scope) {
     const list = disabled()[scope]
     if (list.length === 0 || savingKey()) return
@@ -283,6 +325,7 @@ export function SkillSourcesTab() {
   function section(scope: Scope, title: string, description: string) {
     const list = views(scope)
     const disabledCount = disabled()[scope].length
+    const disableCount = list.filter((skill) => skill.sourcePath && !skill.disabled).length
 
     return (
       <section class="rounded-lg overflow-hidden" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}>
@@ -292,6 +335,11 @@ export function SkillSourcesTab() {
             <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>{description}</p>
           </div>
           <div class="flex items-center gap-2 shrink-0">
+            <Show when={disableCount > 0}>
+              <Button variant="secondary" size="sm" onClick={() => disableAll(scope)} disabled={savingKey() !== null}>
+                Disable all
+              </Button>
+            </Show>
             <Show when={disabledCount > 0}>
               <Button variant="secondary" size="sm" onClick={() => restoreAll(scope)} disabled={savingKey() !== null}>
                 Restore all

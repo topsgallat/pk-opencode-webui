@@ -5,6 +5,7 @@ import { useSDK } from "../context/sdk"
 import { useServer } from "../context/server"
 import { getServerKey } from "../utils/servers"
 import { mkdir, moveItem } from "../utils/extended-api"
+import { appendTargetParam } from "../utils/path"
 import {
   buildDisabledSkillPath,
   disabledSkillStorageKey,
@@ -33,6 +34,12 @@ type SkillView = Skill & {
   hiddenPath?: string
 }
 
+function baseName(value: string): string {
+  const clean = value.replace(/[\\/]+$/, "")
+  const parts = clean.split(/[\\/]/)
+  return parts[parts.length - 1] || clean
+}
+
 function sourceLabel(source: SkillView): string {
   if (source.sourcePath) return "Local folder source"
   return source.location.startsWith("http") ? "Remote URL source" : "Built-in or generated source"
@@ -43,9 +50,9 @@ function sourceIcon(source: SkillView) {
 }
 
 export function SkillSourcesTab() {
-  const { client, global, directory } = useSDK()
+  const { global, directory, url: serverUrl, targetUrl } = useSDK()
   const server = useServer()
-  const serverKey = createMemo(() => getServerKey(server.selectedServer() ?? { id: "builtin", name: "Local", url: client.url, isDefault: true }))
+  const serverKey = createMemo(() => getServerKey(server.selectedServer() ?? { url: serverUrl }))
   const [loading, setLoading] = createSignal(true)
   const [saveError, setSaveError] = createSignal<string | null>(null)
   const [saved, setSaved] = createSignal(false)
@@ -80,14 +87,17 @@ export function SkillSourcesTab() {
     setLoading(true)
     setSaveError(null)
     try {
+      const stamp = Date.now().toString(36)
       const [globalRes, projectRes] = await Promise.all([
-        global.app.skills().catch(() => null),
-        directory ? client.app.skills({ directory }).catch(() => null) : Promise.resolve(null),
+        fetch(appendTargetParam(`${serverUrl}/skill?_=${stamp}`, targetUrl), { cache: "no-store" }).then((res) => res.ok ? res.json() : []).catch(() => []),
+        directory
+          ? fetch(appendTargetParam(`${serverUrl}/skill?directory=${encodeURIComponent(directory)}&_= ${stamp}`.replace("&_= ", "&_="), targetUrl), { cache: "no-store" }).then((res) => res.ok ? res.json() : []).catch(() => [])
+          : Promise.resolve([]),
       ])
 
       setActive({
-        global: (globalRes?.data ?? []) as Skill[],
-        project: (projectRes?.data ?? []) as Skill[],
+        global: globalRes as Skill[],
+        project: projectRes as Skill[],
       })
       loadDisabled()
     } catch (e) {
@@ -122,14 +132,28 @@ export function SkillSourcesTab() {
     const disabledList = disabled()[scope]
     const disabledKeys = new Set(disabledList.map((item) => skillSourceKey(item)))
 
-    return list
-      .map((skill) => {
+    const activeViews = list.map((skill) => {
         const sourcePath = skillSourcePathFromLocation(skill.location)
         const key = sourcePath ? skillSourceKey({ kind: "path", value: sourcePath }) : skillSourceKey({ kind: "url", value: skill.location })
         const hiddenPath = disabledList.find((item) => skillSourceKey(item) === key)?.hiddenPath
         return { ...skill, scope, sourcePath, disabled: disabledKeys.has(key), hiddenPath }
       })
-      .filter((skill) => !skill.disabled || !!skill.sourcePath)
+
+    const activeKeys = new Set(activeViews.map((item) => skillSourceKey({ kind: "path", value: item.sourcePath ?? item.location })))
+    const disabledViews = disabledList
+      .filter((item) => !activeKeys.has(skillSourceKey(item)))
+      .map((item) => ({
+        name: baseName(item.value),
+        description: "",
+        location: item.hiddenPath || item.value,
+        content: "",
+        scope,
+        sourcePath: item.value,
+        disabled: true,
+        hiddenPath: item.hiddenPath,
+      }))
+
+    return [...activeViews, ...disabledViews].sort((a, b) => a.name.localeCompare(b.name))
   }
 
   async function updateLocalSource(scope: Scope, source: SkillSource, restore: boolean) {
@@ -147,7 +171,7 @@ export function SkillSourcesTab() {
         return
       }
       const hiddenPath = existing.hiddenPath || buildDisabledSkillPath(source.value)
-      const ok = await moveItem(client.url, hiddenPath, source.value, client.targetUrl)
+      const ok = await moveItem(serverUrl, hiddenPath, source.value, targetUrl)
       if (!ok) {
         setSaveError(`Could not restore ${source.value}`)
         setSavingKey(null)
@@ -162,14 +186,14 @@ export function SkillSourcesTab() {
 
     const hiddenPath = buildDisabledSkillPath(source.value)
     const hiddenDir = hiddenPath.replace(/[\\/][^\\/]+$/, "")
-    const made = await mkdir(client.url, hiddenDir, client.targetUrl)
+    const made = await mkdir(serverUrl, hiddenDir, targetUrl)
     if (!made) {
       setSaveError(`Could not create hidden folder for ${source.value}`)
       setSavingKey(null)
       return
     }
 
-    const moved = await moveItem(client.url, source.value, hiddenPath, client.targetUrl)
+    const moved = await moveItem(serverUrl, source.value, hiddenPath, targetUrl)
     if (!moved) {
       setSaveError(`Could not move ${source.value}`)
       setSavingKey(null)
@@ -177,6 +201,13 @@ export function SkillSourcesTab() {
     }
 
     writeDisabled(scope, [...current, { ...source, hiddenPath }])
+    setActive((currentActive) => ({
+      ...currentActive,
+      [scope]: currentActive[scope].filter((item) => {
+        const path = skillSourcePathFromLocation(item.location) ?? item.location
+        return path !== source.value
+      }),
+    }))
     showSaved()
     setSavingKey(null)
     await refresh()
@@ -191,7 +222,7 @@ export function SkillSourcesTab() {
     for (const item of list) {
       if (!isLocallyManagedSkill(item.value)) continue
       const hiddenPath = item.hiddenPath || buildDisabledSkillPath(item.value)
-      const ok = await moveItem(client.url, hiddenPath, item.value, client.targetUrl)
+      const ok = await moveItem(serverUrl, hiddenPath, item.value, targetUrl)
       if (!ok) {
         setSaveError(`Could not restore ${item.value}`)
         setSavingKey(null)
@@ -228,7 +259,8 @@ export function SkillSourcesTab() {
         <div class="flex items-center gap-2 shrink-0">
           <Show when={!canToggle} fallback={
             <button
-              onClick={() => updateLocalSource(scope, source, !skill.disabled)}
+              type="button"
+              onClick={() => updateLocalSource(scope, source, skill.disabled)}
               disabled={working}
               role="switch"
               aria-checked={!skill.disabled}

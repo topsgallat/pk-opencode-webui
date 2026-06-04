@@ -17,7 +17,7 @@ import { useTheme } from "../context/theme"
 import { useDevice } from "../context/device"
 import { useServer } from "../context/server"
 import { writeFile } from "../utils/extended-api"
-import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCallback } from "../utils/extended-api"
+import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCallback, restartOpencode, checkOpencodeHealth } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
 import { extractOAuthCode, extractOAuthInstructionCode, needsOAuthReplay, normalizeOAuthCallbackUrl } from "../utils/oauth"
 import { getServerCapabilities } from "../utils/server-capabilities"
@@ -104,6 +104,13 @@ export function Settings() {
   const [serverError, setServerError] = createSignal<string | null>(null)
   const [serverWarn, setServerWarn] = createSignal<string | null>(null)
   const [serverChecking, setServerChecking] = createSignal(false)
+  const [showRestartConfirm, setShowRestartConfirm] = createSignal(false)
+  const [restartLoading, setRestartLoading] = createSignal(false)
+  const [restartChecking, setRestartChecking] = createSignal(false)
+  const [restartState, setRestartState] = createSignal<"idle" | "restarting" | "checking" | "ready" | "error">("idle")
+  const [restartInfo, setRestartInfo] = createSignal<string | null>(null)
+  const [restartError, setRestartError] = createSignal<string | null>(null)
+  const [restartSuccess, setRestartSuccess] = createSignal<string | null>(null)
 
   // Keep servers in sync with localStorage
   onMount(() => {
@@ -217,6 +224,62 @@ export function Settings() {
     if (!server) return
     saveServer({ ...server, isDefault: true })
     refreshServers()
+  }
+
+  async function confirmRestartOpencode() {
+    if (restartLoading() || restartChecking()) return
+    setRestartLoading(true)
+    setRestartChecking(false)
+    setRestartState("restarting")
+    setRestartError(null)
+    setRestartSuccess(null)
+    setRestartInfo("Restarting...")
+
+    const result = await restartOpencode(url)
+
+    if (!result.ok) {
+      setRestartLoading(false)
+      setRestartState("error")
+      setRestartInfo(null)
+      setRestartError(result.error || `Failed to restart OpenCode${result.status ? ` (HTTP ${result.status})` : ""}`)
+      return
+    }
+
+    setRestartLoading(false)
+    setRestartChecking(true)
+    setRestartState("checking")
+    setRestartInfo("กำลังรอให้ backend ปิดและกลับมาออนไลน์...")
+    setShowRestartConfirm(false)
+    void waitForRestartHealth()
+  }
+
+  async function waitForRestartHealth() {
+    const deadline = Date.now() + 60_000
+    let seenDown = false
+    while (Date.now() < deadline) {
+      const health = await checkOpencodeHealth(url)
+      if (!health.ok || health.healthy !== true) {
+        seenDown = true
+      setRestartInfo("Waiting for the backend to come back...")
+      }
+
+      if (seenDown && health.ok && health.healthy) {
+        setRestartChecking(false)
+        setRestartState("ready")
+        setRestartInfo(null)
+        setRestartSuccess("Restart complete")
+        window.setTimeout(() => {
+          setRestartSuccess((current) => current === "Restart complete" ? null : current)
+        }, 6000)
+        return
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 1000))
+    }
+
+    setRestartChecking(false)
+    setRestartState("error")
+    setRestartInfo(null)
+    setRestartError(seenDown ? "Restart began, but the backend did not become healthy in time." : "Restart was accepted, but the backend never appeared to restart.")
   }
 
   // Provider search
@@ -701,23 +764,23 @@ Add your project-specific instructions here.
         // This call blocks until authorization succeeds or fails
         if (import.meta.env.DEV) console.debug("[OAuth] Starting auto callback for", providerID, "with code:", code)
         setConnecting(true)
-        const result = await providers.completeOAuth(providerID, methodIndex)
-        if (import.meta.env.DEV) console.debug("[OAuth] Callback result:", result)
+        const oauthComplete = await providers.completeOAuth(providerID, methodIndex)
+        if (import.meta.env.DEV) console.debug("[OAuth] Callback result:", oauthComplete)
         setConnecting(false)
 
-        if (result.ok) {
+        if (oauthComplete.ok) {
           setSuccess(`Connected to ${providerName}!`)
           setOauthPending(null)
           setSelectedProvider(null)
           setProviderSearch("")
         } else {
-          const where = result.stage === "callback"
+          const where = oauthComplete.stage === "callback"
             ? "while completing the provider callback"
-            : result.stage === "sync"
+            : oauthComplete.stage === "sync"
               ? "while syncing the provider auth back into the UI"
               : "while refreshing provider state"
-          const details = result.status ? ` (HTTP ${result.status})` : ""
-          setError(`${where}: ${result.error}${details}`)
+          const details = oauthComplete.status ? ` (HTTP ${oauthComplete.status})` : ""
+          setError(`${where}: ${oauthComplete.error}${details}`)
           setOauthPending(null)
         }
       }
@@ -764,24 +827,24 @@ Add your project-specific instructions here.
       return
     }
 
-    const result = await providers.completeOAuth(pending.providerID, pending.methodIndex, code || undefined)
+    const oauthComplete = await providers.completeOAuth(pending.providerID, pending.methodIndex, code || undefined)
 
     setConnecting(false)
 
-    if (result.ok) {
+    if (oauthComplete.ok) {
       setSuccess(`Connected to ${pending.providerName}!`)
       setOauthPending(null)
       setOauthCode("")
       setSelectedProvider(null)
       setProviderSearch("")
     } else {
-      const where = result.stage === "callback"
+      const where = oauthComplete.stage === "callback"
         ? "while completing the provider callback"
-        : result.stage === "sync"
+        : oauthComplete.stage === "sync"
           ? "while syncing the provider auth back into the UI"
           : "while refreshing provider state"
-      const details = result.status ? ` (HTTP ${result.status})` : ""
-      setError(`${where}: ${result.error}${details}`)
+      const details = oauthComplete.status ? ` (HTTP ${oauthComplete.status})` : ""
+      setError(`${where}: ${oauthComplete.error}${details}`)
     }
   }
 
@@ -796,7 +859,7 @@ Add your project-specific instructions here.
     const pending = oauthPending()
     if (!pending?.code) return
     try {
-      if (await copyToClipboard(pending.code)) {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText && await navigator.clipboard.writeText(pending.code).then(() => true).catch(() => false)) {
         setCodeCopied(true)
       }
       setTimeout(() => setCodeCopied(false), 2000)
@@ -2692,6 +2755,68 @@ Add your project-specific instructions here.
               <section
                 class="rounded-lg p-4"
                 style={{
+                  background: "var(--background-base)",
+                  border: "1px solid var(--border-base)",
+                }}
+              >
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                      Local Service
+                    </h3>
+                    <p class="text-xs mt-1" style={{ color: "var(--text-weak)" }}>
+                      Restart the local s6-managed opencode service behind this UI. Remote backends are not affected.
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <Show when={restartState() !== "idle"}>
+                      <span
+                        class="text-xs px-2 py-1 rounded-full"
+                        style={{
+                          background: restartState() === "error" ? "var(--surface-inset)" : "var(--background-base)",
+                          color: restartState() === "error" ? "var(--interactive-critical)" : "var(--text-weak)",
+                          border: "1px solid var(--border-base)",
+                        }}
+                      >
+                        {restartState() === "restarting"
+                          ? "Restarting"
+                          : restartState() === "checking"
+                            ? "Checking"
+                            : restartState() === "ready"
+                              ? "Ready"
+                              : "Error"}
+                      </span>
+                    </Show>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setShowRestartConfirm(true)}
+                      disabled={restartLoading() || restartChecking()}
+                    >
+                      {restartLoading() ? "Restarting..." : restartChecking() ? "Checking..." : "Restart opencode"}
+                    </Button>
+                  </div>
+                </div>
+                <Show when={restartInfo()}>
+                  <p class="text-xs mt-3" style={{ color: "var(--text-weak)" }}>
+                    {restartInfo()}
+                  </p>
+                </Show>
+                <Show when={restartError()}>
+                  <p class="text-xs mt-3" style={{ color: "var(--text-critical-base)" }}>
+                    {restartError()}
+                  </p>
+                </Show>
+                <Show when={restartSuccess()}>
+                  <p class="text-xs mt-3" style={{ color: "var(--text-success-base)" }}>
+                    {restartSuccess()}
+                  </p>
+                </Show>
+              </section>
+
+              <section
+                class="rounded-lg p-4"
+                style={{
                   background: "var(--surface-inset)",
                   border: "1px solid var(--border-base)",
                 }}
@@ -2752,6 +2877,24 @@ Add your project-specific instructions here.
         variant="danger"
         onConfirm={confirmPromptDelete}
         onCancel={() => setPromptToDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={showRestartConfirm()}
+        title="Restart OpenCode"
+        message="This will restart the local opencode service and briefly disconnect active sessions and requests."
+        confirmLabel={restartLoading() ? "Restarting..." : "Restart"}
+        cancelLabel="Cancel"
+        confirmDisabled={restartLoading() || restartChecking()}
+        cancelDisabled={restartLoading() || restartChecking()}
+        error={restartError()}
+        onConfirm={confirmRestartOpencode}
+        onCancel={() => {
+          if (!restartLoading() && !restartChecking()) {
+            setShowRestartConfirm(false)
+            setRestartError(null)
+          }
+        }}
       />
 
       {/* Server Add/Edit Dialog */}

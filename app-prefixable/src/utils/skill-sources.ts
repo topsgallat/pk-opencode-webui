@@ -124,8 +124,48 @@ export function buildDisabledSkillPath(sourcePath: string): string {
   return joinPath(hidden, `${baseName(sourcePath)}-${hash(sourcePath)}`)
 }
 
+export function disabledSkillStoragePrefix(serverKey: string, scope: "global" | "project"): string {
+  return `prokube.disabled-skill-sources:${serverKey}:${scope}:`
+}
+
 export function disabledSkillStorageKey(serverKey: string, scope: "global" | "project", directory?: string): string {
-  return `prokube.disabled-skill-sources:${serverKey}:${scope}:${directory || "global"}`
+  return `${disabledSkillStoragePrefix(serverKey, scope)}${scope === "global" ? "global" : directory || "global"}`
+}
+
+function disabledSkillStorageKeys(serverKey: string, scope: "global" | "project", directory?: string): string[] {
+  if (scope === "project") return [disabledSkillStorageKey(serverKey, scope, directory)]
+
+  const prefix = disabledSkillStoragePrefix(serverKey, scope)
+  const keys: string[] = []
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i)
+    if (key?.startsWith(prefix)) keys.push(key)
+  }
+
+  const shared = disabledSkillStorageKey(serverKey, scope)
+  if (!keys.includes(shared)) keys.push(shared)
+  return keys
+}
+
+function migrateDisabledSkillSources(serverKey: string, scope: "global" | "project", directory?: string): DisabledSkillSource[] {
+  const keys = disabledSkillStorageKeys(serverKey, scope, directory)
+  if (scope === "project") return readDisabledSkillSources(keys[0])
+
+  const shared = disabledSkillStorageKey(serverKey, scope)
+  const merged = uniqueDisabledSkillSources(keys.flatMap((key) => readDisabledSkillSources(key)))
+  writeDisabledSkillSources(shared, merged)
+  for (const key of keys) {
+    if (key !== shared) localStorage.removeItem(key)
+  }
+  return merged
+}
+
+export function readDisabledSkillSourcesForScope(serverKey: string, scope: "global" | "project", directory?: string): DisabledSkillSource[] {
+  return migrateDisabledSkillSources(serverKey, scope, directory)
+}
+
+export function writeDisabledSkillSourcesForScope(serverKey: string, scope: "global" | "project", sources: DisabledSkillSource[], directory?: string): void {
+  writeDisabledSkillSources(disabledSkillStorageKey(serverKey, scope, directory), sources)
 }
 
 export function readDisabledSkillSources(storageKey: string): DisabledSkillSource[] {

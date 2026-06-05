@@ -1,22 +1,10 @@
-import { createMemo, createSignal, For, Show, onCleanup, onMount } from "solid-js"
+import { createSignal, For, Show, onMount } from "solid-js"
 import { Check, Folder, Link2, RefreshCw } from "lucide-solid"
 import { Button } from "./ui/button"
 import { useSDK } from "../context/sdk"
-import { useServer } from "../context/server"
-import { getServerKey } from "../utils/servers"
-import { mkdir, moveItem } from "../utils/extended-api"
+import { deleteFile, mkdir, moveItem, writeFile } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
-import {
-  buildDisabledSkillPath,
-  disabledSkillStorageKey,
-  readDisabledSkillSources,
-  skillSourceKey,
-  type DisabledSkillSource,
-  type SkillSource,
-  uniqueDisabledSkillSources,
-  writeDisabledSkillSources,
-} from "../utils/skill-sources"
-import { isLocallyManagedSkill, skillSourcePathFromLocation } from "../utils/skill-discovery"
+import { buildDisabledSkillPath, readDisabledSkillSources, skillSourceKey, type SkillSource } from "../utils/skill-sources"
 
 type Scope = "global" | "project"
 
@@ -25,57 +13,29 @@ type Skill = {
   description: string
   location: string
   content: string
-}
-
-type SkillView = Skill & {
-  scope: Scope
-  sourcePath: string | null
-  disabled: boolean
+  state?: "active" | "disabled"
+  sourcePath?: string
   hiddenPath?: string
+  originalPath?: string
 }
 
-function baseName(value: string): string {
-  const clean = value.replace(/[\\/]+$/, "")
-  const parts = clean.split(/[\\/]/)
-  return parts[parts.length - 1] || clean
-}
-
-function sourceLabel(source: SkillView): string {
-  if (source.sourcePath) return "Local folder source"
+function sourceLabel(source: Skill): string {
+  if (source.sourcePath) return source.state === "disabled" ? "Disabled local source" : "Local folder source"
   return source.location.startsWith("http") ? "Remote URL source" : "Built-in or generated source"
 }
 
-function sourceIcon(source: SkillView) {
+function sourceIcon(source: Skill) {
   return source.sourcePath ? <Folder class="w-3.5 h-3.5" /> : <Link2 class="w-3.5 h-3.5" />
 }
 
 export function SkillSourcesTab() {
-  const { global, directory, url: serverUrl, targetUrl } = useSDK()
-  const server = useServer()
-  const serverKey = createMemo(() => getServerKey(server.selectedServer() ?? { url: serverUrl }))
+  const { directory, url: serverUrl, targetUrl } = useSDK()
   const [loading, setLoading] = createSignal(true)
   const [saveError, setSaveError] = createSignal<string | null>(null)
   const [saved, setSaved] = createSignal(false)
   const [savingKey, setSavingKey] = createSignal<string | null>(null)
-  const [active, setActive] = createSignal<Record<Scope, Skill[]>>({ global: [], project: [] })
-  const [disabled, setDisabled] = createSignal<Record<Scope, DisabledSkillSource[]>>({ global: [], project: [] })
-
-  function storageKey(scope: Scope) {
-    return disabledSkillStorageKey(serverKey(), scope, directory)
-  }
-
-  function loadDisabled() {
-    setDisabled({
-      global: readDisabledSkillSources(storageKey("global")),
-      project: readDisabledSkillSources(storageKey("project")),
-    })
-  }
-
-  function writeDisabled(scope: Scope, next: DisabledSkillSource[]) {
-    const unique = uniqueDisabledSkillSources(next)
-    setDisabled((current) => ({ ...current, [scope]: unique }))
-    writeDisabledSkillSources(storageKey(scope), unique)
-  }
+  const [legacyMigrated, setLegacyMigrated] = createSignal(false)
+  const [skills, setSkills] = createSignal<Record<Scope, Skill[]>>({ global: [], project: [] })
 
   function showSaved() {
     setSaveError(null)
@@ -83,10 +43,31 @@ export function SkillSourcesTab() {
     window.setTimeout(() => setSaved(false), 1800)
   }
 
+  async function migrateLegacyDisabledSkills() {
+    if (legacyMigrated()) return
+    const prefix = "prokube.disabled-skill-sources:"
+
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (!key?.startsWith(prefix)) continue
+      const scope = key.match(/^prokube\.disabled-skill-sources:.*:(global|project):/)?.[1] as Scope | undefined
+      if (!scope) continue
+
+      for (const item of readDisabledSkillSources(key)) {
+        if (!item.hiddenPath) continue
+        const manifest = JSON.stringify({ version: 1, originalPath: item.value, scope, disabledAt: new Date().toISOString() }, null, 2)
+        await writeFile(serverUrl, `${item.hiddenPath}/.prokube-skill.json`, manifest, targetUrl)
+      }
+    }
+
+    setLegacyMigrated(true)
+  }
+
   async function refresh() {
     setLoading(true)
     setSaveError(null)
     try {
+      await migrateLegacyDisabledSkills()
       const stamp = Date.now().toString(36)
       const [globalRes, projectRes] = await Promise.all([
         fetch(appendTargetParam(`${serverUrl}/skill?_=${stamp}`, targetUrl), { cache: "no-store" }).then((res) => res.ok ? res.json() : []).catch(() => []),
@@ -95,11 +76,10 @@ export function SkillSourcesTab() {
           : Promise.resolve([]),
       ])
 
-      setActive({
-        global: globalRes as Skill[],
-        project: projectRes as Skill[],
+      setSkills({
+        global: (globalRes as Skill[]).filter((item) => item.scope === "global" || !item.scope),
+        project: (projectRes as Skill[]).filter((item) => item.scope === "project"),
       })
-      loadDisabled()
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -109,41 +89,10 @@ export function SkillSourcesTab() {
 
   onMount(() => {
     refresh()
-    const handleStorage = (e: StorageEvent) => {
-      if (!e.key?.startsWith("prokube.disabled-skill-sources:")) return
-      loadDisabled()
-    }
-    window.addEventListener("storage", handleStorage)
-    onCleanup(() => window.removeEventListener("storage", handleStorage))
   })
 
-  function views(scope: Scope): SkillView[] {
-    const list = active()[scope]
-    const disabledList = disabled()[scope]
-    const disabledKeys = new Set(disabledList.map((item) => skillSourceKey(item)))
-
-    const activeViews = list.map((skill) => {
-        const sourcePath = skillSourcePathFromLocation(skill.location)
-        const key = sourcePath ? skillSourceKey({ kind: "path", value: sourcePath }) : skillSourceKey({ kind: "url", value: skill.location })
-        const hiddenPath = disabledList.find((item) => skillSourceKey(item) === key)?.hiddenPath
-        return { ...skill, scope, sourcePath, disabled: disabledKeys.has(key), hiddenPath }
-      })
-
-    const activeKeys = new Set(activeViews.map((item) => skillSourceKey({ kind: "path", value: item.sourcePath ?? item.location })))
-    const disabledViews = disabledList
-      .filter((item) => !activeKeys.has(skillSourceKey(item)))
-      .map((item) => ({
-        name: baseName(item.value),
-        description: "",
-        location: item.hiddenPath || item.value,
-        content: "",
-        scope,
-        sourcePath: item.value,
-        disabled: true,
-        hiddenPath: item.hiddenPath,
-      }))
-
-    return [...activeViews, ...disabledViews].sort((a, b) => a.name.localeCompare(b.name))
+  function views(scope: Scope): Skill[] {
+    return skills()[scope].slice().sort((a, b) => a.name.localeCompare(b.name))
   }
 
   async function updateLocalSource(scope: Scope, source: SkillSource, restore: boolean) {
@@ -152,22 +101,20 @@ export function SkillSourcesTab() {
     setSavingKey(key)
     setSaveError(null)
 
-    const current = disabled()[scope]
-    const existing = current.find((item) => skillSourceKey(item) === skillSourceKey(source))
+    const existing = views(scope).find((item) => item.state === "disabled" && item.sourcePath === source.value)
 
     if (restore) {
-      if (!existing) {
+      if (!existing?.hiddenPath || !existing?.originalPath) {
         setSavingKey(null)
         return
       }
-      const hiddenPath = existing.hiddenPath || buildDisabledSkillPath(source.value)
-      const ok = await moveItem(serverUrl, hiddenPath, source.value, targetUrl)
+      const ok = await moveItem(serverUrl, existing.hiddenPath, existing.originalPath, targetUrl)
       if (!ok) {
         setSaveError(`Could not restore ${source.value}`)
         setSavingKey(null)
         return
       }
-      writeDisabled(scope, current.filter((item) => skillSourceKey(item) !== skillSourceKey(source)))
+      await deleteFile(serverUrl, `${existing.hiddenPath}/.prokube-skill.json`, targetUrl).catch(() => false)
       showSaved()
       setSavingKey(null)
       await refresh()
@@ -190,27 +137,27 @@ export function SkillSourcesTab() {
       return
     }
 
-    writeDisabled(scope, [...current, { ...source, hiddenPath }])
-    setActive((currentActive) => ({
-      ...currentActive,
-      [scope]: currentActive[scope].filter((item) => {
-        const path = skillSourcePathFromLocation(item.location) ?? item.location
-        return path !== source.value
-      }),
-    }))
+    const manifest = JSON.stringify({ version: 1, originalPath: source.value, scope, disabledAt: new Date().toISOString() }, null, 2)
+    const written = await writeFile(serverUrl, `${hiddenPath}/.prokube-skill.json`, manifest, targetUrl)
+    if (!written) {
+      await moveItem(serverUrl, hiddenPath, source.value, targetUrl)
+      setSaveError(`Could not save disabled metadata for ${source.value}`)
+      setSavingKey(null)
+      return
+    }
+
     showSaved()
     setSavingKey(null)
     await refresh()
   }
 
   async function disableAll(scope: Scope) {
-    const list = views(scope).filter((skill) => skill.sourcePath && !skill.disabled)
+    const list = views(scope).filter((skill): skill is Skill & { sourcePath: string; state: "active" } => skill.state === "active" && !!skill.sourcePath)
     if (list.length === 0 || savingKey()) return
 
     setSavingKey(`${scope}:disable-all`)
     setSaveError(null)
 
-    const next = [...disabled()[scope]]
     for (const skill of list) {
       const source = { kind: "path" as const, value: skill.sourcePath! }
       const hiddenPath = buildDisabledSkillPath(source.value)
@@ -229,46 +176,43 @@ export function SkillSourcesTab() {
         return
       }
 
-      next.push({ ...source, hiddenPath })
+      const manifest = JSON.stringify({ version: 1, originalPath: source.value, scope, disabledAt: new Date().toISOString() }, null, 2)
+      const written = await writeFile(serverUrl, `${hiddenPath}/.prokube-skill.json`, manifest, targetUrl)
+      if (!written) {
+        await moveItem(serverUrl, hiddenPath, source.value, targetUrl)
+        setSaveError(`Could not save disabled metadata for ${source.value}`)
+        setSavingKey(null)
+        return
+      }
     }
 
-    writeDisabled(scope, next)
-    setActive((currentActive) => ({
-      ...currentActive,
-      [scope]: currentActive[scope].filter((skill) => {
-        const source = skillSourcePathFromLocation(skill.location)
-        return !source || !list.some((item) => item.sourcePath === source)
-      }),
-    }))
     showSaved()
     setSavingKey(null)
     await refresh()
   }
 
   async function restoreAll(scope: Scope) {
-    const list = disabled()[scope]
+    const list = views(scope).filter((skill): skill is Skill & { state: "disabled"; hiddenPath: string; originalPath: string } => skill.state === "disabled" && !!skill.hiddenPath && !!skill.originalPath)
     if (list.length === 0 || savingKey()) return
     setSavingKey(`${scope}:restore-all`)
     setSaveError(null)
 
     for (const item of list) {
-      if (!isLocallyManagedSkill(item.value)) continue
-      const hiddenPath = item.hiddenPath || buildDisabledSkillPath(item.value)
-      const ok = await moveItem(serverUrl, hiddenPath, item.value, targetUrl)
+      const ok = await moveItem(serverUrl, item.hiddenPath!, item.originalPath!, targetUrl)
       if (!ok) {
-        setSaveError(`Could not restore ${item.value}`)
+        setSaveError(`Could not restore ${item.originalPath}`)
         setSavingKey(null)
         return
       }
+      await deleteFile(serverUrl, `${item.hiddenPath}/.prokube-skill.json`, targetUrl).catch(() => false)
     }
 
-    writeDisabled(scope, [])
     showSaved()
     setSavingKey(null)
     await refresh()
   }
 
-  function row(scope: Scope, skill: SkillView) {
+  function row(scope: Scope, skill: Skill) {
     const source = skill.sourcePath ? { kind: "path" as const, value: skill.sourcePath } : { kind: "url" as const, value: skill.location }
     const working = savingKey() === `${scope}:${skillSourceKey(source)}`
     const canToggle = !!skill.sourcePath
@@ -283,7 +227,7 @@ export function SkillSourcesTab() {
             <div class="text-sm font-medium truncate" style={{ color: "var(--text-strong)" }}>{skill.name}</div>
             <div class="text-xs truncate" style={{ color: "var(--text-weak)" }}>
               {skill.location}
-              {skill.sourcePath ? ` · ${sourceLabel(skill)}` : ` · ${sourceLabel(skill)}`}
+              {` · ${sourceLabel(skill)}`}
             </div>
           </div>
         </div>
@@ -292,15 +236,15 @@ export function SkillSourcesTab() {
           <Show when={!canToggle} fallback={
             <button
               type="button"
-              onClick={() => updateLocalSource(scope, source, skill.disabled)}
+              onClick={() => updateLocalSource(scope, source, skill.state === "disabled")}
               disabled={working}
               role="switch"
-              aria-checked={!skill.disabled}
-              aria-label={skill.disabled ? `Enable ${skill.name}` : `Disable ${skill.name}`}
+              aria-checked={skill.state !== "disabled"}
+              aria-label={skill.state === "disabled" ? `Enable ${skill.name}` : `Disable ${skill.name}`}
               class="relative w-10 h-5 rounded-full transition-colors disabled:opacity-50"
-              style={{ background: skill.disabled ? "var(--surface-inset)" : "var(--interactive-base)" }}
+              style={{ background: skill.state === "disabled" ? "var(--surface-inset)" : "var(--interactive-base)" }}
             >
-              <div class="absolute top-0.5 w-4 h-4 rounded-full transition-all" style={{ background: "var(--background-base)", left: skill.disabled ? "2px" : "calc(100% - 18px)" }} />
+              <div class="absolute top-0.5 w-4 h-4 rounded-full transition-all" style={{ background: "var(--background-base)", left: skill.state === "disabled" ? "2px" : "calc(100% - 18px)" }} />
             </button>
           }>
             <span class="text-xs px-2 py-1 rounded" style={{ background: "var(--surface-inset)", color: "var(--text-weak)" }}>
@@ -314,8 +258,8 @@ export function SkillSourcesTab() {
 
   function section(scope: Scope, title: string, description: string) {
     const list = views(scope)
-    const disabledCount = disabled()[scope].length
-    const disableCount = list.filter((skill) => skill.sourcePath && !skill.disabled).length
+    const disabledCount = list.filter((skill) => skill.state === "disabled").length
+    const disableCount = list.filter((skill) => skill.state === "active" && skill.sourcePath).length
 
     return (
       <section class="rounded-lg overflow-hidden" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}>
@@ -336,7 +280,7 @@ export function SkillSourcesTab() {
               </Button>
             </Show>
             <span class="text-xs px-2 py-1 rounded" style={{ background: "var(--surface-inset)", color: "var(--text-weak)" }}>
-              {list.filter((item) => !item.disabled).length} active · {disabledCount} disabled
+              {list.filter((item) => item.state !== "disabled").length} active · {disabledCount} disabled
             </span>
           </div>
         </div>

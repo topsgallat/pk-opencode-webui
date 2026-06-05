@@ -2773,9 +2773,9 @@ Add your project-specific instructions here.
                       <span
                         class="text-xs px-2 py-1 rounded-full inline-flex items-center gap-1 font-medium"
                         style={{
-                          background: restartState() === "ready" ? "var(--icon-success-base)" : restartState() === "error" ? "var(--surface-inset)" : "var(--background-base)",
+                          background: restartState() === "ready" ? "#059669" : restartState() === "error" ? "var(--surface-inset)" : "var(--background-base)",
                           color: restartState() === "ready" ? "white" : restartState() === "error" ? "var(--interactive-critical)" : "var(--text-weak)",
-                          border: restartState() === "ready" ? "1px solid var(--icon-success-base)" : "1px solid var(--border-base)",
+                          border: restartState() === "ready" ? "1px solid #059669" : "1px solid var(--border-base)",
                         }}
                       >
                         <Show when={restartState() === "ready"}>

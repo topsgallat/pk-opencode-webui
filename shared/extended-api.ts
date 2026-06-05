@@ -11,8 +11,7 @@ import * as nodePath from "node:path"
 import * as os from "node:os"
 import { clearProxyAuthSession, syncProxyAuthSession } from "./proxy-auth-session"
 import { clearProviderAuthSession, getProviderIDCandidates, resolveProviderAuthAccountId, resolveProviderAuthHeader, syncProviderAuthSession } from "./provider-auth-session"
-import { readLocalSkills } from "./skill-discovery"
-import { skillSourcePathFromLocation } from "../app-prefixable/src/utils/skill-discovery"
+import { readLocalSkillEntries } from "./skill-discovery"
 
 const OPENCODE_RESTART_COMMAND = ["/package/admin/s6/command/s6-svc", "-r", "/run/service/opencode/"]
 
@@ -33,9 +32,9 @@ function isLocalSkillLocation(location: string): boolean {
   return true
 }
 
-function uniqueSkillList(items: { location: string; name: string; description: string }[]): { location: string; name: string; description: string }[] {
+function uniqueSkillList<T extends { location: string; name: string; description: string }>(items: T[]): T[] {
   const seen = new Set<string>()
-  const next: { location: string; name: string; description: string }[] = []
+  const next: T[] = []
 
   for (const item of items) {
     const key = item.location.trim() || `${item.name}:${item.description}`
@@ -57,7 +56,8 @@ export async function handleSkillEndpoint(
 
   const upstream = await options.fetchUpstreamSkills().catch(() => null)
   const upstreamSkills = upstream?.ok ? await upstream.json().catch(() => []) : []
-  const localSkills = await readLocalSkills(url.searchParams.get("directory") || undefined)
+  const directory = url.searchParams.get("directory") || undefined
+  const localSkills = await readLocalSkillEntries(directory)
 
   const remoteSkills = Array.isArray(upstreamSkills)
     ? upstreamSkills.filter((skill): skill is { name: string; description: string; location: string; content: string } => {

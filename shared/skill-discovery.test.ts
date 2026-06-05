@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test"
 import * as fs from "node:fs/promises"
 import * as os from "node:os"
 import * as nodePath from "node:path"
-import { readLocalSkills } from "./skill-discovery"
+import { readLocalSkillEntries, readLocalSkills } from "./skill-discovery"
 
 const env = {
   HOME: process.env.HOME,
@@ -42,4 +42,26 @@ test("skips hidden disabled skill directories", async () => {
 
   const skills = await readLocalSkills()
   expect(skills.find((skill) => skill.name === ".prokube-disabled-skills")).toBeUndefined()
+})
+
+test("reads disabled skills from hidden manifests", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-skill-disabled-"))
+  process.env.HOME = root
+
+  const hidden = nodePath.join(root, ".config", "opencode", "skills", ".prokube-disabled-skills", "demo-abc")
+  await fs.mkdir(hidden, { recursive: true })
+  await fs.writeFile(nodePath.join(hidden, "SKILL.md"), "---\ndescription: Disabled skill\n---\n# Disabled\n", "utf-8")
+  await fs.writeFile(nodePath.join(hidden, ".prokube-skill.json"), JSON.stringify({
+    version: 1,
+    originalPath: nodePath.join(root, ".config", "opencode", "skills", "demo"),
+    scope: "global",
+  }), "utf-8")
+
+  const skills = await readLocalSkillEntries()
+  const disabled = skills.find((skill) => skill.state === "disabled")
+
+  expect(disabled?.name).toBe("demo")
+  expect(disabled?.sourcePath).toBe(nodePath.join(root, ".config", "opencode", "skills", "demo"))
+  expect(disabled?.hiddenPath).toBe(hidden)
+  expect(disabled?.location).toBe(nodePath.join(root, ".config", "opencode", "skills", "demo", "SKILL.md"))
 })

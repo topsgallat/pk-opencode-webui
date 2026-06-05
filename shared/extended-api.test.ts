@@ -47,6 +47,32 @@ test("discovers local skills alongside upstream skills", async () => {
   expect(local?.location).toBe(nodePath.join(config, "SKILL.md"))
 })
 
+test("includes disabled skills discovered from hidden manifests", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-disabled-skills-"))
+  process.env.HOME = root
+
+  const hidden = nodePath.join(root, ".config", "opencode", "skills", ".prokube-disabled-skills", "demo-abc")
+  await fs.mkdir(hidden, { recursive: true })
+  await fs.writeFile(nodePath.join(hidden, "SKILL.md"), "---\ndescription: Disabled skill\n---\n# Disabled\n", "utf-8")
+  await fs.writeFile(nodePath.join(hidden, ".prokube-skill.json"), JSON.stringify({
+    version: 1,
+    originalPath: nodePath.join(root, ".config", "opencode", "skills", "demo"),
+    scope: "global",
+  }), "utf-8")
+
+  const req = new Request("http://localhost/skill")
+  const res = await handleSkillEndpoint("/skill", "GET", new URL(req.url), {
+    fetchUpstreamSkills: async () => new Response("[]", { headers: { "Content-Type": "application/json" } }),
+  })
+
+  const skills = await res!.json() as Array<{ name: string; state?: string; hiddenPath?: string; sourcePath?: string; location: string }>
+  const disabled = skills.find((skill) => skill.state === "disabled")
+  expect(disabled?.name).toBe("demo")
+  expect(disabled?.sourcePath).toBe(nodePath.join(root, ".config", "opencode", "skills", "demo"))
+  expect(disabled?.hiddenPath).toBe(hidden)
+  expect(disabled?.location).toBe(nodePath.join(root, ".config", "opencode", "skills", "demo", "SKILL.md"))
+})
+
 test("validates provider connection without saving", async () => {
   const originalFetch = globalThis.fetch
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {

@@ -194,9 +194,15 @@ if (OPERATION_MODE === "solo") {
     if (proxyAuthHeader) headers["Authorization"] = proxyAuthHeader
     for (let i = 0; i < 30; i++) {
       try {
-        const res = await fetch(`http://127.0.0.1:${API_PORT}/global/health`, { headers })
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 5000)
+        const res = await fetch(`http://127.0.0.1:${API_PORT}/global/health`, { headers, signal: controller.signal })
+        clearTimeout(timer)
         if (res.ok) return true
-      } catch (_) { void _ }
+        console.log(`[solo] Health check attempt ${i + 1}: status ${res.status}`)
+      } catch (e) {
+        console.log(`[solo] Health check attempt ${i + 1}: ${e}`)
+      }
       await Bun.sleep(1000)
     }
     return false

@@ -823,7 +823,7 @@ export function SessionInfo(props: SessionInfoProps) {
                   }}
                   title="Approximate session quota impact from account-level quota deltas"
                 >
-                  Est. {quotaEstimate()}%
+                  Est. {quotaEstimate()!.toFixed(1)}%
                 </span>
               </Show>
 

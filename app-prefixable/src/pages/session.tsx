@@ -40,7 +40,7 @@ import { Terminal } from "../components/terminal";
 import { SessionHeader } from "../components/session-header";
 import { ResizeHandle } from "../components/resize-handle";
 import { base64Encode, base64Decode } from "../utils/path";
-import type { Part, TextPart } from "../sdk/client";
+import type { Command as BackendCommand, Part, TextPart } from "../sdk/client";
 import type { DisplayMessage, QueueTurnState } from "../types/message";
 import { Plus, Settings, Paperclip, Upload, Bookmark, BookOpen, X as XIcon, SquareTerminal } from "lucide-solid";
 import { Portal } from "solid-js/web";
@@ -71,12 +71,32 @@ const SERVER_SWITCH_HOME_KEY = "opencode.serverSwitchHome";
 const FILE_TREE_DRAG_DATA = "application/x-opencode-file-path";
 const FILE_TREE_KIND_DATA = "application/x-opencode-file-kind";
 
-interface Command {
+interface LocalSlashCommand {
   id: string;
   title: string;
   description?: string;
   slash?: string;
   onSelect: () => void;
+}
+
+interface BackendSlashCommand {
+  id: string;
+  title: string;
+  description?: string;
+  slash: string;
+  source?: BackendCommand["source"];
+  template: string;
+  hints: string[];
+  subtask?: boolean;
+}
+
+type SlashCommandItem = LocalSlashCommand | BackendSlashCommand;
+
+interface SlashCommandGroup {
+  key: string;
+  label: string;
+  description: string;
+  items: SlashCommandItem[];
 }
 
 // Per-session draft storage — module-level because SolidJS Router reuses
@@ -343,6 +363,9 @@ export function Session() {
   const [showSlashPopover, setShowSlashPopover] = createSignal(false);
   const [slashQuery, setSlashQuery] = createSignal("");
   const [slashIndex, setSlashIndex] = createSignal(0);
+  const [backendSlashCommands, setBackendSlashCommands] = createSignal<BackendCommand[]>([]);
+  const [backendSlashLoading, setBackendSlashLoading] = createSignal(false);
+  const [backendSlashError, setBackendSlashError] = createSignal<string | null>(null);
   
   const [showAtPopover, setShowAtPopover] = createSignal(false);
   const [atQuery, setAtQuery] = createSignal("");
@@ -906,8 +929,54 @@ export function Session() {
     return sync.session.get(id) ?? null;
   });
 
+  createEffect(on(
+    () => `${server.serverKey()}:${params.dir}:${directory ?? ""}`,
+    () => {
+      const dir = directory || base64Decode(params.dir);
+      if (!dir) return;
+
+      setBackendSlashLoading(true);
+      setBackendSlashError(null);
+
+      client.command
+        .list({ directory: dir })
+        .then((res) => {
+          setBackendSlashCommands(res.data ?? []);
+          setBackendSlashError(null);
+        })
+        .catch((err) => {
+          setBackendSlashError(errorMessage(err, "Loading commands failed"));
+          setBackendSlashCommands([]);
+        })
+        .finally(() => {
+          setBackendSlashLoading(false);
+        });
+    },
+  ));
+
   // Slash commands — computed so state-dependent commands update reactively
-  const baseSlashCommands = createMemo<Command[]>(() => {
+  function normalizeSlashName(name: string) {
+    return name.replace(/^\/+/, "").trim();
+  }
+
+  function backendSlashName(command: BackendCommand) {
+    return normalizeSlashName(command.name);
+  }
+
+  const backendSlashCommandItems = createMemo<BackendSlashCommand[]>(() =>
+    backendSlashCommands().map((command) => ({
+      id: `backend:${command.name}`,
+      title: command.name,
+      description: command.description,
+      slash: backendSlashName(command),
+      source: command.source,
+      template: command.template,
+      hints: command.hints,
+      subtask: command.subtask,
+    })),
+  );
+
+  const localSlashCommands = createMemo<LocalSlashCommand[]>(() => {
     const id = sessionId();
     const sess = session();
     const msgs = syncMessages();
@@ -915,7 +984,7 @@ export function Session() {
     const isProcessing = processing();
     const lastUserMsg = getNthLastUserMsg(msgs, 1);
 
-    const commands: Command[] = [
+    const commands: LocalSlashCommand[] = [
       {
         id: "session.new",
         title: "New Session",
@@ -1153,6 +1222,13 @@ export function Session() {
     return commands;
   });
 
+  const slashCommands = createMemo<SlashCommandItem[]>(() => {
+    const backend = backendSlashCommandItems();
+    const backendNames = new Set(backend.map((command) => command.slash));
+    const local = localSlashCommands().filter((command) => !command.slash || !backendNames.has(command.slash));
+    return [...backend, ...local];
+  });
+
   // Undo N user turns — finds the Nth-from-last user message and reverts to it.
   // The backend accepts any messageID, so reverting to an earlier message
   // implicitly removes everything after it.
@@ -1220,18 +1296,72 @@ export function Session() {
     }
   }
 
-  // Filtered slash commands based on query
-  const filteredSlashCommands = createMemo(() => {
-    const cmds = baseSlashCommands();
-    const q = slashQuery().toLowerCase();
-    if (!q) return cmds;
+  function slashGroupFor(command: SlashCommandItem) {
+    if (!isBackendSlashCommand(command)) {
+      return {
+        key: "local",
+        label: "App actions",
+        description: "OpenCode UI actions",
+      };
+    }
 
-    return cmds.filter(
-      (c) =>
-        c.slash?.toLowerCase().startsWith(q) ||
-        c.title.toLowerCase().includes(q) ||
-        c.description?.toLowerCase().includes(q),
-    );
+    if (command.source === "skill") {
+      return {
+        key: "backend-skill",
+        label: "Skills",
+        description: "Installed skill commands",
+      };
+    }
+
+    if (command.source === "mcp") {
+      return {
+        key: "backend-mcp",
+        label: "MCP",
+        description: "MCP-provided commands",
+      };
+    }
+
+    return {
+      key: "backend-command",
+      label: "Commands",
+      description: "OpenCode commands",
+    };
+  }
+
+  function isBackendSlashCommand(command: SlashCommandItem): command is BackendSlashCommand {
+    return command.id.startsWith("backend:");
+  }
+
+  const groupedSlashCommands = createMemo<SlashCommandGroup[]>(() => {
+    const q = slashQuery().toLowerCase();
+    const groups = new Map<string, SlashCommandGroup>();
+
+    for (const cmd of slashCommands()) {
+      if (q && !(
+        cmd.slash?.toLowerCase().startsWith(q) ||
+        cmd.title.toLowerCase().includes(q) ||
+        cmd.description?.toLowerCase().includes(q)
+      )) continue;
+
+      const group = slashGroupFor(cmd);
+      const next = groups.get(group.key) ?? { ...group, items: [] };
+      next.items.push(cmd);
+      groups.set(group.key, next);
+    }
+
+    return [
+      groups.get("backend-skill"),
+      groups.get("backend-mcp"),
+      groups.get("backend-command"),
+      groups.get("local"),
+    ].filter(Boolean) as SlashCommandGroup[];
+  });
+
+  const flatSlashCommands = createMemo(() => groupedSlashCommands().flatMap((group) => group.items));
+  const flatSlashCommandIndex = createMemo(() => {
+    const map = new Map<string, number>();
+    flatSlashCommands().forEach((command, idx) => map.set(command.id, idx));
+    return map;
   });
 
   // Close slash popover on click outside
@@ -1245,14 +1375,37 @@ export function Session() {
   }
 
   // Handle slash command selection
-  function selectSlashCommand(cmd: Command) {
+  function applyBackendSlashCommand(cmd: BackendSlashCommand) {
+    const current = input();
+    const first = current.match(/^\/\S*/)?.[0] ?? "";
+    const rest = current.slice(first.length).trimStart();
+    const next = rest ? `/${cmd.slash} ${rest}` : `/${cmd.slash} `;
+
+    setInput(next);
+    if (inputRef) {
+      inputRef.value = next;
+      inputRef.selectionStart = inputRef.selectionEnd = next.length;
+      clampInputHeight(inputRef);
+      requestAnimationFrame(() => inputRef?.focus());
+    }
+    setShowSlashPopover(false);
+    setSlashQuery("");
+    setSlashIndex(0);
+  }
+
+  function selectSlashCommand(cmd: SlashCommandItem) {
+    if (cmd.id.startsWith("backend:")) {
+      applyBackendSlashCommand(cmd as BackendSlashCommand);
+      return;
+    }
+
     setInput("");
     setShowSlashPopover(false);
     setSlashQuery("");
 
     // Use setTimeout to ensure state updates before command runs
     setTimeout(() => {
-      cmd.onSelect();
+      (cmd as LocalSlashCommand).onSelect();
     }, 0);
   }
 
@@ -1317,7 +1470,7 @@ export function Session() {
   function handleInputKeyDown(e: KeyboardEvent) {
     if (!showSlashPopover()) return;
 
-    const cmds = filteredSlashCommands();
+    const cmds = flatSlashCommands();
     if (cmds.length === 0) return;
 
     if (e.key === "ArrowDown") {
@@ -1926,7 +2079,6 @@ export function Session() {
   const dragLabel = createMemo(() =>
     (dragMode() ?? treePreview()) === "mention" ? "Drop to mention file" : "Drop files to upload",
   );
-  const dropMode = createMemo(() => dragMode() ?? treePreview());
   const dropActive = createMemo(() => isDragging() || treePreview() !== null);
   const dragSurface = "color-mix(in srgb, var(--surface-inset) 90%, var(--interactive-base) 10%)";
   const dragBorder = "color-mix(in srgb, var(--border-base) 72%, var(--interactive-base) 28%)";
@@ -2033,6 +2185,120 @@ export function Session() {
     });
   });
 
+  function selectedModelString() {
+    const model = providers.selectedModel;
+    if (!model) return null;
+    return `${model.providerID}/${model.modelID}`;
+  }
+
+  function buildCommandParts(files: FileContext[], images: ImageAttachment[]) {
+    const currentDirectory = directory || base64Decode(params.dir);
+    const parts: Array<{
+      type: "file";
+      mime: string;
+      filename?: string;
+      url: string;
+    }> = [];
+
+    for (const file of files) {
+      const dir = currentDirectory || "";
+      const absolute = file.path.startsWith("/")
+        ? file.path
+        : `${dir.replace(/\/$/, "")}/${file.path.replace(/^\//, "")}`;
+      const filename = file.path.split("/").pop() || file.path;
+      const encoded = absolute
+        .split("/")
+        .map((segment) => encodeURIComponent(segment))
+        .join("/");
+      parts.push({
+        type: "file",
+        mime: "text/plain",
+        url: `file://${encoded}`,
+        filename,
+      });
+    }
+
+    for (const img of images) {
+      parts.push({
+        type: "file",
+        mime: img.mime,
+        url: img.dataUrl,
+        filename: img.name,
+      });
+    }
+
+    return parts.length > 0 ? parts : undefined;
+  }
+
+  async function ensureSessionId() {
+    const id = sessionId();
+    if (id) return id;
+
+    const res = await client.session.create({});
+    if (!res.data || !res.data.id) throw new Error("Failed to create session");
+
+    const sid = res.data.id;
+    setSessionId(sid);
+    navigate(`/${dirSlug()}/session/${sid}`, { replace: true });
+    return sid;
+  }
+
+  function parseSlashCommand(text: string) {
+    const match = text.match(/^\/(\S+)(?:\s+([\s\S]*))?$/);
+    if (!match) return null;
+    return {
+      name: match[1],
+      arguments: match[2] ?? "",
+    };
+  }
+
+  async function executeBackendSlashCommand(command: BackendSlashCommand, text: string, files: FileContext[], images: ImageAttachment[]) {
+    if (queueActive()) {
+      setError("Wait for the current turn to finish before running a command.");
+      return false;
+    }
+
+    if (!providers.selectedModel) {
+      setError("Please select a model before sending messages. Click the model button in the header.");
+      return false;
+    }
+
+    if (!providers.connected.includes(providers.selectedModel.providerID)) {
+      setError(`Provider "${providers.selectedModel.providerID}" is not connected. Please configure it in Settings.`);
+      return false;
+    }
+
+    const id = await ensureSessionId();
+    const model = selectedModelString();
+    if (!model) return false;
+
+    setError(null);
+    setLoading(true);
+    setShowTodoTray(false);
+    resetComposer();
+
+    try {
+      await client.session.command({
+        sessionID: id,
+        directory: directory || base64Decode(params.dir),
+        command: command.slash,
+        arguments: text,
+        agent: providers.selectedAgent || "build",
+        model,
+        variant: providers.selectedVariant ?? undefined,
+        parts: buildCommandParts(files, images),
+      });
+      startProcessing();
+      return true;
+    } catch (err) {
+      setError(`Failed to send command: ${err instanceof Error ? err.message : String(err)}`);
+      setProcessing(false);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function sendMessage(e: SubmitEvent) {
     e.preventDefault();
     await submitComposerAction();
@@ -2056,6 +2322,24 @@ export function Session() {
     const images = imageAttachments();
     if ((!text && files.length === 0 && images.length === 0) || inputBlocked())
       return;
+
+    const slash = parseSlashCommand(text);
+    if (slash) {
+      const backend = backendSlashCommandItems().find((command) => command.slash === slash.name);
+      if (backend) {
+        await executeBackendSlashCommand(backend, slash.arguments, files, images);
+        return;
+      }
+
+      const local = localSlashCommands().find((command) => command.slash === slash.name);
+      if (local) {
+        setInput("");
+        setShowSlashPopover(false);
+        setSlashQuery("");
+        setTimeout(() => local.onSelect(), 0);
+        return;
+      }
+    }
 
     // Require explicit model selection to avoid OpenCode auto-selecting a broken provider
     if (!providers.selectedModel) {
@@ -2093,22 +2377,22 @@ export function Session() {
       return;
     }
 
-      await submitPrompt({
-        id: generateUUID(),
-        createdAt: Date.now(),
-        text,
-        files,
-        images,
-        agent: providers.selectedAgent || "build",
-        model: providers.selectedModel
-          ? {
-              providerID: providers.selectedModel.providerID,
-              modelID: providers.selectedModel.modelID,
-            }
-          : undefined,
-        variant: providers.selectedVariant ?? undefined,
-        status: "running",
-      });
+    await submitPrompt({
+      id: generateUUID(),
+      createdAt: Date.now(),
+      text,
+      files,
+      images,
+      agent: providers.selectedAgent || "build",
+      model: providers.selectedModel
+        ? {
+            providerID: providers.selectedModel.providerID,
+            modelID: providers.selectedModel.modelID,
+          }
+        : undefined,
+      variant: providers.selectedVariant ?? undefined,
+      status: "running",
+    });
   }
 
   async function createSessionAndSendPrompt(text: string) {
@@ -2660,27 +2944,40 @@ export function Session() {
             </Show>
 
             {/* Slash Command Popover */}
-            <Show
-              when={showSlashPopover() && filteredSlashCommands().length > 0}
-            >
-              <div
-                ref={slashPopoverRef}
-                class="absolute bottom-full left-0 mb-2 w-80 max-h-96 rounded-lg shadow-lg z-20 flex flex-col"
-                style={{
-                  background: "var(--background-base)",
-                  border: "1px solid var(--border-base)",
-                }}
-              >
-                {/* Header */}
+            <Show when={showSlashPopover()}>
                 <div
-                  class="px-3 py-2 text-xs font-medium sticky top-0"
+                  ref={slashPopoverRef}
+                  class="absolute bottom-full left-0 mb-2 rounded-xl shadow-xl z-20 flex flex-col overflow-hidden"
+                  style={{
+                    width: "min(28rem, calc(100vw - 1.5rem))",
+                    "max-height": "min(32rem, calc(100vh - 12rem))",
+                    background: "var(--background-base)",
+                    border: "1px solid var(--border-base)",
+                  }}
+                >
+                 {/* Header */}
+                <div
+                  class="sticky top-0 px-4 py-3"
                   style={{
                     color: "var(--text-weak)",
-                    background: "var(--surface-inset)",
+                    background: "linear-gradient(180deg, var(--surface-inset), var(--background-base))",
                     "border-bottom": "1px solid var(--border-base)",
                   }}
                 >
-                  <span>Commands</span>
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="text-sm font-semibold" style={{ color: "var(--text-strong)" }}>Commands</span>
+                      <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)" }}>
+                        / command
+                      </span>
+                    </div>
+                    <Show when={backendSlashLoading()}>
+                      <span class="animate-pulse text-xs">Loading...</span>
+                    </Show>
+                  </div>
+                  <div class="mt-1 text-xs" style={{ color: "var(--text-dimmed)" }}>
+                    Use ↑↓ to move, Enter to insert, Esc to close
+                  </div>
                 </div>
 
                 {/* List */}
@@ -2698,65 +2995,159 @@ export function Session() {
                     });
                   }}
                 >
-                  <For each={filteredSlashCommands()}>
-                    {(cmd, idx) => {
-                      const isSelected = () => idx() === slashIndex();
-                      return (
-                        <button
-                          type="button"
-                          data-index={idx()}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            selectSlashCommand(cmd);
-                          }}
-                          class="w-full px-3 py-2 text-left text-sm flex items-start gap-3 transition-colors"
-                          style={{
-                            background: isSelected()
-                              ? "rgba(147, 112, 219, 0.15)"
-                              : "transparent",
-                            "border-left": isSelected()
-                              ? "2px solid rgb(147, 112, 219)"
-                              : "2px solid transparent",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isSelected())
-                              e.currentTarget.style.background =
-                                "var(--surface-inset)";
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isSelected())
-                              e.currentTarget.style.background = "transparent";
-                          }}
-                        >
-                          <Show when={cmd.slash}>
-                            <span
-                              class="font-mono"
-                              style={{ color: "var(--text-interactive-base)" }}
-                            >
-                              /{cmd.slash}
+                  <Show
+                    when={flatSlashCommands().length > 0}
+                    fallback={
+                      <div class="px-4 py-5 text-sm text-center" style={{ color: "var(--text-weak)" }}>
+                        {backendSlashError()
+                          ? backendSlashError()
+                          : backendSlashLoading()
+                            ? "Loading commands..."
+                            : "No matching commands"}
+                      </div>
+                    }
+                  >
+                    <For each={groupedSlashCommands()}>
+                      {(group) => (
+                        <div>
+                          <div
+                            class="px-4 py-2 text-[10px] sticky top-0 flex items-center justify-between gap-2 uppercase tracking-[0.2em]"
+                            style={{
+                              color: "var(--text-dimmed)",
+                              background: "var(--background-base)",
+                              "border-bottom": "1px solid var(--border-base)",
+                            }}
+                          >
+                            <span>{group.label}</span>
+                            <span class="normal-case tracking-normal text-[10px]" style={{ color: "var(--text-dimmed)" }}>
+                              {group.description}
                             </span>
-                          </Show>
-                          <div class="flex-1">
-                            <div
-                              class="font-medium"
-                              style={{ color: "var(--text-strong)" }}
-                            >
-                              {cmd.title}
-                            </div>
-                            <Show when={cmd.description}>
-                              <div
-                                class="text-xs"
-                                style={{ color: "var(--text-weak)" }}
-                              >
-                                {cmd.description}
-                              </div>
-                            </Show>
                           </div>
-                        </button>
-                      );
-                    }}
-                  </For>
+
+                    <For each={group.items}>
+                      {(cmd) => {
+                        const commandIndex = () => flatSlashCommandIndex().get(cmd.id) ?? -1;
+                        const isSelected = () => commandIndex() === slashIndex();
+                        const isBackend = () => cmd.id.startsWith("backend:");
+                        const backendCmd = () => isBackend() ? cmd as BackendSlashCommand : null;
+                        return (
+                          <button
+                            type="button"
+                            data-index={commandIndex()}
+                            title={backendCmd()?.template ?? undefined}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                                    selectSlashCommand(cmd);
+                                  }}
+                                  class="w-full px-4 py-3 text-left text-sm transition-colors"
+                                  style={{
+                                    background: isSelected()
+                                      ? "rgba(147, 112, 219, 0.15)"
+                                      : "transparent",
+                                    "border-left": isSelected()
+                                      ? "3px solid rgb(147, 112, 219)"
+                                      : "3px solid transparent",
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!isSelected())
+                                      e.currentTarget.style.background =
+                                        "var(--surface-inset)";
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!isSelected())
+                                      e.currentTarget.style.background = "transparent";
+                                  }}
+                                >
+                                  <div class="min-w-0">
+                                    <div class="flex items-center gap-2">
+                                      <Show when={cmd.slash}>
+                                        <span
+                                          class="font-mono text-xs px-2 py-1 rounded-md whitespace-nowrap shrink-0"
+                                          style={{
+                                            color: "var(--text-interactive-base)",
+                                            background: isSelected()
+                                              ? "color-mix(in srgb, var(--interactive-base) 12%, transparent)"
+                                              : "var(--surface-inset)",
+                                            border: "1px solid var(--border-base)",
+                                          }}
+                                        >
+                                          /{cmd.slash}
+                                        </span>
+                                      </Show>
+                                      <span class="font-medium truncate" style={{ color: "var(--text-strong)" }}>
+                                        {cmd.title}
+                                      </span>
+                                    </div>
+                                    <Show when={cmd.description}>
+                                      <div class="text-xs mt-1 leading-relaxed truncate" style={{ color: "var(--text-weak)" }}>
+                                        {cmd.description}
+                                      </div>
+                                    </Show>
+                                    <Show when={isBackend()}>
+                                      <div class="mt-2 flex items-center gap-1.5">
+                                        <span
+                                          class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide shrink-0"
+                                          style={{
+                                            background: "var(--surface-inset)",
+                                            color: "var(--text-weak)",
+                                            border: "1px solid var(--border-base)",
+                                          }}
+                                        >
+                                          {backendCmd()!.source ?? "command"}
+                                        </span>
+                                        <Show when={backendCmd()!.subtask}>
+                                          <span
+                                            class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide shrink-0"
+                                            style={{
+                                              background: "rgba(147,112,219,0.12)",
+                                              color: "rgb(147,112,219)",
+                                              border: "1px solid rgba(147,112,219,0.25)",
+                                            }}
+                                          >
+                                            subtask
+                                          </span>
+                                        </Show>
+                                      </div>
+                                    </Show>
+                                    <Show when={isBackend() && backendCmd()!.hints.length > 0}>
+                                      <div class="mt-3 flex flex-wrap gap-1">
+                                        <For each={backendCmd()!.hints.slice(0, 3)}>
+                                          {(hint) => (
+                                            <span
+                                              class="rounded-full px-2 py-0.5 text-[10px]"
+                                              style={{
+                                                background: "transparent",
+                                                color: "var(--text-dimmed)",
+                                                border: "1px solid var(--border-base)",
+                                              }}
+                                            >
+                                              {hint}
+                                            </span>
+                                          )}
+                                        </For>
+                                      </div>
+                                    </Show>
+                                  </div>
+                                </button>
+                              );
+                            }}
+                          </For>
+                        </div>
+                      )}
+                    </For>
+                  </Show>
+                </div>
+                <div
+                  class="px-4 py-2 text-[10px] flex items-center justify-between"
+                  style={{
+                    color: "var(--text-dimmed)",
+                    background: "var(--background-base)",
+                    "border-top": "1px solid var(--border-base)",
+                  }}
+                >
+                  <span>Local commands stay available for app actions.</span>
+                  <span>Enter inserts backend commands into the composer.</span>
                 </div>
               </div>
             </Show>

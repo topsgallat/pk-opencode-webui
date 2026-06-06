@@ -7,12 +7,13 @@ import { useSync } from "../context/sync"
 import { useProviders } from "../context/providers"
 import { getCopilotMultiplier } from "../utils/path"
 import { shouldLoadQuotaOnOpen } from "../utils/quota-refresh"
+import { getSessionQuotaEstimate } from "../utils/session-quota-estimate"
 import { isAnthropicProviderID } from "../../../shared/anthropic-models"
 import { getContextTokens } from "../utils/tokens"
 import { getQuota } from "../utils/extended-api"
 import { CornerDownLeft, Square, Zap } from "lucide-solid"
 import { ConnectionBadge } from "./connection-badge"
-import { findQuotaProviderBySelectedModel } from "./session-info-helpers"
+import { findPrimaryQuotaEntry, findQuotaProviderBySelectedModel, getQuotaPercentUsed } from "./session-info-helpers"
 
 type TokenPricing = {
   input: number
@@ -99,9 +100,26 @@ export function SessionInfo(props: SessionInfoProps) {
   const selectedModel = () => props.selectedModel?.() ?? providers.selectedModel
   const [quotaRequested, setQuotaRequested] = createSignal(false)
   const [quotaTick, setQuotaTick] = createSignal(0)
+  const [lastQuotaRefreshKey, setLastQuotaRefreshKey] = createSignal<string | null>(null)
+  const [lastQuotaAssistantTurnCount, setLastQuotaAssistantTurnCount] = createSignal<number | null>(null)
+
+  const quotaRequest = createMemo(() => {
+    const id = params.id
+    const selected = selectedModel()
+    if (!id || !selected?.providerID) return null
+
+    return {
+      serverUrl,
+      targetUrl,
+      tick: quotaTick(),
+      sessionID: id,
+      providerID: selected.providerID,
+      modelID: selected.modelID,
+    }
+  })
 
   const [quota] = createResource(
-    () => quotaRequested() ? ({ serverUrl, targetUrl, tick: quotaTick() }) : null,
+    () => quotaRequested() ? quotaRequest() : null,
     async ({ serverUrl, targetUrl }) => await getQuota(serverUrl, { refresh: true, targetUrl }),
   )
 
@@ -118,6 +136,56 @@ export function SessionInfo(props: SessionInfoProps) {
     const id = params.id
     if (!id) return []
     return sync.messages(id)
+  })
+
+  const assistantTurnCount = createMemo(() => messages().reduce(
+    (count, msg) => count + (msg.info?.role === "assistant" && msg.info?.time?.completed ? 1 : 0),
+    0,
+  ))
+
+  createEffect(() => {
+    if (!quotaRequest()) return
+    if (!quotaRequested()) {
+      setQuotaRequested(true)
+    }
+  })
+
+  createEffect(() => {
+    const request = quotaRequest()
+    if (!request) {
+      setLastQuotaRefreshKey(null)
+      setLastQuotaAssistantTurnCount(null)
+      return
+    }
+
+    const key = `${request.sessionID}:${request.providerID}:${request.modelID}`
+    const turns = assistantTurnCount()
+
+    if (lastQuotaRefreshKey() !== key) {
+      setLastQuotaRefreshKey(key)
+      setLastQuotaAssistantTurnCount(turns)
+      return
+    }
+
+    const seen = lastQuotaAssistantTurnCount()
+    if (seen === null) {
+      setLastQuotaAssistantTurnCount(turns)
+      return
+    }
+
+    if (turns <= seen) return
+    if (quota.loading && !quota()) {
+      setLastQuotaAssistantTurnCount(turns)
+      return
+    }
+    if (quota.loading) return
+    if (!quota()) {
+      setLastQuotaAssistantTurnCount(turns)
+      return
+    }
+
+    setLastQuotaAssistantTurnCount(turns)
+    setQuotaTick((value) => value + 1)
   })
 
   // Calculate token usage from last assistant message and cumulative cost
@@ -255,6 +323,21 @@ export function SessionInfo(props: SessionInfoProps) {
     return provider.reason || provider.error || provider.warning || null
   })
 
+  const quotaEstimateSessionKey = createMemo(() => {
+    const id = params.id
+    if (!id) return null
+    return `${targetUrl || "local"}:${params.dir}:${id}`
+  })
+
+  const primaryQuotaEntry = createMemo(() => findPrimaryQuotaEntry(quotaProvider()))
+  const quotaEstimate = createMemo(() => {
+    const id = quotaEstimateSessionKey()
+    const provider = quotaProvider()
+    const entry = primaryQuotaEntry()
+    if (!id || !provider || !entry) return null
+    return getSessionQuotaEstimate(id, provider.id, provider.accounts?.[0]?.id ?? null, entry)
+  })
+
   const quotaStatus = (status?: string) => {
     switch (status) {
       case "ok":
@@ -279,15 +362,6 @@ export function SessionInfo(props: SessionInfoProps) {
           border: "1px solid var(--border-critical-base)",
         }
     }
-  }
-
-  const quotaPercent = (entry: { used?: number; total?: number; percentUsed?: number; unlimited?: boolean }) => {
-    if (entry.unlimited) return null
-    if (entry.percentUsed !== undefined) return Math.max(0, Math.min(100, entry.percentUsed))
-    if (entry.used !== undefined && entry.total !== undefined && entry.total > 0) {
-      return Math.max(0, Math.min(100, (entry.used / entry.total) * 100))
-    }
-    return null
   }
 
   const quotaBarColor = (percent: number | null) => {
@@ -435,8 +509,6 @@ export function SessionInfo(props: SessionInfoProps) {
 
     setShowTokenPopover(true)
   }
-
-  const dirSlug = createMemo(() => params.dir)
 
   const fmt = (n: number) => n.toLocaleString()
   const composerReady = createMemo(() => !!(props.input().trim() || props.hasAttachments?.()))
@@ -632,61 +704,62 @@ export function SessionInfo(props: SessionInfoProps) {
                                 No quota provider matched this composer.
                               </div>
                             }>
-                              <div
-                                class="rounded-md px-2.5 py-2 space-y-2 font-sans"
-                                style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)" }}
-                              >
-                                <div class="flex items-center justify-between gap-2">
-                                  <span class="min-w-0 truncate font-medium" style={{ color: "var(--text-strong)" }}>
-                                    {quotaProvider()!.name}
-                                  </span>
-                                  <span
-                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
-                                    style={{
-                                      background: quotaStatus(quotaProvider()!.status).background,
-                                      color: quotaStatus(quotaProvider()!.status).color,
-                                      border: quotaStatus(quotaProvider()!.status).border,
-                                    }}
-                                  >
-                                    {quotaStatus(quotaProvider()!.status).label}
-                                  </span>
-                                </div>
-
-                              <Show when={quotaProviderIssue()}>
-                                {(message) => (
-                                  <div
-                                    class="text-[10px] leading-snug"
-                                    style={{ color: quotaProvider()!.status === "error" ? "var(--text-critical-base)" : "var(--status-warning-text)" }}
-                                  >
-                                    {message()}
+                              {(provider) => (
+                                <div
+                                  class="rounded-md px-2.5 py-2 space-y-2 font-sans"
+                                  style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)" }}
+                                >
+                                  <div class="flex items-center justify-between gap-2">
+                                    <span class="min-w-0 truncate font-medium" style={{ color: "var(--text-strong)" }}>
+                                      {provider().name}
+                                    </span>
+                                    <span
+                                      class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+                                      style={{
+                                        background: quotaStatus(provider().status).background,
+                                        color: quotaStatus(provider().status).color,
+                                        border: quotaStatus(provider().status).border,
+                                      }}
+                                    >
+                                      {quotaStatus(provider().status).label}
+                                    </span>
                                   </div>
-                                )}
-                              </Show>
 
-                              <Show when={quotaProvider()!.accounts && quotaProvider()!.accounts.length > 0}>
-                                <div class="space-y-1 text-[10px]" style={{ color: "var(--text-weak)" }}>
-                                  <For each={quotaProvider()!.accounts}>
-                                    {(account) => (
-                                      <div class="space-y-0.5">
-                                        <div class="font-medium" style={{ color: "var(--text-base)" }}>{account.label}</div>
-                                        <Show when={account.email}>
-                                          {(email) => <div class="truncate">{email()}</div>}
-                                        </Show>
+                                  <Show when={quotaProviderIssue()}>
+                                    {(message) => (
+                                      <div
+                                        class="text-[10px] leading-snug"
+                                        style={{ color: provider().status === "error" ? "var(--text-critical-base)" : "var(--status-warning-text)" }}
+                                      >
+                                        {message()}
                                       </div>
                                     )}
-                                  </For>
-                                </div>
-                              </Show>
+                                  </Show>
 
-                                <Show when={quotaProvider()!.entries.length > 0} fallback={
-                                  <div class="text-[11px]" style={{ color: "var(--text-weak)" }}>
-                                    No quota limits reported.
-                                  </div>
-                                }>
-                                  <div class="space-y-1.5">
-                                    <For each={quotaProvider()!.entries.slice(0, 3)}>
+                                  <Show when={(provider().accounts?.length ?? 0) > 0}>
+                                    <div class="space-y-1 text-[10px]" style={{ color: "var(--text-weak)" }}>
+                                      <For each={provider().accounts ?? []}>
+                                        {(account) => (
+                                          <div class="space-y-0.5">
+                                            <div class="font-medium" style={{ color: "var(--text-base)" }}>{account.label}</div>
+                                            <Show when={account.email}>
+                                              {(email) => <div class="truncate">{email()}</div>}
+                                            </Show>
+                                          </div>
+                                        )}
+                                      </For>
+                                    </div>
+                                  </Show>
+
+                                  <Show when={provider().entries.length > 0} fallback={
+                                    <div class="text-[11px]" style={{ color: "var(--text-weak)" }}>
+                                      No quota limits reported.
+                                    </div>
+                                  }>
+                                    <div class="space-y-1.5">
+                                      <For each={provider().entries.slice(0, 3)}>
                                       {(entry) => {
-                                        const percent = quotaPercent(entry)
+                                        const percent = getQuotaPercentUsed(entry)
                                         return (
                                           <div class="space-y-1">
                                             <div class="flex items-center justify-between gap-2 text-[11px]">
@@ -725,6 +798,7 @@ export function SessionInfo(props: SessionInfoProps) {
                                   </div>
                                 </Show>
                               </div>
+                            )}
                             </Show>
                           </div>
                         </Show>
@@ -738,6 +812,20 @@ export function SessionInfo(props: SessionInfoProps) {
                 <span class="opacity-60">Cost</span>
                 <span style={{ color: "var(--text-base)" }}>{s().cost}</span>
               </span>
+
+              <Show when={quotaEstimate() !== null}>
+                <span
+                  class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                  style={{
+                    background: "var(--surface-inset)",
+                    color: "var(--text-weak)",
+                    border: "1px solid var(--border-base)",
+                  }}
+                  title="Approximate session quota impact from account-level quota deltas"
+                >
+                  Est. {quotaEstimate()}%
+                </span>
+              </Show>
 
               <ConnectionBadge />
             </div>

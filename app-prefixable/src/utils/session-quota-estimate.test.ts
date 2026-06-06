@@ -39,15 +39,15 @@ describe("getSessionQuotaEstimate", () => {
   it("anchors the first snapshot and then reports the delta", () => {
     expect(getSessionQuotaEstimate("s1", "openai", null, {
       id: "primary",
-      percentUsed: 12,
+      percentUsed: 12.1,
       resetTimeIso: "2026-01-01T00:00:00.000Z",
     })).toBeNull()
 
     expect(getSessionQuotaEstimate("s1", "openai", null, {
       id: "primary",
-      percentUsed: 15,
+      percentUsed: 15.4,
       resetTimeIso: "2026-01-01T00:00:00.000Z",
-    })).toBe(3)
+    })).toBe(3.3)
   })
 
   it("re-anchors when the reset window changes", () => {

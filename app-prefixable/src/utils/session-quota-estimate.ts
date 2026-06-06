@@ -80,7 +80,7 @@ export function getSessionQuotaEstimate(
     return null
   }
 
-  const delta = Math.round(percentUsed - current.percentUsed)
+  const delta = Number((percentUsed - current.percentUsed).toFixed(1))
   return delta > 0 ? delta : null
 }
 

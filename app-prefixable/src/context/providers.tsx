@@ -120,7 +120,7 @@ interface ProviderContextValue {
   setSelectedModel: (model: ModelKey | null) => void
   setSelectedVariant: (variant: string | null) => void
   setSelectedAgent: (agent: string) => void
-  refetch: () => void
+  refetch: () => Promise<void>
   connectProvider: (providerID: string, apiKey: string, accountName?: string) => Promise<boolean>
   disconnectProvider: (providerID: string) => Promise<boolean>
   startOAuth: (providerID: string, methodIndex: number) => Promise<OAuthAuthorization | undefined>
@@ -547,9 +547,9 @@ export function ProviderProvider(props: ParentProps) {
     }
   }
 
-  function refetch() {
-    refetchProviders()
-    refetchAgents()
+  async function refetch() {
+    await refetchProviders()
+    await refetchAgents()
   }
 
   const value: ProviderContextValue = {

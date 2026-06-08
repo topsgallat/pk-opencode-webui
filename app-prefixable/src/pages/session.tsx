@@ -70,6 +70,7 @@ const SESSION_STATUS_TIMEOUT_MS = 8_000;
 const SERVER_SWITCH_HOME_KEY = "opencode.serverSwitchHome";
 const FILE_TREE_DRAG_DATA = "application/x-opencode-file-path";
 const FILE_TREE_KIND_DATA = "application/x-opencode-file-kind";
+const MODEL_NOT_READY_ERROR = "Please select a model before sending messages. Click the model button in the header.";
 
 interface LocalSlashCommand {
   id: string;
@@ -499,6 +500,7 @@ export function Session() {
   const [mentionPath, setMentionPath] = createSignal<string | null>(null);
   const [mentionSelection, setMentionSelection] = createSignal<{ startLine: number; endLine: number } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
+  const [retryingModel, setRetryingModel] = createSignal(false);
   const [historyError, setHistoryError] = createSignal<string | null>(null);
   // Use session tree walk to find pending questions from this session or any descendant.
   // This surfaces child/grandchild session questions in the parent session view.
@@ -747,7 +749,7 @@ export function Session() {
     if (providers.loading || providers.providers.length === 0) return;
     if (!providers.selectedModel) {
       sessionStorage.removeItem(key);
-      setError("Please select a model before sending messages. Click the model button in the header.");
+      setError(MODEL_NOT_READY_ERROR);
       return;
     }
     if (!providers.connected.includes(providers.selectedModel.providerID)) {
@@ -2259,7 +2261,7 @@ export function Session() {
     }
 
     if (!providers.selectedModel) {
-      setError("Please select a model before sending messages. Click the model button in the header.");
+      setError(MODEL_NOT_READY_ERROR);
       return false;
     }
 
@@ -2304,6 +2306,24 @@ export function Session() {
     await submitComposerAction();
   }
 
+  async function retryModelLoad() {
+    if (retryingModel()) return;
+
+    setRetryingModel(true);
+    try {
+      try {
+        await client.instance.dispose();
+      } catch (e) {
+        console.error("Failed to dispose client instance before model retry:", e);
+      }
+
+      await providers.refetch();
+      await submitComposerAction();
+    } finally {
+      setRetryingModel(false);
+    }
+  }
+
   async function submitComposerAction() {
     const text = input().trim();
 
@@ -2343,9 +2363,7 @@ export function Session() {
 
     // Require explicit model selection to avoid OpenCode auto-selecting a broken provider
     if (!providers.selectedModel) {
-      setError(
-        "Please select a model before sending messages. Click the model button in the header.",
-      );
+      setError(MODEL_NOT_READY_ERROR);
       return;
     }
 
@@ -2397,7 +2415,7 @@ export function Session() {
 
   async function createSessionAndSendPrompt(text: string) {
     if (!providers.selectedModel) {
-      setError("Please select a model before sending messages. Click the model button in the header.");
+      setError(MODEL_NOT_READY_ERROR);
       return;
     }
     if (!providers.connected.includes(providers.selectedModel.providerID)) {
@@ -3155,13 +3173,27 @@ export function Session() {
             {/* Error message */}
             <Show when={error()}>
               <div
-                class="px-4 py-2 rounded-lg text-sm mb-2"
+                class="mb-2 rounded-lg px-4 py-2 text-sm"
                 style={{
                   background: "var(--status-danger-dim)",
                   color: "var(--status-danger-text)",
                 }}
               >
-                {error()}
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <span>{error()}</span>
+                  <Show when={error() === MODEL_NOT_READY_ERROR}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={retryingModel()}
+                      onClick={() => void retryModelLoad()}
+                      class="shrink-0 self-start sm:self-auto"
+                    >
+                      {retryingModel() ? "Retrying..." : "Retry"}
+                    </Button>
+                  </Show>
+                </div>
               </div>
             </Show>
 

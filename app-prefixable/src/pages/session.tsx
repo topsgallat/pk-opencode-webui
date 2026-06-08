@@ -314,8 +314,8 @@ export function Session() {
 
   // Viewport-aware maximum matching the CSS max-height on the textarea
   function maxInputHeight() {
-    const reserve = device.isTouchDevice() ? 320 : 200;
-    const floor = device.isTouchDevice() ? 140 : 200;
+    const reserve = device.isTouchDevice() ? 300 : 200;
+    const floor = device.isTouchDevice() ? 160 : 200;
     return Math.max(floor, window.innerHeight - reserve);
   }
 
@@ -3320,7 +3320,7 @@ export function Session() {
                     color: "var(--text-base)",
                     "min-height": "48px",
                     "max-height": device.isTouchDevice()
-                      ? "max(140px, calc(100dvh - 320px))"
+                      ? "max(160px, calc(100dvh - 300px))"
                       : "max(200px, calc(100dvh - 200px))",
                     "overflow-y": "auto",
                   }}

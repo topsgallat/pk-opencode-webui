@@ -71,6 +71,7 @@ const SERVER_SWITCH_HOME_KEY = "opencode.serverSwitchHome";
 const FILE_TREE_DRAG_DATA = "application/x-opencode-file-path";
 const FILE_TREE_KIND_DATA = "application/x-opencode-file-kind";
 const MODEL_NOT_READY_ERROR = "Please select a model before sending messages. Click the model button in the header.";
+const LOAD_FAILED_SUBSTR = "Load failed";
 
 interface LocalSlashCommand {
   id: string;
@@ -501,6 +502,7 @@ export function Session() {
   const [mentionSelection, setMentionSelection] = createSignal<{ startLine: number; endLine: number } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [retryingModel, setRetryingModel] = createSignal(false);
+  const [failedPromptItem, setFailedPromptItem] = createSignal<PendingPromptItem | null>(null);
   const [historyError, setHistoryError] = createSignal<string | null>(null);
   // Use session tree walk to find pending questions from this session or any descendant.
   // This surfaces child/grandchild session questions in the parent session view.
@@ -2030,9 +2032,11 @@ export function Session() {
       return true;
     } catch (err) {
       console.error("[Session] Error sending message:", err);
-      setError(
-        `Failed to send message: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setError(`Failed to send message: ${errMsg}`);
+      if (errMsg.includes(LOAD_FAILED_SUBSTR)) {
+        setFailedPromptItem(item);
+      }
       setActivePrompt(null);
       return false;
     } finally {
@@ -2319,6 +2323,29 @@ export function Session() {
 
       await providers.refetch();
       await submitComposerAction();
+    } finally {
+      setRetryingModel(false);
+    }
+  }
+
+  async function retryFailedSend() {
+    const item = failedPromptItem();
+    if (!item || retryingModel()) return;
+
+    setRetryingModel(true);
+    setError(null);
+    try {
+      try {
+        await client.instance.dispose();
+      } catch (e) {
+        console.error("Failed to dispose client instance before retry:", e);
+      }
+
+      await providers.refetch();
+      const ok = await submitPrompt(item);
+      if (ok) {
+        setFailedPromptItem(null);
+      }
     } finally {
       setRetryingModel(false);
     }
@@ -3181,13 +3208,13 @@ export function Session() {
               >
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <span>{error()}</span>
-                  <Show when={error() === MODEL_NOT_READY_ERROR}>
+                  <Show when={error() === MODEL_NOT_READY_ERROR || (error() ?? "").includes(LOAD_FAILED_SUBSTR)}>
                     <Button
                       type="button"
                       variant="secondary"
                       size="sm"
                       disabled={retryingModel()}
-                      onClick={() => void retryModelLoad()}
+                      onClick={() => void (error() === MODEL_NOT_READY_ERROR ? retryModelLoad() : retryFailedSend())}
                       class="shrink-0 self-start sm:self-auto"
                     >
                       {retryingModel() ? "Retrying..." : "Retry"}

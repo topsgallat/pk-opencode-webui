@@ -320,12 +320,66 @@ export function FileViewer(props: FileViewerProps) {
           </div>
         </Match>
         <Match when={fileLoaded() && isPdf()}>
-          <iframe
-            src={pdfUrl()}
-            class="w-full border-0"
-            style={{ height: "calc(100vh - 120px)", background: "var(--background-base)" }}
-            title="PDF preview"
-          />
+          <div class="p-2">
+            <div class="rounded overflow-hidden flex flex-col" style={{ border: "1px solid var(--border-base)" }}>
+              <div
+                class="px-3 py-1.5 text-xs flex justify-between items-center shrink-0"
+                style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}
+              >
+                <div class="truncate flex-1 min-w-0 pr-2">{props.path}</div>
+                <div class="flex items-center gap-1 shrink-0 flex-nowrap">
+                  <button
+                    class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
+                    onClick={() => setFullscreenPreview(true)}
+                    title="Fullscreen Preview"
+                    aria-label="Fullscreen Preview"
+                    style={{ color: "var(--text-base)" }}
+                  >
+                    <Maximize2 class="w-3.5 h-3.5" />
+                  </button>
+                  <Show when={capabilities().canUseLocalExtFileOps}>
+                    <button
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
+                      onClick={() => setIsEditing(true)}
+                      title="Edit File"
+                      aria-label="Edit File"
+                      style={{ color: "var(--text-base)" }}
+                    >
+                      <Pencil class="w-3.5 h-3.5" />
+                    </button>
+                  </Show>
+                  <button
+                    class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
+                    onClick={() => void handleDownload()}
+                    title="Download File"
+                    aria-label="Download File"
+                    style={{ color: "var(--text-base)" }}
+                  >
+                    <Download class="w-3.5 h-3.5" />
+                  </button>
+                  <Show when={props.onMentionFile}>
+                    <button
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
+                      onClick={() => props.onMentionFile?.(props.path)}
+                      title="Mention in prompt"
+                      aria-label="Mention in prompt"
+                      style={{ color: "var(--text-base)" }}
+                    >
+                      <MessageSquarePlus class="w-3.5 h-3.5" />
+                    </button>
+                  </Show>
+                </div>
+              </div>
+              <div class="overflow-x-auto min-h-0">
+                <iframe
+                  src={pdfUrl()}
+                  class="w-full border-0"
+                  style={{ height: "calc(100vh - 120px)", background: "var(--background-base)" }}
+                  title="PDF preview"
+                />
+              </div>
+            </div>
+          </div>
         </Match>
         <Match when={fileLoaded() && isBinary()}>
           <div class="flex flex-col items-center justify-center h-full text-center px-4">

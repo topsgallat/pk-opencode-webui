@@ -109,6 +109,14 @@ function normalizePath(path: string) {
   return `${absolute ? "/" : ""}${stack.join("/")}`
 }
 
+function blobFromContent(content: string, type: string, encoding?: string) {
+  if (encoding === "base64") {
+    return new Blob([Uint8Array.from(atob(content), (c) => c.charCodeAt(0))], { type })
+  }
+
+  return new Blob([content], { type })
+}
+
 export function FileViewer(props: FileViewerProps) {
   const file = useFile()
   const sdk = useSDK()
@@ -128,6 +136,8 @@ export function FileViewer(props: FileViewerProps) {
   const [isBinary, setIsBinary] = createSignal(false)
   const [imageUrl, setImageUrl] = createSignal<string | undefined>(undefined)
   const [isImage, setIsImage] = createSignal(false)
+  const [isPdf, setIsPdf] = createSignal(false)
+  const [pdfUrl, setPdfUrl] = createSignal<string | undefined>(undefined)
 
   const lang = createMemo(() => getLanguage(props.path))
   const isMarkdown = createMemo(() => lang() === "markdown")
@@ -162,6 +172,7 @@ export function FileViewer(props: FileViewerProps) {
     const isBin = s?.content?.type === "binary"
     const mime = s?.content?.mimeType
     const img = s?.content?.encoding === "base64" && mime && SAFE_IMAGE_TYPES.has(mime)
+    const pdf = mime === "application/pdf" || path.toLowerCase().endsWith(".pdf")
 
     setFileLoading(loading)
     setFileLoaded(loaded)
@@ -169,10 +180,21 @@ export function FileViewer(props: FileViewerProps) {
     setFileContent(content)
     setIsBinary(isBin)
     setIsImage(!!img)
+    setIsPdf(pdf)
     if (img) {
       setImageUrl(`data:${mime};base64,${s?.content?.content}`)
     } else {
       setImageUrl(undefined)
+    }
+
+    if (pdf && content) {
+      const type = mime || "application/pdf"
+      const blob = blobFromContent(content, type, s?.content?.encoding)
+      const url = URL.createObjectURL(blob)
+      setPdfUrl(url)
+      onCleanup(() => URL.revokeObjectURL(url))
+    } else {
+      setPdfUrl(undefined)
     }
 
     if (!loaded && !loading) {
@@ -262,9 +284,7 @@ export function FileViewer(props: FileViewerProps) {
     }
 
     const type = data.mimeType || (data.type === "binary" ? "application/octet-stream" : "text/plain;charset=utf-8")
-    const blob = data.encoding === "base64"
-      ? new Blob([Uint8Array.from(atob(data.content), (c) => c.charCodeAt(0))], { type })
-      : new Blob([data.content], { type })
+    const blob = blobFromContent(data.content, type, data.encoding)
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
@@ -298,6 +318,14 @@ export function FileViewer(props: FileViewerProps) {
           <div class="p-4 flex justify-center">
             <img src={imageUrl()} alt={props.path} class="max-w-full max-h-[60vh]" />
           </div>
+        </Match>
+        <Match when={fileLoaded() && isPdf()}>
+          <iframe
+            src={pdfUrl()}
+            class="w-full border-0"
+            style={{ height: "calc(100vh - 120px)", background: "var(--background-base)" }}
+            title="PDF preview"
+          />
         </Match>
         <Match when={fileLoaded() && isBinary()}>
           <div class="flex flex-col items-center justify-center h-full text-center px-4">
@@ -342,10 +370,10 @@ export function FileViewer(props: FileViewerProps) {
                       </Show>
                     </button>
                   </Show>
-                  <Show when={fileLoaded() && !isBinary() && !isImage()}>
-                    <button
-                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
-                      onClick={() => setFullscreenPreview(true)}
+                    <Show when={fileLoaded() && (!isBinary() || isPdf()) && !isImage()}>
+                      <button
+                        class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
+                        onClick={() => setFullscreenPreview(true)}
                       title="Fullscreen Preview"
                       aria-label="Fullscreen Preview"
                       style={{ color: "var(--text-base)" }}
@@ -497,6 +525,7 @@ export function FileViewer(props: FileViewerProps) {
                     <Show
                       when={isHtml() && htmlPreview()}
                       fallback={
+                        <Show when={isPdf()} fallback={
                         <div class="p-8 max-w-4xl mx-auto">
                           <div class="font-mono text-xs leading-6 whitespace-pre" style={{ color: "var(--text-base)" }}>
                             <For each={sourceLines()}>
@@ -525,6 +554,13 @@ export function FileViewer(props: FileViewerProps) {
                             </For>
                           </div>
                         </div>
+                        }>
+                          <iframe
+                            src={pdfUrl()}
+                            class="w-full h-full border-0"
+                            title="PDF preview"
+                          />
+                        </Show>
                       }
                     >
                       <iframe

@@ -1,10 +1,20 @@
-import { afterEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { getQuotaData } from './index'
 import { CopilotProvider } from './providers/copilot'
 import { OpenAIProvider } from './providers/openai'
 import { GeminiProvider } from './providers/gemini-cli'
 
 const originalFetch = globalThis.fetch
+const originalHome = process.env.HOME
+let home = ''
+
+beforeEach(() => {
+  home = mkdtempSync(join(tmpdir(), 'pkui-quota-'))
+  process.env.HOME = home
+})
 
 function installQuotaFetchMock() {
   globalThis.fetch = (async (input: RequestInfo | URL) => {
@@ -41,6 +51,11 @@ function installQuotaFetchMock() {
 
 afterEach(() => {
   globalThis.fetch = originalFetch
+  process.env.HOME = originalHome
+  if (home) {
+    rmSync(home, { recursive: true, force: true })
+    home = ''
+  }
 })
 
 describe('getQuotaData', () => {

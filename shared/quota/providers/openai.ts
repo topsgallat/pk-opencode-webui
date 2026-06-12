@@ -1,5 +1,6 @@
 import { QuotaProvider, QuotaProviderView, QuotaFetchOptions, QuotaEntryView } from '../types'
 import { fetchQuotaJson, resolveQuotaAuthHeader } from '../http'
+import { loadOpenAIQuotaAccountCandidates } from './openai-account-source'
 
 const OPENAI_USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
 
@@ -115,6 +116,47 @@ function percentToEntry(label: string, window: Record<string, unknown>, windowTy
   }
 }
 
+async function fetchAccountQuota(options: QuotaFetchOptions, authHeader: string, accountId: string | undefined, label: string, email: string | undefined) {
+  const identity = extractOpenAIIdentity(authHeader, accountId)
+  const requestHeaders: Record<string, string> = {}
+  if (identity?.id) requestHeaders['ChatGPT-Account-Id'] = identity.id
+
+  const data = await fetchQuotaJson<Record<string, unknown>>(OPENAI_USAGE_URL, { ...options, authHeader }, {
+    method: 'GET',
+    headers: requestHeaders,
+  })
+
+  const rateLimit = (data.rate_limit && typeof data.rate_limit === 'object' ? data.rate_limit : data) as Record<string, unknown>
+  const primary = (rateLimit.primary_window && typeof rateLimit.primary_window === 'object' ? rateLimit.primary_window : undefined) as Record<string, unknown> | undefined
+  const secondary = (rateLimit.secondary_window && typeof rateLimit.secondary_window === 'object' ? rateLimit.secondary_window : undefined) as Record<string, unknown> | undefined
+  const codeReviewRoot = (rateLimit.code_review_rate_limit && typeof rateLimit.code_review_rate_limit === 'object' ? rateLimit.code_review_rate_limit : undefined) as Record<string, unknown> | undefined
+  const codeReview = (codeReviewRoot?.primary_window && typeof codeReviewRoot.primary_window === 'object' ? codeReviewRoot.primary_window : undefined) as Record<string, unknown> | undefined
+
+  const entries: QuotaEntryView[] = []
+  const primaryEntry = primary ? percentToEntry('Primary Window', primary, 'hourly', '5h window') : undefined
+  const secondaryEntry = secondary ? percentToEntry('Secondary Window', secondary, 'weekly', 'Weekly window') : undefined
+  const codeReviewEntry = codeReview ? percentToEntry('Code Review', codeReview, 'daily', 'Code review window') : undefined
+  if (primaryEntry) entries.push(primaryEntry)
+  if (secondaryEntry) entries.push(secondaryEntry)
+  if (codeReviewEntry) entries.push(codeReviewEntry)
+
+  if (entries.length === 0) {
+    throw new Error('OpenAI quota response did not include rate limit windows')
+  }
+
+  return {
+    account: {
+      id: identity?.id || accountId || email || label,
+      label: identity?.label || label,
+      email: identity?.email || email,
+      status: 'ok' as const,
+      entries,
+    },
+    entries,
+    identity,
+  }
+}
+
 export class OpenAIProvider implements QuotaProvider {
   id = 'openai'
   name = 'OpenAI'
@@ -125,8 +167,15 @@ export class OpenAIProvider implements QuotaProvider {
 
   async fetch(options: QuotaFetchOptions): Promise<QuotaProviderView> {
     try {
-      const auth = options?.resolveProviderAuthHeader?.(this.id) || resolveQuotaAuthHeader(options, OPENAI_USAGE_URL)
-      if (!auth) {
+      const fallbackAuth = options?.resolveProviderAuthHeader?.(this.id) || resolveQuotaAuthHeader(options, OPENAI_USAGE_URL)
+      const candidates = await loadOpenAIQuotaAccountCandidates({ projectDir: options?.projectDir })
+      const resolved = candidates.length > 0
+        ? candidates
+        : fallbackAuth
+          ? [{ authHeader: fallbackAuth, label: 'OpenAI account', active: true }]
+          : []
+
+      if (resolved.length === 0) {
         return {
           id: this.id,
           name: this.name,
@@ -138,31 +187,44 @@ export class OpenAIProvider implements QuotaProvider {
         }
       }
 
-      const accountId = options?.resolveProviderAuthAccountId?.(this.id)
-      const identity = extractOpenAIIdentity(auth, accountId)
-      const requestHeaders: Record<string, string> = {}
-      if (identity?.id) requestHeaders['ChatGPT-Account-Id'] = identity.id
+      const accounts = [] as NonNullable<QuotaProviderView['accounts']>
+      let activeAccountId: string | undefined
+      let activeEntries: QuotaEntryView[] = []
+      let sawActiveAccount = false
 
-      const data = await fetchQuotaJson<Record<string, unknown>>(OPENAI_USAGE_URL, { ...options, authHeader: auth }, {
-        method: 'GET',
-        headers: requestHeaders,
-      })
+      for (const candidate of resolved) {
+        try {
+          const result = await fetchAccountQuota(options, candidate.authHeader, candidate.accountId, candidate.label, candidate.email)
+          const account = {
+            ...result.account,
+            active: candidate.active,
+          } as NonNullable<QuotaProviderView['accounts']>[number] & { active?: boolean }
+          accounts.push(account)
+          if (candidate.active) {
+            sawActiveAccount = true
+            activeAccountId = account.id
+            activeEntries = result.entries
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          const account = {
+            id: candidate.accountId || candidate.email || candidate.label,
+            label: candidate.label,
+            email: candidate.email,
+            status: message.includes('rate limit windows') ? 'error' : 'error',
+            reason: message,
+            entries: [],
+            active: candidate.active,
+          } as NonNullable<QuotaProviderView['accounts']>[number]
+          accounts.push(account)
+          if (candidate.active) {
+            sawActiveAccount = true
+            activeAccountId = account.id
+          }
+        }
+      }
 
-      const rateLimit = (data.rate_limit && typeof data.rate_limit === 'object' ? data.rate_limit : data) as Record<string, unknown>
-      const primary = (rateLimit.primary_window && typeof rateLimit.primary_window === 'object' ? rateLimit.primary_window : undefined) as Record<string, unknown> | undefined
-      const secondary = (rateLimit.secondary_window && typeof rateLimit.secondary_window === 'object' ? rateLimit.secondary_window : undefined) as Record<string, unknown> | undefined
-      const codeReviewRoot = (rateLimit.code_review_rate_limit && typeof rateLimit.code_review_rate_limit === 'object' ? rateLimit.code_review_rate_limit : undefined) as Record<string, unknown> | undefined
-      const codeReview = (codeReviewRoot?.primary_window && typeof codeReviewRoot.primary_window === 'object' ? codeReviewRoot.primary_window : undefined) as Record<string, unknown> | undefined
-
-      const entries: QuotaEntryView[] = []
-      const primaryEntry = primary ? percentToEntry('Primary Window', primary, 'hourly', '5h window') : undefined
-      const secondaryEntry = secondary ? percentToEntry('Secondary Window', secondary, 'weekly', 'Weekly window') : undefined
-      const codeReviewEntry = codeReview ? percentToEntry('Code Review', codeReview, 'daily', 'Code review window') : undefined
-      if (primaryEntry) entries.push(primaryEntry)
-      if (secondaryEntry) entries.push(secondaryEntry)
-      if (codeReviewEntry) entries.push(codeReviewEntry)
-
-      if (entries.length === 0) {
+      if (activeEntries.length === 0) {
         return {
           id: this.id,
           name: this.name,
@@ -170,7 +232,11 @@ export class OpenAIProvider implements QuotaProvider {
           available: false,
           fetchedAt: new Date().toISOString(),
           entries: [],
-          error: 'OpenAI quota response did not include rate limit windows',
+          accounts: accounts.length > 0 ? accounts : undefined,
+          activeAccountId,
+          error: sawActiveAccount
+            ? accounts.find((account) => account.active)?.reason || 'OpenAI quota response did not include rate limit windows'
+            : accounts.find((account) => account.reason)?.reason || 'OpenAI quota response did not include rate limit windows',
         }
       }
 
@@ -180,8 +246,9 @@ export class OpenAIProvider implements QuotaProvider {
         status: 'ok',
         available: true,
         fetchedAt: new Date().toISOString(),
-        entries,
-        accounts: identity ? [{ ...identity, entries }] : undefined,
+        entries: activeEntries,
+        accounts: accounts.length > 0 ? accounts : undefined,
+        activeAccountId,
         matchedCurrentModel: true,
       }
     } catch (error) {

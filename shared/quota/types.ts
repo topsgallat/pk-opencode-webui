@@ -1,6 +1,7 @@
 export interface QuotaFetchOptions {
   refresh?: boolean
   targetUrl?: string
+  projectDir?: string
   authHeader?: string
   resolveAuthHeader?: (target: string) => string | undefined
   resolveProviderAuthHeader?: (providerID: string) => string | undefined
@@ -34,6 +35,7 @@ export type QuotaProviderView = {
   status: "ok" | "unavailable" | "error"
   available: boolean
   matchedCurrentModel?: boolean
+  activeAccountId?: string
   fetchedAt?: string
   entries: QuotaEntryView[]
   accounts?: QuotaAccountView[]
@@ -62,5 +64,8 @@ export type QuotaAccountView = {
   id: string
   label: string
   email?: string
+  status?: "ok" | "unavailable" | "error"
+  reason?: string
+  active?: boolean
   entries: QuotaEntryView[]
 }

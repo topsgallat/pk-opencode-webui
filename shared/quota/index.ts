@@ -8,6 +8,7 @@ export async function getQuotaData(options: {
   refresh?: boolean
   providerFilter?: string
   targetUrl?: string
+  projectDir?: string
   authHeader?: string
   resolveAuthHeader?: (target: string) => string | undefined
   resolveProviderAuthHeader?: (providerID: string) => string | undefined

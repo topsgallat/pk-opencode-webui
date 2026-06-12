@@ -3672,48 +3672,50 @@ export function Session() {
         </Show>
 
         {/* Unified toast — only one visible at a time */}
-        <Show when={toastMessage()}>
-          <div
-            class="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] px-4 py-2.5 rounded-lg shadow-xl text-sm transition-all border animate-in fade-in slide-in-from-bottom-2 duration-300 flex items-start gap-3"
-            style={{
-              "min-width": "280px",
-              "max-width": "90vw",
-              background: toastVariant() === "error" ? "var(--status-critical-dim)" :
-                toastVariant() === "warning" ? "var(--status-warning-dim)" :
-                  toastVariant() === "success" ? "rgba(22, 163, 74, 0.1)" :
-                    toastVariant() === "hint" ? "var(--surface-inset)" :
-                      "var(--interactive-base)",
-              color: toastVariant() === "error" ? "var(--status-critical-text)" :
-                toastVariant() === "warning" ? "var(--status-warning-text)" :
-                  toastVariant() === "success" ? "var(--icon-success-base)" :
-                    toastVariant() === "hint" ? "var(--text-strong)" :
-                      "white",
-              "border-color": toastVariant() === "error" ? "var(--status-critical-border)" :
-                toastVariant() === "warning" ? "var(--status-warning-border)" :
-                  toastVariant() === "success" ? "rgba(22, 163, 74, 0.2)" :
-                    toastVariant() === "hint" ? "var(--border-base)" :
-                      "var(--interactive-hover)",
-            }}
-          >
-            <div class="flex-1 flex flex-col gap-0.5 min-w-0">
-              <Show when={toastTitle()}>
-                <div class="font-bold text-xs uppercase tracking-wide opacity-80">{toastTitle()}</div>
-              </Show>
-              <div class="font-medium break-words">{toastMessage()}</div>
-            </div>
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                hideToast();
+        <Portal>
+          <Show when={toastMessage()}>
+            <div
+              class="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] px-4 py-2.5 rounded-lg shadow-xl text-sm transition-all border animate-in fade-in slide-in-from-bottom-2 duration-300 flex items-start gap-3"
+              style={{
+                "min-width": "280px",
+                "max-width": "90vw",
+                background: toastVariant() === "error" ? "var(--status-critical-dim)" :
+                  toastVariant() === "warning" ? "var(--status-warning-dim)" :
+                    toastVariant() === "success" ? "rgba(22, 163, 74, 0.1)" :
+                      toastVariant() === "hint" ? "var(--surface-inset)" :
+                        "var(--interactive-base)",
+                color: toastVariant() === "error" ? "var(--status-critical-text)" :
+                  toastVariant() === "warning" ? "var(--status-warning-text)" :
+                    toastVariant() === "success" ? "var(--icon-success-base)" :
+                      toastVariant() === "hint" ? "var(--text-strong)" :
+                        "white",
+                "border-color": toastVariant() === "error" ? "var(--status-critical-border)" :
+                  toastVariant() === "warning" ? "var(--status-warning-border)" :
+                    toastVariant() === "success" ? "rgba(22, 163, 74, 0.2)" :
+                      toastVariant() === "hint" ? "var(--border-base)" :
+                        "var(--interactive-hover)",
               }}
-              class="shrink-0 p-1 -mr-1 rounded-md opacity-60 hover:opacity-100 transition-opacity"
-              aria-label="Close notification"
             >
-              <XIcon class="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </Show>
+              <div class="flex-1 flex flex-col gap-0.5 min-w-0">
+                <Show when={toastTitle()}>
+                  <div class="font-bold text-xs uppercase tracking-wide opacity-80">{toastTitle()}</div>
+                </Show>
+                <div class="font-medium break-words">{toastMessage()}</div>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  hideToast();
+                }}
+                class="shrink-0 p-1 -mr-1 rounded-md opacity-60 hover:opacity-100 transition-opacity"
+                aria-label="Close notification"
+              >
+                <XIcon class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </Show>
+        </Portal>
       </div>
     );
   }

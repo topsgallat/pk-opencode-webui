@@ -1159,6 +1159,7 @@ export async function handleExtendedEndpoint(
     const refresh = url.searchParams.get("refresh") === "true"
     const providerFilter = url.searchParams.get("provider") || undefined
     const target = url.searchParams.get("target") || ""
+    const projectDir = url.searchParams.get("projectDir") || undefined
 
     try {
       const { getQuotaData } = await import("./quota/index")
@@ -1166,6 +1167,7 @@ export async function handleExtendedEndpoint(
         refresh,
         providerFilter,
         targetUrl: target,
+        projectDir,
         resolveAuthHeader: options?.resolveUpstreamAuthHeader,
         resolveProviderAuthHeader: (providerID) => resolveProviderAuthHeader(req, target, providerID),
         resolveProviderAuthAccountId: (providerID) => resolveProviderAuthAccountId(req, target, providerID),

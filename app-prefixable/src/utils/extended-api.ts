@@ -473,10 +473,11 @@ export async function readLogFile(serverUrl: string, name: string): Promise<stri
 /**
  * Get quota data from all providers
  */
-export async function getQuota(serverUrl: string, options?: { refresh?: boolean; targetUrl?: string }): Promise<QuotaApiResponse> {
+export async function getQuota(serverUrl: string, options?: { refresh?: boolean; targetUrl?: string; projectDir?: string }): Promise<QuotaApiResponse> {
   const params = new URLSearchParams()
   if (options?.refresh) params.set("refresh", "true")
   if (options?.targetUrl) params.set("target", options.targetUrl)
+  if (options && "projectDir" in options && options.projectDir) params.set("projectDir", options.projectDir)
 
   const res = await fetchWithTimeout(`${serverUrl}/api/ext/quota?${params}`, {}, EXT_API_TIMEOUT_MS, "extended getQuota")
   if (!res.ok) {

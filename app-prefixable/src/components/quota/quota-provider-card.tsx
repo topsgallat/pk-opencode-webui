@@ -181,8 +181,15 @@ export function QuotaProviderCard(props: QuotaProviderCardProps) {
                   >
                     <div class="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
                       <div class="min-w-0">
-                        <div class="text-sm font-medium" style={{ color: 'var(--text-strong)' }}>
-                          {account.label}
+                        <div class="flex items-center gap-2">
+                          <div class="text-sm font-medium" style={{ color: 'var(--text-strong)' }}>
+                            {account.label}
+                          </div>
+                          <Show when={account.active}>
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ background: 'var(--surface-inset)', color: 'var(--text-weak)', border: '1px solid var(--border-base)' }}>
+                              active
+                            </span>
+                          </Show>
                         </div>
                         <Show when={account.email}>
                           {(email) => (

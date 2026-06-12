@@ -5,7 +5,7 @@ import { useBasePath } from "../context/base-path"
 import { useSDK } from "../context/sdk"
 import { useSync } from "../context/sync"
 import { useProviders } from "../context/providers"
-import { getCopilotMultiplier } from "../utils/path"
+import { base64Decode, getCopilotMultiplier } from "../utils/path"
 import { shouldLoadQuotaOnOpen } from "../utils/quota-refresh"
 import { getSessionQuotaEstimate } from "../utils/session-quota-estimate"
 import { isAnthropicProviderID } from "../../../shared/anthropic-models"
@@ -120,7 +120,7 @@ export function SessionInfo(props: SessionInfoProps) {
 
   const [quota] = createResource(
     () => quotaRequested() ? quotaRequest() : null,
-    async ({ serverUrl, targetUrl }) => await getQuota(serverUrl, { refresh: true, targetUrl }),
+    async ({ serverUrl, targetUrl }) => await getQuota(serverUrl, { refresh: true, targetUrl, projectDir: base64Decode(params.dir) }),
   )
 
   // Sync session data when session ID changes
@@ -334,8 +334,9 @@ export function SessionInfo(props: SessionInfoProps) {
     const id = quotaEstimateSessionKey()
     const provider = quotaProvider()
     const entry = primaryQuotaEntry()
+    const account = provider?.accounts?.find((item) => item.id === provider.activeAccountId) ?? provider?.accounts?.[0] ?? null
     if (!id || !provider || !entry) return null
-    return getSessionQuotaEstimate(id, provider.id, provider.accounts?.[0]?.id ?? null, entry)
+    return getSessionQuotaEstimate(id, provider.id, account?.id ?? null, entry)
   })
 
   const quotaStatus = (status?: string) => {
@@ -741,7 +742,14 @@ export function SessionInfo(props: SessionInfoProps) {
                                       <For each={provider().accounts ?? []}>
                                         {(account) => (
                                           <div class="space-y-0.5">
-                                            <div class="font-medium" style={{ color: "var(--text-base)" }}>{account.label}</div>
+                                            <div class="flex items-center gap-1.5">
+                                              <div class="font-medium" style={{ color: "var(--text-base)" }}>{account.label}</div>
+                                              <Show when={account.active}>
+                                                <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium" style={{ background: "var(--surface-inset)", color: "var(--text-weak)", border: "1px solid var(--border-base)" }}>
+                                                  active
+                                                </span>
+                                              </Show>
+                                            </div>
                                             <Show when={account.email}>
                                               {(email) => <div class="truncate">{email()}</div>}
                                             </Show>

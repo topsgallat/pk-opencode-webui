@@ -23,6 +23,42 @@ type ProviderData = {
   default: Record<string, string>
 }
 
+function createSyntheticTextPart(sessionID: string, messageID: string, partID: string): Part {
+  return {
+    id: partID,
+    sessionID,
+    messageID,
+    type: "text",
+    text: "",
+    synthetic: true,
+  }
+}
+
+function createSyntheticAssistantMessage(sessionID: string, messageID: string, parts: Part[]): MessageWithParts {
+  return {
+    info: {
+      id: messageID,
+      sessionID,
+      role: "assistant",
+      time: { created: Date.now() },
+      parentID: "",
+      modelID: "",
+      providerID: "",
+      mode: "",
+      agent: "",
+      path: { cwd: "", root: "" },
+      cost: 0,
+      tokens: {
+        input: 0,
+        output: 0,
+        reasoning: 0,
+        cache: { read: 0, write: 0 },
+      },
+    },
+    parts,
+  }
+}
+
 type SyncStore = {
   ready: boolean
   bootstrapping: boolean
@@ -120,14 +156,14 @@ export function SyncProvider(props: ParentProps) {
     string,
     { sessionID: string; messageID: string; partID: string; fields: Record<string, string>; order: number }
   >()
-  let rafHandle: number | null = null
+  let flushQueued = false
   let seqCounter = 0
 
   function scheduleFlush() {
-    // Prefer requestAnimationFrame to batch updates into a single paint tick.
-    if (rafHandle != null) return
-    rafHandle = requestAnimationFrame(() => {
-      rafHandle = null
+    if (flushQueued) return
+    flushQueued = true
+    queueMicrotask(() => {
+      flushQueued = false
       flushDeltaQueue()
     })
   }
@@ -152,39 +188,65 @@ export function SyncProvider(props: ParentProps) {
 
       for (const [messageID, list] of byMessage.entries()) {
         const existingParts = store.part[messageID] ?? []
-        if (existingParts.length === 0) continue
+        const next = [...existingParts]
         let changed = false
-        const next = existingParts.map((p) => {
-          const matched = list.find((le) => le.partID === p.id)
-          if (!matched) return p
-          const updated: any = { ...p }
-          for (const [f, v] of Object.entries(matched.fields)) {
-            const cur = (updated as any)[f] ?? ""
-            const result = cur + v
-            console.log(`[Sync:flush] id=${p.id} field=${f} cur=${JSON.stringify(cur.slice(0,80))} delta=${JSON.stringify(v.slice(0,80))} result=${JSON.stringify(result.slice(0,80))}`)
-            ;(updated as any)[f] = result
+
+        for (const item of list) {
+          const partIndex = next.findIndex((part) => part.id === item.partID)
+          if (partIndex === -1) {
+            next.push(createSyntheticTextPart(item.sessionID, item.messageID, item.partID))
+            changed = true
           }
+
+          const index = next.findIndex((part) => part.id === item.partID)
+          if (index === -1) continue
+
+          const current = next[index]
+          const updated: Part = { ...current }
+          const currentRecord = updated as Record<string, unknown>
+          for (const [field, value] of Object.entries(item.fields)) {
+            const currentValue = typeof currentRecord[field] === "string" ? currentRecord[field] : ""
+            const result = currentValue + value
+            console.log(`[Sync:flush] id=${current.id} field=${field} cur=${JSON.stringify(currentValue.slice(0,80))} delta=${JSON.stringify(value.slice(0,80))} result=${JSON.stringify(result.slice(0,80))}`)
+            currentRecord[field] = result
+          }
+
+          next[index] = updated
           changed = true
-          return updated as Part
-        })
+        }
+
         if (changed) {
-          updatedPartsByMessage.set(messageID, next)
-          setStore("part", messageID, next)
+          const sorted = sortParts(next)
+          updatedPartsByMessage.set(messageID, sorted)
+          setStore("part", messageID, sorted)
         }
       }
 
-      const affectedSessions = new Set(entries.map((e) => e.sessionID))
-      for (const sessionID of affectedSessions) {
-        const msgs = store.message[sessionID] ?? []
-        if (!msgs || msgs.length === 0) continue
-        let changed = false
-        const nextMsgs = msgs.map((m) => {
-          const updated = updatedPartsByMessage.get(m.info.id)
-          if (!updated) return m
-          changed = true
-          return { ...m, parts: updated }
+      const updatesBySession = new Map<string, Array<{ messageID: string; parts: Part[] }>>()
+      for (const [messageID, parts] of updatedPartsByMessage.entries()) {
+        const sessionID = entries.find((entry) => entry.messageID === messageID)?.sessionID
+        if (!sessionID) continue
+        const next = updatesBySession.get(sessionID) ?? []
+        next.push({ messageID, parts })
+        updatesBySession.set(sessionID, next)
+      }
+
+      for (const [sessionID, updates] of updatesBySession.entries()) {
+        setStore("message", sessionID, (msgs: MessageWithParts[] = []) => {
+          const nextMsgs = [...msgs]
+
+          for (const update of updates) {
+            const index = nextMsgs.findIndex((message) => message.info.id === update.messageID)
+            if (index === -1) {
+              nextMsgs.push(createSyntheticAssistantMessage(sessionID, update.messageID, update.parts))
+              continue
+            }
+
+            nextMsgs[index] = { ...nextMsgs[index], parts: update.parts }
+          }
+
+          return nextMsgs.sort((a, b) => cmp(a.info.id, b.info.id))
         })
-        if (changed) setStore("message", sessionID, nextMsgs)
       }
     })
   }
@@ -373,16 +435,8 @@ export function SyncProvider(props: ParentProps) {
 
         if (msgIdx === -1) {
           // If message doesn't exist yet, synthesize a placeholder assistant message
-          const synthesized: MessageWithParts = {
-            info: {
-              id: part.messageID,
-              sessionID: part.sessionID,
-              role: "assistant", // Parts updated from SSE are almost always assistant messages
-              time: { created: Date.now() },
-            } as any,
-            parts: [part]
-          };
-          return [...(msgs || []), synthesized].sort((a, b) => cmp(a.info.id, b.info.id));
+          const synthesized = createSyntheticAssistantMessage(part.sessionID, part.messageID, [part])
+          return [...(msgs || []), synthesized].sort((a, b) => cmp(a.info.id, b.info.id))
         }
 
         // Update existing message parts

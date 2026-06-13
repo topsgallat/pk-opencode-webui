@@ -271,6 +271,13 @@ export function MessageTimeline(props: {
 }) {
   const autoScroll = createAutoScroll({ working: () => props.processing })
 
+  function latestIncompleteAssistantTurnId(items: Turn[]) {
+    for (let i = items.length - 1; i >= 0; i--) {
+      if (items[i].assistantMessages.some((message) => message.time?.completed == null)) return items[i].id
+    }
+    return undefined
+  }
+
   const [now, setNow] = createSignal(Date.now())
   let tick: number | undefined
   onMount(() => {
@@ -307,9 +314,35 @@ export function MessageTimeline(props: {
     const all = turns()
     return all.length > 0 ? all[all.length - 1] : null
   })
+  const visibleActiveTurnId = createMemo(() => {
+    const all = turns()
+    if (all.length === 0) return props.activeTurnId
+
+    const explicit = props.activeTurnId && all.some((turn) => turn.id === props.activeTurnId)
+      ? props.activeTurnId
+      : undefined
+
+    if (!props.processing) return explicit
+
+    const assistantTurnId = latestIncompleteAssistantTurnId(all)
+    if (assistantTurnId) return assistantTurnId
+    if (explicit) return explicit
+
+    return all[all.length - 1]?.id
+  })
+  const detachedStreamingTurnId = createMemo(() => {
+    if (!props.processing) return undefined
+
+    const activeId = visibleActiveTurnId()
+    const last = lastTurn()
+    if (!activeId || !last || activeId === last.id) return undefined
+    if (last.assistantMessages.length > 0) return undefined
+
+    return activeId
+  })
   const timelineTurns = createMemo(() => {
-    const activeTurnId = props.activeTurnId
-    const base = renderedTurns().map((turn, index, all) => ({
+    const activeTurnId = visibleActiveTurnId()
+    const base = renderedTurns().map((turn) => ({
       turn,
       queueState: turn.id === activeTurnId ? props.activeTurnState : undefined,
     }))
@@ -350,6 +383,22 @@ export function MessageTimeline(props: {
     setExpanded((prev) => {
       if (prev[last.id] !== undefined) return prev
       return { ...prev, [last.id]: true }
+    })
+  })
+
+  createEffect(() => {
+    const activeId = visibleActiveTurnId()
+    if (!activeId) return
+
+    const detachedId = detachedStreamingTurnId()
+    const lastId = lastTurn()?.id
+    setExpanded((prev) => {
+      const next = { ...prev, [activeId]: true }
+      if (detachedId && lastId) next[lastId] = false
+      if (Object.keys(next).length === Object.keys(prev).length && Object.entries(next).every(([key, value]) => prev[key] === value)) {
+        return prev
+      }
+      return next
     })
   })
 
@@ -494,17 +543,18 @@ export function MessageTimeline(props: {
                   const turn = entry.turn
                   const isLastRealTurn = index() === renderedTurns().length - 1
                   const isQueuedItem = index() >= renderedTurns().length
+                  const isStreamingTurn = turn.id === visibleActiveTurnId()
                   return (
-                   <MessageTurn
-                     turn={turn}
-                     queueState={entry.queueState}
-                     now={now}
-                     isLast={index() === timelineTurns().length - 1}
-                     streaming={props.processing && isLastRealTurn}
-                     defaultExpanded={expanded()[turn.id] ?? (isLastRealTurn || isQueuedItem)}
-                     onToggle={handleToggle}
-                     onDeleteQueued={props.onDeleteQueuedTurn}
-                     onRetry={props.onRetry}
+                    <MessageTurn
+                      turn={turn}
+                      queueState={entry.queueState}
+                      now={now}
+                      isLast={index() === timelineTurns().length - 1}
+                      streaming={props.processing && isStreamingTurn}
+                      defaultExpanded={expanded()[turn.id] ?? (isStreamingTurn || (!props.processing && isLastRealTurn) || isQueuedItem)}
+                      onToggle={handleToggle}
+                      onDeleteQueued={props.onDeleteQueuedTurn}
+                      onRetry={props.onRetry}
                      onOpenFile={props.onOpenFile}
                    />
                   )

@@ -2331,6 +2331,10 @@ export function Session() {
   async function retryFailedSend() {
     const item = failedPromptItem();
     if (!item || retryingModel()) return;
+    if (!item.model) {
+      setShowModelPicker(true);
+      return;
+    }
 
     setRetryingModel(true);
     setError(null);
@@ -2342,6 +2346,16 @@ export function Session() {
       }
 
       await providers.refetch();
+      applySelection({
+        agent: item.agent,
+        model: item.model,
+        variant: item.variant ?? null,
+      });
+      if (!providers.selectedModel) {
+        setShowModelPicker(true);
+        return;
+      }
+
       const ok = await submitPrompt(item);
       if (ok) {
         setFailedPromptItem(null);

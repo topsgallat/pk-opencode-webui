@@ -479,6 +479,11 @@ export function Session() {
     });
     if (currentModelVariants(model).length > 0) {
       setShowVariantPicker(true);
+      return;
+    }
+
+    if (retryAwaitingSelection() && failedPromptItem()) {
+      void retryFailedSendWithSelection();
     }
   }
 
@@ -492,6 +497,10 @@ export function Session() {
         variant,
       }
     })
+
+    if (retryAwaitingSelection() && failedPromptItem()) {
+      void retryFailedSendWithSelection();
+    }
   }
 
   const [fileContext, setFileContext] = createSignal<FileContext[]>([]);
@@ -503,6 +512,7 @@ export function Session() {
   const [error, setError] = createSignal<string | null>(null);
   const [retryingModel, setRetryingModel] = createSignal(false);
   const [failedPromptItem, setFailedPromptItem] = createSignal<PendingPromptItem | null>(null);
+  const [retryAwaitingSelection, setRetryAwaitingSelection] = createSignal(false);
   const [historyError, setHistoryError] = createSignal<string | null>(null);
   // Use session tree walk to find pending questions from this session or any descendant.
   // This surfaces child/grandchild session questions in the parent session view.
@@ -2331,12 +2341,9 @@ export function Session() {
   async function retryFailedSend() {
     const item = failedPromptItem();
     if (!item || retryingModel()) return;
-    if (!item.model) {
-      setShowModelPicker(true);
-      return;
-    }
 
     setRetryingModel(true);
+    setRetryAwaitingSelection(true);
     setError(null);
     try {
       try {
@@ -2346,22 +2353,26 @@ export function Session() {
       }
 
       await providers.refetch();
-      applySelection({
-        agent: item.agent,
-        model: item.model,
-        variant: item.variant ?? null,
-      });
-      if (!providers.selectedModel) {
-        setShowModelPicker(true);
-        return;
-      }
-
-      const ok = await submitPrompt(item);
-      if (ok) {
-        setFailedPromptItem(null);
-      }
+      setShowModelPicker(true);
     } finally {
       setRetryingModel(false);
+    }
+  }
+
+  async function retryFailedSendWithSelection() {
+    const item = failedPromptItem();
+    const model = providers.selectedModel;
+    if (!item || !model) return;
+
+    setRetryAwaitingSelection(false);
+    const ok = await submitPrompt({
+      ...item,
+      model,
+      variant: providers.selectedVariant ?? undefined,
+    });
+    if (ok) {
+      setFailedPromptItem(null);
+      setRetryAwaitingSelection(false);
     }
   }
 

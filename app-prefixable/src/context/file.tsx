@@ -51,6 +51,7 @@ type FileStore = {
 interface FileContextValue {
   tree: {
     list: (dir: string, options?: { force?: boolean }) => Promise<void>
+    refresh: () => Promise<void>
     state: (dir: string) => DirState | undefined
     children: (dir: string) => FileNode[]
     expand: (dir: string) => void
@@ -156,6 +157,19 @@ export function FileProvider(props: ParentProps) {
       }))
     })
     await listDir(dir, { force: true })
+  }
+
+  async function refreshTree() {
+    const dirs = Object.keys(store.dirs)
+    batch(() => {
+      for (const dir of dirs) {
+        setStore("dirs", dir, produce((d) => {
+          d.loaded = false
+        }))
+      }
+    })
+
+    await listDir("", { force: true })
   }
 
   function expand(dir: string) {
@@ -442,6 +456,7 @@ export function FileProvider(props: ParentProps) {
   const value: FileContextValue = {
     tree: {
       list: listDir,
+      refresh: refreshTree,
       state: (dir: string) => store.dirs[dir],
       children: (dir: string) => store.children[dir] ?? [],
       expand,

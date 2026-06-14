@@ -9,6 +9,7 @@ import {
 import * as Diff from "diff";
 import type { FileDiff, FileNode } from "../sdk/client";
 import { useSDK } from "../context/sdk";
+import { useFile } from "../context/file";
 import { useEvents } from "../context/events";
 import { useLayout } from "../context/layout";
 import { withTimeout } from "../utils/request-timeout";
@@ -48,6 +49,7 @@ interface ReviewPanelProps {
 
 export function ReviewPanel(props: ReviewPanelProps) {
   const { client, directory } = useSDK();
+  const file = useFile();
   const events = useEvents();
   const layout = useLayout();
 
@@ -386,13 +388,16 @@ export function ReviewPanel(props: ReviewPanelProps) {
               class="flex items-center justify-between px-3 py-2 shrink-0"
               style={{ "border-bottom": "1px solid var(--border-base)" }}
             >
-              <div class="flex items-center gap-2">
-                <button
-                  onClick={() => loadDiffs()}
-                  class="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                  style={{ color: "var(--icon-weak)" }}
-                  title="Refresh"
-                >
+                <div class="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      void file.tree.refresh()
+                      void loadDiffs()
+                    }}
+                    class="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    style={{ color: "var(--icon-weak)" }}
+                    title="Refresh"
+                  >
                   <RefreshCw
                     class="w-3.5 h-3.5"
                     classList={{ "animate-spin": loading() }}

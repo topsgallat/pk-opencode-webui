@@ -160,7 +160,7 @@ function createAutoScroll(options: { working: () => boolean; bottomThreshold?: n
       return
     }
 
-    if (delta < 0) {
+    if (userIntent && delta < 0) {
       if (store.pinned) setStore("pinned", false)
       userIntent = false
       return

@@ -19,6 +19,13 @@ type AnthropicQuotaSource = {
   accounts?: QuotaAccountView[]
   warning?: string
   error?: string
+  cooldownUntil?: string
+}
+
+type AnthropicQuotaCacheEntry = {
+  at: number
+  value: AnthropicQuotaSource
+  cooldownUntil?: number
 }
 
 const WINDOWS: AnthropicQuotaWindow[] = [
@@ -27,7 +34,8 @@ const WINDOWS: AnthropicQuotaWindow[] = [
 ]
 
 const CACHE_MS = 10_000
-const cache = new Map<string, { at: number; value: AnthropicQuotaSource }>()
+const RATE_LIMIT_COOLDOWN_MS = 5 * 60_000
+const cache = new Map<string, AnthropicQuotaCacheEntry>()
 
 function nowMs(ops?: AnthropicQuotaOps): number {
   return ops?.now?.() ?? Date.now()
@@ -167,6 +175,34 @@ function isRemoteTarget(targetUrl?: string): boolean {
   }
 }
 
+function parseRetryAfterMs(value: string | null, now: number): number | undefined {
+  if (!value) return undefined
+
+  const seconds = Number(value)
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000)
+
+  const at = Date.parse(value)
+  if (Number.isNaN(at)) return undefined
+
+  return Math.max(0, at - now)
+}
+
+function withWarning(value: AnthropicQuotaSource, warning: string): AnthropicQuotaSource {
+  return {
+    ...value,
+    warning: value.warning ? `${value.warning} ${warning}` : warning,
+  }
+}
+
+class AnthropicQuotaRateLimitError extends Error {
+  retryAfterMs?: number
+
+  constructor(message: string, retryAfterMs?: number) {
+    super(message)
+    this.retryAfterMs = retryAfterMs
+  }
+}
+
 async function runCommand(args: string[], ops?: AnthropicQuotaOps): Promise<{ code: number; stdout: string; stderr: string } | null> {
   if (ops?.run) return await ops.run(args)
 
@@ -242,6 +278,7 @@ function extractAccount(data: unknown): QuotaAccountView | undefined {
 
 async function loadOAuthUsage(token: string, ops?: AnthropicQuotaOps): Promise<AnthropicQuotaSource> {
   const fetchFn = ops?.fetch || fetch
+  const now = nowMs(ops)
   const res = await fetchFn("https://api.anthropic.com/api/oauth/usage", {
     method: "GET",
     headers: {
@@ -253,6 +290,12 @@ async function loadOAuthUsage(token: string, ops?: AnthropicQuotaOps): Promise<A
 
   if (!res.ok) {
     const body = await res.text().catch(() => "")
+    if (res.status === 429) {
+      throw new AnthropicQuotaRateLimitError(
+        `Anthropic OAuth usage HTTP 429${body ? `: ${body.slice(0, 200)}` : ""}`,
+        parseRetryAfterMs(res.headers.get("retry-after"), now),
+      )
+    }
     throw new Error(`Anthropic OAuth usage HTTP ${res.status}${body ? `: ${body.slice(0, 200)}` : ""}`)
   }
 
@@ -288,13 +331,15 @@ async function loadCredentials(home: string, ops?: AnthropicQuotaOps): Promise<s
 
 export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh?: boolean; ops?: AnthropicQuotaOps }): Promise<AnthropicQuotaSource> {
   const key = options?.targetUrl || "default"
-  const cached = !options?.refresh ? cache.get(key) : undefined
-  const age = cached ? nowMs(options?.ops) - cached.at : Infinity
-  if (cached && age < CACHE_MS) return cached.value
+  const cached = cache.get(key)
+  const now = nowMs(options?.ops)
+  if (cached?.cooldownUntil && now < cached.cooldownUntil) return cached.value
+  const age = cached ? now - cached.at : Infinity
+  if (cached && !options?.refresh && age < CACHE_MS) return cached.value
 
   const maybeCache = (value: AnthropicQuotaSource) => {
     if (value.entries.length > 0) {
-      cache.set(key, { at: nowMs(options?.ops), value })
+      cache.set(key, { at: now, value })
     }
     return value
   }
@@ -320,12 +365,33 @@ export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh
 
       const token = extractToken(parsed)
       if (token) {
-        const usage = await loadOAuthUsage(token, ops)
-        if (account) usage.accounts = [{ ...account, entries: usage.entries }]
-        usage.warning = isRemoteTarget(options?.targetUrl)
-          ? "Claude.ai quota is read from the UI server host, not the selected remote target"
-          : undefined
-        return maybeCache(usage)
+        try {
+          const usage = await loadOAuthUsage(token, ops)
+          if (account) usage.accounts = [{ ...account, entries: usage.entries }]
+          usage.warning = isRemoteTarget(options?.targetUrl)
+            ? "Claude.ai quota is read from the UI server host, not the selected remote target"
+            : undefined
+          return maybeCache(usage)
+        } catch (error) {
+          if (error instanceof AnthropicQuotaRateLimitError) {
+            const retryAfterMs = error.retryAfterMs ?? RATE_LIMIT_COOLDOWN_MS
+            const cooldownUntil = new Date(now + retryAfterMs).toISOString()
+            const warning = `Anthropic OAuth usage is rate limited; retrying after ${Math.ceil(retryAfterMs / 1000)}s.`
+            let value = cached?.value
+              ? withWarning(cached.value, warning)
+              : { entries: [], warning }
+            value.cooldownUntil = cooldownUntil
+            if (account && value.entries.length > 0 && !value.accounts) {
+              value.accounts = [{ ...account, entries: value.entries }]
+            }
+            if (isRemoteTarget(options?.targetUrl)) {
+              value = withWarning(value, "Claude.ai quota is read from the UI server host, not the selected remote target")
+            }
+            cache.set(key, { at: now, value, cooldownUntil: now + retryAfterMs })
+            return value
+          }
+          throw error
+        }
       }
     } catch {
       // fall through to plain text / credentials fallback

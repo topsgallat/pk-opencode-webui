@@ -131,6 +131,30 @@ describe("AnthropicProvider", () => {
     expect(second.status).toBe("ok")
     expect(second.entries).toHaveLength(1)
   })
+
+  it("cools down after oauth 429 and avoids another Anthropic call", async () => {
+    clearEnv()
+    let calls = 0
+    const provider = new AnthropicProvider({
+      run: mockCliStatus({ authenticated: true, oauth: { accessToken: "tok_123" } }),
+      fetch: async () => {
+        calls += 1
+        return new Response(JSON.stringify({ error: { type: "rate_limit_error", message: "Rate limited. Please try again later." } }), {
+          status: 429,
+          headers: { "content-type": "application/json", "retry-after": "60" },
+        })
+      },
+      now: () => 1_000,
+    })
+
+    const first = await provider.fetch({})
+    const second = await provider.fetch({ refresh: true })
+
+    expect(first.status).toBe("unavailable")
+    expect(first.cooldownUntil).toBe("1970-01-01T00:01:01.000Z")
+    expect(second.cooldownUntil).toBe(first.cooldownUntil)
+    expect(calls).toBe(1)
+  })
 })
 
 afterAll(() => {

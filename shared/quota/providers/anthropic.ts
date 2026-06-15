@@ -25,6 +25,7 @@ export class AnthropicProvider implements QuotaProvider {
           fetchedAt: new Date().toISOString(),
           entries: [],
           accounts: quota.accounts,
+          cooldownUntil: quota.cooldownUntil,
           warning: quota.warning || "Claude.ai quota data was not available",
         }
       }
@@ -37,6 +38,7 @@ export class AnthropicProvider implements QuotaProvider {
         fetchedAt: new Date().toISOString(),
         entries: quota.entries,
         accounts: quota.accounts,
+        cooldownUntil: quota.cooldownUntil,
         warning: quota.warning,
       }
     } catch (error) {

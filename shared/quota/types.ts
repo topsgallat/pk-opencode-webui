@@ -36,6 +36,7 @@ export type QuotaProviderView = {
   available: boolean
   matchedCurrentModel?: boolean
   activeAccountId?: string
+  cooldownUntil?: string
   fetchedAt?: string
   entries: QuotaEntryView[]
   accounts?: QuotaAccountView[]

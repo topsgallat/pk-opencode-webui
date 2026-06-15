@@ -58,12 +58,76 @@ import { errorMessage, withTimeout } from "../utils/request-timeout";
 import { applyQueuedPromptSubmission } from "../utils/chat-queue";
 import { findOptimisticMessageEcho, mergeOptimisticMessage, projectDisplayMessages, type OptimisticQueueMessage, type SyncMessageLike } from "../utils/message-reconcile";
 
-const ACCEPTED_TYPES = [
+const ACCEPTED_IMAGE_TYPES = [
   "image/png",
   "image/jpeg",
   "image/gif",
   "image/webp",
+];
+const ACCEPTED_TEXT_EXTENSIONS = [
+  ".txt",
+  ".conf",
+  ".cfg",
+  ".ini",
+  ".log",
+  ".md",
+  ".markdown",
+  ".csv",
+  ".tsv",
+  ".json",
+  ".xml",
+  ".html",
+  ".htm",
+  ".css",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".ts",
+  ".tsx",
+  ".jsx",
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".env",
+  ".properties",
+  ".sql",
+  ".py",
+  ".rb",
+  ".go",
+  ".rs",
+  ".java",
+  ".c",
+  ".h",
+  ".cpp",
+  ".hpp",
+  ".kt",
+  ".swift",
+  ".php",
+  ".toml",
+  ".yaml",
+  ".yml",
+];
+const ACCEPTED_TYPES = [
+  ...ACCEPTED_IMAGE_TYPES,
   "application/pdf",
+];
+const ACCEPTED_TEXT_MIME_TYPES = [
+  "text/plain",
+  "text/csv",
+  "text/markdown",
+  "text/xml",
+  "text/html",
+  "text/css",
+  "text/javascript",
+  "application/json",
+  "application/xml",
+  "application/yaml",
+  "application/x-yaml",
+  "application/toml",
+  "application/x-toml",
+  "application/x-shellscript",
+  "application/javascript",
+  "application/ecmascript",
 ];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
 const SESSION_STATUS_TIMEOUT_MS = 8_000;
@@ -1913,9 +1977,14 @@ export function Session() {
 
   function addUpload(file: File) {
     setError(null); // Clear previous errors
-    if (!ACCEPTED_TYPES.includes(file.type)) {
+    const name = file.name.toLowerCase();
+    const isTextBased =
+      file.type.startsWith("text/") ||
+      ACCEPTED_TEXT_MIME_TYPES.includes(file.type) ||
+      ACCEPTED_TEXT_EXTENSIONS.some((ext) => name.endsWith(ext));
+    if (!ACCEPTED_TYPES.includes(file.type) && !isTextBased) {
       setError(
-        `Unsupported file type: ${file.type}. Accepted: images and PDFs.`,
+        `Unsupported file type: ${file.type || file.name}. Accepted: images, PDFs, and text-based files.`,
       );
       return;
     }
@@ -2095,10 +2164,11 @@ export function Session() {
   const dragLabel = createMemo(() =>
     (dragMode() ?? treePreview()) === "mention" ? "Drop to mention file" : "Drop files to upload",
   );
-  const dropActive = createMemo(() => isDragging() || treePreview() !== null);
+  const dropActive = createMemo(() => dragMode() !== null || isDragging() || treePreview() !== null);
   const dragSurface = "color-mix(in srgb, var(--surface-inset) 90%, var(--interactive-base) 10%)";
-  const dragBorder = "color-mix(in srgb, var(--border-base) 72%, var(--interactive-base) 28%)";
-  const dragLabelSurface = "color-mix(in srgb, var(--background-base) 82%, var(--surface-inset) 18%)";
+  const dragBorder = "color-mix(in srgb, var(--border-base) 56%, var(--interactive-base) 44%)";
+  const dragGlow = "color-mix(in srgb, var(--interactive-base) 34%, transparent)";
+  const dragLabelSurface = "color-mix(in srgb, var(--background-base) 72%, var(--surface-inset) 28%)";
 
   function clearDragState() {
     dragCounter = 0;
@@ -3277,7 +3347,7 @@ export function Session() {
                       ? `1px solid ${dragBorder}`
                       : "1px solid var(--border-base)",
                     "box-shadow": dropActive()
-                      ? `0 0 0 1px ${dragBorder} inset`
+                      ? `0 0 0 1px ${dragBorder} inset, 0 0 0 3px ${dragGlow}`
                       : "none",
                     "--tw-ring-color": "var(--interactive-base)",
                     opacity: inputBlocked() ? "0.5" : "1",
@@ -3290,7 +3360,7 @@ export function Session() {
                   onRemove={removeFileFromContext}
                 />
 
-                {/* Device uploads (images/PDFs) */}
+                {/* Device uploads (images, PDFs, and text-based files) */}
                 <ImageAttachments
                   attachments={imageAttachments()}
                   onRemove={removeUpload}
@@ -3300,7 +3370,7 @@ export function Session() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept={ACCEPTED_TYPES.join(",")}
+                  accept={[...ACCEPTED_TYPES, "text/*", ...ACCEPTED_TEXT_EXTENSIONS].join(",")}
                   multiple
                   class="hidden"
                   onChange={handleFileInputChange}
@@ -3458,8 +3528,8 @@ export function Session() {
                           e.currentTarget.style.background = "transparent";
                           e.currentTarget.style.color = "var(--text-weak)";
                         }}
-                        title="Upload image or PDF"
-                        aria-label="Upload image or PDF"
+                        title="Upload file"
+                        aria-label="Upload file"
                       >
                         <Upload class="w-4 h-4" />
                       </button>

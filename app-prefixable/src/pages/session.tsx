@@ -2390,24 +2390,6 @@ export function Session() {
     await submitComposerAction();
   }
 
-  async function retryModelLoad() {
-    if (retryingModel()) return;
-
-    setRetryingModel(true);
-    try {
-      try {
-        await client.instance.dispose();
-      } catch (e) {
-        console.error("Failed to dispose client instance before model retry:", e);
-      }
-
-      await providers.refetch();
-      await submitComposerAction();
-    } finally {
-      setRetryingModel(false);
-    }
-  }
-
   async function retryFailedSend() {
     const item = failedPromptItem();
     if (!item || retryingModel()) return;
@@ -3309,10 +3291,17 @@ export function Session() {
                       variant="secondary"
                       size="sm"
                       disabled={retryingModel()}
-                      onClick={() => void (error() === MODEL_NOT_READY_ERROR ? retryModelLoad() : retryFailedSend())}
+                      onClick={() => {
+                        if (error() === MODEL_NOT_READY_ERROR) {
+                          setShowModelPicker(true);
+                          return;
+                        }
+
+                        void retryFailedSend();
+                      }}
                       class="shrink-0 self-start sm:self-auto"
                     >
-                      {retryingModel() ? "Retrying..." : "Retry"}
+                      {retryingModel() ? "Loading..." : "Select model"}
                     </Button>
                   </Show>
                 </div>

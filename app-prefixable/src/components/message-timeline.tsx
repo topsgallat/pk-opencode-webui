@@ -1,5 +1,4 @@
-import { createSignal, createMemo, createEffect, on, For, Show, onMount, onCleanup, untrack } from "solid-js"
-import { createStore } from "solid-js/store"
+import { createSignal, createMemo, createEffect, For, Show, onMount, onCleanup, untrack } from "solid-js"
 import { Spinner } from "./ui/spinner"
 import { MessageTurn } from "./message-turn"
 // Note: Markdown and MessageParts are used in the FlatMessageList component below
@@ -23,234 +22,61 @@ function hasVisibleContent(message: DisplayMessage): boolean {
   return extractTextContent(message.parts).trim().length > 0
 }
 
-function createAutoScroll(options: { working: () => boolean; bottomThreshold?: number }) {
+function createAutoScroll(options: { bottomThreshold?: number } = {}) {
   let scroll: HTMLElement | undefined
-  let scrollFrame: number | undefined
-  let smoothScrollFrame: number | undefined
+  let content: HTMLElement | undefined
+  let scrollResizeObserver: ResizeObserver | undefined
   let resizeObserver: ResizeObserver | undefined
-  let observedContent: HTMLElement | undefined
-  let suppressScroll = false
-  let smoothScrolling = false
-  let userIntent = false
-  let lastScrollTop = 0
-
   const threshold = options.bottomThreshold ?? 24
 
-  const [store, setStore] = createStore({
-    contentRef: undefined as HTMLElement | undefined,
-    pinned: true,
-  })
-
   const distanceFromBottom = (el: HTMLElement) => el.scrollHeight - el.clientHeight - el.scrollTop
+  const [showFab, setShowFab] = createSignal(false)
 
-  const canScroll = (el: HTMLElement) => el.scrollHeight - el.clientHeight > 1
-
-  const scrollTargetTop = (el: HTMLElement) => Math.max(0, el.scrollHeight - el.clientHeight)
-
-  const writeScrollBottom = (el: HTMLElement) => {
-    const next = scrollTargetTop(el)
-    if (Math.abs(el.scrollTop - next) < 1) return
-    suppressScroll = true
-    el.scrollTop = next
-    queueMicrotask(() => {
-      suppressScroll = false
-    })
-  }
-
-  const cancelSmoothScroll = () => {
-    smoothScrolling = false
-    if (smoothScrollFrame !== undefined) {
-      cancelAnimationFrame(smoothScrollFrame)
-      smoothScrollFrame = undefined
-    }
-  }
-
-  const finishSmoothScroll = () => {
-    cancelSmoothScroll()
-    if (!store.pinned) setStore("pinned", true)
-    queueScrollToBottom()
-  }
-
-  const queueScrollToBottom = () => {
-    if (scrollFrame !== undefined) return
-    scrollFrame = requestAnimationFrame(() => {
-      scrollFrame = undefined
-      const el = scroll
-      if (!el) return
-      if (!store.pinned) return
-      writeScrollBottom(el)
-    })
-  }
-
-  const scrollToBottom = (force: boolean) => {
+  const update = () => {
     const el = scroll
     if (!el) return
-    cancelSmoothScroll()
-    if (!force && !store.pinned) return
-    if (!store.pinned) setStore("pinned", true)
-    queueScrollToBottom()
+    setShowFab(distanceFromBottom(el) > threshold)
   }
 
-  const smoothScrollToBottom = () => {
-    const el = scroll
-    if (!el) return
-    cancelSmoothScroll()
-    if (!store.pinned) setStore("pinned", true)
-    const target = scrollTargetTop(el)
-    if (Math.abs(el.scrollTop - target) < 1) return
-
-    smoothScrolling = true
-    el.scrollTo({ top: target, behavior: "smooth" })
-
-    const monitor = () => {
-      const active = scroll
-      if (!active || !smoothScrolling) return
-      if (distanceFromBottom(active) <= threshold) {
-        finishSmoothScroll()
-        return
-      }
-      smoothScrollFrame = requestAnimationFrame(monitor)
-    }
-
-    smoothScrollFrame = requestAnimationFrame(monitor)
-  }
-
-  const handleWheel = (e: WheelEvent) => {
-    const el = scroll
-    const target = e.target instanceof Element ? e.target : undefined
-    const nested = target?.closest("[data-scrollable]")
-    if (el && nested && nested !== el) return
-    userIntent = true
-    cancelSmoothScroll()
-  }
-
-  const handlePointerDown = () => {
-    userIntent = true
-    cancelSmoothScroll()
-  }
-
-  const handleWindowKeyDown = (e: KeyboardEvent) => {
-    if (!smoothScrolling) return
-    if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " ", "Spacebar"].includes(e.key)) {
-      userIntent = true
-      cancelSmoothScroll()
-    }
-  }
-
-  const handleScroll = () => {
-    const el = scroll
-    if (!el) return
-    if (suppressScroll) return
-
-    const currentTop = el.scrollTop
-    const delta = currentTop - lastScrollTop
-    lastScrollTop = currentTop
-
-    if (!canScroll(el)) {
-      cancelSmoothScroll()
-      if (!store.pinned) setStore("pinned", true)
-      return
-    }
-
-    const bottom = distanceFromBottom(el)
-    if (smoothScrolling) {
-      if (bottom <= threshold) {
-        finishSmoothScroll()
-      }
-      return
-    }
-
-    if (userIntent && delta < 0) {
-      if (store.pinned) setStore("pinned", false)
-      userIntent = false
-      return
-    }
-
-    if (bottom <= threshold) {
-      if (!store.pinned) setStore("pinned", true)
-      userIntent = false
-      return
-    }
-
-    if (!userIntent) {
-      queueScrollToBottom()
-      return
-    }
-
-    if (store.pinned) setStore("pinned", false)
-    userIntent = false
-  }
-
-  const updateOverflowAnchor = (el: HTMLElement) => {
-    el.style.overflowAnchor = store.pinned ? "none" : "auto"
-  }
-
-  const setupResizeObserver = (content: HTMLElement) => {
-    if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = undefined }
-    observedContent = content
-    resizeObserver = new ResizeObserver(() => {
-      const el = scroll
-      if (!el) return
-      if (!canScroll(el)) {
-        if (!store.pinned) setStore("pinned", true)
-        return
-      }
-      if (!store.pinned) return
-      queueScrollToBottom()
-    })
+  const observe = () => {
+    if (!content || typeof ResizeObserver === "undefined") return
+    if (resizeObserver) resizeObserver.disconnect()
+    resizeObserver = new ResizeObserver(() => update())
     resizeObserver.observe(content)
   }
 
-  createEffect(() => {
-    const content = store.contentRef
-    if (!content) return
-    if (content === observedContent) return
-    setupResizeObserver(content)
-  })
-
-  createEffect(on(options.working, (working: boolean) => {
-    if (!working) return
-    if (!store.pinned) return
-    scrollToBottom(false)
-  }))
-
-  createEffect(() => {
-    store.pinned
-    const el = scroll
-    if (!el) return
-    updateOverflowAnchor(el)
-  })
+  const observeScroll = (el: HTMLElement) => {
+    if (typeof ResizeObserver === "undefined") return
+    if (scrollResizeObserver) scrollResizeObserver.disconnect()
+    scrollResizeObserver = new ResizeObserver(() => update())
+    scrollResizeObserver.observe(el)
+  }
 
   onCleanup(() => {
-    if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame)
-    if (smoothScrollFrame !== undefined) cancelAnimationFrame(smoothScrollFrame)
-    if (typeof window !== "undefined") window.removeEventListener("keydown", handleWindowKeyDown)
-    if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = undefined }
+    if (scrollResizeObserver) scrollResizeObserver.disconnect()
+    if (resizeObserver) resizeObserver.disconnect()
   })
 
   return {
     scrollRef: (el: HTMLElement | undefined) => {
-      if (scroll) {
-        scroll.removeEventListener("wheel", handleWheel)
-        scroll.removeEventListener("pointerdown", handlePointerDown)
-      }
-    scroll = el
-    if (!el) return
-    lastScrollTop = el.scrollTop
-    updateOverflowAnchor(el)
-      el.addEventListener("wheel", handleWheel, { passive: true })
-      el.addEventListener("pointerdown", handlePointerDown, { passive: true })
-      if (typeof window !== "undefined") {
-        window.removeEventListener("keydown", handleWindowKeyDown)
-        window.addEventListener("keydown", handleWindowKeyDown)
-      }
+      scroll = el
+      if (!el) return
+      observeScroll(el)
+      update()
     },
-    contentRef: (el: HTMLElement | undefined) => setStore("contentRef", el),
-    handleScroll,
-    scrollToBottom: () => scrollToBottom(false),
-    forceScrollToBottom: () => scrollToBottom(true),
-    smoothScrollToBottom,
-    userScrolled: () => !store.pinned,
+    contentRef: (el: HTMLElement | undefined) => {
+      content = el
+      if (!el) return
+      observe()
+      update()
+    },
+    handleScroll: update,
+    scrollToBottom: () => {
+      const el = scroll
+      if (!el) return
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+    },
+    showScrollToBottom: () => showFab(),
   }
 }
 
@@ -269,7 +95,7 @@ export function MessageTimeline(props: {
   onRetryHistory?: () => void
   onOpenFile?: (path: string) => void
 }) {
-  const autoScroll = createAutoScroll({ working: () => props.processing })
+  const autoScroll = createAutoScroll()
 
   function latestIncompleteAssistantTurnId(items: Turn[]) {
     for (let i = items.length - 1; i >= 0; i--) {
@@ -284,9 +110,6 @@ export function MessageTimeline(props: {
     tick = window.setInterval(() => setNow(Date.now()), 30_000)
   })
 
-  createEffect(on(() => props.loadingHistory, (loading, prev) => {
-    if (prev && !loading) requestAnimationFrame(() => autoScroll.forceScrollToBottom())
-  }))
   onCleanup(() => {
     if (tick !== undefined) clearInterval(tick)
   })
@@ -428,10 +251,10 @@ export function MessageTimeline(props: {
   })
 
   createEffect(() => {
-    props.onScroll?.(!autoScroll.userScrolled())
+    props.onScroll?.(!autoScroll.showScrollToBottom())
   })
 
-  const showScrollToBottom = createMemo(() => !props.loadingHistory && autoScroll.userScrolled())
+  const showScrollToBottom = createMemo(() => !props.loadingHistory && autoScroll.showScrollToBottom())
 
   return (
     <div class="relative flex-1 min-h-0">
@@ -439,7 +262,7 @@ export function MessageTimeline(props: {
         ref={(el) => { containerRef = el; autoScroll.scrollRef(el) }}
         onScroll={autoScroll.handleScroll}
         class="h-full overflow-y-auto p-6"
-        style={{ background: "var(--background-stronger)" }}
+        style={{ background: "var(--background-stronger)", "overflow-anchor": "none" }}
       >
         {/* Loading history indicator */}
         <Show when={props.loadingHistory}>
@@ -611,7 +434,7 @@ export function MessageTimeline(props: {
             onMouseLeave={(e) => {
               e.currentTarget.style.background = "var(--interactive-base)"
             }}
-            onClick={() => autoScroll.smoothScrollToBottom()}
+            onClick={() => autoScroll.scrollToBottom()}
             aria-label="Scroll to bottom"
             title="Scroll to bottom"
           >

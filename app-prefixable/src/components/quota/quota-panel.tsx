@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, Show, onCleanup } from 'solid-js'
 import { useBasePath } from '../../context/base-path'
 import { useSDK } from '../../context/sdk'
 import { getQuota } from '../../utils/extended-api'
@@ -10,6 +10,7 @@ export function QuotaContent() {
   const { targetUrl } = useSDK()
   const [refreshing, setRefreshing] = createSignal(false)
   const [selectedProvider, setSelectedProvider] = createSignal<string>('all')
+  const [clock, setClock] = createSignal(Date.now())
 
   const [quotaResource, { refetch }] = createResource(
     () => ({ serverUrl, refresh: false }),
@@ -19,6 +20,8 @@ export function QuotaContent() {
   )
 
   const handleRefresh = async () => {
+    if (anthropicCoolingDown()) return
+
     setRefreshing(true)
     try {
       await getQuota(serverUrl, { refresh: true, targetUrl })
@@ -31,6 +34,27 @@ export function QuotaContent() {
   }
 
   const providers = createMemo(() => quotaResource()?.providers ?? [])
+  const anthropicProvider = createMemo(() => providers().find((provider) => provider.id === 'anthropic') ?? null)
+  const anthropicCooldownUntil = createMemo(() => anthropicProvider()?.cooldownUntil ?? null)
+  const anthropicCoolingDown = createMemo(() => {
+    const cooldownUntil = anthropicCooldownUntil()
+    if (!cooldownUntil) return false
+
+    const cooldownAt = Date.parse(cooldownUntil)
+    return !Number.isNaN(cooldownAt) && clock() < cooldownAt
+  })
+
+  createEffect(() => {
+    const cooldownUntil = anthropicCooldownUntil()
+    if (!cooldownUntil) return
+
+    const cooldownAt = Date.parse(cooldownUntil)
+    if (Number.isNaN(cooldownAt)) return
+
+    const delay = Math.max(0, cooldownAt - Date.now()) + 1_000
+    const timer = setTimeout(() => setClock(Date.now()), delay)
+    onCleanup(() => clearTimeout(timer))
+  })
 
   const filterOptions = createMemo(() => [
     { id: 'all', label: 'All providers' },
@@ -80,6 +104,17 @@ export function QuotaContent() {
   })
 
   const availableCount = createMemo(() => providers().filter(provider => provider.available).length)
+  const refreshDisabled = createMemo(() => refreshing() || anthropicCoolingDown())
+  const refreshLabel = createMemo(() => {
+    if (refreshing()) return 'Refreshing…'
+    if (!anthropicCoolingDown()) return 'Refresh'
+
+    const cooldownUntil = anthropicCooldownUntil()
+    if (!cooldownUntil) return 'Rate limited'
+
+    const at = new Date(cooldownUntil)
+    return `Rate limited until ${at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+  })
 
   return (
     <div class="space-y-6">
@@ -132,7 +167,7 @@ export function QuotaContent() {
           <button
             type="button"
             onClick={handleRefresh}
-            disabled={refreshing()}
+            disabled={refreshDisabled()}
             class="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: 'var(--surface-inset)',
@@ -140,15 +175,21 @@ export function QuotaContent() {
               color: 'var(--text-base)',
             }}
             onMouseEnter={(e) => {
-              if (!refreshing()) e.currentTarget.style.background = 'var(--surface-raised)'
+              if (!refreshDisabled()) e.currentTarget.style.background = 'var(--surface-raised)'
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'var(--surface-inset)'
             }}
           >
-            {refreshing() ? 'Refreshing…' : 'Refresh'}
+            {refreshLabel()}
           </button>
         </div>
+
+        <Show when={anthropicCoolingDown()}>
+          <div class="px-4 text-xs" style={{ color: 'var(--status-warning-text)' }}>
+            Anthropic is cooling down to avoid 429s. Manual refresh will re-enable after the retry window.
+          </div>
+        </Show>
 
         <div class="space-y-4 p-4">
         <div

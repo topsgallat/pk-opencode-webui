@@ -73,6 +73,7 @@ function handleDragStart(e: DragEvent, path: string) {
 function handleTreeDragStart(e: DragEvent, path: string, kind: "file" | "directory") {
   handleDragStart(e, path)
   e.dataTransfer?.setData(FILE_TREE_KIND_DATA, kind)
+  if (kind === "file") dispatchLongPressPreview(kind, path, true)
 }
 
 function dispatchLongPressPreview(kind: "file" | "directory", path: string, active: boolean) {
@@ -558,7 +559,8 @@ function handleDragOverTarget(e: DragEvent, path: string) {
     setDragInternal(false)
   }
 
-  function handleDragEnd() {
+  function handleDragEnd(kind?: "file" | "directory", path?: string) {
+    if (kind === "file" && path) dispatchLongPressPreview(kind, path, false)
     handleDropClear()
   }
 
@@ -719,8 +721,8 @@ function handleDragOverTarget(e: DragEvent, path: string) {
                        }}
                        aria-expanded={expanded()}
                        classList={{ "cursor-not-allowed": targetInvalid(node.path) }}
-                       onDragStart={(e) => { clearLongPress(); handleTreeDragStart(e, node.path, "directory") }}
-                        onDragEnd={handleDragEnd}
+                        onDragStart={(e) => { clearLongPress(); handleTreeDragStart(e, node.path, "directory") }}
+                         onDragEnd={() => handleDragEnd("directory", node.path)}
                         onDragEnter={(e) => handleDragEnter(e, node.path)}
                         onDragOver={(e) => handleDirectoryDragHover(e, node.path, expanded())}
                         onDragLeave={(e) => { clearAutoExpand(node.path); handleDragLeave(e) }}
@@ -807,7 +809,7 @@ function handleDragOverTarget(e: DragEvent, path: string) {
                     props.onFileClick?.(node)
                   }}
                    onDragStart={(e) => { clearLongPress(); handleTreeDragStart(e, node.path, "file") }}
-                  onDragEnd={handleDragEnd}
+                  onDragEnd={() => handleDragEnd("file", node.path)}
                   onContextMenu={(e) => handleContextMenu(e, node)}
                   onTouchStart={(e) => handleTouchStart(e, node)}
                   onTouchEnd={() => handleTouchEnd(node.path)}

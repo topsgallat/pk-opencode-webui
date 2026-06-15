@@ -17,6 +17,14 @@ describe("shouldRefreshQuotaOnOpen", () => {
   it("refreshes after an error", () => {
     expect(shouldRefreshQuotaOnOpen({ fetchedAt: "1970-01-01T00:00:01.000Z" }, true, 1_500, 1_000)).toBe(true)
   })
+
+  it("does not refresh during cooldown", () => {
+    expect(shouldRefreshQuotaOnOpen({ fetchedAt: "1970-01-01T00:00:01.000Z" }, true, 1_500, 1_000, "1970-01-01T00:00:05.000Z")).toBe(false)
+  })
+
+  it("refreshes again once cooldown expires", () => {
+    expect(shouldRefreshQuotaOnOpen({ fetchedAt: "1970-01-01T00:00:01.000Z" }, false, 6_100, 1_000, "1970-01-01T00:00:05.000Z")).toBe(true)
+  })
 })
 
 describe("shouldLoadQuotaOnOpen", () => {
@@ -30,5 +38,9 @@ describe("shouldLoadQuotaOnOpen", () => {
 
   it("refetches stale data after open", () => {
     expect(shouldLoadQuotaOnOpen({ requested: true, loading: false, quota: { fetchedAt: "1970-01-01T00:00:01.000Z" }, hasError: false, now: 3_100, ttlMs: 1_000 })).toBe(true)
+  })
+
+  it("suppresses refetch during cooldown", () => {
+    expect(shouldLoadQuotaOnOpen({ requested: true, loading: false, quota: { fetchedAt: "1970-01-01T00:00:01.000Z" }, hasError: true, cooldownUntil: "1970-01-01T00:00:05.000Z", now: 1_500, ttlMs: 1_000 })).toBe(false)
   })
 })

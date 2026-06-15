@@ -7,7 +7,12 @@ export function shouldRefreshQuotaOnOpen(
   hasError: boolean,
   now = Date.now(),
   ttlMs = QUOTA_REFRESH_TTL_MS,
+  cooldownUntil?: string,
 ): boolean {
+  if (cooldownUntil) {
+    const cooldownAt = Date.parse(cooldownUntil)
+    if (!Number.isNaN(cooldownAt) && now < cooldownAt) return false
+  }
   if (hasError) return true
   if (!quota?.fetchedAt) return true
   return now - Date.parse(quota.fetchedAt) >= ttlMs
@@ -18,10 +23,11 @@ export function shouldLoadQuotaOnOpen(options: {
   loading: boolean
   quota: Pick<QuotaApiResponse, "fetchedAt"> | null | undefined
   hasError: boolean
+  cooldownUntil?: string
   now?: number
   ttlMs?: number
 }): boolean {
   if (!options.requested) return true
   if (options.loading) return false
-  return shouldRefreshQuotaOnOpen(options.quota, options.hasError, options.now, options.ttlMs)
+  return shouldRefreshQuotaOnOpen(options.quota, options.hasError, options.now, options.ttlMs, options.cooldownUntil)
 }

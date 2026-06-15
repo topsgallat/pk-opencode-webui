@@ -213,11 +213,8 @@ export function MessageTimeline(props: {
     const activeId = visibleActiveTurnId()
     if (!activeId) return
 
-    const detachedId = detachedStreamingTurnId()
-    const lastId = lastTurn()?.id
     setExpanded((prev) => {
       const next = { ...prev, [activeId]: true }
-      if (detachedId && lastId) next[lastId] = false
       if (Object.keys(next).length === Object.keys(prev).length && Object.entries(next).every(([key, value]) => prev[key] === value)) {
         return prev
       }

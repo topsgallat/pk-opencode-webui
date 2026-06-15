@@ -174,6 +174,10 @@ export function SessionInfo(props: SessionInfoProps) {
     }
 
     if (turns <= seen) return
+    if (isQuotaCoolingDown()) {
+      setLastQuotaAssistantTurnCount(turns)
+      return
+    }
     if (quota.loading && !quota()) {
       setLastQuotaAssistantTurnCount(turns)
       return
@@ -322,6 +326,16 @@ export function SessionInfo(props: SessionInfoProps) {
     if (!provider) return null
     return provider.reason || provider.error || provider.warning || null
   })
+
+  const quotaProviderCooldownUntil = createMemo(() => quotaProvider()?.cooldownUntil ?? null)
+
+  function isQuotaCoolingDown() {
+    const cooldownUntil = quotaProviderCooldownUntil()
+    if (!cooldownUntil) return false
+
+    const cooldownAt = Date.parse(cooldownUntil)
+    return !Number.isNaN(cooldownAt) && Date.now() < cooldownAt
+  }
 
   const quotaEstimateSessionKey = createMemo(() => {
     const id = params.id
@@ -493,6 +507,7 @@ export function SessionInfo(props: SessionInfoProps) {
       loading: quota.loading,
       quota: quota(),
       hasError: Boolean(quota.error),
+      cooldownUntil: quotaProviderCooldownUntil() ?? undefined,
     })
 
     if (!quotaRequested()) {

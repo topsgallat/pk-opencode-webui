@@ -23,6 +23,12 @@ interface Props {
   emptyMessage?: string
   placeholder?: string
   initialFilter?: string
+  headerActionLabel?: string
+  headerActionPendingLabel?: string
+  headerActionDisabled?: boolean
+  onHeaderAction?: () => void
+  statusMessage?: string | null
+  statusTone?: "default" | "error"
 }
 
 export function PickerDialog(props: Props) {
@@ -30,6 +36,7 @@ export function PickerDialog(props: Props) {
   const [activeIndex, setActiveIndex] = createSignal(0)
   let inputRef: HTMLInputElement | undefined
   let listRef: HTMLDivElement | undefined
+  let headerActionRef: HTMLButtonElement | undefined
   let closeButtonRef: HTMLButtonElement | undefined
 
   const filtered = createMemo(() => {
@@ -87,6 +94,7 @@ export function PickerDialog(props: Props) {
         e.preventDefault()
         setActiveIndex((i) => (i - 1 + items.length) % items.length)
       } else if (e.key === "Enter" && items.length > 0) {
+        if (document.activeElement === headerActionRef || document.activeElement === closeButtonRef) return
         e.preventDefault()
         const item = items[activeIndex()]
         if (item) {
@@ -95,11 +103,13 @@ export function PickerDialog(props: Props) {
         }
       } else if (e.key === "Tab") {
         e.preventDefault()
-        if (document.activeElement === inputRef) {
-          closeButtonRef?.focus()
-        } else {
-          inputRef?.focus()
-        }
+        const focusable = [inputRef, headerActionRef, closeButtonRef].filter((el): el is HTMLButtonElement | HTMLInputElement => !!el)
+        if (focusable.length === 0) return
+        const current = focusable.indexOf(document.activeElement as HTMLButtonElement | HTMLInputElement)
+        const next = current === -1
+          ? 0
+          : (current + (e.shiftKey ? -1 : 1) + focusable.length) % focusable.length
+        focusable[next]?.focus()
       }
     }
     window.addEventListener("keydown", handler, true)
@@ -136,17 +146,45 @@ export function PickerDialog(props: Props) {
             <h2 id="picker-title" class="text-base font-medium" style={{ color: "var(--text-strong)" }}>
               {props.title}
             </h2>
-            <button
-              ref={closeButtonRef}
-              onClick={props.onClose}
-              class="p-1 rounded transition-colors"
-              style={{ color: "var(--icon-weak)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-inset)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-              aria-label="Close"
-            >
-              <X class="w-5 h-5" />
-            </button>
+            <div class="flex items-center gap-2">
+              <Show when={props.onHeaderAction && props.headerActionLabel}>
+                <button
+                  ref={headerActionRef}
+                  type="button"
+                  onClick={() => props.onHeaderAction?.()}
+                  disabled={props.headerActionDisabled}
+                  class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors"
+                  style={{
+                    background: "var(--surface-inset)",
+                    color: "var(--text-base)",
+                    border: "1px solid var(--border-base)",
+                    ...(props.headerActionDisabled ? { opacity: "0.6", cursor: "not-allowed" } : {}),
+                  }}
+                  onMouseEnter={(e) => {
+                    if (props.headerActionDisabled) return
+                    e.currentTarget.style.background = "color-mix(in srgb, var(--surface-inset) 75%, var(--interactive-base) 25%)"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "var(--surface-inset)"
+                  }}
+                >
+                  {props.headerActionDisabled && props.headerActionPendingLabel
+                    ? props.headerActionPendingLabel
+                    : props.headerActionLabel}
+                </button>
+              </Show>
+              <button
+                ref={closeButtonRef}
+                onClick={props.onClose}
+                class="p-1 rounded transition-colors"
+                style={{ color: "var(--icon-weak)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-inset)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                aria-label="Close"
+              >
+                <X class="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Search */}
@@ -182,6 +220,14 @@ export function PickerDialog(props: Props) {
               <span class="mx-1.5">-</span>
               <span class="opacity-70">Esc to close</span>
             </div>
+            <Show when={props.statusMessage}>
+              <div
+                class="mt-2 text-xs"
+                style={{ color: props.statusTone === "error" ? "var(--text-critical-base)" : "var(--text-weak)" }}
+              >
+                {props.statusMessage}
+              </div>
+            </Show>
           </div>
 
           {/* List */}

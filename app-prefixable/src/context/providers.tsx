@@ -69,6 +69,11 @@ interface ProviderAuthMethod {
   label: string
 }
 
+interface RefetchResult {
+  ok: boolean
+  error?: string
+}
+
 interface ModelKey {
   providerID: string
   modelID: string
@@ -120,7 +125,7 @@ interface ProviderContextValue {
   setSelectedModel: (model: ModelKey | null) => void
   setSelectedVariant: (variant: string | null) => void
   setSelectedAgent: (agent: string) => void
-  refetch: () => Promise<void>
+  refetch: () => Promise<RefetchResult>
   connectProvider: (providerID: string, apiKey: string, accountName?: string) => Promise<boolean>
   disconnectProvider: (providerID: string) => Promise<boolean>
   startOAuth: (providerID: string, methodIndex: number) => Promise<OAuthAuthorization | undefined>
@@ -148,6 +153,8 @@ export function ProviderProvider(props: ParentProps) {
 
   // Track whether the user has manually changed the agent via setSelectedAgent
   let userChangedAgent = false
+  let providerFetchError: string | null = null
+  let agentFetchError: string | null = null
 
   function formatOAuthError(error: unknown): { status?: number; error: string } {
     const status = typeof error === "object" && error !== null && "status" in error && typeof (error as { status?: unknown }).status === "number"
@@ -200,6 +207,7 @@ export function ProviderProvider(props: ParentProps) {
     try {
       const res = await withTimeout(() => client.provider.list(), PROVIDER_REQUEST_TIMEOUT_MS, "Loading providers")
       const data = res.data as ProviderListData | undefined
+      providerFetchError = null
       if (!data) return undefined
       const multipliers = getCopilotModelMultipliers()
       // Inject providerID into each model since the SDK response doesn't include it
@@ -232,6 +240,8 @@ export function ProviderProvider(props: ParentProps) {
       return { ...data, all }
     } catch (e) {
       console.error("Failed to fetch providers:", e)
+      providerFetchError = readErrorMessage(e)
+        ?? (e instanceof Error ? e.message : typeof e === "string" ? e : "Failed to load providers")
       return undefined
     }
   })
@@ -388,11 +398,15 @@ export function ProviderProvider(props: ParentProps) {
       const agents = res.data
       if (!Array.isArray(agents)) {
         console.error("[Providers] Agents is not an array:", agents)
+        agentFetchError = "Failed to load agents"
         return []
       }
+      agentFetchError = null
       return agents as Agent[]
     } catch (e) {
       console.error("Failed to fetch agents:", e)
+      agentFetchError = readErrorMessage(e)
+        ?? (e instanceof Error ? e.message : typeof e === "string" ? e : "Failed to load agents")
       return []
     }
   })
@@ -550,6 +564,10 @@ export function ProviderProvider(props: ParentProps) {
   async function refetch() {
     await refetchProviders()
     await refetchAgents()
+
+    const error = providerFetchError ?? agentFetchError
+    if (error) return { ok: false, error }
+    return { ok: true }
   }
 
   const value: ProviderContextValue = {

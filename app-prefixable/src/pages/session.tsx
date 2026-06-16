@@ -42,7 +42,7 @@ import { ResizeHandle } from "../components/resize-handle";
 import { base64Encode, base64Decode } from "../utils/path";
 import type { Command as BackendCommand, Part, TextPart } from "../sdk/client";
 import type { DisplayMessage, QueueTurnState } from "../types/message";
-import { Plus, Settings, Paperclip, Upload, Bookmark, BookOpen, X as XIcon, SquareTerminal } from "lucide-solid";
+import { Plus, Settings, Paperclip, Upload, Bookmark, BookOpen, X as XIcon, SquareTerminal, RefreshCw, Clock } from "lucide-solid";
 import { Portal } from "solid-js/web";
 import { ContextItems, type FileContext } from "../components/context-items";
 import { FilePickerDialog } from "../components/file-picker-dialog";
@@ -249,15 +249,66 @@ function readSelections(serverKey: string, dir: string) {
     }
   }
 
-  function consumeServerSwitchHome() {
-    try {
-      if (sessionStorage.getItem(SERVER_SWITCH_HOME_KEY) !== "1") return false;
-      sessionStorage.removeItem(SERVER_SWITCH_HOME_KEY);
-      return true;
-    } catch {
-      return false;
-    }
+function consumeServerSwitchHome() {
+  try {
+    if (sessionStorage.getItem(SERVER_SWITCH_HOME_KEY) !== "1") return false;
+    sessionStorage.removeItem(SERVER_SWITCH_HOME_KEY);
+    return true;
+  } catch {
+    return false;
   }
+}
+
+type RetrySessionStatus = { type: "retry"; next?: number; message: string }
+
+function RetryStatusBanner(props: { status: () => RetrySessionStatus | undefined }) {
+  const [timeLeft, setTimeLeft] = createSignal(0)
+
+  const calculateRemaining = () => {
+    const s = props.status()
+    if (s?.type === "retry" && s.next) {
+      return Math.max(0, Math.round((s.next - Date.now()) / 1000))
+    }
+    return 0
+  }
+
+  createEffect(() => {
+    const s = props.status()
+    if (s?.type !== "retry" || !s.next) return
+
+    setTimeLeft(calculateRemaining())
+    const timer = setInterval(() => {
+      setTimeLeft(calculateRemaining())
+    }, 1000)
+
+    onCleanup(() => clearInterval(timer))
+  })
+
+  return (
+    <Show when={props.status()?.type === "retry"}>
+      {(status) => (
+        <div
+          class="mx-2 mb-2 rounded-lg px-3 py-2 text-xs font-medium"
+          style={{
+            background: "var(--status-warning-dim)",
+            color: "var(--status-warning-text)",
+            border: "1px solid var(--status-warning-border)",
+          }}
+        >
+          <div class="flex items-center gap-2">
+            <RefreshCw class="w-3.5 h-3.5 animate-spin-slow" />
+            <span class="text-sm font-semibold">Retrying soon</span>
+            <div class="flex items-center gap-1 ml-auto text-xs px-2 py-0.5 rounded bg-black/10" style={{ color: "var(--status-warning-text)" }}>
+              <Clock class="w-3 h-3" />
+              <span class="font-mono">{timeLeft()}s</span>
+            </div>
+          </div>
+          <div class="mt-1 text-[11px] leading-relaxed opacity-90">{status().message}</div>
+        </div>
+      )}
+    </Show>
+  )
+}
 
 export function Session() {
   const params = useParams<{ dir: string; id?: string }>();
@@ -3440,21 +3491,7 @@ export function Session() {
                   )}
                 </Show>
 
-                <Show when={sessionStatus()?.type === "retry"}>
-                  {(status) => (
-                    <div
-                      class="mx-2 mb-2 rounded-lg px-3 py-2 text-xs font-medium"
-                      style={{
-                        background: "var(--status-warning-dim)",
-                        color: "var(--status-warning-text)",
-                        border: "1px solid var(--status-warning-border)",
-                      }}
-                    >
-                      <div class="font-semibold">Retrying soon</div>
-                      <div class="mt-1 text-[11px] leading-relaxed opacity-90">{status().message}</div>
-                    </div>
-                  )}
-                </Show>
+                <RetryStatusBanner status={sessionStatus} />
 
                 {/* Drag-to-resize handle */}
                 <ResizeHandle

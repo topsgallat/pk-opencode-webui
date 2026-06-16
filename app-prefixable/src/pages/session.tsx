@@ -1025,6 +1025,11 @@ export function Session() {
     if (paused) return { status: paused };
     return { status: "thinking" };
   });
+  const sessionStatus = createMemo(() => {
+    const id = sessionId();
+    if (!id) return undefined;
+    return events.status[id];
+  });
   const sessionPausedReason = createMemo<"paused_question" | "paused_permission" | null>(() => {
     const reason = queuePausedReason();
     if (reason === "paused_question" || reason === "paused_permission") return reason;
@@ -3431,6 +3436,22 @@ export function Session() {
                       }}
                     >
                       {reason() === "paused_question" ? "Paused: question" : "Paused: permission"}
+                    </div>
+                  )}
+                </Show>
+
+                <Show when={sessionStatus()?.type === "retry"}>
+                  {(status) => (
+                    <div
+                      class="mx-2 mb-2 rounded-lg px-3 py-2 text-xs font-medium"
+                      style={{
+                        background: "var(--status-warning-dim)",
+                        color: "var(--status-warning-text)",
+                        border: "1px solid var(--status-warning-border)",
+                      }}
+                    >
+                      <div class="font-semibold">Retrying soon</div>
+                      <div class="mt-1 text-[11px] leading-relaxed opacity-90">{status().message}</div>
                     </div>
                   )}
                 </Show>

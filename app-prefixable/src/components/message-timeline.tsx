@@ -265,10 +265,6 @@ export function MessageTimeline(props: {
 
         {/* Main content */}
         <Show when={!props.loadingHistory}>
-          <Show when={props.sessionStatus?.type === "retry"}>
-            <ProcessingIndicator sessionStatus={props.sessionStatus} />
-          </Show>
-
           <Show when={props.historyError && turns().length === 0}>
             <div class="flex flex-col items-center justify-center h-full text-center gap-3 px-6">
               <p class="text-lg" style={{ color: "var(--status-danger-text)" }}>
@@ -501,10 +497,6 @@ export function FlatMessageList(props: {
       </Show>
 
       <Show when={!props.loadingHistory}>
-        <Show when={props.sessionStatus?.type === "retry"}>
-          <ProcessingIndicator sessionStatus={props.sessionStatus} />
-        </Show>
-
         <Show when={visibleMessages().length === 0 && !props.processing}>
           <div class="flex flex-col items-center justify-center h-full text-center py-12">
             <p class="text-lg mb-2" style={{ color: "var(--text-weak)" }}>

@@ -536,6 +536,7 @@ export function Session() {
   function selectModel(model: { providerID: string; modelID: string }) {
     providers.setSelectedModel(model);
     providers.setSelectedVariant(null);
+    setModelPickerError(null);
     setSessionSelection({
       agent: providers.selectedAgent,
       model: { providerID: model.providerID, modelID: model.modelID },
@@ -548,6 +549,37 @@ export function Session() {
 
     if (retryAwaitingSelection() && failedPromptItem()) {
       void retryFailedSendWithSelection();
+    }
+  }
+
+  function openModelPicker() {
+    setModelPickerError(null);
+    setShowModelPicker(true);
+  }
+
+  function closeModelPicker() {
+    setModelPickerError(null);
+    setShowModelPicker(false);
+  }
+
+  async function refreshModelPicker() {
+    if (refreshingModelPicker()) return;
+
+    setRefreshingModelPicker(true);
+    setModelPickerError(null);
+    try {
+      try {
+        await client.instance.dispose();
+      } catch (e) {
+        console.error("Failed to dispose client instance before model refresh:", e);
+      }
+
+      const result = await providers.refetch();
+      if (!result.ok) {
+        setModelPickerError(result.error ?? "Failed to refresh models.");
+      }
+    } finally {
+      setRefreshingModelPicker(false);
     }
   }
 
@@ -575,6 +607,8 @@ export function Session() {
   const [mentionSelection, setMentionSelection] = createSignal<{ startLine: number; endLine: number } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [retryingModel, setRetryingModel] = createSignal(false);
+  const [refreshingModelPicker, setRefreshingModelPicker] = createSignal(false);
+  const [modelPickerError, setModelPickerError] = createSignal<string | null>(null);
   const [failedPromptItem, setFailedPromptItem] = createSignal<PendingPromptItem | null>(null);
   const [retryAwaitingSelection, setRetryAwaitingSelection] = createSignal(false);
   const [historyError, setHistoryError] = createSignal<string | null>(null);
@@ -1106,7 +1140,7 @@ export function Session() {
         description: "Select the AI model to use",
         slash: "model",
         onSelect: () => {
-          setShowModelPicker(true);
+          openModelPicker();
         },
       },
       {
@@ -2405,7 +2439,7 @@ export function Session() {
       }
 
       await providers.refetch();
-      setShowModelPicker(true);
+      openModelPicker();
     } finally {
       setRetryingModel(false);
     }
@@ -3293,7 +3327,7 @@ export function Session() {
                       disabled={retryingModel()}
                       onClick={() => {
                         if (error() === MODEL_NOT_READY_ERROR) {
-                          setShowModelPicker(true);
+                          openModelPicker();
                           return;
                         }
 
@@ -3574,7 +3608,7 @@ export function Session() {
                       onAbort={handleAbort}
                       onAction={submitComposerAction}
                       onAgentClick={() => setShowAgentPicker(true)}
-                      onModelClick={() => setShowModelPicker(true)}
+                      onModelClick={openModelPicker}
                       onVariantClick={() => setShowVariantPicker(true)}
                       hasAttachments={() => fileContext().length > 0 || imageAttachments().length > 0}
                     />
@@ -3612,6 +3646,12 @@ export function Session() {
             title="Select Model"
             placeholder="Filter models..."
             emptyMessage="No models found. Connect a provider in settings."
+            headerActionLabel="Retry load models"
+            headerActionPendingLabel="Retrying..."
+            headerActionDisabled={refreshingModelPicker()}
+            onHeaderAction={() => void refreshModelPicker()}
+            statusMessage={modelPickerError() ?? undefined}
+            statusTone="error"
             items={providers.providers
               .filter((p) => providers.connected.includes(p.id))
               .flatMap((p) => {
@@ -3647,7 +3687,7 @@ export function Session() {
               const modelID = parts.slice(1).join(":");
               selectModel({ providerID, modelID });
             }}
-            onClose={() => setShowModelPicker(false)}
+            onClose={closeModelPicker}
           />
         </Show>
 

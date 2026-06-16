@@ -124,6 +124,31 @@ describe("mergeOptimisticMessage", () => {
 })
 
 describe("reconcileTurns", () => {
+  test("preserves all older turns when only the active streamed turn changes", () => {
+    const messages = projectDisplayMessages([], [
+      userMessage("u1", "first"),
+      assistantMessage("a1", "done", 5),
+      userMessage("u2", "second"),
+      assistantMessage("a2", "done", 8),
+      userMessage("u3", "third"),
+      assistantMessage("a3", "stream"),
+    ])
+
+    const first = reconcileTurns([], messages)
+    const second = reconcileTurns(first, [
+      messages[0],
+      messages[1],
+      messages[2],
+      messages[3],
+      messages[4],
+      { ...messages[5], parts: [textPart("a3-part", "stream more")] },
+    ])
+
+    expect(second[0]).toBe(first[0])
+    expect(second[1]).toBe(first[1])
+    expect(second[2]).not.toBe(first[2])
+  })
+
   test("reuses unchanged historical turns while streaming updates last turn", () => {
     const messages = projectDisplayMessages([], [
       userMessage("u1", "first"),

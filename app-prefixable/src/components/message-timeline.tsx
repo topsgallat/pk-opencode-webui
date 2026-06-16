@@ -163,15 +163,7 @@ export function MessageTimeline(props: {
 
     return activeId
   })
-  const timelineTurns = createMemo(() => {
-    const activeTurnId = visibleActiveTurnId()
-    const base = renderedTurns().map((turn) => ({
-      turn,
-      queueState: turn.id === activeTurnId ? props.activeTurnState : undefined,
-    }))
-    const queued = props.queuedTurns ?? []
-    return [...base, ...queued.map((turn) => ({ turn, queueState: turn.queueState }))]
-  })
+  const queuedTurns = createMemo(() => props.queuedTurns ?? [])
 
   let containerRef: HTMLDivElement | undefined
 
@@ -357,28 +349,43 @@ export function MessageTimeline(props: {
 
           {/* Turns */}
           <div ref={autoScroll.contentRef} class="space-y-4">
-            <For each={timelineTurns()}>
-              {(entry, index) => (
+            <For each={renderedTurns()}>
+              {(turn, index) => (
                 (() => {
-                  const turn = entry.turn
                   const isLastRealTurn = index() === renderedTurns().length - 1
-                  const isQueuedItem = index() >= renderedTurns().length
                   const isStreamingTurn = turn.id === visibleActiveTurnId()
                   return (
                     <MessageTurn
                       turn={turn}
-                      queueState={entry.queueState}
+                      queueState={isStreamingTurn ? props.activeTurnState : undefined}
                       now={now}
-                      isLast={index() === timelineTurns().length - 1}
+                      isLast={queuedTurns().length === 0 && isLastRealTurn}
                       streaming={props.processing && isStreamingTurn}
-                      defaultExpanded={expanded()[turn.id] ?? (isStreamingTurn || (!props.processing && isLastRealTurn) || isQueuedItem)}
+                      defaultExpanded={expanded()[turn.id] ?? (isStreamingTurn || (!props.processing && isLastRealTurn))}
                       onToggle={handleToggle}
                       onDeleteQueued={props.onDeleteQueuedTurn}
                       onRetry={props.onRetry}
-                     onOpenFile={props.onOpenFile}
-                   />
+                      onOpenFile={props.onOpenFile}
+                    />
                   )
                 })()
+              )}
+            </For>
+
+            <For each={queuedTurns()}>
+              {(turn, index) => (
+                <MessageTurn
+                  turn={turn}
+                  queueState={turn.queueState}
+                  now={now}
+                  isLast={index() === queuedTurns().length - 1}
+                  streaming={false}
+                  defaultExpanded={expanded()[turn.id] ?? true}
+                  onToggle={handleToggle}
+                  onDeleteQueued={props.onDeleteQueuedTurn}
+                  onRetry={props.onRetry}
+                  onOpenFile={props.onOpenFile}
+                />
               )}
             </For>
           </div>

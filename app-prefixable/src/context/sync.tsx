@@ -148,7 +148,7 @@ export function SyncProvider(props: ParentProps) {
 
   const inflight = new Map<string, Promise<void>>()
   const externalListeners = new Set<(event: SyncEvent) => void>()
-  // Queue for micro-batching incoming part delta events to avoid many
+  // Queue for frame-batching incoming part delta events to avoid many
   // synchronous setStore calls which block the main thread during heavy streams.
   // Keyed by `${messageID}:${partID}` and accumulates per-field string deltas
   // preserving arrival order by a monotonic counter.
@@ -157,15 +157,43 @@ export function SyncProvider(props: ParentProps) {
     { sessionID: string; messageID: string; partID: string; fields: Record<string, string>; order: number }
   >()
   let flushQueued = false
+  let flushTimer: number | ReturnType<typeof setTimeout> | null = null
+  let flushTimerMode: "raf" | "timeout" | null = null
   let seqCounter = 0
 
   function scheduleFlush() {
     if (flushQueued) return
     flushQueued = true
-    queueMicrotask(() => {
+    const flush = () => {
+      flushTimer = null
+      flushTimerMode = null
       flushQueued = false
       flushDeltaQueue()
-    })
+    }
+
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function" && document.visibilityState === "visible") {
+      flushTimerMode = "raf"
+      flushTimer = window.requestAnimationFrame(flush)
+      return
+    }
+
+    flushTimerMode = "timeout"
+    flushTimer = setTimeout(flush, 16)
+  }
+
+  function rescheduleFlushForHiddenTab() {
+    if (!flushQueued || flushTimerMode !== "raf") return
+    if (typeof document === "undefined" || document.visibilityState === "visible") return
+    if (typeof window === "undefined" || typeof flushTimer !== "number") return
+
+    window.cancelAnimationFrame(flushTimer)
+    flushTimerMode = "timeout"
+    flushTimer = setTimeout(() => {
+      flushTimer = null
+      flushTimerMode = null
+      flushQueued = false
+      flushDeltaQueue()
+    }, 16)
   }
 
   function flushDeltaQueue() {
@@ -206,9 +234,7 @@ export function SyncProvider(props: ParentProps) {
           const currentRecord = updated as Record<string, unknown>
           for (const [field, value] of Object.entries(item.fields)) {
             const currentValue = typeof currentRecord[field] === "string" ? currentRecord[field] : ""
-            const result = currentValue + value
-            console.log(`[Sync:flush] id=${current.id} field=${field} cur=${JSON.stringify(currentValue.slice(0,80))} delta=${JSON.stringify(value.slice(0,80))} result=${JSON.stringify(result.slice(0,80))}`)
-            currentRecord[field] = result
+            currentRecord[field] = currentValue + value
           }
 
           next[index] = updated
@@ -223,8 +249,9 @@ export function SyncProvider(props: ParentProps) {
       }
 
       const updatesBySession = new Map<string, Array<{ messageID: string; parts: Part[] }>>()
+      const sessionByMessageID = new Map(entries.map((entry) => [entry.messageID, entry.sessionID]))
       for (const [messageID, parts] of updatedPartsByMessage.entries()) {
-        const sessionID = entries.find((entry) => entry.messageID === messageID)?.sessionID
+        const sessionID = sessionByMessageID.get(messageID)
         if (!sessionID) continue
         const next = updatesBySession.get(sessionID) ?? []
         next.push({ messageID, parts })
@@ -236,16 +263,16 @@ export function SyncProvider(props: ParentProps) {
           const nextMsgs = [...msgs]
 
           for (const update of updates) {
-            const index = nextMsgs.findIndex((message) => message.info.id === update.messageID)
-            if (index === -1) {
-              nextMsgs.push(createSyntheticAssistantMessage(sessionID, update.messageID, update.parts))
+            const match = binarySearch(nextMsgs, update.messageID, (message) => message.info.id)
+            if (!match.found) {
+              nextMsgs.splice(match.index, 0, createSyntheticAssistantMessage(sessionID, update.messageID, update.parts))
               continue
             }
 
-            nextMsgs[index] = { ...nextMsgs[index], parts: update.parts }
+            nextMsgs[match.index] = { ...nextMsgs[match.index], parts: update.parts }
           }
 
-          return nextMsgs.sort((a, b) => cmp(a.info.id, b.info.id))
+          return nextMsgs
         })
       }
     })
@@ -267,7 +294,6 @@ export function SyncProvider(props: ParentProps) {
     console.log("[Sync] Connecting to SSE:", eventUrl)
 
     eventSource.onopen = () => {
-      console.log("[Sync] Connected, bootstrapping...")
       if (!store.ready) bootstrap()
     }
 
@@ -317,7 +343,6 @@ export function SyncProvider(props: ParentProps) {
   }
 
   function handleEvent(event: SyncEvent) {
-    console.log("[Sync] Event:", event.type)
     const props = event.properties
 
     // Session events
@@ -412,9 +437,6 @@ export function SyncProvider(props: ParentProps) {
       const part = props.part as Part
       if (!part?.sessionID || !part?.messageID) return
 
-      const queuedDelta = deltaQueue.get(`${part.messageID}:${part.id}`)
-      console.log(`[Sync:part.updated] id=${part.id} text=${JSON.stringify((part as any).text?.slice(0, 80))} queuedDelta=${JSON.stringify(queuedDelta?.fields)}`)
-
       // Evict any queued deltas for this part — the updated event carries
       // authoritative full text, so any accumulated deltas are stale/redundant
       // and must not be appended on top of the correct value.
@@ -459,10 +481,7 @@ export function SyncProvider(props: ParentProps) {
       }
       if (!sessionID || !messageID || !partID) return
 
-      const currentStoreText = (store.part[messageID]?.find(p => p.id === partID) as any)?.[field] ?? ""
-      console.log(`[Sync:part.delta] id=${partID} field=${field} delta=${JSON.stringify(delta.slice(0,80))} storeText=${JSON.stringify(currentStoreText.slice(0,80))}`)
-
-      // Micro-batch deltas: accumulate per-part per-field deltas in an
+      // Frame-batch deltas: accumulate per-part per-field deltas in an
       // in-memory queue and schedule a single flush per animation frame.
       const key = `${messageID}:${partID}`
       const existing = deltaQueue.get(key)
@@ -489,6 +508,8 @@ export function SyncProvider(props: ParentProps) {
         partID: string
       }
       if (!sessionID || !messageID || !partID) return
+
+      deltaQueue.delete(`${messageID}:${partID}`)
 
       setStore("part", messageID, (existing: Part[] | undefined) => {
         if (!existing) return [];
@@ -720,10 +741,21 @@ export function SyncProvider(props: ParentProps) {
   // Start connection
   connect()
 
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", rescheduleFlushForHiddenTab)
+  }
+
   onCleanup(() => {
     setGlobalSyncReady(false)
     eventSource?.close()
     if (reconnectTimer) clearTimeout(reconnectTimer)
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", rescheduleFlushForHiddenTab)
+    }
+    if (flushTimerMode === "raf" && typeof flushTimer === "number" && typeof window !== "undefined") {
+      window.cancelAnimationFrame(flushTimer)
+    }
+    if (flushTimerMode === "timeout" && flushTimer != null) clearTimeout(flushTimer)
   })
 
   const value: SyncContextValue = {

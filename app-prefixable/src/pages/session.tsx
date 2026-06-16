@@ -3386,6 +3386,21 @@ export function Session() {
                   </div>
                 </Show>
 
+                <Show when={sessionPausedReason()}>
+                  {(reason) => (
+                    <div
+                      class="mx-2 mb-2 rounded-lg px-3 py-2 text-xs font-medium"
+                      style={{
+                        background: "var(--status-warning-dim)",
+                        color: "var(--status-warning-text)",
+                        border: "1px solid var(--status-warning-border)",
+                      }}
+                    >
+                      {reason() === "paused_question" ? "Paused: question" : "Paused: permission"}
+                    </div>
+                  )}
+                </Show>
+
                 {/* Drag-to-resize handle */}
                 <ResizeHandle
                   direction="vertical"
@@ -3556,7 +3571,6 @@ export function Session() {
                       processing={processing}
                       queueActive={queueActive}
                       queueCount={() => pendingQueue().length}
-                      pausedReason={sessionPausedReason}
                       onAbort={handleAbort}
                       onAction={submitComposerAction}
                       onAgentClick={() => setShowAgentPicker(true)}

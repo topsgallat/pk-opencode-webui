@@ -78,7 +78,6 @@ interface SessionInfoProps {
   processing: () => boolean
   queueActive?: () => boolean
   queueCount?: () => number
-  pausedReason?: () => "paused_question" | "paused_permission" | null
   onAbort: () => void
   onAction: () => void
   onAgentClick: () => void
@@ -535,13 +534,6 @@ export function SessionInfo(props: SessionInfoProps) {
     if (composerReady()) return "send"
     return null
   })
-  const pausedLabel = createMemo(() => {
-    const reason = props.pausedReason?.()
-    if (reason === "paused_question") return "Paused: question"
-    if (reason === "paused_permission") return "Paused: permission"
-    return null
-  })
-
   return (
     <div class="relative flex items-center gap-2 px-2 py-1.5 text-xs sm:gap-3 sm:px-4" style={{ color: "var(--text-weak)" }}>
       <div class="flex min-w-0 flex-1 flex-col gap-1 [&_button:focus-visible]:outline-offset-[-2px] [&_a:focus-visible]:outline-offset-[-2px] sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
@@ -868,20 +860,6 @@ export function SessionInfo(props: SessionInfoProps) {
           </span>
         </Show>
 
-        <Show when={pausedLabel()}>
-          {(label) => (
-            <span
-              class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
-              style={{
-                background: "var(--status-warning-dim)",
-                color: "var(--status-warning-text)",
-                border: "1px solid var(--status-warning-border)",
-              }}
-            >
-              {label()}
-            </span>
-          )}
-        </Show>
       </div>
 
       <Show when={!props.loading()}>

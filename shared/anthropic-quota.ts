@@ -203,6 +203,13 @@ class AnthropicQuotaRateLimitError extends Error {
   }
 }
 
+function isAnthropicQuotaRateLimitError(error: unknown): error is AnthropicQuotaRateLimitError {
+  if (error instanceof AnthropicQuotaRateLimitError) return true
+  if (!(error instanceof Error)) return false
+
+  return /Anthropic OAuth usage HTTP 429|rate_limit_error/i.test(error.message)
+}
+
 async function runCommand(args: string[], ops?: AnthropicQuotaOps): Promise<{ code: number; stdout: string; stderr: string } | null> {
   if (ops?.run) return await ops.run(args)
 
@@ -373,7 +380,7 @@ export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh
             : undefined
           return maybeCache(usage)
         } catch (error) {
-          if (error instanceof AnthropicQuotaRateLimitError) {
+          if (isAnthropicQuotaRateLimitError(error)) {
             const retryAfterMs = error.retryAfterMs ?? RATE_LIMIT_COOLDOWN_MS
             const cooldownUntil = new Date(now + retryAfterMs).toISOString()
             const warning = `Anthropic OAuth usage is rate limited; retrying after ${Math.ceil(retryAfterMs / 1000)}s.`

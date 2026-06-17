@@ -868,13 +868,6 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
 function ReasoningPartDisplay(props: { part: ReasoningPart }) {
   const expanded = () => expandedStore.get(props.part.id);
 
-  // Auto-expand when content starts arriving
-  createEffect(() => {
-    if (props.part.text.length > 0 && !expandedStore.get(props.part.id)) {
-      expandedStore.set(props.part.id, true);
-    }
-  });
-
   return (
     <div
       class="rounded-md overflow-hidden bg-[var(--background-base)] border border-[var(--border-base)] mb-2"

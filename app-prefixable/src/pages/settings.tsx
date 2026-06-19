@@ -3803,6 +3803,9 @@ function ProjectFallbackTab() {
   const config = useConfig()
   const providers = useProviders()
   const { directory } = useSDK()
+  const basePath = useBasePath()
+  const server = useServer()
+  const capabilities = () => getServerCapabilities(server.selectedServer())
   const [saving, setSaving] = createSignal(false)
   const [saved, setSaved] = createSignal(false)
   const [saveError, setSaveError] = createSignal<string | null>(null)
@@ -3859,6 +3862,11 @@ function ProjectFallbackTab() {
     if (savedTimer !== undefined) clearTimeout(savedTimer)
   })
 
+  createEffect(() => {
+    if (config.initialLoading()) return
+    syncFromConfig()
+  })
+
   function syncFromConfig() {
     const current = fallbackConfig()
     setEnabled(current.enabled ?? true)
@@ -3870,6 +3878,27 @@ function ProjectFallbackTab() {
   async function saveFallbackPolicy() {
     setSaving(true)
     setSaveError(null)
+
+    const next: Config = {
+      ...config.project,
+      fallback: {
+        enabled: enabled(),
+        cross_provider: crossProvider(),
+        order: order(),
+      },
+    }
+
+    if (capabilities().canEditLocalInstructionFiles && directory) {
+      const ok = await writeFile(basePath.serverUrl, `${directory.replace(/\/$/, "")}/opencode.json`, `${JSON.stringify(next, null, 2)}\n`)
+      setSaving(false)
+      if (ok) {
+        await config.refresh()
+        showSaved()
+        return
+      }
+      setSaveError("Failed to save fallback settings")
+      return
+    }
 
     const result = await config.updateProject({
       fallback: {

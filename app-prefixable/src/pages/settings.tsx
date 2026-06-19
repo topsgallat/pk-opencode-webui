@@ -1,5 +1,7 @@
 import { createSignal, For, Index, Show, type JSX, createMemo, onMount, onCleanup, createEffect } from "solid-js"
 import { Portal } from "solid-js/web"
+import { closestCenter, DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, createSortable } from "@thisbeyond/solid-dnd"
+import type { DragEvent as SolidDragEvent } from "@thisbeyond/solid-dnd"
 import { Spinner } from "../components/ui/spinner"
 import { useProviders } from "../context/providers"
 import { useMCP } from "../context/mcp"
@@ -10,12 +12,14 @@ import type { Config, PermissionActionConfig, ProviderConfig } from "../sdk/clie
 import { MCPAddDialog } from "../components/mcp-add-dialog"
 import { ConfirmDialog } from "../components/confirm-dialog"
 import { Button } from "../components/ui/button"
-import { Check, Copy, Plug, GitBranch, Server, ExternalLink, Key, Search, X, Trash2, BookmarkPlus, Pencil, Palette, Sun, Moon, Monitor, BookOpen, Plus, Save, Volume2, Play, Settings2, Code, Shield, Cpu, Wrench, ChevronDown, ChevronRight, Info } from "lucide-solid"
+import { Check, Copy, Plug, GitBranch, Server, ExternalLink, Key, Search, X, Trash2, BookmarkPlus, Pencil, Palette, Sun, Moon, Monitor, BookOpen, Plus, Save, Volume2, Play, Settings2, Code, Shield, Cpu, Wrench, ChevronDown, ChevronRight, Info, Shuffle, GripVertical as DragHandle } from "lucide-solid"
 import { SOUND_OPTIONS, readSoundSettings, writeSoundSettings, playSound, primeAudioContext, SOUND_STORAGE_KEY, type SoundSettings } from "../utils/sound"
 import { useSavedPrompts } from "../context/saved-prompts"
 import { useTheme } from "../context/theme"
 import { useDevice } from "../context/device"
 import { useServer } from "../context/server"
+import { ConstrainDragXAxis } from "../utils/solid-dnd"
+import { generateUUID } from "../utils/uuid"
 import { writeFile } from "../utils/extended-api"
 import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCallback, restartOpencode, checkOpencodeHealth } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
@@ -57,7 +61,7 @@ export function Settings() {
   const getInitialTab = () => {
     const hash = window.location.hash.slice(1)
     const validTabs = directory
-      ? ["providers", "git", "mcp", "prompts", "instructions", "skills", "config", "appearance", "sounds", "servers", "quota"]
+      ? ["providers", "git", "mcp", "prompts", "instructions", "skills", "config", "fallback", "appearance", "sounds", "servers", "quota"]
       : ["providers", "git", "mcp", "prompts", "instructions", "skills", "appearance", "sounds", "servers", "quota"]
     return validTabs.includes(hash) ? hash : "providers"
   }
@@ -944,6 +948,7 @@ Add your project-specific instructions here.
     ]
     if (directory) {
       base.push({ id: "config", label: "Project Config", icon: () => <Settings2 class="w-4 h-4" />, scope: "Project" })
+      base.push({ id: "fallback", label: "Model Fallback", icon: () => <Shuffle class="w-4 h-4" />, scope: "Project" })
     }
     base.push({ id: "appearance", label: "Appearance", icon: () => <Palette class="w-4 h-4" />, scope: null })
     base.push({ id: "sounds", label: "Sounds", icon: () => <Volume2 class="w-4 h-4" />, scope: null })
@@ -2455,6 +2460,11 @@ Add your project-specific instructions here.
             <ProjectConfigTab />
           </Show>
 
+          {/* Model Fallback Tab */}
+          <Show when={activeTab() === "fallback"}>
+            <ProjectFallbackTab />
+          </Show>
+
           {/* Skills Tab */}
           <Show when={activeTab() === "skills"}>
             <SkillSourcesTab />
@@ -3734,6 +3744,345 @@ function ProjectConfigTab() {
         </section>
       </Show>
 
+    </div>
+  )
+}
+
+type FallbackRow = { id: string; value: string }
+
+function SortableFallbackRow(props: {
+  row: FallbackRow
+  onRemove: () => void
+  onValueChange: (value: string) => void
+}) {
+  const sortable = createSortable(props.row.id)
+  return (
+    <div
+      use:sortable={sortable}
+      class="group/drag flex items-center gap-2 rounded-lg px-3 py-2 transition-colors"
+      classList={{ "opacity-35": sortable.isActiveDraggable }}
+      style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}
+    >
+      <button
+        type="button"
+        aria-label="Drag to reorder"
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 cursor-grab active:cursor-grabbing opacity-70 group-hover/drag:opacity-100"
+        style={{ color: "var(--text-weak)" }}
+        {...sortable.dragActivators}
+      >
+              <DragHandle class="h-4 w-4" />
+      </button>
+
+      <input
+        value={props.row.value}
+        onInput={(e) => props.onValueChange(e.currentTarget.value)}
+        placeholder="provider/model"
+        spellcheck={false}
+        class="min-w-0 flex-1 rounded-md px-3 py-2 text-sm font-mono"
+        style={{
+          background: "var(--surface-inset)",
+          border: "1px solid var(--border-base)",
+          color: "var(--text-base)",
+        }}
+      />
+
+      <button
+        type="button"
+        onClick={props.onRemove}
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors"
+        style={{ color: "var(--text-weak)" }}
+        title="Remove"
+      >
+        <Trash2 class="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
+
+function ProjectFallbackTab() {
+  const config = useConfig()
+  const providers = useProviders()
+  const { directory } = useSDK()
+  const [saving, setSaving] = createSignal(false)
+  const [saved, setSaved] = createSignal(false)
+  const [saveError, setSaveError] = createSignal<string | null>(null)
+  const [draggingId, setDraggingId] = createSignal<string | null>(null)
+
+  const fallbackConfig = () => config.project.fallback ?? {}
+  const [enabled, setEnabled] = createSignal(fallbackConfig().enabled ?? true)
+  const [crossProvider, setCrossProvider] = createSignal(fallbackConfig().cross_provider ?? true)
+  const [rows, setRows] = createSignal<FallbackRow[]>((fallbackConfig().order ?? []).map((value) => ({ id: generateUUID(), value })))
+
+  const order = createMemo(() => Array.from(new Set(rows().map((row) => row.value.trim()).filter(Boolean))))
+  const currentModels = createMemo(() => providers.eligibleModels().map((item) => `${item.providerID}/${item.modelID}`))
+  const availableModels = createMemo(() => currentModels().filter((item) => !order().includes(item)))
+
+  let savedTimer: number | undefined
+  function showSaved() {
+    setSaveError(null)
+    setSaved(true)
+    if (savedTimer !== undefined) clearTimeout(savedTimer)
+    savedTimer = window.setTimeout(() => setSaved(false), 2000)
+  }
+
+  onCleanup(() => {
+    if (savedTimer !== undefined) clearTimeout(savedTimer)
+  })
+
+  function syncFromConfig() {
+    const current = fallbackConfig()
+    setEnabled(current.enabled ?? true)
+    setCrossProvider(current.cross_provider ?? true)
+    setRows((current.order ?? []).map((value) => ({ id: generateUUID(), value })))
+    setSaveError(null)
+  }
+
+  async function saveFallbackPolicy() {
+    setSaving(true)
+    setSaveError(null)
+
+    const result = await config.updateProject({
+      fallback: {
+        enabled: enabled(),
+        cross_provider: crossProvider(),
+        order: order(),
+      },
+    })
+
+    setSaving(false)
+    if (result) showSaved()
+    else setSaveError("Failed to save fallback settings")
+  }
+
+  function addRow(value = "") {
+    setRows((prev) => [...prev, { id: generateUUID(), value }])
+  }
+
+  function addModel(value: string) {
+    if (!value) return
+    addRow(value)
+  }
+
+  function removeRow(id: string) {
+    setRows((prev) => prev.filter((row) => row.id !== id))
+  }
+
+  function updateRow(id: string, value: string) {
+    setRows((prev) => prev.map((row) => (row.id === id ? { ...row, value } : row)))
+  }
+
+  function reorderRows(fromId: string, toId: string) {
+    setRows((prev) => {
+      const ids = prev.map((row) => row.id)
+      const from = ids.indexOf(fromId)
+      const to = ids.indexOf(toId)
+      if (from === -1 || to === -1 || from === to) return prev
+      const next = [...prev]
+      const [item] = next.splice(from, 1)
+      next.splice(to, 0, item)
+      return next
+    })
+  }
+
+  function handleDragStart(event: SolidDragEvent) {
+    const id = typeof event.draggable?.id === "string" ? event.draggable.id : null
+    setDraggingId(id)
+  }
+
+  function handleDragEnd(event: SolidDragEvent) {
+    const from = typeof event.draggable?.id === "string" ? event.draggable.id : null
+    const to = event.droppable && typeof event.droppable.id === "string" ? event.droppable.id : null
+    setDraggingId(null)
+    if (!from || !to || from === to) return
+    reorderRows(from, to)
+  }
+
+  return (
+    <div class="space-y-6">
+      <header>
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h1 class="text-lg font-medium" style={{ color: "var(--text-strong)" }}>
+              Model Fallback
+            </h1>
+            <p class="mt-1 text-sm" style={{ color: "var(--text-weak)" }}>
+              Control the automatic retry order used when a model hits rate limit or quota.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <Show when={saving()}>
+              <Spinner class="w-4 h-4" />
+            </Show>
+            <Show when={saved()}>
+              <span class="text-xs flex items-center gap-1" style={{ color: "var(--icon-success-base)" }}>
+                <Check class="w-3 h-3" /> Saved
+              </span>
+            </Show>
+          </div>
+        </div>
+        <div
+          class="mt-3 flex items-center gap-2 px-3 py-2 rounded-md text-xs"
+          style={{
+            background: "var(--surface-inset)",
+            color: "var(--text-weak)",
+            border: "1px solid var(--border-base)",
+          }}
+        >
+          <Info class="w-3.5 h-3.5 shrink-0" />
+          <span>
+            Saved to <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code> in this project{directory ? ` (${directory})` : ""}.
+            It survives restarts and moving the project to another machine.
+          </span>
+        </div>
+      </header>
+
+      <Show when={saveError()}>
+        <div
+          class="p-3 rounded-md text-sm"
+          style={{
+            background: "var(--surface-inset)",
+            border: "1px solid var(--border-base)",
+            "border-left": "3px solid var(--interactive-critical)",
+            color: "var(--interactive-critical)",
+          }}
+        >
+          {saveError()}
+        </div>
+      </Show>
+
+      <section
+        class="rounded-lg overflow-hidden"
+        style={{
+          background: "var(--background-base)",
+          border: "1px solid var(--border-base)",
+        }}
+      >
+        <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
+          <Shuffle class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
+          <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+            Fallback policy
+          </h2>
+        </div>
+        <div class="p-4 space-y-4">
+          <label class="flex items-center gap-3 text-sm" style={{ color: "var(--text-base)" }}>
+            <input type="checkbox" checked={enabled()} onChange={(e) => setEnabled(e.currentTarget.checked)} />
+            Enable automatic fallback
+          </label>
+
+          <label class="flex items-center gap-3 text-sm" style={{ color: "var(--text-base)" }}>
+            <input type="checkbox" checked={crossProvider()} onChange={(e) => setCrossProvider(e.currentTarget.checked)} />
+            Allow switching providers
+          </label>
+
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <label class="block text-sm font-medium" style={{ color: "var(--text-base)" }}>
+                Preferred fallback order
+              </label>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={syncFromConfig}
+                  class="text-xs px-2 py-1 rounded-md"
+                  style={{ background: "var(--surface-inset)", color: "var(--text-weak)", border: "1px solid var(--border-base)" }}
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            <DragDropProvider onDragStart={handleDragStart} onDragEnd={handleDragEnd} collisionDetector={closestCenter}>
+              <DragDropSensors />
+              <ConstrainDragXAxis />
+              <div class="space-y-2">
+                <SortableProvider ids={rows().map((row) => row.id)}>
+                  <For each={rows()}>
+                    {(row) => (
+                      <SortableFallbackRow
+                        row={row}
+                        onRemove={() => removeRow(row.id)}
+                        onValueChange={(value) => updateRow(row.id, value)}
+                      />
+                    )}
+                  </For>
+                </SortableProvider>
+
+                <Show when={rows().length === 0}>
+                  <div class="rounded-lg border border-dashed px-4 py-6 text-center" style={{ "border-color": "var(--border-base)", color: "var(--text-weak)" }}>
+                    No fallback order yet. Add models below, then drag them into priority.
+                  </div>
+                </Show>
+              </div>
+
+              <DragOverlay>
+                <Show when={draggingId()}>
+                  {(id) => {
+                    const item = () => rows().find((row) => row.id === id())
+                    return (
+                      <div class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm" style={{ background: "var(--surface-inset)", color: "var(--text-interactive-base)", border: "1px solid var(--border-base)", "box-shadow": "0 10px 24px rgba(0,0,0,0.16)" }}>
+                        <DragHandle class="w-4 h-4" />
+                        <span class="truncate font-mono">{item()?.value || "provider/model"}</span>
+                      </div>
+                    )
+                  }}
+                </Show>
+              </DragOverlay>
+            </DragDropProvider>
+
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={() => addRow()}>
+                <Plus class="w-4 h-4" />
+                Add custom model
+              </Button>
+              <Show when={availableModels().length > 0}>
+                <span class="text-xs" style={{ color: "var(--text-weak)" }}>
+                  Quick add:
+                </span>
+                <For each={availableModels().slice(0, 6)}>
+                  {(item) => (
+                    <button
+                      type="button"
+                      onClick={() => addModel(item)}
+                      class="rounded-full px-3 py-1 text-xs transition-colors"
+                      style={{ background: "var(--surface-inset)", color: "var(--text-base)", border: "1px solid var(--border-base)" }}
+                    >
+                      {item}
+                    </button>
+                  )}
+                </For>
+              </Show>
+            </div>
+
+            <p class="text-xs mt-2" style={{ color: "var(--text-weak)" }}>
+              Drag the handle to reorder. Exact strings are saved to config; unknown or disconnected models are skipped at runtime.
+            </p>
+          </div>
+
+          <Show when={currentModels().length > 0}>
+            <div class="rounded-md p-3" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)" }}>
+              <div class="text-xs font-medium mb-2" style={{ color: "var(--text-weak)" }}>
+                Currently eligible models
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <For each={currentModels().slice(0, 12)}>
+                  {(item) => (
+                    <span class="text-xs px-2 py-1 rounded-full" style={{ background: "var(--background-base)", color: "var(--text-base)", border: "1px solid var(--border-base)" }}>
+                      {item}
+                    </span>
+                  )}
+                </For>
+              </div>
+            </div>
+          </Show>
+
+          <div class="flex items-center gap-2 pt-1">
+            <Button type="button" onClick={saveFallbackPolicy} disabled={saving()}>
+              <Save class="w-4 h-4" />
+              Save fallback settings
+            </Button>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

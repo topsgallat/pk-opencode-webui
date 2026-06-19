@@ -4247,12 +4247,29 @@ function ProjectFallbackTab() {
     setProjectSaving(true)
     setProjectSaveError(null)
 
-    const result = await config.updateProject({
+    const next: Config = {
+      ...config.project,
       fallback: {
         enabled: projectEnabled(),
         cross_provider: projectCrossProvider(),
         order: fallbackOrder(projectRows()),
       },
+    }
+
+    if (directory && capabilities().canEditLocalInstructionFiles) {
+      const ok = await writeFile(basePath.serverUrl, `${directory.replace(/\/$/, "")}/opencode.json`, `${JSON.stringify(next, null, 2)}\n`)
+      setProjectSaving(false)
+      if (ok) {
+        await config.refresh()
+        showProjectSaved()
+        return
+      }
+      setProjectSaveError("Failed to save project fallback override")
+      return
+    }
+
+    const result = await config.updateProject({
+      fallback: next.fallback,
     })
     setProjectSaving(false)
     if (result) showProjectSaved()

@@ -6,7 +6,7 @@ import { useBasePath } from "../context/base-path"
 import { useServer } from "../context/server"
 import { useDevice } from "../context/device"
 import { Spinner } from "./ui/spinner"
-import { FileCode, Pencil, Eye, Maximize2, X, MessageSquarePlus, Download } from "lucide-solid"
+import { FileCode, Pencil, Eye, Maximize2, X, MessageSquarePlus, Download, ShieldAlert } from "lucide-solid"
 import { writeFile } from "../utils/extended-api"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { EditorDialog } from "./editor-dialog"
@@ -14,7 +14,7 @@ import { Markdown } from "./markdown"
 
 interface FileViewerProps {
   path: string
-  onMentionFile?: (path: string) => void
+  onMentionFile?: (path: string, options?: { autoAddToContext?: boolean; note?: string }) => void
   onMentionFileLine?: (path: string, selection: { startLine: number; endLine: number }) => void
 }
 
@@ -145,7 +145,9 @@ export function FileViewer(props: FileViewerProps) {
   const [markdownPreview, setMarkdownPreview] = createSignal(true)
   const [htmlPreview, setHtmlPreview] = createSignal(true)
   const [htmlAllowJs, setHtmlAllowJs] = createSignal(false)
+  const [showHtmlJsWarning, setShowHtmlJsWarning] = createSignal(false)
   const [fullscreenPreview, setFullscreenPreview] = createSignal(false)
+  let htmlJsWarningRef: HTMLDivElement | undefined
   let fullscreenRef: HTMLDivElement | undefined
   const htmlBlobUrl = createMemo(() => {
     if (!isHtml() || !fileContent()) return undefined
@@ -155,6 +157,7 @@ export function FileViewer(props: FileViewerProps) {
     return url
   })
   const htmlSandbox = createMemo(() => (htmlAllowJs() ? "allow-scripts" : ""))
+  const htmlJsReviewNote = "Please review this HTML file for JavaScript safety before enabling scripts in preview. Check inline and external scripts, network requests, storage access, redirects, popups, and any other risky behavior, then summarize whether it looks safe to trust."
   const sourceLines = createMemo(() => fileContent().split("\n"))
   const lineButtonClass = () =>
     device.isTouchDevice()
@@ -167,6 +170,7 @@ export function FileViewer(props: FileViewerProps) {
     if (!path) return
 
     setHtmlAllowJs(false)
+    setShowHtmlJsWarning(false)
 
     const s = file.get(path)
     const loading = !!s?.loading
@@ -252,6 +256,36 @@ export function FileViewer(props: FileViewerProps) {
       active?.focus?.()
     })
   })
+
+  createEffect(() => {
+    if (!showHtmlJsWarning()) return
+
+    setTimeout(() => {
+      htmlJsWarningRef?.querySelector<HTMLButtonElement>("button")?.focus()
+    }, 0)
+  })
+
+  function handleHtmlJsToggle() {
+    if (htmlAllowJs()) {
+      setHtmlAllowJs(false)
+      return
+    }
+
+    setShowHtmlJsWarning(true)
+  }
+
+  function handleTrustHtmlFile() {
+    setHtmlAllowJs(true)
+    setShowHtmlJsWarning(false)
+  }
+
+  function handleAskAiReview() {
+    props.onMentionFile?.(props.path, {
+      autoAddToContext: true,
+      note: htmlJsReviewNote,
+    })
+    setShowHtmlJsWarning(false)
+  }
 
   // Bug #8: Save Path
   async function handleSave(newContent: string) {
@@ -431,17 +465,21 @@ export function FileViewer(props: FileViewerProps) {
                   <Show when={isHtml()}>
                     <button
                       classList={{
-                        "p-1 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center text-[10px] font-mono border": true,
+                        "px-2 rounded min-h-[44px] flex-shrink-0 flex items-center justify-center gap-1 text-[10px] font-mono border transition-colors": true,
                         "hover:bg-black/5 dark:hover:bg-white/5": !htmlAllowJs(),
-                        "bg-black/10 dark:bg-white/10": htmlAllowJs(),
                       }}
-                      onClick={() => setHtmlAllowJs(!htmlAllowJs())}
+                      onClick={handleHtmlJsToggle}
                       title={htmlAllowJs() ? "Disable JavaScript in HTML preview" : "Enable JavaScript in HTML preview"}
                       aria-label={htmlAllowJs() ? "Disable JavaScript in HTML preview" : "Enable JavaScript in HTML preview"}
                       aria-pressed={htmlAllowJs()}
-                      style={{ color: "var(--text-base)", borderColor: "var(--border-base)" }}
+                      style={{
+                        color: htmlAllowJs() ? "var(--status-warning-text)" : "var(--text-weak)",
+                        background: htmlAllowJs() ? "var(--status-warning-dim)" : "var(--surface-inset)",
+                        "border-color": htmlAllowJs() ? "var(--status-warning-border)" : "var(--border-base)",
+                      }}
                     >
-                      JS
+                      <span>JS</span>
+                      <span>{htmlAllowJs() ? "ON" : "OFF"}</span>
                     </button>
                   </Show>
                     <Show when={fileLoaded() && (!isBinary() || isPdf()) && !isImage()}>
@@ -592,6 +630,18 @@ export function FileViewer(props: FileViewerProps) {
               >
                 <X class="w-5 h-5" />
               </button>
+              <Show when={isHtml() && htmlPreview()}>
+                <div
+                  class="absolute top-4 left-4 z-10 px-2.5 py-1 rounded-full text-[11px] font-mono border"
+                  style={{
+                    color: htmlAllowJs() ? "var(--status-warning-text)" : "var(--text-weak)",
+                    background: htmlAllowJs() ? "var(--status-warning-dim)" : "var(--surface-inset)",
+                    "border-color": htmlAllowJs() ? "var(--status-warning-border)" : "var(--border-base)",
+                  }}
+                >
+                  HTML JS {htmlAllowJs() ? "ENABLED" : "DISABLED"}
+                </div>
+              </Show>
               <div class="w-full h-full overflow-auto">
                 <Show
                   when={isMarkdown() && markdownPreview()}
@@ -665,6 +715,87 @@ export function FileViewer(props: FileViewerProps) {
         onClose={() => setIsEditing(false)}
         onSave={handleSave}
       />
+
+      <Show when={showHtmlJsWarning()}>
+        <Portal>
+          <div
+            class="fixed inset-0 z-[110] flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.5)" }}
+            role="presentation"
+          >
+            <div
+              ref={htmlJsWarningRef}
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="html-js-warning-title"
+              aria-describedby="html-js-warning-message"
+              class="w-full max-w-md rounded-lg shadow-xl overflow-hidden"
+              style={{
+                background: "var(--background-base)",
+                border: "1px solid var(--border-base)",
+              }}
+            >
+              <div class="p-4 flex gap-3">
+                <div
+                  class="shrink-0 mt-0.5 rounded-full p-2"
+                  style={{
+                    background: "var(--status-warning-dim)",
+                    color: "var(--status-warning-text)",
+                  }}
+                >
+                  <ShieldAlert class="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 id="html-js-warning-title" class="text-base font-medium mb-2" style={{ color: "var(--text-strong)" }}>
+                    Enable JavaScript for this HTML preview?
+                  </h2>
+                  <p id="html-js-warning-message" class="text-sm" style={{ color: "var(--text-base)" }}>
+                    JavaScript is disabled by default because previewed HTML can run untrusted code. Only trust files you understand.
+                  </p>
+                </div>
+              </div>
+
+              <div class="px-4 py-3 flex flex-col gap-2" style={{ "border-top": "1px solid var(--border-base)" }}>
+                <button
+                  type="button"
+                  onClick={handleTrustHtmlFile}
+                  class="w-full px-4 py-2 text-sm font-medium rounded-md text-left"
+                  style={{
+                    background: "var(--interactive-warning)",
+                    color: "var(--text-on-interactive)",
+                    border: "none",
+                  }}
+                >
+                  Trust file
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAskAiReview}
+                  class="w-full px-4 py-2 text-sm font-medium rounded-md text-left"
+                  style={{
+                    background: "var(--interactive-base)",
+                    color: "var(--text-on-interactive)",
+                    border: "none",
+                  }}
+                >
+                  Ask AI review
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowHtmlJsWarning(false)}
+                  class="w-full px-4 py-2 text-sm font-medium rounded-md text-left"
+                  style={{
+                    background: "var(--surface-inset)",
+                    color: "var(--text-base)",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      </Show>
     </div>
   )
 }

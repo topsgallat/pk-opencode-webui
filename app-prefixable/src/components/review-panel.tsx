@@ -44,7 +44,7 @@ function createPatch(filename: string, before: string, after: string): string {
 
 interface ReviewPanelProps {
   sessionId: string;
-  onMentionFile?: (path: string) => void;
+  onMentionFile?: (path: string, options?: { autoAddToContext?: boolean; note?: string }) => void;
   onMentionFileLine?: (path: string, selection: { startLine: number; endLine: number }) => void;
 }
 

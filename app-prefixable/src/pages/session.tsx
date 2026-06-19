@@ -2072,7 +2072,14 @@ export function Session() {
     setFileContext((prev) => [...prev, { path, key: generateUUID(), comment, selection, preview }]);
   }
 
-  function openFileMention(path: string) {
+  function openFileMention(path: string, options?: { autoAddToContext?: boolean; note?: string }) {
+    if (options?.autoAddToContext) {
+      addFileToContext(path, options.note)
+      setInput((prev) => prev || "Please review the attached HTML file before enabling JavaScript in preview.")
+      closeFileMention()
+      return
+    }
+
     setMentionSelection(null);
     setMentionPath(path);
   }

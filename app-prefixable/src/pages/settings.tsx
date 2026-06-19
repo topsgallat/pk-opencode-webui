@@ -1,4 +1,4 @@
-import { createSignal, For, Index, Show, type JSX, createMemo, onMount, onCleanup, createEffect } from "solid-js"
+import { createSignal, For, Index, Show, type JSX, type Accessor, createMemo, onMount, onCleanup, createEffect } from "solid-js"
 import { Portal } from "solid-js/web"
 import { closestCenter, DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, createSortable } from "@thisbeyond/solid-dnd"
 import type { DragEvent as SolidDragEvent } from "@thisbeyond/solid-dnd"
@@ -62,7 +62,7 @@ export function Settings() {
     const hash = window.location.hash.slice(1)
     const validTabs = directory
       ? ["providers", "git", "mcp", "prompts", "instructions", "skills", "config", "fallback", "appearance", "sounds", "servers", "quota"]
-      : ["providers", "git", "mcp", "prompts", "instructions", "skills", "appearance", "sounds", "servers", "quota"]
+      : ["providers", "git", "mcp", "prompts", "instructions", "skills", "fallback", "appearance", "sounds", "servers", "quota"]
     return validTabs.includes(hash) ? hash : "providers"
   }
   const [activeTab, setActiveTab] = createSignal(getInitialTab())
@@ -948,8 +948,8 @@ Add your project-specific instructions here.
     ]
     if (directory) {
       base.push({ id: "config", label: "Project Config", icon: () => <Settings2 class="w-4 h-4" />, scope: "Project" })
-      base.push({ id: "fallback", label: "Model Fallback", icon: () => <Shuffle class="w-4 h-4" />, scope: "Project" })
     }
+    base.push({ id: "fallback", label: "Model Fallback", icon: () => <Shuffle class="w-4 h-4" />, scope: directory ? "Global + Project" : "Global" })
     base.push({ id: "appearance", label: "Appearance", icon: () => <Palette class="w-4 h-4" />, scope: null })
     base.push({ id: "sounds", label: "Sounds", icon: () => <Volume2 class="w-4 h-4" />, scope: null })
     base.push({ id: "servers", label: "Servers", icon: () => <Server class="w-4 h-4" />, scope: null })
@@ -3750,6 +3750,16 @@ function ProjectConfigTab() {
 
 type FallbackRow = { id: string; value: string }
 
+type FallbackRowsSetter = (value: FallbackRow[] | ((prev: FallbackRow[]) => FallbackRow[])) => void
+
+function fallbackRows(order?: Array<string>) {
+  return (order ?? []).map((value) => ({ id: generateUUID(), value }))
+}
+
+function fallbackOrder(rows: FallbackRow[]) {
+  return Array.from(new Set(rows.map((row) => row.value.trim()).filter(Boolean)))
+}
+
 function SortableFallbackRow(props: {
   row: FallbackRow
   onRemove: () => void
@@ -3799,28 +3809,31 @@ function SortableFallbackRow(props: {
   )
 }
 
-function ProjectFallbackTab() {
-  const config = useConfig()
+function FallbackPolicySection(props: {
+  title: string
+  description: string
+  info: JSX.Element
+  rows: Accessor<FallbackRow[]>
+  setRows: FallbackRowsSetter
+  enabled: boolean
+  setEnabled: (value: boolean) => void
+  crossProvider: boolean
+  setCrossProvider: (value: boolean) => void
+  saving: Accessor<boolean>
+  saved: Accessor<boolean>
+  saveError: Accessor<string | null>
+  onReset: () => void
+  onSave: () => void
+  saveLabel: string
+}) {
   const providers = useProviders()
-  const { directory } = useSDK()
-  const basePath = useBasePath()
-  const server = useServer()
-  const capabilities = () => getServerCapabilities(server.selectedServer())
-  const [saving, setSaving] = createSignal(false)
-  const [saved, setSaved] = createSignal(false)
-  const [saveError, setSaveError] = createSignal<string | null>(null)
   const [draggingId, setDraggingId] = createSignal<string | null>(null)
   const [modelSearch, setModelSearch] = createSignal("")
   const [modelSearchOpen, setModelSearchOpen] = createSignal(false)
   const [modelSearchIndex, setModelSearchIndex] = createSignal(0)
   let modelSearchRef: HTMLInputElement | undefined
 
-  const fallbackConfig = () => config.project.fallback ?? {}
-  const [enabled, setEnabled] = createSignal(fallbackConfig().enabled ?? true)
-  const [crossProvider, setCrossProvider] = createSignal(fallbackConfig().cross_provider ?? true)
-  const [rows, setRows] = createSignal<FallbackRow[]>((fallbackConfig().order ?? []).map((value) => ({ id: generateUUID(), value })))
-
-  const order = createMemo(() => Array.from(new Set(rows().map((row) => row.value.trim()).filter(Boolean))))
+  const order = createMemo(() => fallbackOrder(props.rows()))
   const eligibleModels = createMemo(() => providers.eligibleModels().map((item) => ({
     ...item,
     value: `${item.providerID}/${item.modelID}`,
@@ -3850,71 +3863,8 @@ function ProjectFallbackTab() {
       .slice(0, 12)
   })
 
-  let savedTimer: number | undefined
-  function showSaved() {
-    setSaveError(null)
-    setSaved(true)
-    if (savedTimer !== undefined) clearTimeout(savedTimer)
-    savedTimer = window.setTimeout(() => setSaved(false), 2000)
-  }
-
-  onCleanup(() => {
-    if (savedTimer !== undefined) clearTimeout(savedTimer)
-  })
-
-  createEffect(() => {
-    if (config.initialLoading()) return
-    syncFromConfig()
-  })
-
-  function syncFromConfig() {
-    const current = fallbackConfig()
-    setEnabled(current.enabled ?? true)
-    setCrossProvider(current.cross_provider ?? true)
-    setRows((current.order ?? []).map((value) => ({ id: generateUUID(), value })))
-    setSaveError(null)
-  }
-
-  async function saveFallbackPolicy() {
-    setSaving(true)
-    setSaveError(null)
-
-    const next: Config = {
-      ...config.project,
-      fallback: {
-        enabled: enabled(),
-        cross_provider: crossProvider(),
-        order: order(),
-      },
-    }
-
-    if (capabilities().canEditLocalInstructionFiles && directory) {
-      const ok = await writeFile(basePath.serverUrl, `${directory.replace(/\/$/, "")}/opencode.json`, `${JSON.stringify(next, null, 2)}\n`)
-      setSaving(false)
-      if (ok) {
-        await config.refresh()
-        showSaved()
-        return
-      }
-      setSaveError("Failed to save fallback settings")
-      return
-    }
-
-    const result = await config.updateProject({
-      fallback: {
-        enabled: enabled(),
-        cross_provider: crossProvider(),
-        order: order(),
-      },
-    })
-
-    setSaving(false)
-    if (result) showSaved()
-    else setSaveError("Failed to save fallback settings")
-  }
-
   function addRow(value = "") {
-    setRows((prev) => [...prev, { id: generateUUID(), value }])
+    props.setRows((prev) => [...prev, { id: generateUUID(), value }])
   }
 
   function addModel(value: string) {
@@ -3931,15 +3881,15 @@ function ProjectFallbackTab() {
   }
 
   function removeRow(id: string) {
-    setRows((prev) => prev.filter((row) => row.id !== id))
+    props.setRows((prev) => prev.filter((row) => row.id !== id))
   }
 
   function updateRow(id: string, value: string) {
-    setRows((prev) => prev.map((row) => (row.id === id ? { ...row, value } : row)))
+    props.setRows((prev) => prev.map((row) => (row.id === id ? { ...row, value } : row)))
   }
 
   function reorderRows(fromId: string, toId: string) {
-    setRows((prev) => {
+    props.setRows((prev) => {
       const ids = prev.map((row) => row.id)
       const from = ids.indexOf(fromId)
       const to = ids.indexOf(toId)
@@ -3997,30 +3947,38 @@ function ProjectFallbackTab() {
   }
 
   return (
-    <div class="space-y-6">
-      <header>
+    <section
+      class="rounded-lg overflow-hidden"
+      style={{
+        background: "var(--background-base)",
+        border: "1px solid var(--border-base)",
+      }}
+    >
+      <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
+        <Shuffle class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
+        <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+          {props.title}
+        </h2>
+      </div>
+      <div class="p-4 space-y-4">
         <div class="flex items-center justify-between gap-3">
-          <div>
-            <h1 class="text-lg font-medium" style={{ color: "var(--text-strong)" }}>
-              Model Fallback
-            </h1>
-            <p class="mt-1 text-sm" style={{ color: "var(--text-weak)" }}>
-              Control the automatic retry order used when a model hits rate limit or quota.
-            </p>
-          </div>
+          <p class="text-sm" style={{ color: "var(--text-weak)" }}>
+            {props.description}
+          </p>
           <div class="flex items-center gap-2">
-            <Show when={saving()}>
+            <Show when={props.saving()}>
               <Spinner class="w-4 h-4" />
             </Show>
-            <Show when={saved()}>
+            <Show when={props.saved()}>
               <span class="text-xs flex items-center gap-1" style={{ color: "var(--icon-success-base)" }}>
                 <Check class="w-3 h-3" /> Saved
               </span>
             </Show>
           </div>
         </div>
+
         <div
-          class="mt-3 flex items-center gap-2 px-3 py-2 rounded-md text-xs"
+          class="flex items-center gap-2 px-3 py-2 rounded-md text-xs"
           style={{
             background: "var(--surface-inset)",
             color: "var(--text-weak)",
@@ -4028,195 +3986,390 @@ function ProjectFallbackTab() {
           }}
         >
           <Info class="w-3.5 h-3.5 shrink-0" />
-          <span>
-            Saved to <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code> in this project{directory ? ` (${directory})` : ""}.
-            It survives restarts and moving the project to another machine.
-          </span>
+          {props.info}
         </div>
-      </header>
 
-      <Show when={saveError()}>
-        <div
-          class="p-3 rounded-md text-sm"
-          style={{
-            background: "var(--surface-inset)",
-            border: "1px solid var(--border-base)",
-            "border-left": "3px solid var(--interactive-critical)",
-            color: "var(--interactive-critical)",
-          }}
-        >
-          {saveError()}
-        </div>
-      </Show>
+        <Show when={props.saveError()}>
+          <div
+            class="p-3 rounded-md text-sm"
+            style={{
+              background: "var(--surface-inset)",
+              border: "1px solid var(--border-base)",
+              "border-left": "3px solid var(--interactive-critical)",
+              color: "var(--interactive-critical)",
+            }}
+          >
+            {props.saveError()}
+          </div>
+        </Show>
 
-      <section
-        class="rounded-lg overflow-hidden"
-        style={{
-          background: "var(--background-base)",
-          border: "1px solid var(--border-base)",
-        }}
-      >
-        <div class="px-4 py-3 flex items-center gap-2" style={{ "border-bottom": "1px solid var(--border-base)" }}>
-          <Shuffle class="w-4 h-4" style={{ color: "var(--text-weak)" }} />
-          <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
-            Fallback policy
-          </h2>
-        </div>
-        <div class="p-4 space-y-4">
-          <label class="flex items-center gap-3 text-sm" style={{ color: "var(--text-base)" }}>
-            <input type="checkbox" checked={enabled()} onChange={(e) => setEnabled(e.currentTarget.checked)} />
-            Enable automatic fallback
-          </label>
+        <label class="flex items-center gap-3 text-sm" style={{ color: "var(--text-base)" }}>
+          <input type="checkbox" checked={props.enabled} onChange={(e) => props.setEnabled(e.currentTarget.checked)} />
+          Enable automatic fallback
+        </label>
 
-          <label class="flex items-center gap-3 text-sm" style={{ color: "var(--text-base)" }}>
-            <input type="checkbox" checked={crossProvider()} onChange={(e) => setCrossProvider(e.currentTarget.checked)} />
-            Allow switching providers
-          </label>
+        <label class="flex items-center gap-3 text-sm" style={{ color: "var(--text-base)" }}>
+          <input type="checkbox" checked={props.crossProvider} onChange={(e) => props.setCrossProvider(e.currentTarget.checked)} />
+          Allow switching providers
+        </label>
 
-          <div>
-            <div class="flex items-center justify-between gap-2 mb-1.5">
-              <label class="block text-sm font-medium" style={{ color: "var(--text-base)" }}>
-                Preferred fallback order
-              </label>
-              <div class="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={syncFromConfig}
-                  class="text-xs px-2 py-1 rounded-md"
-                  style={{ background: "var(--surface-inset)", color: "var(--text-weak)", border: "1px solid var(--border-base)" }}
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-1.5">
+            <label class="block text-sm font-medium" style={{ color: "var(--text-base)" }}>
+              Preferred fallback order
+            </label>
+            <button
+              type="button"
+              onClick={props.onReset}
+              class="text-xs px-2 py-1 rounded-md"
+              style={{ background: "var(--surface-inset)", color: "var(--text-weak)", border: "1px solid var(--border-base)" }}
+            >
+              Reset
+            </button>
+          </div>
 
-            <DragDropProvider onDragStart={handleDragStart} onDragEnd={handleDragEnd} collisionDetector={closestCenter}>
-              <DragDropSensors />
-              <ConstrainDragXAxis />
-              <div class="space-y-2">
-                <SortableProvider ids={rows().map((row) => row.id)}>
-                  <For each={rows()}>
-                    {(row) => (
-                      <SortableFallbackRow
-                        row={row}
-                        onRemove={() => removeRow(row.id)}
-                        onValueChange={(value) => updateRow(row.id, value)}
-                      />
-                    )}
-                  </For>
-                </SortableProvider>
+          <DragDropProvider onDragStart={handleDragStart} onDragEnd={handleDragEnd} collisionDetector={closestCenter}>
+            <DragDropSensors />
+            <ConstrainDragXAxis />
+            <div class="space-y-2">
+              <SortableProvider ids={props.rows().map((row) => row.id)}>
+                <For each={props.rows()}>
+                  {(row) => (
+                    <SortableFallbackRow
+                      row={row}
+                      onRemove={() => removeRow(row.id)}
+                      onValueChange={(value) => updateRow(row.id, value)}
+                    />
+                  )}
+                </For>
+              </SortableProvider>
 
-                <Show when={rows().length === 0}>
-                  <div class="rounded-lg border border-dashed px-4 py-6 text-center" style={{ "border-color": "var(--border-base)", color: "var(--text-weak)" }}>
-                    No fallback order yet. Add models below, then drag them into priority.
-                  </div>
-                </Show>
-              </div>
-
-              <DragOverlay>
-                <Show when={draggingId()}>
-                  {(id) => {
-                    const item = () => rows().find((row) => row.id === id())
-                    return (
-                      <div class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm" style={{ background: "var(--surface-inset)", color: "var(--text-interactive-base)", border: "1px solid var(--border-base)", "box-shadow": "0 10px 24px rgba(0,0,0,0.16)" }}>
-                        <DragHandle class="w-4 h-4" />
-                        <span class="truncate font-mono">{item()?.value || "provider/model"}</span>
-                      </div>
-                    )
-                  }}
-                </Show>
-              </DragOverlay>
-            </DragDropProvider>
-
-            <div class="mt-3 flex flex-wrap items-center gap-2">
-              <Button type="button" variant="secondary" size="sm" onClick={() => addRow()}>
-                <Plus class="w-4 h-4" />
-                Add custom model
-              </Button>
-            </div>
-
-            <div class="mt-3">
-              <label class="block text-xs font-medium mb-1.5" style={{ color: "var(--text-weak)" }}>
-                Search eligible models
-              </label>
-              <div class="relative">
-                <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-weak)" }} />
-                <input
-                  ref={(el) => (modelSearchRef = el)}
-                  value={modelSearch()}
-                  onFocus={() => setModelSearchOpen(true)}
-                  onBlur={() => window.setTimeout(() => setModelSearchOpen(false), 120)}
-                  onInput={(e) => {
-                    setModelSearch(e.currentTarget.value)
-                    setModelSearchOpen(true)
-                    setModelSearchIndex(0)
-                  }}
-                  onKeyDown={handleSearchKeyDown}
-                  placeholder="Search provider or model name"
-                  class="w-full rounded-md py-2 pl-9 pr-3 text-sm"
-                  style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }}
-                />
-              </div>
-
-              <Show when={modelSearchOpen()}>
-                <div class="mt-2 overflow-hidden rounded-md border" style={{ background: "var(--background-base)", "border-color": "var(--border-base)" }}>
-                  <Show when={searchableModels().length > 0} fallback={<div class="px-3 py-2 text-sm" style={{ color: "var(--text-weak)" }}>No matching models found.</div>}>
-                    <div class="max-h-56 overflow-auto py-1" role="listbox" aria-label="Eligible models">
-                      <For each={searchableModels()}>
-                        {(item, index) => (
-                          <button
-                            type="button"
-                            role="option"
-                            aria-selected={index() === modelSearchIndex()}
-                            class="w-full px-3 py-2 text-left transition-colors"
-                            style={{ background: index() === modelSearchIndex() ? "var(--surface-inset)" : "transparent", color: "var(--text-base)" }}
-                            onMouseEnter={() => setModelSearchIndex(index())}
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => pickModel(item.value)}
-                          >
-                            <div class="flex items-center justify-between gap-3">
-                              <span class="min-w-0 truncate text-sm">{item.label}</span>
-                              <code class="shrink-0 text-xs" style={{ color: "var(--text-weak)" }}>{item.value}</code>
-                            </div>
-                          </button>
-                        )}
-                      </For>
-                    </div>
-                  </Show>
+              <Show when={props.rows().length === 0}>
+                <div class="rounded-lg border border-dashed px-4 py-6 text-center" style={{ "border-color": "var(--border-base)", color: "var(--text-weak)" }}>
+                  No fallback order yet. Add models below, then drag them into priority.
                 </div>
               </Show>
             </div>
 
-            <p class="text-xs mt-2" style={{ color: "var(--text-weak)" }}>
-              Drag the handle to reorder. Exact strings are saved to config; unknown or disconnected models are skipped at runtime.
-            </p>
-          </div>
+            <DragOverlay>
+              <Show when={draggingId()}>
+                {(id) => {
+                  const item = () => props.rows().find((row) => row.id === id())
+                  return (
+                    <div class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm" style={{ background: "var(--surface-inset)", color: "var(--text-interactive-base)", border: "1px solid var(--border-base)", "box-shadow": "0 10px 24px rgba(0,0,0,0.16)" }}>
+                      <DragHandle class="w-4 h-4" />
+                      <span class="truncate font-mono">{item()?.value || "provider/model"}</span>
+                    </div>
+                  )
+                }}
+              </Show>
+            </DragOverlay>
+          </DragDropProvider>
 
-          <Show when={currentModels().length > 0}>
-            <div class="rounded-md p-3" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)" }}>
-              <div class="text-xs font-medium mb-2" style={{ color: "var(--text-weak)" }}>
-                Currently eligible models
-              </div>
-              <div class="flex flex-wrap gap-2">
-                <For each={currentModels().slice(0, 12)}>
-                  {(item) => (
-                    <span class="text-xs px-2 py-1 rounded-full" style={{ background: "var(--background-base)", color: "var(--text-base)", border: "1px solid var(--border-base)" }}>
-                      {item}
-                    </span>
-                  )}
-                </For>
-              </div>
-            </div>
-          </Show>
-
-          <div class="flex items-center gap-2 pt-1">
-            <Button type="button" onClick={saveFallbackPolicy} disabled={saving()}>
-              <Save class="w-4 h-4" />
-              Save fallback settings
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={() => addRow()}>
+              <Plus class="w-4 h-4" />
+              Add custom model
             </Button>
           </div>
+
+          <div class="mt-3">
+            <label class="block text-xs font-medium mb-1.5" style={{ color: "var(--text-weak)" }}>
+              Search eligible models
+            </label>
+            <div class="relative">
+              <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-weak)" }} />
+              <input
+                ref={(el) => (modelSearchRef = el)}
+                value={modelSearch()}
+                onFocus={() => setModelSearchOpen(true)}
+                onBlur={() => window.setTimeout(() => setModelSearchOpen(false), 120)}
+                onInput={(e) => {
+                  setModelSearch(e.currentTarget.value)
+                  setModelSearchOpen(true)
+                  setModelSearchIndex(0)
+                }}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search provider or model name"
+                class="w-full rounded-md py-2 pl-9 pr-3 text-sm"
+                style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }}
+              />
+            </div>
+
+            <Show when={modelSearchOpen()}>
+              <div class="mt-2 overflow-hidden rounded-md border" style={{ background: "var(--background-base)", "border-color": "var(--border-base)" }}>
+                <Show when={searchableModels().length > 0} fallback={<div class="px-3 py-2 text-sm" style={{ color: "var(--text-weak)" }}>No matching models found.</div>}>
+                  <div class="max-h-56 overflow-auto py-1" role="listbox" aria-label="Eligible models">
+                    <For each={searchableModels()}>
+                      {(item, index) => (
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={index() === modelSearchIndex()}
+                          class="w-full px-3 py-2 text-left transition-colors"
+                          style={{ background: index() === modelSearchIndex() ? "var(--surface-inset)" : "transparent", color: "var(--text-base)" }}
+                          onMouseEnter={() => setModelSearchIndex(index())}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => pickModel(item.value)}
+                        >
+                          <div class="flex items-center justify-between gap-3">
+                            <span class="min-w-0 truncate text-sm">{item.label}</span>
+                            <code class="shrink-0 text-xs" style={{ color: "var(--text-weak)" }}>{item.value}</code>
+                          </div>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </div>
+            </Show>
+          </div>
+
+          <p class="text-xs mt-2" style={{ color: "var(--text-weak)" }}>
+            Drag the handle to reorder. Exact strings are saved to config; unknown or disconnected models are skipped at runtime.
+          </p>
         </div>
-      </section>
+
+        <Show when={currentModels().length > 0}>
+          <div class="rounded-md p-3" style={{ background: "var(--surface-inset)", border: "1px solid var(--border-base)" }}>
+            <div class="text-xs font-medium mb-2" style={{ color: "var(--text-weak)" }}>
+              Currently eligible models
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <For each={currentModels().slice(0, 12)}>
+                {(item) => (
+                  <span class="text-xs px-2 py-1 rounded-full" style={{ background: "var(--background-base)", color: "var(--text-base)", border: "1px solid var(--border-base)" }}>
+                    {item}
+                  </span>
+                )}
+              </For>
+            </div>
+          </div>
+        </Show>
+
+        <div class="flex items-center gap-2 pt-1">
+          <Button type="button" onClick={props.onSave} disabled={props.saving()}>
+            <Save class="w-4 h-4" />
+            {props.saveLabel}
+          </Button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ProjectFallbackTab() {
+  const config = useConfig()
+  const { directory } = useSDK()
+  const basePath = useBasePath()
+  const server = useServer()
+  const capabilities = () => getServerCapabilities(server.selectedServer())
+  const [globalSaving, setGlobalSaving] = createSignal(false)
+  const [globalSaved, setGlobalSaved] = createSignal(false)
+  const [globalSaveError, setGlobalSaveError] = createSignal<string | null>(null)
+  const [globalEnabled, setGlobalEnabled] = createSignal(true)
+  const [globalCrossProvider, setGlobalCrossProvider] = createSignal(true)
+  const [globalRows, setGlobalRows] = createSignal<FallbackRow[]>([])
+
+  const [projectSaving, setProjectSaving] = createSignal(false)
+  const [projectSaved, setProjectSaved] = createSignal(false)
+  const [projectSaveError, setProjectSaveError] = createSignal<string | null>(null)
+  const [projectRows, setProjectRows] = createSignal<FallbackRow[]>([])
+  const [projectEnabled, setProjectEnabled] = createSignal(true)
+  const [projectCrossProvider, setProjectCrossProvider] = createSignal(true)
+
+  const hasProjectOverride = createMemo(() => !!config.project.fallback)
+
+  let globalSavedTimer: number | undefined
+  let projectSavedTimer: number | undefined
+
+  function showGlobalSaved() {
+    setGlobalSaveError(null)
+    setGlobalSaved(true)
+    if (globalSavedTimer !== undefined) clearTimeout(globalSavedTimer)
+    globalSavedTimer = window.setTimeout(() => setGlobalSaved(false), 2000)
+  }
+
+  function showProjectSaved() {
+    setProjectSaveError(null)
+    setProjectSaved(true)
+    if (projectSavedTimer !== undefined) clearTimeout(projectSavedTimer)
+    projectSavedTimer = window.setTimeout(() => setProjectSaved(false), 2000)
+  }
+
+  onCleanup(() => {
+    if (globalSavedTimer !== undefined) clearTimeout(globalSavedTimer)
+    if (projectSavedTimer !== undefined) clearTimeout(projectSavedTimer)
+  })
+
+  function syncGlobalFromConfig() {
+    const current = config.global.fallback ?? {}
+    setGlobalEnabled(current.enabled ?? true)
+    setGlobalCrossProvider(current.cross_provider ?? true)
+    setGlobalRows(fallbackRows(current.order))
+    setGlobalSaveError(null)
+  }
+
+  function syncProjectFromConfig() {
+    const current = config.project.fallback ?? config.global.fallback ?? {}
+    setProjectEnabled(current.enabled ?? true)
+    setProjectCrossProvider(current.cross_provider ?? true)
+    setProjectRows(fallbackRows(current.order))
+    setProjectSaveError(null)
+  }
+
+  createEffect(() => {
+    if (config.initialLoading()) return
+    syncGlobalFromConfig()
+  })
+
+  createEffect(() => {
+    if (config.initialLoading()) return
+    syncProjectFromConfig()
+  })
+
+  async function saveGlobalFallbackPolicy() {
+    setGlobalSaving(true)
+    setGlobalSaveError(null)
+    const result = await config.updateGlobal({
+      fallback: {
+        enabled: globalEnabled(),
+        cross_provider: globalCrossProvider(),
+        order: fallbackOrder(globalRows()),
+      },
+    })
+    setGlobalSaving(false)
+    if (result) showGlobalSaved()
+    else setGlobalSaveError("Failed to save global fallback settings")
+  }
+
+  async function saveProjectFallbackPolicy() {
+    setProjectSaving(true)
+    setProjectSaveError(null)
+
+    const next: Config = { ...config.project }
+    next.fallback = {
+      enabled: projectEnabled(),
+      cross_provider: projectCrossProvider(),
+      order: fallbackOrder(projectRows()),
+    }
+
+    if (capabilities().canEditLocalInstructionFiles && directory) {
+      const ok = await writeFile(basePath.serverUrl, `${directory.replace(/\/$/, "")}/opencode.json`, `${JSON.stringify(next, null, 2)}\n`)
+      setProjectSaving(false)
+      if (ok) {
+        await config.refresh()
+        showProjectSaved()
+        return
+      }
+      setProjectSaveError("Failed to save project fallback override")
+      return
+    }
+
+    const result = await config.updateProject({ fallback: next.fallback })
+    setProjectSaving(false)
+    if (result) showProjectSaved()
+    else setProjectSaveError("Failed to save project fallback override")
+  }
+
+  async function clearProjectFallbackOverride() {
+    if (!directory || !capabilities().canEditLocalInstructionFiles) {
+      setProjectSaveError("Clearing the project override requires the local OpenCode backend.")
+      return
+    }
+
+    setProjectSaving(true)
+    setProjectSaveError(null)
+    const next: Config = { ...config.project }
+    delete next.fallback
+    const ok = await writeFile(basePath.serverUrl, `${directory.replace(/\/$/, "")}/opencode.json`, `${JSON.stringify(next, null, 2)}\n`)
+    setProjectSaving(false)
+    if (ok) {
+      await config.refresh()
+      showProjectSaved()
+      return
+    }
+    setProjectSaveError("Failed to clear project fallback override")
+  }
+
+  return (
+    <div class="space-y-6">
+      <header>
+        <h1 class="text-lg font-medium" style={{ color: "var(--text-strong)" }}>
+          Model Fallback
+        </h1>
+        <p class="mt-1 text-sm" style={{ color: "var(--text-weak)" }}>
+          Set a global fallback default for every project, then override it only where a specific project needs different retry behavior.
+        </p>
+      </header>
+
+      <FallbackPolicySection
+        title="Global default"
+        description="These fallback rules apply to every project unless that project saves its own override."
+        info={<span>Saved in your global OpenCode config and used as the default fallback policy everywhere.</span>}
+        rows={globalRows}
+        setRows={setGlobalRows}
+        enabled={globalEnabled()}
+        setEnabled={setGlobalEnabled}
+        crossProvider={globalCrossProvider()}
+        setCrossProvider={setGlobalCrossProvider}
+        saving={globalSaving}
+        saved={globalSaved}
+        saveError={globalSaveError}
+        onReset={syncGlobalFromConfig}
+        onSave={saveGlobalFallbackPolicy}
+        saveLabel="Save global default"
+      />
+
+      <Show when={directory}>
+        <div class="space-y-4">
+          <div
+            class="flex items-center gap-2 px-3 py-2 rounded-md text-xs"
+            style={{
+              background: "var(--surface-inset)",
+              color: "var(--text-weak)",
+              border: "1px solid var(--border-base)",
+            }}
+          >
+            <Info class="w-3.5 h-3.5 shrink-0" />
+            <span>
+              <Show
+                when={hasProjectOverride()}
+                fallback={<>This project is currently inheriting the global fallback default. Saving below will create a project-specific override.</>}
+              >
+                <>This project currently overrides the global fallback default. Clear the override to inherit the global behavior again.</>
+              </Show>
+            </span>
+          </div>
+
+          <FallbackPolicySection
+            title="Project override"
+            description="Use this only when this project should fall back differently from the global default."
+            info={<span>Saved to <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code> in this project{directory ? ` (${directory})` : ""}.</span>}
+            rows={projectRows}
+            setRows={setProjectRows}
+            enabled={projectEnabled()}
+            setEnabled={setProjectEnabled}
+            crossProvider={projectCrossProvider()}
+            setCrossProvider={setProjectCrossProvider}
+            saving={projectSaving}
+            saved={projectSaved}
+            saveError={projectSaveError}
+            onReset={syncProjectFromConfig}
+            onSave={saveProjectFallbackPolicy}
+            saveLabel={hasProjectOverride() ? "Save project override" : "Create project override"}
+          />
+
+          <Show when={hasProjectOverride()}>
+            <div class="flex items-center gap-2">
+              <Button type="button" variant="secondary" onClick={clearProjectFallbackOverride} disabled={projectSaving()}>
+                <Trash2 class="w-4 h-4" />
+                Clear project override
+              </Button>
+            </div>
+          </Show>
+        </div>
+      </Show>
     </div>
   )
 }

@@ -539,6 +539,15 @@ export function isApiPath(path: string): boolean {
   return API_PATHS.some((p) => path === p || path.startsWith(p + "/") || path.startsWith(p + "?"))
 }
 
+async function loadQuotaSkipSettings(): Promise<Record<string, unknown>> {
+  try {
+    const { getSettingsStore } = await import("./settings-store")
+    return getSettingsStore().load("quota")
+  } catch {
+    return {}
+  }
+}
+
 /**
  * Handle extended API endpoints.
  * Returns a Response if the path matches an extended endpoint, otherwise undefined.
@@ -1161,6 +1170,11 @@ export async function handleExtendedEndpoint(
     const target = url.searchParams.get("target") || ""
     const projectDir = url.searchParams.get("projectDir") || undefined
 
+    const settings = await loadQuotaSkipSettings()
+    const skipProviders = Array.isArray(settings?.disabledProviders)
+      ? settings.disabledProviders.filter((id: unknown): id is string => typeof id === "string")
+      : undefined
+
     try {
       const { getQuotaData } = await import("./quota/index")
       const result = await getQuotaData({
@@ -1168,6 +1182,7 @@ export async function handleExtendedEndpoint(
         providerFilter,
         targetUrl: target,
         projectDir,
+        skipProviders,
         resolveAuthHeader: options?.resolveUpstreamAuthHeader,
         resolveProviderAuthHeader: (providerID) => resolveProviderAuthHeader(req, target, providerID),
         resolveProviderAuthAccountId: (providerID) => resolveProviderAuthAccountId(req, target, providerID),
@@ -1175,6 +1190,37 @@ export async function handleExtendedEndpoint(
       return Response.json(result)
     } catch (error) {
       console.error("[ExtAPI] quota error:", error)
+      return Response.json({ error: String(error) }, { status: 500 })
+    }
+  }
+
+  // GET /api/ext/settings?ns=quota - Read settings for a namespace
+  if (path === "/api/ext/settings" && method === "GET") {
+    const ns = url.searchParams.get("ns") || "quota"
+    try {
+      const { getSettingsStore } = await import("./settings-store")
+      const settings = getSettingsStore().load(ns)
+      return Response.json(settings)
+    } catch (error) {
+      console.error("[ExtAPI] settings read error:", error)
+      return Response.json({ error: String(error) }, { status: 500 })
+    }
+  }
+
+  // PUT /api/ext/settings - Save a setting in a namespace
+  if (path === "/api/ext/settings" && method === "PUT") {
+    try {
+      const body = await req.json() as Record<string, unknown>
+      const ns = typeof body.ns === "string" ? body.ns : null
+      const key = typeof body.key === "string" ? body.key : null
+      if (!ns || !key) {
+        return Response.json({ error: "Missing ns or key" }, { status: 400 })
+      }
+      const { getSettingsStore } = await import("./settings-store")
+      getSettingsStore().save(ns, key, body.value)
+      return Response.json({ ok: true })
+    } catch (error) {
+      console.error("[ExtAPI] settings write error:", error)
       return Response.json({ error: String(error) }, { status: 500 })
     }
   }

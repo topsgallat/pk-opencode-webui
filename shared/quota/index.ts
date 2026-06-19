@@ -9,6 +9,7 @@ export async function getQuotaData(options: {
   providerFilter?: string
   targetUrl?: string
   projectDir?: string
+  skipProviders?: string[]
   authHeader?: string
   resolveAuthHeader?: (target: string) => string | undefined
   resolveProviderAuthHeader?: (providerID: string) => string | undefined
@@ -25,8 +26,10 @@ export async function getQuotaData(options: {
   const availableProviders: string[] = []
   const unavailableProviders: Array<{ id: string; reason: string }> = []
   const warnings: string[] = []
+  const skipSet = new Set(options.skipProviders ?? [])
 
   for (const provider of providers) {
+    if (skipSet.has(provider.id)) continue
     if (options.providerFilter && provider.id !== options.providerFilter) continue
 
     try {

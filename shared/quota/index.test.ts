@@ -95,6 +95,39 @@ describe('getQuotaData', () => {
     expect(copilot?.reason).toContain('GitHub auth')
     expect(result.summary.unavailableProviders.find(provider => provider.id === 'copilot')?.reason).toContain('GitHub auth')
   })
+
+  it('skips providers listed in skipProviders without calling fetch', async () => {
+    const calls: string[] = []
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+
+      if (url.includes('chatgpt.com/backend-api/wham/usage')) {
+        calls.push('openai')
+        return new Response(JSON.stringify({
+          rate_limit: { primary_window: { used_percent: 40, reset_at: '2026-05-15T10:00:00.000Z' } },
+        }), { status: 200, headers: { 'content-type': 'application/json' } })
+      }
+
+      if (url.includes('copilot_internal/user')) {
+        calls.push('copilot')
+        return new Response(JSON.stringify({
+          quota: { limit: 200, used: 100, remaining: 100, reset_at: '2026-05-15T10:00:00.000Z' },
+        }), { status: 200, headers: { 'content-type': 'application/json' } })
+      }
+
+      return new Response('not found', { status: 404 })
+    }) as typeof fetch
+
+    const result = await getQuotaData({
+      skipProviders: ['copilot', 'openai'],
+      resolveProviderAuthHeader: () => 'Bearer test',
+    })
+
+    expect(calls).not.toContain('copilot')
+    expect(calls).not.toContain('openai')
+    expect(result.providers.find((p) => p.id === 'copilot')).toBeUndefined()
+    expect(result.providers.find((p) => p.id === 'openai')).toBeUndefined()
+  })
 })
 
 describe('CopilotProvider', () => {

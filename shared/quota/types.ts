@@ -2,6 +2,7 @@ export interface QuotaFetchOptions {
   refresh?: boolean
   targetUrl?: string
   projectDir?: string
+  skipProviders?: string[]
   authHeader?: string
   resolveAuthHeader?: (target: string) => string | undefined
   resolveProviderAuthHeader?: (providerID: string) => string | undefined

@@ -6,6 +6,7 @@ import {
   onCleanup,
   For,
 } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import * as Diff from "diff";
 import type { FileDiff, FileNode } from "../sdk/client";
 import { useSDK } from "../context/sdk";
@@ -49,6 +50,7 @@ interface ReviewPanelProps {
 
 export function ReviewPanel(props: ReviewPanelProps) {
   const { client, directory } = useSDK();
+  const navigate = useNavigate();
   const file = useFile();
   const events = useEvents();
   const layout = useLayout();
@@ -544,6 +546,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
                           kinds={kinds()}
                           active={selected() ?? undefined}
                           viewKey={searchQuery() ? `changes:${searchQuery()}` : undefined}
+                          onExitProject={() => navigate("/")}
                           onFileClick={(node) => handleDiffClick(node.path)}
                           onMentionFile={props.onMentionFile}
                           onMentionFileLine={props.onMentionFileLine}
@@ -609,6 +612,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
                     kinds={kinds()}
                     active={selected() ?? undefined}
                     viewKey={searchQuery() ? `all:${searchQuery()}` : undefined}
+                    onExitProject={() => navigate("/")}
                     onFileClick={handleFileClick}
                     onMentionFile={props.onMentionFile}
                     onMentionFileLine={props.onMentionFileLine}

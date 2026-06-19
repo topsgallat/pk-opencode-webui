@@ -7,6 +7,7 @@ import { useServer } from "../context/server"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { ChevronDown, ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Trash2, Pencil, MessageSquarePlus, Upload, Download } from "lucide-solid"
 import { NewFileDialog } from "./new-file-dialog"
+import { resolveFileTreeArrowLeftAction } from "./file-tree-keyboard"
 
 type Kind = "add" | "del" | "mix"
 
@@ -159,14 +160,17 @@ interface FileTreeProps {
   kinds?: ReadonlyMap<string, Kind>
   active?: string
   viewKey?: string
+  treeId?: string
   onFileClick?: (node: FileNode) => void
   onMentionFile?: (path: string) => void
   onMentionFileLine?: (path: string, selection: { startLine: number; endLine: number }) => void
+  onExitProject?: () => void
 }
 
 export function FileTree(props: FileTreeProps) {
   const file = useFile()
   const server = useServer()
+  const treeId = props.treeId ?? `file-tree-${Math.random().toString(36).slice(2, 10)}`
   const capabilities = () => getServerCapabilities(server.selectedServer())
   const level = () => props.level ?? 0
   const canCreateFile = () => capabilities().canUseLocalExtFileOps
@@ -275,6 +279,30 @@ async function readDirectory(entry: DropEntry): Promise<UploadEntry[]> {
   function saveScroll() {
     if (!rootRef || !scrollKey()) return
     scrollStore.set(scrollKey()!, rootRef.scrollTop)
+  }
+
+  function focusTreePath(path: string) {
+    const nodes = document.querySelectorAll<HTMLButtonElement>(`[data-file-tree-id="${treeId}"] button[data-file-tree-path]`)
+    for (const node of nodes) {
+      if (node.dataset.fileTreePath !== path) continue
+      node.focus()
+      return true
+    }
+    return false
+  }
+
+  function handleArrowLeft(path: string, expanded: boolean) {
+    const action = resolveFileTreeArrowLeftAction(path, expanded)
+    if (action.type === "collapse") {
+      file.tree.collapse(path)
+      return
+    }
+    if (action.type === "focus-parent") {
+      if (focusTreePath(action.path)) return
+      props.onExitProject?.()
+      return
+    }
+    props.onExitProject?.()
   }
 
   function restoreScroll() {
@@ -601,6 +629,7 @@ function handleDragOverTarget(e: DragEvent, path: string) {
   return (
     <div
       ref={rootRef}
+      data-file-tree-id={treeId}
       class="flex flex-col gap-0.5 w-full h-full min-h-[100px] overflow-auto rounded-lg border border-transparent"
       onScroll={saveScroll}
       onDragEnter={(e) => handleDragEnter(e, "")}
@@ -705,11 +734,18 @@ function handleDragOverTarget(e: DragEvent, path: string) {
                 <Match when={node.type === "directory"}>
                   <div>
                     <button
-                       type="button"
-                       draggable={true}
-                       onClick={(e) => {
-                         if (consumeLongPress(node.path)) {
-                           e.preventDefault()
+                        type="button"
+                        data-file-tree-path={node.path}
+                        draggable={true}
+                        onKeyDown={(e) => {
+                          if (e.key !== "ArrowLeft") return
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleArrowLeft(node.path, expanded())
+                        }}
+                        onClick={(e) => {
+                          if (consumeLongPress(node.path)) {
+                            e.preventDefault()
                            e.stopPropagation()
                            return
                          }
@@ -780,9 +816,10 @@ function handleDragOverTarget(e: DragEvent, path: string) {
                         class="absolute top-0 bottom-0 w-px pointer-events-none opacity-30"
                         style={{ left: `${Math.max(0, 6 + level() * 12) + 8}px`, background: "var(--border-base)" }}
                       />
-                      <FileTree
+                        <FileTree
                         path={node.path}
                         level={level() + 1}
+                        treeId={treeId}
                         allowed={props.allowed}
                         modified={props.modified}
                         kinds={props.kinds}
@@ -791,6 +828,7 @@ function handleDragOverTarget(e: DragEvent, path: string) {
                         onFileClick={props.onFileClick}
                         onMentionFile={props.onMentionFile}
                         onMentionFileLine={props.onMentionFileLine}
+                        onExitProject={props.onExitProject}
                       />
                     </div>
                   </Show>
@@ -799,7 +837,14 @@ function handleDragOverTarget(e: DragEvent, path: string) {
               <Match when={node.type === "file"}>
                 <button
                   type="button"
+                  data-file-tree-path={node.path}
                   draggable={true}
+                  onKeyDown={(e) => {
+                    if (e.key !== "ArrowLeft") return
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleArrowLeft(node.path, false)
+                  }}
                   onClick={(e) => {
                     if (consumeLongPress(node.path)) {
                       e.preventDefault()

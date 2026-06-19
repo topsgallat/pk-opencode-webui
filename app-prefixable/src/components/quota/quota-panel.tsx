@@ -2,6 +2,7 @@ import { createEffect, createMemo, createResource, createSignal, For, Show, onCl
 import { useBasePath } from '../../context/base-path'
 import { useSDK } from '../../context/sdk'
 import { getQuota } from '../../utils/extended-api'
+import { loadSettings, saveSetting } from '../../utils/settings-api'
 import { QuotaProviderView } from '../../types/quota'
 import { QuotaProviderCard } from './quota-provider-card'
 
@@ -11,9 +12,33 @@ export function QuotaContent() {
   const [refreshing, setRefreshing] = createSignal(false)
   const [selectedProvider, setSelectedProvider] = createSignal<string>('all')
   const [clock, setClock] = createSignal(Date.now())
+  const [disabledProviders, setDisabledProviders] = createSignal<string[]>([])
+
+  const [settings] = createResource(
+    () => serverUrl,
+    async (url) => {
+      const data = await loadSettings(url, "quota")
+      const ids = Array.isArray(data?.disabledProviders) ? data.disabledProviders.filter((id: unknown): id is string => typeof id === "string") : []
+      setDisabledProviders(ids)
+      return data
+    },
+  )
+
+  const toggleProvider = async (id: string) => {
+    const next = disabledProviders().includes(id)
+      ? disabledProviders().filter((p) => p !== id)
+      : [...disabledProviders(), id]
+    setDisabledProviders(next)
+    try {
+      await saveSetting(serverUrl, "quota", "disabledProviders", next)
+      refetch()
+    } catch (error) {
+      console.error("Failed to save provider toggle:", error)
+    }
+  }
 
   const [quotaResource, { refetch }] = createResource(
-    () => ({ serverUrl, refresh: false }),
+    () => ({ serverUrl, settings: settings(), refresh: false }),
     async ({ serverUrl }) => {
       return await getQuota(serverUrl, { targetUrl })
     }
@@ -218,6 +243,44 @@ export function QuotaContent() {
             </For>
           </select>
         </div>
+
+        <Show when={providers().length > 0}>
+          <div
+            class="flex flex-wrap items-center gap-2 rounded-lg px-3 py-2"
+            style={{
+              background: 'var(--surface-inset)',
+              border: '1px solid var(--border-base)',
+            }}
+          >
+            <span class="pr-1 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-weak)' }}>
+              Fetch
+            </span>
+            <For each={providers()}>
+              {(provider) => {
+                const isDisabled = () => disabledProviders().includes(provider.id)
+                return (
+                  <button
+                    type="button"
+                    onClick={() => toggleProvider(provider.id)}
+                    class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors"
+                    style={{
+                      background: isDisabled() ? 'var(--background-base)' : 'var(--interactive-base)',
+                      color: isDisabled() ? 'var(--text-weak)' : 'white',
+                      border: '1px solid var(--border-base)',
+                    }}
+                    aria-pressed={!isDisabled()}
+                  >
+                    <span
+                      class="inline-block w-2 h-2 rounded-full"
+                      style={{ background: isDisabled() ? 'var(--status-warning-text)' : 'var(--icon-success-base)' }}
+                    />
+                    {provider.name}
+                  </button>
+                )
+              }}
+            </For>
+          </div>
+        </Show>
 
           <div class="space-y-4">
             <Show when={quotaResource.loading}>

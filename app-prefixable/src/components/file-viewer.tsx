@@ -435,7 +435,7 @@ export function FileViewer(props: FileViewerProps) {
                 style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}
               >
                 <div class="truncate flex-1 min-w-0 pr-2">{props.path}</div>
-                <div class="flex items-center gap-1 shrink-0 flex-nowrap">
+                <div class="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                   <Show when={isMarkdown()}>
                     <button
                       class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center gap-1"
@@ -465,7 +465,9 @@ export function FileViewer(props: FileViewerProps) {
                   <Show when={isHtml()}>
                     <button
                       classList={{
-                        "px-2 rounded min-h-[44px] flex-shrink-0 flex items-center justify-center gap-1 text-[10px] font-mono border transition-colors": true,
+                        "rounded flex-shrink-0 flex items-center justify-center gap-1 border transition-colors touch-manipulation": true,
+                        "px-3 py-2 min-h-[44px] min-w-[88px] text-[11px] font-mono": device.isTouchDevice(),
+                        "px-2 py-1.5 min-h-[32px] text-[10px] font-mono": !device.isTouchDevice(),
                         "hover:bg-black/5 dark:hover:bg-white/5": !htmlAllowJs(),
                       }}
                       onClick={handleHtmlJsToggle}
@@ -483,19 +485,19 @@ export function FileViewer(props: FileViewerProps) {
                     </button>
                   </Show>
                     <Show when={fileLoaded() && (!isBinary() || isPdf()) && !isImage()}>
-                      <button
-                        class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
-                        onClick={() => setFullscreenPreview(true)}
-                      title="Fullscreen Preview"
-                      aria-label="Fullscreen Preview"
-                      style={{ color: "var(--text-base)" }}
-                    >
+                  <button
+                    class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center touch-manipulation"
+                    onClick={() => setFullscreenPreview(true)}
+                    title="Fullscreen Preview"
+                    aria-label="Fullscreen Preview"
+                    style={{ color: "var(--text-base)" }}
+                  >
                       <Maximize2 class="w-3.5 h-3.5" />
                     </button>
                   </Show>
                   <Show when={capabilities().canUseLocalExtFileOps}>
                     <button
-                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center touch-manipulation"
                       onClick={() => setIsEditing(true)}
                       title="Edit File"
                       aria-label="Edit File"
@@ -505,19 +507,19 @@ export function FileViewer(props: FileViewerProps) {
                     </button>
                   </Show>
                   <Show when={fileLoaded()}>
-                    <button
-                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
-                      onClick={() => void handleDownload()}
-                      title="Download File"
-                      aria-label="Download File"
-                      style={{ color: "var(--text-base)" }}
-                    >
+                  <button
+                    class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center touch-manipulation"
+                    onClick={() => void handleDownload()}
+                    title="Download File"
+                    aria-label="Download File"
+                    style={{ color: "var(--text-base)" }}
+                  >
                       <Download class="w-3.5 h-3.5" />
                     </button>
                   </Show>
                   <Show when={props.onMentionFile}>
                     <button
-                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center touch-manipulation"
                       onClick={() => props.onMentionFile?.(props.path)}
                       title="Mention in prompt"
                       aria-label="Mention in prompt"
@@ -729,7 +731,7 @@ export function FileViewer(props: FileViewerProps) {
               aria-modal="true"
               aria-labelledby="html-js-warning-title"
               aria-describedby="html-js-warning-message"
-              class="w-full max-w-md rounded-lg shadow-xl overflow-hidden"
+              class="w-full max-w-md max-h-[90dvh] overflow-auto rounded-lg shadow-xl"
               style={{
                 background: "var(--background-base)",
                 border: "1px solid var(--border-base)",
@@ -759,7 +761,7 @@ export function FileViewer(props: FileViewerProps) {
                 <button
                   type="button"
                   onClick={handleTrustHtmlFile}
-                  class="w-full px-4 py-2 text-sm font-medium rounded-md text-left"
+                  class="w-full px-4 min-h-[44px] py-2 text-sm font-medium rounded-md text-left touch-manipulation"
                   style={{
                     background: "var(--interactive-warning)",
                     color: "var(--text-on-interactive)",
@@ -771,7 +773,7 @@ export function FileViewer(props: FileViewerProps) {
                 <button
                   type="button"
                   onClick={handleAskAiReview}
-                  class="w-full px-4 py-2 text-sm font-medium rounded-md text-left"
+                  class="w-full px-4 min-h-[44px] py-2 text-sm font-medium rounded-md text-left touch-manipulation"
                   style={{
                     background: "var(--interactive-base)",
                     color: "var(--text-on-interactive)",
@@ -783,7 +785,7 @@ export function FileViewer(props: FileViewerProps) {
                 <button
                   type="button"
                   onClick={() => setShowHtmlJsWarning(false)}
-                  class="w-full px-4 py-2 text-sm font-medium rounded-md text-left"
+                  class="w-full px-4 min-h-[44px] py-2 text-sm font-medium rounded-md text-left touch-manipulation"
                   style={{
                     background: "var(--surface-inset)",
                     color: "var(--text-base)",

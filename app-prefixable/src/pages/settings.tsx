@@ -4247,26 +4247,13 @@ function ProjectFallbackTab() {
     setProjectSaving(true)
     setProjectSaveError(null)
 
-    const next: Config = { ...config.project }
-    next.fallback = {
-      enabled: projectEnabled(),
-      cross_provider: projectCrossProvider(),
-      order: fallbackOrder(projectRows()),
-    }
-
-    if (capabilities().canEditLocalInstructionFiles && directory) {
-      const ok = await writeFile(basePath.serverUrl, `${directory.replace(/\/$/, "")}/opencode.json`, `${JSON.stringify(next, null, 2)}\n`)
-      setProjectSaving(false)
-      if (ok) {
-        await config.refresh()
-        showProjectSaved()
-        return
-      }
-      setProjectSaveError("Failed to save project fallback override")
-      return
-    }
-
-    const result = await config.updateProject({ fallback: next.fallback })
+    const result = await config.updateProject({
+      fallback: {
+        enabled: projectEnabled(),
+        cross_provider: projectCrossProvider(),
+        order: fallbackOrder(projectRows()),
+      },
+    })
     setProjectSaving(false)
     if (result) showProjectSaved()
     else setProjectSaveError("Failed to save project fallback override")
@@ -4345,7 +4332,7 @@ function ProjectFallbackTab() {
           <FallbackPolicySection
             title="Project override"
             description="Use this only when this project should fall back differently from the global default."
-            info={<span>Saved to <code class="px-1 py-0.5 rounded" style={{ background: "var(--background-base)" }}>opencode.json</code> in this project{directory ? ` (${directory})` : ""}.</span>}
+            info={<span>Saved in this project's config and used only when this project overrides the global default.</span>}
             rows={projectRows}
             setRows={setProjectRows}
             enabled={projectEnabled()}

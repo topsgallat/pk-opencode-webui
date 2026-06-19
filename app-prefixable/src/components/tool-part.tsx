@@ -865,15 +865,16 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
 }
 
 // Reasoning part display (AI Thinking)
-function ReasoningPartDisplay(props: { part: ReasoningPart }) {
-  const expanded = () => expandedStore.get(props.part.id);
+function ReasoningPartDisplay(props: { parts: ReasoningPart[] }) {
+  const first = () => props.parts[0];
+  const expanded = () => expandedStore.get(first().id);
 
   return (
     <div
       class="rounded-md overflow-hidden bg-[var(--background-base)] border border-[var(--border-base)] mb-2"
     >
-      <button
-        onClick={() => expandedStore.toggle(props.part.id)}
+        <button
+        onClick={() => expandedStore.toggle(first().id)}
         class="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--surface-inset)]"
         style={{
           background: expanded() ? "var(--surface-inset)" : "transparent",
@@ -900,7 +901,7 @@ function ReasoningPartDisplay(props: { part: ReasoningPart }) {
             color: "var(--text-base)",
           }}
         >
-          <Markdown content={props.part.text} class="thinking-content opacity-80" />
+          <Markdown content={props.parts.map((part) => part.text).join("")} class="thinking-content opacity-80" />
         </div>
       </Show>
     </div>
@@ -1241,18 +1242,44 @@ export function MessageParts(props: { parts: Part[] }) {
   // Separate parts by type but keep order
   const filteredParts = () => props.parts.filter(p => p.type === "tool" || p.type === "reasoning" || p.type === "subtask" || p.type === "agent");
 
+  const groupedParts = () => {
+    const next: Array<{ type: "reasoning"; parts: ReasoningPart[] } | { type: "tool"; part: ToolPart } | { type: "subtask"; part: SubtaskPart } | { type: "agent"; part: AgentPart }> = [];
+    let run: ReasoningPart[] = [];
+
+    const flush = () => {
+      if (run.length === 0) return;
+      next.push({ type: "reasoning", parts: run });
+      run = [];
+    };
+
+    for (const part of filteredParts()) {
+      if (part.type === "reasoning") {
+        run.push(part as ReasoningPart);
+        continue;
+      }
+
+      flush();
+      if (part.type === "tool") next.push({ type: "tool", part: part as ToolPart });
+      if (part.type === "subtask") next.push({ type: "subtask", part: part as SubtaskPart });
+      if (part.type === "agent") next.push({ type: "agent", part: part as AgentPart });
+    }
+
+    flush();
+    return next;
+  };
+
   return (
-    <Show when={filteredParts().length > 0}>
+    <Show when={groupedParts().length > 0}>
       <div class="space-y-2 mt-3">
-        <For each={filteredParts()}>
-          {(part, i) => {
-            if (part.type === "reasoning") return <ReasoningPartDisplay part={part as ReasoningPart} />;
-            if (part.type === "subtask") return null;
-            if (part.type === "agent") return null;
-            if (part.type === "tool") {
+        <For each={groupedParts()}>
+          {(item) => {
+            if (item.type === "reasoning") return <ReasoningPartDisplay parts={item.parts} />;
+            if (item.type === "subtask") return null;
+            if (item.type === "agent") return null;
+            if (item.type === "tool") {
               const subtask = props.parts.find((p): p is SubtaskPart => p.type === "subtask");
               const agentPart = props.parts.find((p): p is AgentPart => p.type === "agent");
-              return <ToolPartDisplay part={part as ToolPart} subtask={subtask} agentPart={agentPart} />;
+              return <ToolPartDisplay part={item.part} subtask={subtask} agentPart={agentPart} />;
             }
             return null;
           }}

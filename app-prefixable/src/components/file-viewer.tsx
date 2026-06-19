@@ -144,6 +144,7 @@ export function FileViewer(props: FileViewerProps) {
   const isHtml = createMemo(() => lang() === "html")
   const [markdownPreview, setMarkdownPreview] = createSignal(true)
   const [htmlPreview, setHtmlPreview] = createSignal(true)
+  const [htmlAllowJs, setHtmlAllowJs] = createSignal(false)
   const [fullscreenPreview, setFullscreenPreview] = createSignal(false)
   let fullscreenRef: HTMLDivElement | undefined
   const htmlBlobUrl = createMemo(() => {
@@ -153,6 +154,7 @@ export function FileViewer(props: FileViewerProps) {
     onCleanup(() => URL.revokeObjectURL(url))
     return url
   })
+  const htmlSandbox = createMemo(() => (htmlAllowJs() ? "allow-scripts" : ""))
   const sourceLines = createMemo(() => fileContent().split("\n"))
   const lineButtonClass = () =>
     device.isTouchDevice()
@@ -163,6 +165,8 @@ export function FileViewer(props: FileViewerProps) {
   createEffect(() => {
     const path = props.path
     if (!path) return
+
+    setHtmlAllowJs(false)
 
     const s = file.get(path)
     const loading = !!s?.loading
@@ -424,6 +428,22 @@ export function FileViewer(props: FileViewerProps) {
                       </Show>
                     </button>
                   </Show>
+                  <Show when={isHtml()}>
+                    <button
+                      classList={{
+                        "p-1 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center text-[10px] font-mono border": true,
+                        "hover:bg-black/5 dark:hover:bg-white/5": !htmlAllowJs(),
+                        "bg-black/10 dark:bg-white/10": htmlAllowJs(),
+                      }}
+                      onClick={() => setHtmlAllowJs(!htmlAllowJs())}
+                      title={htmlAllowJs() ? "Disable JavaScript in HTML preview" : "Enable JavaScript in HTML preview"}
+                      aria-label={htmlAllowJs() ? "Disable JavaScript in HTML preview" : "Enable JavaScript in HTML preview"}
+                      aria-pressed={htmlAllowJs()}
+                      style={{ color: "var(--text-base)", borderColor: "var(--border-base)" }}
+                    >
+                      JS
+                    </button>
+                  </Show>
                     <Show when={fileLoaded() && (!isBinary() || isPdf()) && !isImage()}>
                       <button
                         class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
@@ -510,7 +530,7 @@ export function FileViewer(props: FileViewerProps) {
                       >
                     <iframe
                       src={htmlBlobUrl()}
-                      sandbox=""
+                      sandbox={htmlSandbox()}
                       class="w-full border-0"
                       style={{ height: "calc(100vh - 120px)", background: "var(--background-base)" }}
                       title="HTML preview"
@@ -619,7 +639,7 @@ export function FileViewer(props: FileViewerProps) {
                     >
                       <iframe
                         src={htmlBlobUrl()}
-                        sandbox=""
+                        sandbox={htmlSandbox()}
                         tabIndex={-1}
                         class="w-full h-full border-0"
                         title="HTML preview"

@@ -370,6 +370,13 @@ export async function loadAnthropicQuota(options?: { targetUrl?: string; refresh
         return maybeCache(result)
       }
 
+      if (!account) {
+        result.warning = isRemoteTarget(options?.targetUrl)
+          ? "Claude.ai quota is read from the UI server host, not the selected remote target"
+          : "No active Anthropic account found. Sign in to Claude to view subscription usage."
+        return result
+      }
+
       const token = extractToken(parsed)
       if (token) {
         try {

@@ -60,7 +60,12 @@ describe("AnthropicProvider", () => {
     }) as typeof fetch
 
     const provider = new AnthropicProvider({
-      run: mockCliStatus({ authenticated: true, oauth: { accessToken: "tok_123" } }),
+      run: mockCliStatus({
+        loggedIn: true,
+        email: "consult@secstrike.ai",
+        orgName: "Secstrike Team",
+        oauth: { accessToken: "tok_123" },
+      }),
       fetch: anthropicFetch,
     })
 
@@ -136,14 +141,19 @@ describe("AnthropicProvider", () => {
     clearEnv()
     let calls = 0
     const provider = new AnthropicProvider({
-      run: mockCliStatus({ authenticated: true, oauth: { accessToken: "tok_123" } }),
-      fetch: async () => {
+      run: mockCliStatus({
+        loggedIn: true,
+        email: "consult@secstrike.ai",
+        orgName: "Secstrike Team",
+        oauth: { accessToken: "tok_123" },
+      }),
+      fetch: (async () => {
         calls += 1
         return new Response(JSON.stringify({ error: { type: "rate_limit_error", message: "Rate limited. Please try again later." } }), {
           status: 429,
           headers: { "content-type": "application/json", "retry-after": "60" },
         })
-      },
+      }) as unknown as typeof fetch,
       now: () => 1_000,
     })
 
@@ -154,6 +164,26 @@ describe("AnthropicProvider", () => {
     expect(first.cooldownUntil).toBe("1970-01-01T00:01:01.000Z")
     expect(second.cooldownUntil).toBe(first.cooldownUntil)
     expect(calls).toBe(1)
+  })
+
+  it("does not call oauth usage when no active account exists", async () => {
+    clearEnv()
+    let calls = 0
+    const provider = new AnthropicProvider({
+      run: mockCliStatus({ authenticated: true, oauth: { accessToken: "tok_123" } }),
+      fetch: (async () => {
+        calls += 1
+        return new Response("should not be called", { status: 500 })
+      }) as unknown as typeof fetch,
+    })
+
+    const result = await provider.fetch({})
+
+    expect(result.status).toBe("unavailable")
+    expect(result.available).toBe(false)
+    expect(result.entries).toHaveLength(0)
+    expect(result.warning).toContain("No active Anthropic account found")
+    expect(calls).toBe(0)
   })
 })
 

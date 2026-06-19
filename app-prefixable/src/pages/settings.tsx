@@ -3807,6 +3807,10 @@ function ProjectFallbackTab() {
   const [saved, setSaved] = createSignal(false)
   const [saveError, setSaveError] = createSignal<string | null>(null)
   const [draggingId, setDraggingId] = createSignal<string | null>(null)
+  const [modelSearch, setModelSearch] = createSignal("")
+  const [modelSearchOpen, setModelSearchOpen] = createSignal(false)
+  const [modelSearchIndex, setModelSearchIndex] = createSignal(0)
+  let modelSearchRef: HTMLInputElement | undefined
 
   const fallbackConfig = () => config.project.fallback ?? {}
   const [enabled, setEnabled] = createSignal(fallbackConfig().enabled ?? true)
@@ -3814,8 +3818,34 @@ function ProjectFallbackTab() {
   const [rows, setRows] = createSignal<FallbackRow[]>((fallbackConfig().order ?? []).map((value) => ({ id: generateUUID(), value })))
 
   const order = createMemo(() => Array.from(new Set(rows().map((row) => row.value.trim()).filter(Boolean))))
-  const currentModels = createMemo(() => providers.eligibleModels().map((item) => `${item.providerID}/${item.modelID}`))
-  const availableModels = createMemo(() => currentModels().filter((item) => !order().includes(item)))
+  const eligibleModels = createMemo(() => providers.eligibleModels().map((item) => ({
+    ...item,
+    value: `${item.providerID}/${item.modelID}`,
+    label: `${item.providerName} / ${item.modelName}`,
+  })))
+  const currentModels = createMemo(() => eligibleModels().map((item) => item.value))
+  const searchableModels = createMemo(() => {
+    const q = modelSearch().trim().toLowerCase()
+    const pool = eligibleModels().filter((item) => !order().includes(item.value))
+    const top = pool.slice(0, 6)
+    if (!q) return top
+
+    const score = (item: { value: string; label: string; providerID: string; providerName: string; modelID: string; modelName: string }) => {
+      const values = [item.value, item.label, item.providerID, item.providerName, item.modelID, item.modelName].map((value) => value.toLowerCase())
+      let total = 0
+      for (const value of values) {
+        if (value === q) total += 100
+        else if (value.startsWith(q)) total += 50
+        else if (value.includes(q)) total += 10
+      }
+      return total
+    }
+
+    return [...pool]
+      .filter((item) => [item.value, item.label, item.providerID, item.providerName, item.modelID, item.modelName].some((value) => value.toLowerCase().includes(q)))
+      .sort((a, b) => score(b) - score(a) || a.providerIndex - b.providerIndex || a.modelIndex - b.modelIndex)
+      .slice(0, 12)
+  })
 
   let savedTimer: number | undefined
   function showSaved() {
@@ -3859,8 +3889,16 @@ function ProjectFallbackTab() {
   }
 
   function addModel(value: string) {
-    if (!value) return
+    if (!value || order().includes(value)) return
     addRow(value)
+  }
+
+  function pickModel(value: string) {
+    addModel(value)
+    setModelSearch("")
+    setModelSearchOpen(true)
+    setModelSearchIndex(0)
+    requestAnimationFrame(() => modelSearchRef?.focus())
   }
 
   function removeRow(id: string) {
@@ -3895,6 +3933,38 @@ function ProjectFallbackTab() {
     setDraggingId(null)
     if (!from || !to || from === to) return
     reorderRows(from, to)
+  }
+
+  function handleSearchKeyDown(event: KeyboardEvent) {
+    const list = searchableModels()
+    if (event.key === "ArrowDown") {
+      event.preventDefault()
+      setModelSearchOpen(true)
+      setModelSearchIndex((index) => Math.min(index + 1, Math.max(0, list.length - 1)))
+      return
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault()
+      setModelSearchOpen(true)
+      setModelSearchIndex((index) => Math.max(index - 1, 0))
+      return
+    }
+    if (event.key === "Enter") {
+      const selected = list[modelSearchIndex()]
+      if (!selected) return
+      event.preventDefault()
+      pickModel(selected.value)
+      return
+    }
+    if (event.key === "Escape") {
+      event.preventDefault()
+      if (modelSearch()) {
+        setModelSearch("")
+        setModelSearchIndex(0)
+        return
+      }
+      setModelSearchOpen(false)
+    }
   }
 
   return (
@@ -4034,22 +4104,57 @@ function ProjectFallbackTab() {
                 <Plus class="w-4 h-4" />
                 Add custom model
               </Button>
-              <Show when={availableModels().length > 0}>
-                <span class="text-xs" style={{ color: "var(--text-weak)" }}>
-                  Quick add:
-                </span>
-                <For each={availableModels().slice(0, 6)}>
-                  {(item) => (
-                    <button
-                      type="button"
-                      onClick={() => addModel(item)}
-                      class="rounded-full px-3 py-1 text-xs transition-colors"
-                      style={{ background: "var(--surface-inset)", color: "var(--text-base)", border: "1px solid var(--border-base)" }}
-                    >
-                      {item}
-                    </button>
-                  )}
-                </For>
+            </div>
+
+            <div class="mt-3">
+              <label class="block text-xs font-medium mb-1.5" style={{ color: "var(--text-weak)" }}>
+                Search eligible models
+              </label>
+              <div class="relative">
+                <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-weak)" }} />
+                <input
+                  ref={(el) => (modelSearchRef = el)}
+                  value={modelSearch()}
+                  onFocus={() => setModelSearchOpen(true)}
+                  onBlur={() => window.setTimeout(() => setModelSearchOpen(false), 120)}
+                  onInput={(e) => {
+                    setModelSearch(e.currentTarget.value)
+                    setModelSearchOpen(true)
+                    setModelSearchIndex(0)
+                  }}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search provider or model name"
+                  class="w-full rounded-md py-2 pl-9 pr-3 text-sm"
+                  style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }}
+                />
+              </div>
+
+              <Show when={modelSearchOpen()}>
+                <div class="mt-2 overflow-hidden rounded-md border" style={{ background: "var(--background-base)", "border-color": "var(--border-base)" }}>
+                  <Show when={searchableModels().length > 0} fallback={<div class="px-3 py-2 text-sm" style={{ color: "var(--text-weak)" }}>No matching models found.</div>}>
+                    <div class="max-h-56 overflow-auto py-1" role="listbox" aria-label="Eligible models">
+                      <For each={searchableModels()}>
+                        {(item, index) => (
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={index() === modelSearchIndex()}
+                            class="w-full px-3 py-2 text-left transition-colors"
+                            style={{ background: index() === modelSearchIndex() ? "var(--surface-inset)" : "transparent", color: "var(--text-base)" }}
+                            onMouseEnter={() => setModelSearchIndex(index())}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => pickModel(item.value)}
+                          >
+                            <div class="flex items-center justify-between gap-3">
+                              <span class="min-w-0 truncate text-sm">{item.label}</span>
+                              <code class="shrink-0 text-xs" style={{ color: "var(--text-weak)" }}>{item.value}</code>
+                            </div>
+                          </button>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                </div>
               </Show>
             </div>
 

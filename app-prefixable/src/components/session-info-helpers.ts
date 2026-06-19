@@ -54,3 +54,11 @@ export function findPrimaryQuotaEntry(provider: Pick<QuotaProviderView, "id" | "
 
   return provider.entries.find((entry) => getQuotaPercentUsed(entry) !== null) ?? provider.entries[0] ?? null
 }
+
+export function resolveQuotaProviderState(providers: QuotaProviderView[], providerID?: string) {
+  const provider = findQuotaProviderBySelectedModel(providers, providerID)
+  return {
+    provider,
+    entry: findPrimaryQuotaEntry(provider),
+  }
+}

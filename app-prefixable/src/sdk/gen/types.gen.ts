@@ -1768,6 +1768,23 @@ export type Config = {
    */
   small_model?: string
   /**
+   * Automatic model fallback behavior for retryable model failures
+   */
+  fallback?: {
+    /**
+     * Enable automatic model fallback when rate limit/quota is detected
+     */
+    enabled?: boolean
+    /**
+     * When false, only consider fallback candidates from the current provider family
+     */
+    cross_provider?: boolean
+    /**
+     * Preferred fallback order, top-to-bottom, in provider/model format (e.g. anthropic/claude-sonnet-4-5)
+     */
+    order?: Array<string>
+  }
+  /**
    * Default agent to use when none is specified. Must be a primary agent. Falls back to 'build' if not set or if the specified agent is invalid.
    */
   default_agent?: string

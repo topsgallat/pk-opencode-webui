@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { findPrimaryQuotaEntry, findQuotaProviderBySelectedModel, getQuotaPercentUsed } from "./session-info-helpers"
+import { findPrimaryQuotaEntry, findQuotaProviderBySelectedModel, getQuotaPercentUsed, resolveQuotaProviderState } from "./session-info-helpers"
 import type { QuotaProviderView } from "../../../shared/quota/types"
 
 describe("session-info quota matching", () => {
@@ -24,6 +24,21 @@ describe("session-info quota matching", () => {
 
   it("falls back to the first provider when none is selected", () => {
     expect(findQuotaProviderBySelectedModel(providers, undefined)?.id).toBe("copilot")
+  })
+
+  it("returns the provider and primary quota entry together", () => {
+    const state = resolveQuotaProviderState([
+      {
+        id: "anthropic",
+        entries: [
+          { id: "secondary", label: "Claude 7d", group: "quota", percentUsed: 42 },
+          { id: "primary", label: "Claude 5h", group: "quota", percentUsed: 9 },
+        ],
+      },
+    ] as QuotaProviderView[], "anthropic:claude-sonnet-4-5")
+
+    expect(state.provider?.id).toBe("anthropic")
+    expect(state.entry?.id).toBe("primary")
   })
 })
 

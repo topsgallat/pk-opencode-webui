@@ -48,6 +48,15 @@ interface Model {
   }
 }
 
+interface EligibleModel {
+  providerID: string
+  providerName: string
+  modelID: string
+  modelName: string
+  providerIndex: number
+  modelIndex: number
+}
+
 function isZeroCost(cost?: Model["cost"]): boolean {
   return !cost || (cost.input === 0 && cost.output === 0)
 }
@@ -122,6 +131,7 @@ interface ProviderContextValue {
   selectedVariant: string | null
   selectedAgent: string
   modelsByAgent: Record<string, ModelKey>
+  eligibleModels: () => EligibleModel[]
   setSelectedModel: (model: ModelKey | null) => void
   setSelectedVariant: (variant: string | null) => void
   setSelectedAgent: (agent: string) => void
@@ -270,6 +280,22 @@ export function ProviderProvider(props: ParentProps) {
       ),
     })))
   const connectedView = createMemo(() => rawConnected().filter((providerID) => providerAllowed(providerID)))
+  const eligibleModels = createMemo(() => {
+    const connected = new Set(connectedView())
+
+    return providersView().flatMap((provider, providerIndex) => {
+      if (!connected.has(provider.id)) return []
+
+      return Object.entries(provider.models).map(([modelID, model], modelIndex) => ({
+        providerID: provider.id,
+        providerName: provider.name,
+        modelID,
+        modelName: model.name || model.id,
+        providerIndex,
+        modelIndex,
+      }))
+    })
+  })
 
   function providerFor(model: ModelKey | null, list = providersView()) {
     if (!model) return null
@@ -608,6 +634,7 @@ export function ProviderProvider(props: ParentProps) {
     get modelsByAgent() {
       return store.modelsByAgent
     },
+    eligibleModels: () => eligibleModels(),
     setSelectedModel,
     setSelectedVariant,
     setSelectedAgent,

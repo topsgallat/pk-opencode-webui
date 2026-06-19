@@ -57,6 +57,8 @@ import { sessionQuestionRequest } from "../utils/session-tree-request";
 import { errorMessage, withTimeout } from "../utils/request-timeout";
 import { applyQueuedPromptSubmission } from "../utils/chat-queue";
 import { findOptimisticMessageEcho, mergeOptimisticMessage, projectDisplayMessages, type OptimisticQueueMessage, type SyncMessageLike } from "../utils/message-reconcile";
+import { getQuota } from "../utils/extended-api";
+import { isRetryableModelFailure, pickFallbackCandidate } from "../utils/model-fallback";
 
 const ACCEPTED_IMAGE_TYPES = [
   "image/png",
@@ -285,7 +287,7 @@ function RetryStatusBanner(props: { status: () => RetrySessionStatus | undefined
   })
 
   return (
-    <Show when={props.status()?.type === "retry"}>
+    <Show when={props.status()}>
       {(status) => (
         <div
           class="mx-2 mb-2 rounded-lg px-3 py-2 text-xs font-medium"
@@ -313,7 +315,7 @@ function RetryStatusBanner(props: { status: () => RetrySessionStatus | undefined
 export function Session() {
   const params = useParams<{ dir: string; id?: string }>();
   const navigate = useNavigate();
-  const { client, directory } = useSDK();
+  const { client, directory, targetUrl, url: serverUrl } = useSDK();
   const events = useEvents();
   const sync = useSync();
   const providers = useProviders();
@@ -325,6 +327,7 @@ export function Session() {
   const appConfig = useConfig();
   const server = useServer();
   const device = useDevice();
+  const fallbackPolicy = createMemo(() => appConfig.project.fallback ?? appConfig.global.fallback);
 
   function normalizePreviewPath(raw: string) {
     const decoded = decodeURIComponent(raw.replace(/^file:\/\//, "")).trim();
@@ -670,6 +673,12 @@ export function Session() {
   );
   const [activePrompt, setActivePrompt] = createSignal<PendingPromptItem | null>(null);
   const [pendingQueue, setPendingQueue] = createSignal<PendingPromptItem[]>([]);
+  const autoFallbackAttempts = new Set<string>();
+
+  createEffect(() => {
+    params.id;
+    autoFallbackAttempts.clear();
+  });
 
   const pendingPermissions = createMemo(() => permission.pendingForSession(sessionId() ?? ""));
   const inputBlocked = createMemo(() => !!pendingQuestion() || pendingPermissions().length > 0);
@@ -1080,6 +1089,15 @@ export function Session() {
     const id = sessionId();
     if (!id) return undefined;
     return events.status[id];
+  });
+  const retrySessionStatus = createMemo<RetrySessionStatus | undefined>(() => {
+    const status = sessionStatus();
+    if (!status || status.type !== "retry") return undefined;
+    return {
+      type: "retry",
+      next: status.next,
+      message: status.message,
+    };
   });
   const sessionPausedReason = createMemo<"paused_question" | "paused_permission" | null>(() => {
     const reason = queuePausedReason();
@@ -1933,6 +1951,28 @@ export function Session() {
 
           if (props.sessionID !== id) return;
 
+          const prompt = activePrompt();
+          if (prompt) {
+            void (async () => {
+              const fallback = await maybeAutoFallback(prompt, props.error)
+              if (fallback.attempted) {
+                void sync.session.sync(id).catch(() => {})
+                return
+              }
+
+              batch(() => {
+                setError(errorMessage(props.error, "The selected model hit a limit. Please choose another model or try again later."))
+                setActivePrompt(null)
+                wasProcessing.value = false
+                setProcessing(false)
+                if (isRetryableModelFailure(props.error)) setFailedPromptItem(prompt)
+              })
+
+              void sync.session.sync(id).catch(() => {})
+            })()
+            return
+          }
+
           batch(() => {
             setError(errorMessage(props.error, "The selected model hit a limit. Please choose another model or try again later."));
             setActivePrompt(null);
@@ -2169,7 +2209,7 @@ export function Session() {
     return parts;
   }
 
-  async function submitPrompt(item: PendingPromptItem) {
+  async function submitPrompt(item: PendingPromptItem, options?: { allowAutoFallback?: boolean }) {
     setError(null);
     setLoading(true);
     setShowTodoTray(false);
@@ -2200,10 +2240,15 @@ export function Session() {
       startProcessing();
       return true;
     } catch (err) {
+      if (options?.allowAutoFallback !== false) {
+        const fallback = await maybeAutoFallback(item, err)
+        if (fallback.attempted) return fallback.succeeded
+      }
+
       console.error("[Session] Error sending message:", err);
       const errMsg = err instanceof Error ? err.message : String(err);
       setError(`Failed to send message: ${errMsg}`);
-      if (errMsg.includes(LOAD_FAILED_SUBSTR)) {
+      if (errMsg.includes(LOAD_FAILED_SUBSTR) || isRetryableModelFailure(err)) {
         setFailedPromptItem(item);
       }
       setActivePrompt(null);
@@ -2365,6 +2410,62 @@ export function Session() {
     const model = providers.selectedModel;
     if (!model) return null;
     return `${model.providerID}/${model.modelID}`;
+  }
+
+  async function loadQuotaSnapshot() {
+    try {
+      return await getQuota(serverUrl, { targetUrl, projectDir: directory })
+    } catch {
+      return null
+    }
+  }
+
+  async function maybeAutoFallback(item: PendingPromptItem, error: unknown): Promise<{ attempted: boolean; succeeded: boolean }> {
+    if (!isRetryableModelFailure(error)) return { attempted: false, succeeded: false }
+    if (autoFallbackAttempts.has(item.id)) return { attempted: false, succeeded: false }
+
+    const current = item.model ?? providers.selectedModel
+    if (!current) return { attempted: false, succeeded: false }
+
+    const candidates = providers.eligibleModels()
+    if (candidates.length <= 1) return { attempted: false, succeeded: false }
+
+    const quota = await loadQuotaSnapshot()
+    const next = pickFallbackCandidate(candidates, current, quota, fallbackPolicy())
+    if (!next) return { attempted: false, succeeded: false }
+
+    autoFallbackAttempts.add(item.id)
+    batch(() => {
+      providers.setSelectedAgent(item.agent)
+      providers.setSelectedModel({ providerID: next.providerID, modelID: next.modelID })
+      providers.setSelectedVariant(null)
+      setSessionSelection({
+        agent: item.agent,
+        model: { providerID: next.providerID, modelID: next.modelID },
+        variant: null,
+      })
+      setModelPickerError(null)
+      setRetryAwaitingSelection(false)
+      setFailedPromptItem(null)
+      setError(null)
+    })
+
+    showToast(`Retrying with ${next.providerName} ${next.modelName} after rate limit.`, 8000, "warning")
+
+    const retried = await submitPrompt({
+      ...item,
+      model: { providerID: next.providerID, modelID: next.modelID },
+      variant: null,
+    }, { allowAutoFallback: false })
+
+    if (retried) {
+      autoFallbackAttempts.delete(item.id)
+      setFailedPromptItem(null)
+      return { attempted: true, succeeded: true }
+    }
+
+    setFailedPromptItem(item)
+    return { attempted: true, succeeded: false }
   }
 
   function buildCommandParts(files: FileContext[], images: ImageAttachment[]) {
@@ -3375,7 +3476,7 @@ export function Session() {
               >
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <span>{error()}</span>
-                  <Show when={error() === MODEL_NOT_READY_ERROR || (error() ?? "").includes(LOAD_FAILED_SUBSTR)}>
+                  <Show when={error() === MODEL_NOT_READY_ERROR || (error() ?? "").includes(LOAD_FAILED_SUBSTR) || (failedPromptItem() && isRetryableModelFailure(error()))}>
                     <Button
                       type="button"
                       variant="secondary"
@@ -3491,7 +3592,7 @@ export function Session() {
                   )}
                 </Show>
 
-                <RetryStatusBanner status={sessionStatus} />
+                <RetryStatusBanner status={retrySessionStatus} />
 
                 {/* Drag-to-resize handle */}
                 <ResizeHandle

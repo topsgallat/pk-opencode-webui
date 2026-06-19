@@ -13,6 +13,7 @@ type Skill = {
   description: string
   location: string
   content: string
+  scope?: Scope
   state?: "active" | "disabled"
   sourcePath?: string
   hiddenPath?: string

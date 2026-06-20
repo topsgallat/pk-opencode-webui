@@ -156,6 +156,11 @@ export function FileViewer(props: FileViewerProps) {
     onCleanup(() => URL.revokeObjectURL(url))
     return url
   })
+  const htmlPreviewSrc = createMemo(() => {
+    const url = htmlBlobUrl()
+    if (!url) return undefined
+    return `${url}#js=${htmlAllowJs() ? "1" : "0"}`
+  })
   const htmlSandbox = createMemo(() => (htmlAllowJs() ? "allow-scripts" : ""))
   const htmlJsReviewNote = "Please review this HTML file for JavaScript safety before enabling scripts in preview. Check inline and external scripts, network requests, storage access, redirects, popups, and any other risky behavior, then summarize whether it looks safe to trust."
   const sourceLines = createMemo(() => fileContent().split("\n"))
@@ -569,7 +574,7 @@ export function FileViewer(props: FileViewerProps) {
                       }
                       >
                     <iframe
-                      src={htmlBlobUrl()}
+                      src={htmlPreviewSrc()}
                       sandbox={htmlSandbox()}
                       class="w-full border-0"
                       style={{ height: "calc(100vh - 120px)", background: "var(--background-base)" }}
@@ -690,7 +695,7 @@ export function FileViewer(props: FileViewerProps) {
                       }
                     >
                       <iframe
-                        src={htmlBlobUrl()}
+                        src={htmlPreviewSrc()}
                         sandbox={htmlSandbox()}
                         tabIndex={-1}
                         class="w-full h-full border-0"

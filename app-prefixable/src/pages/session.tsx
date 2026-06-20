@@ -4,6 +4,7 @@ import {
   For,
   onMount,
   createEffect,
+  createResource,
   onCleanup,
   createMemo,
   on,
@@ -59,6 +60,7 @@ import { applyQueuedPromptSubmission } from "../utils/chat-queue";
 import { findOptimisticMessageEcho, mergeOptimisticMessage, projectDisplayMessages, type OptimisticQueueMessage, type SyncMessageLike } from "../utils/message-reconcile";
 import { getQuota } from "../utils/extended-api";
 import { isRetryableModelFailure, pickFallbackCandidate } from "../utils/model-fallback";
+import { loadFallbackSettings, resolveFallbackPolicies } from "../utils/fallback-settings";
 
 const ACCEPTED_IMAGE_TYPES = [
   "image/png",
@@ -327,7 +329,8 @@ export function Session() {
   const appConfig = useConfig();
   const server = useServer();
   const device = useDevice();
-  const fallbackPolicy = createMemo(() => appConfig.project.fallback ?? appConfig.global.fallback);
+  const [fallbackSettings] = createResource(() => serverUrl, loadFallbackSettings);
+  const fallbackPolicy = createMemo(() => resolveFallbackPolicies(fallbackSettings() ?? {}, directory, appConfig.global.fallback, appConfig.project.fallback).project);
 
   function normalizePreviewPath(raw: string) {
     const decoded = decodeURIComponent(raw.replace(/^file:\/\//, "")).trim();

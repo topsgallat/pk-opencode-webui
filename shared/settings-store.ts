@@ -21,9 +21,10 @@ function createSettingsStore(dbPath: string) {
 
   return {
     load(namespace: string): Record<string, unknown> {
-      const rows = db.query<{ key: string; value: string }>(
-        "SELECT key, value FROM settings WHERE namespace = ?",
-      ).all(namespace)
+      const rows = db.query("SELECT key, value FROM settings WHERE namespace = ?").all(namespace) as Array<{
+        key: string
+        value: string
+      }>
 
       const result: Record<string, unknown> = {}
       for (const row of rows) {

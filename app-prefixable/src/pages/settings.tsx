@@ -24,7 +24,15 @@ import { writeFile } from "../utils/extended-api"
 import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCallback, restartOpencode, checkOpencodeHealth } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
 import { extractOAuthCode, extractOAuthInstructionCode, needsOAuthReplay, normalizeOAuthCallbackUrl } from "../utils/oauth"
-import { loadFallbackSettings, resolveFallbackPolicies, saveGlobalFallbackPolicy as saveFallbackGlobalPolicy, saveProjectFallbackPolicy as saveFallbackProjectPolicy } from "../utils/fallback-settings"
+import {
+  loadFallbackSettings,
+  resolveFallbackPolicies,
+  resolveFallbackPolicyForAgent,
+  saveGlobalAgentFallbackPolicy as saveFallbackGlobalAgentPolicy,
+  saveGlobalFallbackPolicy as saveFallbackGlobalPolicy,
+  saveProjectAgentFallbackPolicy as saveFallbackProjectAgentPolicy,
+  saveProjectFallbackPolicy as saveFallbackProjectPolicy,
+} from "../utils/fallback-settings"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { modelPolicyEnabled, providerBaseID, providerModelConfig } from "../utils/model-policy"
 import {
@@ -4161,6 +4169,7 @@ function FallbackPolicySection(props: {
 
 function ProjectFallbackTab() {
   const config = useConfig()
+  const providers = useProviders()
   const { directory } = useSDK()
   const { serverUrl } = useBasePath()
   const [fallbackSettings, { refetch: refetchFallbackSettings }] = createResource(() => serverUrl, loadFallbackSettings)
@@ -4179,10 +4188,45 @@ function ProjectFallbackTab() {
   const [projectEnabled, setProjectEnabled] = createSignal(true)
   const [projectCrossProvider, setProjectCrossProvider] = createSignal(true)
 
+  const agentNames = createMemo(() => providers.agents.map((agent) => agent.name).filter(Boolean))
+  const [globalAgent, setGlobalAgent] = createSignal("")
+  const [globalAgentSaving, setGlobalAgentSaving] = createSignal(false)
+  const [globalAgentSaved, setGlobalAgentSaved] = createSignal(false)
+  const [globalAgentSaveError, setGlobalAgentSaveError] = createSignal<string | null>(null)
+  const [globalAgentRows, setGlobalAgentRows] = createSignal<FallbackRow[]>([])
+  const [globalAgentEnabled, setGlobalAgentEnabled] = createSignal(true)
+  const [globalAgentCrossProvider, setGlobalAgentCrossProvider] = createSignal(true)
+
+  const [projectAgent, setProjectAgent] = createSignal("")
+  const [projectAgentSaving, setProjectAgentSaving] = createSignal(false)
+  const [projectAgentSaved, setProjectAgentSaved] = createSignal(false)
+  const [projectAgentSaveError, setProjectAgentSaveError] = createSignal<string | null>(null)
+  const [projectAgentRows, setProjectAgentRows] = createSignal<FallbackRow[]>([])
+  const [projectAgentEnabled, setProjectAgentEnabled] = createSignal(true)
+  const [projectAgentCrossProvider, setProjectAgentCrossProvider] = createSignal(true)
+
   const hasProjectOverride = createMemo(() => fallbackState().hasProjectOverride)
+  const globalAgentState = createMemo(() => resolveFallbackPolicyForAgent(
+    fallbackSettings() ?? {},
+    directory,
+    globalAgent() || undefined,
+    config.global.fallback,
+    config.project.fallback,
+  ))
+  const projectAgentState = createMemo(() => resolveFallbackPolicyForAgent(
+    fallbackSettings() ?? {},
+    directory,
+    projectAgent() || undefined,
+    config.global.fallback,
+    config.project.fallback,
+  ))
+  const hasGlobalAgentOverride = createMemo(() => globalAgentState().hasGlobalAgentOverride)
+  const hasProjectAgentOverride = createMemo(() => projectAgentState().hasProjectAgentOverride)
 
   let globalSavedTimer: number | undefined
   let projectSavedTimer: number | undefined
+  let globalAgentSavedTimer: number | undefined
+  let projectAgentSavedTimer: number | undefined
 
   function showGlobalSaved() {
     setGlobalSaveError(null)
@@ -4198,9 +4242,25 @@ function ProjectFallbackTab() {
     projectSavedTimer = window.setTimeout(() => setProjectSaved(false), 2000)
   }
 
+  function showGlobalAgentSaved() {
+    setGlobalAgentSaveError(null)
+    setGlobalAgentSaved(true)
+    if (globalAgentSavedTimer !== undefined) clearTimeout(globalAgentSavedTimer)
+    globalAgentSavedTimer = window.setTimeout(() => setGlobalAgentSaved(false), 2000)
+  }
+
+  function showProjectAgentSaved() {
+    setProjectAgentSaveError(null)
+    setProjectAgentSaved(true)
+    if (projectAgentSavedTimer !== undefined) clearTimeout(projectAgentSavedTimer)
+    projectAgentSavedTimer = window.setTimeout(() => setProjectAgentSaved(false), 2000)
+  }
+
   onCleanup(() => {
     if (globalSavedTimer !== undefined) clearTimeout(globalSavedTimer)
     if (projectSavedTimer !== undefined) clearTimeout(projectSavedTimer)
+    if (globalAgentSavedTimer !== undefined) clearTimeout(globalAgentSavedTimer)
+    if (projectAgentSavedTimer !== undefined) clearTimeout(projectAgentSavedTimer)
   })
 
   function syncGlobalFromSettings() {
@@ -4219,6 +4279,24 @@ function ProjectFallbackTab() {
     setProjectSaveError(null)
   }
 
+  function syncGlobalAgentFromSettings() {
+    const current = globalAgentState()
+    const policy = current.globalAgent ?? current.global ?? {}
+    setGlobalAgentEnabled(policy.enabled ?? true)
+    setGlobalAgentCrossProvider(policy.cross_provider ?? true)
+    setGlobalAgentRows(fallbackRows(policy.order))
+    setGlobalAgentSaveError(null)
+  }
+
+  function syncProjectAgentFromSettings() {
+    const current = projectAgentState()
+    const policy = current.projectAgent ?? current.effective ?? {}
+    setProjectAgentEnabled(policy.enabled ?? true)
+    setProjectAgentCrossProvider(policy.cross_provider ?? true)
+    setProjectAgentRows(fallbackRows(policy.order))
+    setProjectAgentSaveError(null)
+  }
+
   createEffect(() => {
     if (fallbackSettings.loading) return
     syncGlobalFromSettings()
@@ -4227,6 +4305,25 @@ function ProjectFallbackTab() {
   createEffect(() => {
     if (fallbackSettings.loading) return
     syncProjectFromSettings()
+  })
+
+  createEffect(() => {
+    const names = agentNames()
+    if (names.length === 0) return
+    if (!globalAgent() || !names.includes(globalAgent())) setGlobalAgent(names[0])
+    if (!projectAgent() || !names.includes(projectAgent())) setProjectAgent(names[0])
+  })
+
+  createEffect(() => {
+    if (fallbackSettings.loading) return
+    if (!globalAgent()) return
+    syncGlobalAgentFromSettings()
+  })
+
+  createEffect(() => {
+    if (fallbackSettings.loading) return
+    if (!projectAgent()) return
+    syncProjectAgentFromSettings()
   })
 
   async function saveGlobalFallbackPolicy() {
@@ -4288,6 +4385,94 @@ function ProjectFallbackTab() {
     setProjectSaving(false)
   }
 
+  async function saveGlobalAgentFallbackPolicy() {
+    if (!globalAgent()) {
+      setGlobalAgentSaveError("Select an agent first.")
+      return
+    }
+
+    setGlobalAgentSaving(true)
+    setGlobalAgentSaveError(null)
+    try {
+      await saveFallbackGlobalAgentPolicy(serverUrl, globalAgent(), {
+        enabled: globalAgentEnabled(),
+        cross_provider: globalAgentCrossProvider(),
+        order: fallbackOrder(globalAgentRows()),
+      })
+      await refetchFallbackSettings()
+      showGlobalAgentSaved()
+    } catch {
+      setGlobalAgentSaveError("Failed to save global agent fallback settings")
+    }
+    setGlobalAgentSaving(false)
+  }
+
+  async function clearGlobalAgentFallbackOverride() {
+    if (!globalAgent()) {
+      setGlobalAgentSaveError("Select an agent first.")
+      return
+    }
+
+    setGlobalAgentSaving(true)
+    setGlobalAgentSaveError(null)
+    try {
+      await saveFallbackGlobalAgentPolicy(serverUrl, globalAgent(), null)
+      await refetchFallbackSettings()
+      showGlobalAgentSaved()
+    } catch {
+      setGlobalAgentSaveError("Failed to clear global agent fallback override")
+    }
+    setGlobalAgentSaving(false)
+  }
+
+  async function saveProjectAgentFallbackPolicy() {
+    if (!directory) {
+      setProjectAgentSaveError("A project directory is required.")
+      return
+    }
+    if (!projectAgent()) {
+      setProjectAgentSaveError("Select an agent first.")
+      return
+    }
+
+    setProjectAgentSaving(true)
+    setProjectAgentSaveError(null)
+    try {
+      await saveFallbackProjectAgentPolicy(serverUrl, directory, projectAgent(), {
+        enabled: projectAgentEnabled(),
+        cross_provider: projectAgentCrossProvider(),
+        order: fallbackOrder(projectAgentRows()),
+      })
+      await refetchFallbackSettings()
+      showProjectAgentSaved()
+    } catch {
+      setProjectAgentSaveError("Failed to save project agent fallback settings")
+    }
+    setProjectAgentSaving(false)
+  }
+
+  async function clearProjectAgentFallbackOverride() {
+    if (!directory) {
+      setProjectAgentSaveError("A project directory is required.")
+      return
+    }
+    if (!projectAgent()) {
+      setProjectAgentSaveError("Select an agent first.")
+      return
+    }
+
+    setProjectAgentSaving(true)
+    setProjectAgentSaveError(null)
+    try {
+      await saveFallbackProjectAgentPolicy(serverUrl, directory, projectAgent(), null)
+      await refetchFallbackSettings()
+      showProjectAgentSaved()
+    } catch {
+      setProjectAgentSaveError("Failed to clear project agent fallback override")
+    }
+    setProjectAgentSaving(false)
+  }
+
   return (
     <div class="space-y-6">
       <header>
@@ -4316,6 +4501,75 @@ function ProjectFallbackTab() {
         onSave={saveGlobalFallbackPolicy}
         saveLabel="Save global default"
       />
+
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+            Global agent overrides
+          </h3>
+          <p class="mt-1 text-xs" style={{ color: "var(--text-weak)" }}>
+            Pick an agent, then save a fallback policy that applies only to that agent everywhere.
+          </p>
+        </div>
+
+        <Show
+          when={agentNames().length > 0}
+          fallback={<div class="rounded-lg border border-dashed px-4 py-6 text-sm text-center" style={{ "border-color": "var(--border-base)", color: "var(--text-weak)" }}>No agents are available yet.</div>}
+        >
+          <div class="space-y-3">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h4 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                  Agent override
+                </h4>
+                <p class="mt-1 text-xs" style={{ color: "var(--text-weak)" }}>
+                  Saved under the global fallback scope for the selected agent.
+                </p>
+              </div>
+              <div class="flex items-end gap-2">
+                <label class="text-xs font-medium" style={{ color: "var(--text-weak)" }}>
+                  Agent
+                  <select
+                    value={globalAgent()}
+                    onChange={(e) => setGlobalAgent(e.currentTarget.value)}
+                    disabled={globalAgentSaving()}
+                    class="ml-2 rounded-md px-3 py-2 text-sm"
+                    style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }}
+                  >
+                    <For each={agentNames()}>
+                      {(agent) => <option value={agent}>{agent}</option>}
+                    </For>
+                  </select>
+                </label>
+                <Show when={hasGlobalAgentOverride()}>
+                  <Button type="button" variant="secondary" onClick={clearGlobalAgentFallbackOverride} disabled={globalAgentSaving()}>
+                    <Trash2 class="w-4 h-4" />
+                    Clear
+                  </Button>
+                </Show>
+              </div>
+            </div>
+
+            <FallbackPolicySection
+              title="Global agent override"
+              description="This policy is used when the selected agent runs, before any project override is applied."
+              info={<span>{hasGlobalAgentOverride() ? `Saved for ${globalAgent()}.` : `Inherits the global default until saved for ${globalAgent()}.`}</span>}
+              rows={globalAgentRows}
+              setRows={setGlobalAgentRows}
+              enabled={globalAgentEnabled()}
+              setEnabled={setGlobalAgentEnabled}
+              crossProvider={globalAgentCrossProvider()}
+              setCrossProvider={setGlobalAgentCrossProvider}
+              saving={globalAgentSaving}
+              saved={globalAgentSaved}
+              saveError={globalAgentSaveError}
+              onReset={syncGlobalAgentFromSettings}
+              onSave={saveGlobalAgentFallbackPolicy}
+              saveLabel={hasGlobalAgentOverride() ? "Save agent override" : "Create agent override"}
+            />
+          </div>
+        </Show>
+      </div>
 
       <Show when={directory}>
         <div class="space-y-4">
@@ -4364,6 +4618,75 @@ function ProjectFallbackTab() {
               </Button>
             </div>
           </Show>
+
+          <div class="space-y-4 pt-2">
+            <div>
+              <h3 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                Project agent overrides
+              </h3>
+              <p class="mt-1 text-xs" style={{ color: "var(--text-weak)" }}>
+                Pick an agent, then save a fallback policy that applies only inside this project.
+              </p>
+            </div>
+
+            <Show
+              when={agentNames().length > 0}
+              fallback={<div class="rounded-lg border border-dashed px-4 py-6 text-sm text-center" style={{ "border-color": "var(--border-base)", color: "var(--text-weak)" }}>No agents are available yet.</div>}
+            >
+              <div class="space-y-3">
+                <div class="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h4 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+                      Agent override
+                    </h4>
+                    <p class="mt-1 text-xs" style={{ color: "var(--text-weak)" }}>
+                      Saved under this project for the selected agent and takes priority over the global agent override.
+                    </p>
+                  </div>
+                  <div class="flex items-end gap-2">
+                    <label class="text-xs font-medium" style={{ color: "var(--text-weak)" }}>
+                      Agent
+                      <select
+                        value={projectAgent()}
+                        onChange={(e) => setProjectAgent(e.currentTarget.value)}
+                        disabled={projectAgentSaving()}
+                        class="ml-2 rounded-md px-3 py-2 text-sm"
+                        style={{ background: "var(--background-base)", border: "1px solid var(--border-base)", color: "var(--text-base)" }}
+                      >
+                        <For each={agentNames()}>
+                          {(agent) => <option value={agent}>{agent}</option>}
+                        </For>
+                      </select>
+                    </label>
+                    <Show when={hasProjectAgentOverride()}>
+                      <Button type="button" variant="secondary" onClick={clearProjectAgentFallbackOverride} disabled={projectAgentSaving()}>
+                        <Trash2 class="w-4 h-4" />
+                        Clear
+                      </Button>
+                    </Show>
+                  </div>
+                </div>
+
+                <FallbackPolicySection
+                  title="Project agent override"
+                  description="This policy is used for the selected agent in this project, before the global agent or global default policy."
+                  info={<span>{hasProjectAgentOverride() ? `Saved for ${projectAgent()} in this project.` : `Inherits the project/global defaults until saved for ${projectAgent()}.`}</span>}
+                  rows={projectAgentRows}
+                  setRows={setProjectAgentRows}
+                  enabled={projectAgentEnabled()}
+                  setEnabled={setProjectAgentEnabled}
+                  crossProvider={projectAgentCrossProvider()}
+                  setCrossProvider={setProjectAgentCrossProvider}
+                  saving={projectAgentSaving}
+                  saved={projectAgentSaved}
+                  saveError={projectAgentSaveError}
+                  onReset={syncProjectAgentFromSettings}
+                  onSave={saveProjectAgentFallbackPolicy}
+                  saveLabel={hasProjectAgentOverride() ? "Save agent override" : "Create agent override"}
+                />
+              </div>
+            </Show>
+          </div>
         </div>
       </Show>
     </div>

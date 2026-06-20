@@ -60,7 +60,7 @@ import { applyQueuedPromptSubmission } from "../utils/chat-queue";
 import { findOptimisticMessageEcho, mergeOptimisticMessage, projectDisplayMessages, type OptimisticQueueMessage, type SyncMessageLike } from "../utils/message-reconcile";
 import { getQuota } from "../utils/extended-api";
 import { isRetryableModelFailure, pickFallbackCandidate } from "../utils/model-fallback";
-import { loadFallbackSettings, resolveFallbackPolicies } from "../utils/fallback-settings";
+import { loadFallbackSettings, resolveFallbackPolicyForAgent, resolveFallbackPolicies } from "../utils/fallback-settings";
 
 const ACCEPTED_IMAGE_TYPES = [
   "image/png",
@@ -330,7 +330,13 @@ export function Session() {
   const server = useServer();
   const device = useDevice();
   const [fallbackSettings] = createResource(() => serverUrl, loadFallbackSettings);
-  const fallbackPolicy = createMemo(() => resolveFallbackPolicies(fallbackSettings() ?? {}, directory, appConfig.global.fallback, appConfig.project.fallback).project);
+  const fallbackPolicy = (agent: string) => resolveFallbackPolicyForAgent(
+    fallbackSettings() ?? {},
+    directory,
+    agent,
+    appConfig.global.fallback,
+    appConfig.project.fallback,
+  ).effective;
 
   function normalizePreviewPath(raw: string) {
     const decoded = decodeURIComponent(raw.replace(/^file:\/\//, "")).trim();
@@ -2441,7 +2447,7 @@ export function Session() {
     if (candidates.length <= 1) return { attempted: false, succeeded: false }
 
     const quota = await loadQuotaSnapshot()
-    const next = pickFallbackCandidate(candidates, current, quota, fallbackPolicy())
+    const next = pickFallbackCandidate(candidates, current, quota, fallbackPolicy(item.agent))
     if (!next) return { attempted: false, succeeded: false }
 
     autoFallbackAttempts.add(item.id)

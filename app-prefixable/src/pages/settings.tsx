@@ -1,4 +1,4 @@
-import { createSignal, For, Index, Show, type JSX, type Accessor, createMemo, onMount, onCleanup, createEffect } from "solid-js"
+import { createSignal, For, Index, Show, type JSX, type Accessor, createMemo, onMount, onCleanup, createEffect, createResource } from "solid-js"
 import { Portal } from "solid-js/web"
 import { closestCenter, DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, createSortable } from "@thisbeyond/solid-dnd"
 import type { DragEvent as SolidDragEvent } from "@thisbeyond/solid-dnd"
@@ -24,6 +24,7 @@ import { writeFile } from "../utils/extended-api"
 import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCallback, restartOpencode, checkOpencodeHealth } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
 import { extractOAuthCode, extractOAuthInstructionCode, needsOAuthReplay, normalizeOAuthCallbackUrl } from "../utils/oauth"
+import { loadFallbackSettings, resolveFallbackPolicies, saveGlobalFallbackPolicy as saveFallbackGlobalPolicy, saveProjectFallbackPolicy as saveFallbackProjectPolicy } from "../utils/fallback-settings"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { modelPolicyEnabled, providerBaseID, providerModelConfig } from "../utils/model-policy"
 import {
@@ -4161,9 +4162,9 @@ function FallbackPolicySection(props: {
 function ProjectFallbackTab() {
   const config = useConfig()
   const { directory } = useSDK()
-  const basePath = useBasePath()
-  const server = useServer()
-  const capabilities = () => getServerCapabilities(server.selectedServer())
+  const { serverUrl } = useBasePath()
+  const [fallbackSettings, { refetch: refetchFallbackSettings }] = createResource(() => serverUrl, loadFallbackSettings)
+  const fallbackState = createMemo(() => resolveFallbackPolicies(fallbackSettings() ?? {}, directory, config.global.fallback, config.project.fallback))
   const [globalSaving, setGlobalSaving] = createSignal(false)
   const [globalSaved, setGlobalSaved] = createSignal(false)
   const [globalSaveError, setGlobalSaveError] = createSignal<string | null>(null)
@@ -4178,7 +4179,7 @@ function ProjectFallbackTab() {
   const [projectEnabled, setProjectEnabled] = createSignal(true)
   const [projectCrossProvider, setProjectCrossProvider] = createSignal(true)
 
-  const hasProjectOverride = createMemo(() => !!config.project.fallback)
+  const hasProjectOverride = createMemo(() => fallbackState().hasProjectOverride)
 
   let globalSavedTimer: number | undefined
   let projectSavedTimer: number | undefined
@@ -4202,16 +4203,16 @@ function ProjectFallbackTab() {
     if (projectSavedTimer !== undefined) clearTimeout(projectSavedTimer)
   })
 
-  function syncGlobalFromConfig() {
-    const current = config.global.fallback ?? {}
+  function syncGlobalFromSettings() {
+    const current = fallbackState().global ?? {}
     setGlobalEnabled(current.enabled ?? true)
     setGlobalCrossProvider(current.cross_provider ?? true)
     setGlobalRows(fallbackRows(current.order))
     setGlobalSaveError(null)
   }
 
-  function syncProjectFromConfig() {
-    const current = config.project.fallback ?? config.global.fallback ?? {}
+  function syncProjectFromSettings() {
+    const current = fallbackState().project ?? fallbackState().global ?? {}
     setProjectEnabled(current.enabled ?? true)
     setProjectCrossProvider(current.cross_provider ?? true)
     setProjectRows(fallbackRows(current.order))
@@ -4219,81 +4220,72 @@ function ProjectFallbackTab() {
   }
 
   createEffect(() => {
-    if (config.initialLoading()) return
-    syncGlobalFromConfig()
+    if (fallbackSettings.loading) return
+    syncGlobalFromSettings()
   })
 
   createEffect(() => {
-    if (config.initialLoading()) return
-    syncProjectFromConfig()
+    if (fallbackSettings.loading) return
+    syncProjectFromSettings()
   })
 
   async function saveGlobalFallbackPolicy() {
     setGlobalSaving(true)
     setGlobalSaveError(null)
-    const result = await config.updateGlobal({
-      fallback: {
+    try {
+      await saveFallbackGlobalPolicy(serverUrl, {
         enabled: globalEnabled(),
         cross_provider: globalCrossProvider(),
         order: fallbackOrder(globalRows()),
-      },
-    })
+      })
+      await refetchFallbackSettings()
+      showGlobalSaved()
+    } catch {
+      setGlobalSaveError("Failed to save global fallback settings")
+    }
     setGlobalSaving(false)
-    if (result) showGlobalSaved()
-    else setGlobalSaveError("Failed to save global fallback settings")
   }
 
   async function saveProjectFallbackPolicy() {
     setProjectSaving(true)
     setProjectSaveError(null)
 
-    const next: Config = {
-      ...config.project,
-      fallback: {
-        enabled: projectEnabled(),
-        cross_provider: projectCrossProvider(),
-        order: fallbackOrder(projectRows()),
-      },
-    }
-
-    if (directory && capabilities().canEditLocalInstructionFiles) {
-      const ok = await writeFile(basePath.serverUrl, `${directory.replace(/\/$/, "")}/opencode.json`, `${JSON.stringify(next, null, 2)}\n`)
+    if (!directory) {
       setProjectSaving(false)
-      if (ok) {
-        await config.refresh()
-        showProjectSaved()
-        return
-      }
-      setProjectSaveError("Failed to save project fallback override")
+      setProjectSaveError("A project directory is required to save a project override.")
       return
     }
 
-    const result = await config.updateProject({
-      fallback: next.fallback,
-    })
+    try {
+      await saveFallbackProjectPolicy(serverUrl, directory, {
+        enabled: projectEnabled(),
+        cross_provider: projectCrossProvider(),
+        order: fallbackOrder(projectRows()),
+      })
+      await refetchFallbackSettings()
+      showProjectSaved()
+    } catch {
+      setProjectSaveError("Failed to save project fallback override")
+    }
     setProjectSaving(false)
-    if (result) showProjectSaved()
-    else setProjectSaveError("Failed to save project fallback override")
   }
 
   async function clearProjectFallbackOverride() {
-    if (!directory || !capabilities().canEditLocalInstructionFiles) {
-      setProjectSaveError("Clearing the project override requires the local OpenCode backend.")
+    if (!directory) {
+      setProjectSaveError("A project directory is required to clear a project override.")
       return
     }
 
     setProjectSaving(true)
     setProjectSaveError(null)
-    const next: Config = { ...config.project }
-    delete next.fallback
-    const ok = await writeFile(basePath.serverUrl, `${directory.replace(/\/$/, "")}/opencode.json`, `${JSON.stringify(next, null, 2)}\n`)
-    setProjectSaving(false)
-    if (ok) {
-      await config.refresh()
+    try {
+      await saveFallbackProjectPolicy(serverUrl, directory, null)
+      await refetchFallbackSettings()
       showProjectSaved()
-      return
+    } catch {
+      setProjectSaveError("Failed to clear project fallback override")
     }
-    setProjectSaveError("Failed to clear project fallback override")
+    setProjectSaving(false)
   }
 
   return (
@@ -4310,7 +4302,7 @@ function ProjectFallbackTab() {
       <FallbackPolicySection
         title="Global default"
         description="These fallback rules apply to every project unless that project saves its own override."
-        info={<span>Saved in your global OpenCode config and used as the default fallback policy everywhere.</span>}
+        info={<span>Saved in the SQLite settings DB and used as the default fallback policy everywhere.</span>}
         rows={globalRows}
         setRows={setGlobalRows}
         enabled={globalEnabled()}
@@ -4320,7 +4312,7 @@ function ProjectFallbackTab() {
         saving={globalSaving}
         saved={globalSaved}
         saveError={globalSaveError}
-        onReset={syncGlobalFromConfig}
+        onReset={syncGlobalFromSettings}
         onSave={saveGlobalFallbackPolicy}
         saveLabel="Save global default"
       />
@@ -4349,7 +4341,7 @@ function ProjectFallbackTab() {
           <FallbackPolicySection
             title="Project override"
             description="Use this only when this project should fall back differently from the global default."
-            info={<span>Saved in this project's config and used only when this project overrides the global default.</span>}
+            info={<span>Saved in the SQLite settings DB and used only when this project overrides the global default.</span>}
             rows={projectRows}
             setRows={setProjectRows}
             enabled={projectEnabled()}
@@ -4359,7 +4351,7 @@ function ProjectFallbackTab() {
             saving={projectSaving}
             saved={projectSaved}
             saveError={projectSaveError}
-            onReset={syncProjectFromConfig}
+            onReset={syncProjectFromSettings}
             onSave={saveProjectFallbackPolicy}
             saveLabel={hasProjectOverride() ? "Save project override" : "Create project override"}
           />

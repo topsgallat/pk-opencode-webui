@@ -5,12 +5,17 @@ import type { FallbackPolicyConfig } from "./model-fallback"
 export type { FallbackPolicyConfig } from "./model-fallback"
 
 export const FALLBACK_SETTINGS_NAMESPACE = "fallback"
+const FALLBACK_SERVER_NAMESPACE_PREFIX = "fallback.server"
 const GLOBAL_KEY = "global"
 const PROJECT_KEY_PREFIX = "project:"
 const AGENT_KEY_PREFIX = "agent:"
 
 export function fallbackProjectKey(directory: string) {
   return `${PROJECT_KEY_PREFIX}${base64Encode(directory)}`
+}
+
+export function fallbackSettingsNamespace(serverKey: string) {
+  return `${FALLBACK_SERVER_NAMESPACE_PREFIX}.${base64Encode(serverKey)}`
 }
 
 export function fallbackGlobalAgentKey(agent: string) {
@@ -91,22 +96,24 @@ export function resolveFallbackPolicyForAgent(
   }
 }
 
-export async function loadFallbackSettings(serverUrl: string): Promise<Record<string, unknown>> {
+export async function loadFallbackSettings(serverUrl: string, serverKey: string): Promise<Record<string, unknown>> {
+  const scoped = await loadSettings(serverUrl, fallbackSettingsNamespace(serverKey))
+  if (Object.keys(scoped).length > 0) return scoped
   return await loadSettings(serverUrl, FALLBACK_SETTINGS_NAMESPACE)
 }
 
-export async function saveGlobalFallbackPolicy(serverUrl: string, policy: FallbackPolicyConfig): Promise<void> {
-  await saveSetting(serverUrl, FALLBACK_SETTINGS_NAMESPACE, GLOBAL_KEY, policy)
+export async function saveGlobalFallbackPolicy(serverUrl: string, serverKey: string, policy: FallbackPolicyConfig): Promise<void> {
+  await saveSetting(serverUrl, fallbackSettingsNamespace(serverKey), GLOBAL_KEY, policy)
 }
 
-export async function saveGlobalAgentFallbackPolicy(serverUrl: string, agent: string, policy: FallbackPolicyConfig | null): Promise<void> {
-  await saveSetting(serverUrl, FALLBACK_SETTINGS_NAMESPACE, fallbackGlobalAgentKey(agent), policy)
+export async function saveGlobalAgentFallbackPolicy(serverUrl: string, serverKey: string, agent: string, policy: FallbackPolicyConfig | null): Promise<void> {
+  await saveSetting(serverUrl, fallbackSettingsNamespace(serverKey), fallbackGlobalAgentKey(agent), policy)
 }
 
-export async function saveProjectFallbackPolicy(serverUrl: string, directory: string, policy: FallbackPolicyConfig | null): Promise<void> {
-  await saveSetting(serverUrl, FALLBACK_SETTINGS_NAMESPACE, fallbackProjectKey(directory), policy)
+export async function saveProjectFallbackPolicy(serverUrl: string, serverKey: string, directory: string, policy: FallbackPolicyConfig | null): Promise<void> {
+  await saveSetting(serverUrl, fallbackSettingsNamespace(serverKey), fallbackProjectKey(directory), policy)
 }
 
-export async function saveProjectAgentFallbackPolicy(serverUrl: string, directory: string, agent: string, policy: FallbackPolicyConfig | null): Promise<void> {
-  await saveSetting(serverUrl, FALLBACK_SETTINGS_NAMESPACE, fallbackProjectAgentKey(directory, agent), policy)
+export async function saveProjectAgentFallbackPolicy(serverUrl: string, serverKey: string, directory: string, agent: string, policy: FallbackPolicyConfig | null): Promise<void> {
+  await saveSetting(serverUrl, fallbackSettingsNamespace(serverKey), fallbackProjectAgentKey(directory, agent), policy)
 }

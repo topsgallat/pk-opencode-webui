@@ -3,6 +3,7 @@ import {
   fallbackGlobalAgentKey,
   fallbackProjectAgentKey,
   fallbackProjectKey,
+  fallbackSettingsNamespace,
   resolveFallbackPolicyForAgent,
   resolveFallbackPolicies,
   type FallbackPolicyConfig,
@@ -13,6 +14,11 @@ function policy(overrides: FallbackPolicyConfig): FallbackPolicyConfig {
 }
 
 describe("fallback-settings", () => {
+  it("scopes the server namespace by server key", () => {
+    expect(fallbackSettingsNamespace("http://127.0.0.1:4096/notebook/ns/name")).toContain("fallback.server.")
+    expect(fallbackSettingsNamespace("http://127.0.0.1:4096/notebook/ns/name")).not.toContain("/")
+  })
+
   it("keeps legacy global/project resolution intact", () => {
     const resolved = resolveFallbackPolicies({
       [fallbackProjectKey("/work")]: policy({ enabled: true, cross_provider: false, order: ["a/b"] }),

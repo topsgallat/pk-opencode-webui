@@ -4,6 +4,7 @@ import { useSDK } from '../../context/sdk'
 import { getQuota } from '../../utils/extended-api'
 import { loadSettings, saveSetting } from '../../utils/settings-api'
 import { QuotaProviderView } from '../../types/quota'
+import { QUOTA_PROVIDER_CATALOG } from '../../../../shared/quota/provider-catalog'
 import { QuotaProviderCard } from './quota-provider-card'
 
 export function QuotaContent() {
@@ -83,7 +84,7 @@ export function QuotaContent() {
 
   const filterOptions = createMemo(() => [
     { id: 'all', label: 'All providers' },
-    ...providers().map(provider => ({ id: provider.id, label: provider.name })),
+    ...QUOTA_PROVIDER_CATALOG.map(provider => ({ id: provider.id, label: provider.name })),
   ])
 
   const [visibleProviders, setVisibleProviders] = createSignal<QuotaProviderView[]>([])
@@ -255,7 +256,7 @@ export function QuotaContent() {
             <span class="pr-1 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-weak)' }}>
               Fetch
             </span>
-            <For each={providers()}>
+            <For each={QUOTA_PROVIDER_CATALOG}>
               {(provider) => {
                 const isDisabled = () => disabledProviders().includes(provider.id)
                 return (

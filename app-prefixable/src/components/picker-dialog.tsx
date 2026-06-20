@@ -2,6 +2,7 @@ import { createSignal, createEffect, createMemo, Show, onMount, onCleanup, For }
 import { Portal } from "solid-js/web"
 import { X, Search } from "lucide-solid"
 import { createBackdropDismiss } from "../utils/backdrop"
+import { Spinner } from "./ui/spinner"
 
 interface PickerItem {
   id: string
@@ -29,6 +30,8 @@ interface Props {
   onHeaderAction?: () => void
   statusMessage?: string | null
   statusTone?: "default" | "error"
+  loading?: boolean
+  loadingMessage?: string
 }
 
 export function PickerDialog(props: Props) {
@@ -238,9 +241,16 @@ export function PickerDialog(props: Props) {
             aria-label={props.title}
             class="flex-1 overflow-y-auto min-h-0"
           >
-            <Show when={filtered().length === 0}>
-              <div class="px-4 py-8 text-center" style={{ color: "var(--text-weak)" }}>
-                {props.emptyMessage || "No items found"}
+            <Show when={props.loading && filtered().length === 0} fallback={
+              <Show when={filtered().length === 0}>
+                <div class="px-4 py-8 text-center" style={{ color: "var(--text-weak)" }}>
+                  {props.emptyMessage || "No items found"}
+                </div>
+              </Show>
+            }>
+              <div class="flex items-center justify-center gap-2 px-4 py-10 text-sm" style={{ color: "var(--text-weak)" }}>
+                <Spinner class="w-4 h-4" />
+                <span>{props.loadingMessage || "Loading models…"}</span>
               </div>
             </Show>
 

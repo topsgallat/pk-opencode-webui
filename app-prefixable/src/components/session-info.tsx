@@ -14,6 +14,7 @@ import { getQuota } from "../utils/extended-api"
 import { CornerDownLeft, Square, Zap } from "lucide-solid"
 import { ConnectionBadge } from "./connection-badge"
 import { findPrimaryQuotaEntry, findQuotaProviderBySelectedModel, getQuotaPercentUsed } from "./session-info-helpers"
+import { Spinner } from "./ui/spinner"
 
 type TokenPricing = {
   input: number
@@ -554,10 +555,23 @@ export function SessionInfo(props: SessionInfoProps) {
               type="button"
               class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer"
               onClick={() => props.onModelClick()}
+              aria-busy={providers.loading}
             >
               <span class="opacity-60 shrink-0">Model:</span>
               <span class="truncate" style={{ color: "var(--text-base)" }}>{modelLabel()}</span>
               {modelBadge()}
+              <Show when={providers.loading}>
+                <span
+                  class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                  style={{
+                    background: "var(--surface-inset)",
+                    color: "var(--text-weak)",
+                  }}
+                >
+                  <Spinner class="w-3 h-3" />
+                  Loading models…
+                </span>
+              </Show>
             </button>
           </Show>
 

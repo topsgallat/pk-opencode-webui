@@ -3821,6 +3821,8 @@ export function Session() {
             onHeaderAction={() => void refreshModelPicker()}
             statusMessage={modelPickerError() ?? undefined}
             statusTone="error"
+            loading={providers.loading || refreshingModelPicker()}
+            loadingMessage={refreshingModelPicker() ? "Refreshing models…" : "Loading models…"}
             items={providers.providers
               .filter((p) => providers.connected.includes(p.id))
               .flatMap((p) => {

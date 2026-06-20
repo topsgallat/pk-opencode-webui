@@ -329,7 +329,8 @@ export function Session() {
   const appConfig = useConfig();
   const server = useServer();
   const device = useDevice();
-  const [fallbackSettings] = createResource(() => serverUrl, loadFallbackSettings);
+  const serverKey = () => server.serverKey();
+  const [fallbackSettings] = createResource(() => [serverUrl, serverKey()] as const, ([base, key]) => loadFallbackSettings(base, key));
   const fallbackPolicy = (agent: string) => resolveFallbackPolicyForAgent(
     fallbackSettings() ?? {},
     directory,

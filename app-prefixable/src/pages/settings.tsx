@@ -4169,10 +4169,15 @@ function FallbackPolicySection(props: {
 
 function ProjectFallbackTab() {
   const config = useConfig()
+  const server = useServer()
   const providers = useProviders()
   const { directory } = useSDK()
   const { serverUrl } = useBasePath()
-  const [fallbackSettings, { refetch: refetchFallbackSettings }] = createResource(() => serverUrl, loadFallbackSettings)
+  const serverKey = () => server.serverKey()
+  const [fallbackSettings, { refetch: refetchFallbackSettings }] = createResource(
+    () => [serverUrl, serverKey()] as const,
+    ([base, key]) => loadFallbackSettings(base, key),
+  )
   const fallbackState = createMemo(() => resolveFallbackPolicies(fallbackSettings() ?? {}, directory, config.global.fallback, config.project.fallback))
   const [globalSaving, setGlobalSaving] = createSignal(false)
   const [globalSaved, setGlobalSaved] = createSignal(false)
@@ -4330,7 +4335,7 @@ function ProjectFallbackTab() {
     setGlobalSaving(true)
     setGlobalSaveError(null)
     try {
-      await saveFallbackGlobalPolicy(serverUrl, {
+      await saveFallbackGlobalPolicy(serverUrl, serverKey(), {
         enabled: globalEnabled(),
         cross_provider: globalCrossProvider(),
         order: fallbackOrder(globalRows()),
@@ -4354,7 +4359,7 @@ function ProjectFallbackTab() {
     }
 
     try {
-      await saveFallbackProjectPolicy(serverUrl, directory, {
+      await saveFallbackProjectPolicy(serverUrl, serverKey(), directory, {
         enabled: projectEnabled(),
         cross_provider: projectCrossProvider(),
         order: fallbackOrder(projectRows()),
@@ -4376,7 +4381,7 @@ function ProjectFallbackTab() {
     setProjectSaving(true)
     setProjectSaveError(null)
     try {
-      await saveFallbackProjectPolicy(serverUrl, directory, null)
+      await saveFallbackProjectPolicy(serverUrl, serverKey(), directory, null)
       await refetchFallbackSettings()
       showProjectSaved()
     } catch {
@@ -4394,7 +4399,7 @@ function ProjectFallbackTab() {
     setGlobalAgentSaving(true)
     setGlobalAgentSaveError(null)
     try {
-      await saveFallbackGlobalAgentPolicy(serverUrl, globalAgent(), {
+      await saveFallbackGlobalAgentPolicy(serverUrl, serverKey(), globalAgent(), {
         enabled: globalAgentEnabled(),
         cross_provider: globalAgentCrossProvider(),
         order: fallbackOrder(globalAgentRows()),
@@ -4416,7 +4421,7 @@ function ProjectFallbackTab() {
     setGlobalAgentSaving(true)
     setGlobalAgentSaveError(null)
     try {
-      await saveFallbackGlobalAgentPolicy(serverUrl, globalAgent(), null)
+      await saveFallbackGlobalAgentPolicy(serverUrl, serverKey(), globalAgent(), null)
       await refetchFallbackSettings()
       showGlobalAgentSaved()
     } catch {
@@ -4438,7 +4443,7 @@ function ProjectFallbackTab() {
     setProjectAgentSaving(true)
     setProjectAgentSaveError(null)
     try {
-      await saveFallbackProjectAgentPolicy(serverUrl, directory, projectAgent(), {
+      await saveFallbackProjectAgentPolicy(serverUrl, serverKey(), directory, projectAgent(), {
         enabled: projectAgentEnabled(),
         cross_provider: projectAgentCrossProvider(),
         order: fallbackOrder(projectAgentRows()),
@@ -4464,7 +4469,7 @@ function ProjectFallbackTab() {
     setProjectAgentSaving(true)
     setProjectAgentSaveError(null)
     try {
-      await saveFallbackProjectAgentPolicy(serverUrl, directory, projectAgent(), null)
+      await saveFallbackProjectAgentPolicy(serverUrl, serverKey(), directory, projectAgent(), null)
       await refetchFallbackSettings()
       showProjectAgentSaved()
     } catch {
@@ -4487,7 +4492,7 @@ function ProjectFallbackTab() {
       <FallbackPolicySection
         title="Global default"
         description="These fallback rules apply to every project unless that project saves its own override."
-        info={<span>Saved in the SQLite settings DB and used as the default fallback policy everywhere.</span>}
+        info={<span>Saved in the UI-owned SQLite DB for the selected server and used as the default fallback policy everywhere.</span>}
         rows={globalRows}
         setRows={setGlobalRows}
         enabled={globalEnabled()}
@@ -4508,7 +4513,7 @@ function ProjectFallbackTab() {
             Global agent overrides
           </h3>
           <p class="mt-1 text-xs" style={{ color: "var(--text-weak)" }}>
-            Pick an agent, then save a fallback policy that applies only to that agent everywhere.
+            Pick an agent, then save a fallback policy that applies only to that agent for the selected server.
           </p>
         </div>
 
@@ -4523,7 +4528,7 @@ function ProjectFallbackTab() {
                   Agent override
                 </h4>
                 <p class="mt-1 text-xs" style={{ color: "var(--text-weak)" }}>
-                  Saved under the global fallback scope for the selected agent.
+                  Saved under the global fallback scope for the selected agent and selected server.
                 </p>
               </div>
               <div class="flex items-end gap-2">
@@ -4625,7 +4630,7 @@ function ProjectFallbackTab() {
                 Project agent overrides
               </h3>
               <p class="mt-1 text-xs" style={{ color: "var(--text-weak)" }}>
-                Pick an agent, then save a fallback policy that applies only inside this project.
+                Pick an agent, then save a fallback policy that applies only inside this project for the selected server.
               </p>
             </div>
 
@@ -4640,7 +4645,7 @@ function ProjectFallbackTab() {
                       Agent override
                     </h4>
                     <p class="mt-1 text-xs" style={{ color: "var(--text-weak)" }}>
-                      Saved under this project for the selected agent and takes priority over the global agent override.
+                      Saved under this project for the selected agent, selected server, and takes priority over the global agent override.
                     </p>
                   </div>
                   <div class="flex items-end gap-2">

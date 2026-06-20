@@ -118,6 +118,28 @@ fetch("/notebook/ns/name/api/session");
 - Use Bun APIs when possible, like `Bun.file()`
 - Rely on type inference; avoid explicit type annotations unless necessary
 
+## Local DB / Settings Store
+
+- The app uses a small SQLite settings DB at `~/.opencode/pkui-settings.db` by default (`shared/settings-store.ts`).
+- The schema is intentionally generic and future-proof:
+
+  ```sql
+  CREATE TABLE settings (
+    namespace  TEXT NOT NULL,
+    key        TEXT NOT NULL,
+    value      TEXT NOT NULL,
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (namespace, key)
+  )
+  ```
+
+- Values are JSON-stringified on save and JSON-parsed on load, so treat each row value as opaque serialized settings.
+- Use namespaces to separate concerns (for example, `quota`, `ui`, `sessions`, `projects`) instead of adding new tables for simple preferences.
+- Add new settings by reusing the same namespace/key/value model; do not create a new table unless the data is relational or needs querying across rows.
+- The store is created with WAL mode and exposed via `getSettingsStore()`; tests can reset it with `__resetSettingsStoreForTests(dbPath)`.
+- The quota provider toggle currently lives under namespace `quota` with key `disabledProviders`.
+- For project config, prefer the existing config APIs/files (`opencode.json`, `config.json`) rather than the settings DB.
+
 ### Avoid let statements
 
 ```typescript

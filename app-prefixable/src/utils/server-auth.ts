@@ -1,7 +1,11 @@
 import type { ServerConfig } from "./servers"
 import { dispatchStorageEvent } from "./storage"
+import { getServerUrl } from "./path"
+import { loadSettings, saveSetting } from "./settings-api"
 
 const SERVER_AUTH_KEY = "opencode.serverAuth"
+const SERVER_SETTINGS_NAMESPACE = "servers"
+const SERVER_AUTH_SETTINGS_KEY = "auth"
 
 export interface ServerAuth {
   username?: string
@@ -44,9 +48,47 @@ export function getServerAuthMap(): Record<string, ServerAuth> {
   }
 }
 
+function saveServerAuthMapToDb(map: Record<string, ServerAuth>) {
+  void saveSetting(getServerUrl(), SERVER_SETTINGS_NAMESPACE, SERVER_AUTH_SETTINGS_KEY, map).catch(() => undefined)
+}
+
+function loadServerAuthMapFromDb() {
+  return loadSettings(getServerUrl(), SERVER_SETTINGS_NAMESPACE).catch(() => null)
+}
+
+function syncServerAuthMapToLocalStorage(map: Record<string, ServerAuth>) {
+  const value = JSON.stringify(map)
+  localStorage.setItem(SERVER_AUTH_KEY, value)
+  dispatchStorageEvent(SERVER_AUTH_KEY, value)
+}
+
+export async function hydrateServerAuthFromDb(): Promise<void> {
+  if (typeof window === "undefined") return
+
+  const db = await loadServerAuthMapFromDb()
+  const stored = localStorage.getItem(SERVER_AUTH_KEY)
+  const current = stored ? getServerAuthMap() : {}
+
+  if (db && isRecord(db[SERVER_AUTH_SETTINGS_KEY])) {
+    const next: Record<string, ServerAuth> = {}
+    for (const [id, value] of Object.entries(db[SERVER_AUTH_SETTINGS_KEY] as Record<string, unknown>)) {
+      const auth = normalizeServerAuth(value)
+      if (!auth) continue
+      next[id] = auth
+    }
+    syncServerAuthMapToLocalStorage(next)
+    return
+  }
+
+  if (Object.keys(current).length > 0) {
+    saveServerAuthMapToDb(current)
+  }
+}
+
 export function saveServerAuthMap(map: Record<string, ServerAuth>): void {
   const value = JSON.stringify(map)
   localStorage.setItem(SERVER_AUTH_KEY, value)
+  saveServerAuthMapToDb(map)
   dispatchStorageEvent(SERVER_AUTH_KEY, value)
 }
 

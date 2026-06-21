@@ -7,8 +7,11 @@
 import { dispatchStorageEvent } from "./storage"
 import { cleanupServerAuth, markServerAuthForRevalidation, migrateLegacyServerAuth } from "./server-auth"
 import { getServerUrl } from "./path"
+import { loadSettings, saveSetting } from "./settings-api"
 
 const SERVERS_KEY = "opencode.servers"
+const SERVER_SETTINGS_NAMESPACE = "servers"
+const SERVER_LIST_KEY = "list"
 
 export interface ServerConfig {
   id: string
@@ -97,6 +100,45 @@ export function getServers(): ServerConfig[] {
   }
 }
 
+function saveServersToDb(servers: ServerConfig[]) {
+  void saveSetting(getServerUrl(), SERVER_SETTINGS_NAMESPACE, SERVER_LIST_KEY, servers).catch(() => undefined)
+}
+
+function loadServersFromDb() {
+  return loadSettings(getServerUrl(), SERVER_SETTINGS_NAMESPACE).catch(() => null)
+}
+
+function syncServerListToLocalStorage(servers: ServerConfig[]) {
+  const value = JSON.stringify(servers)
+  localStorage.setItem(SERVERS_KEY, value)
+  dispatchStorageEvent(SERVERS_KEY, value)
+}
+
+export async function hydrateServersFromDb(): Promise<void> {
+  if (typeof window === "undefined") return
+
+  const db = await loadServersFromDb()
+  const stored = localStorage.getItem(SERVERS_KEY)
+  let current: ServerConfig[] = []
+  if (stored) {
+    try {
+      current = JSON.parse(stored) as ServerConfig[]
+    } catch {
+      current = []
+    }
+  }
+
+  if (db && Array.isArray(db[SERVER_LIST_KEY])) {
+    const next = db[SERVER_LIST_KEY] as ServerConfig[]
+    syncServerListToLocalStorage(next.map((server) => sanitizeServerConfig(server)))
+    return
+  }
+
+  if (current.length > 0) {
+    saveServersToDb(current.map((server) => sanitizeServerConfig(server)))
+  }
+}
+
 /**
  * Get the default server
  */
@@ -127,6 +169,7 @@ export function saveServers(servers: ServerConfig[]): void {
   const value = JSON.stringify(sanitized)
   localStorage.setItem(SERVERS_KEY, value)
   cleanupServerAuth(sanitized)
+  saveServersToDb(sanitized)
   dispatchStorageEvent(SERVERS_KEY, value)
 }
 

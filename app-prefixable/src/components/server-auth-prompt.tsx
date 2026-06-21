@@ -1,21 +1,22 @@
 import { createSignal, Show, For } from "solid-js"
+import { useServer } from "../context/server"
 import { useServerAuthUI } from "../context/server-auth-ui"
-import { getServers, type ServerConfig } from "../utils/servers"
+import type { ServerConfig } from "../utils/servers"
 import { getServerAuth, setServerAuth, clearServerAuthRevalidation } from "../utils/server-auth"
 import { Button } from "./ui/button"
 import { Portal } from "solid-js/web"
 
 function AuthPromptDialog(props: { serverId: string }) {
   const { resolveAuth, cancelAuth } = useServerAuthUI()
-  const servers = getServers()
-  const server = servers.find((s) => s.id === props.serverId)
+  const server = useServer()
+  const current = () => server.servers().find((s) => s.id === props.serverId)
   
   const auth = getServerAuth(props.serverId)
   const [username, setUsername] = createSignal(auth?.username || "")
   const [password, setPassword] = createSignal("")
   const [error, setError] = createSignal<string | null>(null)
 
-  if (!server) {
+  if (!current()) {
     // If the server doesn't exist anymore, just resolve to close it
     resolveAuth(props.serverId)
     return null
@@ -57,7 +58,7 @@ function AuthPromptDialog(props: { serverId: string }) {
             Authentication Required
           </h2>
           <p class="text-sm mb-4" style={{ color: "var(--text-weak)" }}>
-            Please enter credentials for <strong>{server.name}</strong> ({server.url})
+            Please enter credentials for <strong>{current()!.name}</strong> ({current()!.url})
           </p>
 
           <Show when={error()}>

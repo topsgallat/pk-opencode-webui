@@ -1,13 +1,20 @@
-import { createContext, useContext, createSignal, createEffect, type ParentProps } from "solid-js"
+import { createContext, useContext, createSignal, createEffect, onMount, type ParentProps } from "solid-js"
 import {
   getServers,
   getDefaultServer,
   resolveSelectedServer,
   getServerKey,
+  hydrateServersFromDb,
   type ServerConfig,
 } from "../utils/servers"
+import { hydrateServerAuthFromDb } from "../utils/server-auth"
+import { loadSettings, saveSetting } from "../utils/settings-api"
+import { getServerUrl } from "../utils/path"
+import { dispatchStorageEvent } from "../utils/storage"
 
 const SERVERS_STORAGE_KEY = "opencode.selectedServer"
+const SERVER_SETTINGS_NAMESPACE = "servers"
+const SELECTED_SERVER_KEY = "selectedServerId"
 const PROJECTS_STORAGE_KEY = "opencode.projects"
 const RECENT_PROJECTS_STORAGE_KEY = "opencode-recent-projects"
 const MODELS_BY_AGENT_STORAGE_KEY = "opencode.modelsByAgent"
@@ -71,6 +78,33 @@ function migrateServerScopedStorage(server: ServerConfig | undefined) {
   migratedServerStorageKeys.add(targetKey)
 }
 
+function saveSelectedServerToDb(id: string | null) {
+  void saveSetting(getServerUrl(), SERVER_SETTINGS_NAMESPACE, SELECTED_SERVER_KEY, id).catch(() => undefined)
+}
+
+async function hydrateSelectedServerFromDb() {
+  if (typeof window === "undefined") return
+
+  const db = await loadSettings(getServerUrl(), SERVER_SETTINGS_NAMESPACE).catch(() => null)
+  const stored = localStorage.getItem(SERVERS_STORAGE_KEY)
+  const current = stored === null ? null : stored
+
+  if (db && Object.prototype.hasOwnProperty.call(db, SELECTED_SERVER_KEY)) {
+    const value = db[SELECTED_SERVER_KEY]
+    if (typeof value === "string" || value === null) {
+      if (value === null) {
+        localStorage.removeItem(SERVERS_STORAGE_KEY)
+      } else {
+        localStorage.setItem(SERVERS_STORAGE_KEY, value)
+      }
+      dispatchStorageEvent(SERVERS_STORAGE_KEY, value)
+      return
+    }
+  }
+
+  saveSelectedServerToDb(current)
+}
+
 interface ServerContextValue {
   servers: () => ServerConfig[]
   selectedServerId: () => string | null
@@ -89,13 +123,26 @@ export function ServerProvider(props: ParentProps) {
 
   const selectedServer = () => resolveSelectedServer(selectedServerId(), servers())
 
-  migrateServerScopedStorage(selectedServer())
+  onMount(() => {
+    void Promise.all([
+      hydrateServersFromDb(),
+      hydrateServerAuthFromDb(),
+      hydrateSelectedServerFromDb(),
+    ]).then(() => {
+      setServers(getServers())
+      setSelectedServerId(typeof window === "undefined" ? null : localStorage.getItem(SERVERS_STORAGE_KEY))
+    })
+  })
 
   const serverKey = () => {
     const selected = selectedServer()
     if (!selected) return "default"
     return getServerKey(selected)
   }
+
+  createEffect(() => {
+    migrateServerScopedStorage(selectedServer())
+  })
 
   const setSelectedServer = (id: string | null) => {
     setSelectedServerId(id)
@@ -106,6 +153,7 @@ export function ServerProvider(props: ParentProps) {
         localStorage.removeItem(SERVERS_STORAGE_KEY)
       }
     }
+    saveSelectedServerToDb(id)
   }
 
   createEffect(() => {

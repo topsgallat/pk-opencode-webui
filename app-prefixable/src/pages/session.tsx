@@ -53,7 +53,8 @@ import {
   ImageAttachments,
   type ImageAttachment,
 } from "../components/image-attachments";
-import { readNotifyMap, writeNotifyMap } from "../utils/notify";
+import { readNotifyMap, writeNotifyMap, fireBrowserNotification } from "../utils/notify";
+import { readSoundSettings, playSound } from "../utils/sound";
 import { sessionQuestionRequest } from "../utils/session-tree-request";
 import { errorMessage, withTimeout } from "../utils/request-timeout";
 import { applyQueuedPromptSubmission } from "../utils/chat-queue";
@@ -735,6 +736,18 @@ export function Session() {
   const deniedTimer = { id: null as ReturnType<typeof setTimeout> | null };
   onCleanup(() => { if (deniedTimer.id !== null) clearTimeout(deniedTimer.id) });
 
+  function confirmNotifyEnabled(id: string) {
+    fireBrowserNotification({
+      title: "Notifications enabled",
+      body: "You will now get browser notifications for this session.",
+      tag: `session-notify-enabled-${id}`,
+      requireInteraction: false,
+    })
+
+    const sound = readSoundSettings()
+    if (sound.enabled) playSound(sound.sound)
+  }
+
   // Re-read notification state when session changes
   createEffect(() => {
     const id = params.id;
@@ -765,6 +778,7 @@ export function Session() {
       map[id] = true;
       writeNotifyMap(map);
       setNotifyEnabled(true);
+      confirmNotifyEnabled(id);
       return;
     }
     if (perm === "denied") {
@@ -780,6 +794,7 @@ export function Session() {
         map[id] = true;
         writeNotifyMap(map);
         setNotifyEnabled(true);
+        confirmNotifyEnabled(id);
         return;
       }
       if (result === "denied") {

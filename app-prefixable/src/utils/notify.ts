@@ -4,6 +4,45 @@ import { dispatchStorageEvent } from "./storage"
 
 export const NOTIFY_STORAGE_KEY = "opencode.sessionNotify";
 
+export type BrowserNotificationStatus = "unsupported" | NotificationPermission;
+
+export interface BrowserNotificationPayload {
+  title: string
+  body: string
+  tag: string
+  icon?: string
+  requireInteraction?: boolean
+  onClick?: () => void
+}
+
+export function browserNotificationSupported() {
+  return typeof window !== "undefined" && "Notification" in window
+}
+
+export function browserNotificationStatus(): BrowserNotificationStatus {
+  if (!browserNotificationSupported()) return "unsupported"
+  return Notification.permission
+}
+
+export function fireBrowserNotification(payload: BrowserNotificationPayload) {
+  if (!browserNotificationSupported()) return false
+  if (Notification.permission !== "granted") return false
+
+  const n = new Notification(payload.title, {
+    body: payload.body,
+    requireInteraction: payload.requireInteraction ?? true,
+    tag: payload.tag,
+    icon: payload.icon,
+  })
+
+  n.onclick = () => {
+    payload.onClick?.()
+    n.close()
+  }
+
+  return true
+}
+
 /** Read the per-session notification toggle map from localStorage */
 export function readNotifyMap(): Record<string, boolean> {
   if (typeof window === "undefined") return {};

@@ -82,7 +82,7 @@ import {
 import type { DragEvent as SolidDragEvent } from "@thisbeyond/solid-dnd";
 import { ConstrainDragXAxis } from "../utils/solid-dnd";
 
-import { readNotifyMap, cleanupNotifyState, NOTIFY_STORAGE_KEY } from "../utils/notify";
+import { readNotifyMap, cleanupNotifyState, NOTIFY_STORAGE_KEY, fireBrowserNotification } from "../utils/notify";
 import { readSoundSettings, playSound, primeAudioContext, SOUND_STORAGE_KEY } from "../utils/sound";
 import { dispatchStorageEvent } from "../utils/storage";
 import { sessionHasQuestion, buildChildMap, rootAncestorId } from "../utils/session-tree-request";
@@ -1652,23 +1652,18 @@ export function Layout(props: ParentProps) {
     const sound = soundCache();
     if (sound.enabled) playSound(sound.sound);
 
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    if (Notification.permission !== "granted") return;
-
-    const n = new Notification(title, {
+    fireBrowserNotification({
+      title,
       body,
-      requireInteraction: true,
       tag,
       icon: basePath + "favicon.svg",
+      onClick: () => {
+        window.focus();
+        const sess = sync.session.get(sessionID);
+        const slug = sess ? base64Encode(sess.directory) : dirSlug();
+        navigate(`/${slug}/session/${sessionID}`);
+      },
     });
-    n.onclick = () => {
-      window.focus();
-      n.close();
-      // Navigate to the alarming session using its actual directory
-      const sess = sync.session.get(sessionID);
-      const slug = sess ? base64Encode(sess.directory) : dirSlug();
-      navigate(`/${slug}/session/${sessionID}`);
-    };
   }
 
   function getSessionSummary(sessionID: string): string {

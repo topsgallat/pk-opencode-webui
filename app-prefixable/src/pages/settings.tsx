@@ -51,6 +51,7 @@ import {
 } from "../utils/server-auth"
 import { QuotaContent } from "../components/quota/quota-panel"
 import { SkillSourcesTab } from "../components/skill-sources-tab"
+import { browserNotificationStatus } from "../utils/notify"
 
 export function Settings() {
   const providers = useProviders()
@@ -90,6 +91,7 @@ export function Settings() {
 
   // Sound settings
   const [soundSettings, setSoundSettings] = createSignal<SoundSettings>(readSoundSettings())
+  const [notificationStatus, setNotificationStatus] = createSignal(browserNotificationStatus())
 
   // Keep soundSettings in sync with localStorage changes from other tabs
   onMount(() => {
@@ -97,7 +99,15 @@ export function Settings() {
       if (e.key === SOUND_STORAGE_KEY) setSoundSettings(readSoundSettings())
     }
     window.addEventListener("storage", handleStorage)
+    function refreshNotificationStatus() {
+      setNotificationStatus(browserNotificationStatus())
+    }
+    window.addEventListener("focus", refreshNotificationStatus)
+    document.addEventListener("visibilitychange", refreshNotificationStatus)
+    refreshNotificationStatus()
     onCleanup(() => window.removeEventListener("storage", handleStorage))
+    onCleanup(() => window.removeEventListener("focus", refreshNotificationStatus))
+    onCleanup(() => document.removeEventListener("visibilitychange", refreshNotificationStatus))
   })
 
   function updateSoundSettings(patch: Partial<SoundSettings>) {
@@ -2557,6 +2567,23 @@ Add your project-specific instructions here.
                   border: "1px solid var(--border-base)",
                 }}
               >
+                <div class="px-4 py-3 grid gap-2 text-xs" style={{ "border-bottom": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
+                  <div class="flex items-center justify-between gap-4">
+                    <span>Browser notifications</span>
+                    <span style={{ color: notificationStatus() === "granted" ? "var(--icon-success-base)" : notificationStatus() === "denied" ? "var(--icon-warning-base)" : "var(--text-base)" }}>
+                      {notificationStatus() === "unsupported" ? "Unsupported" : notificationStatus()}
+                    </span>
+                  </div>
+                  <div class="flex items-center justify-between gap-4">
+                    <span>Sound delivery</span>
+                    <span style={{ color: soundSettings().enabled ? "var(--icon-success-base)" : "var(--text-base)" }}>
+                      {soundSettings().enabled ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
+                  <p>
+                    Sound plays only when global sound is enabled and the session bell is turned on in the chat header.
+                  </p>
+                </div>
                 <div class="px-4 py-3 flex items-center justify-between" style={{ "border-bottom": "1px solid var(--border-base)" }}>
                   <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
                     Enable Sound

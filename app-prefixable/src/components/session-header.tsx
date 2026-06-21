@@ -8,6 +8,7 @@ import { useTerminal } from "../context/terminal"
 import { useSDK } from "../context/sdk"
 import { PanelBottom, FileCode, ListTodo, Plug, ArrowLeft, Users, Bell, BellRing, BookOpen } from "lucide-solid"
 import { base64Encode } from "../utils/path"
+import { browserNotificationSupported } from "../utils/notify"
 import type { Session } from "../sdk/client"
 
 interface SessionHeaderProps {
@@ -32,6 +33,7 @@ export function SessionHeader(props: SessionHeaderProps) {
 
   const dirSlug = () => (directory ? base64Encode(directory) : params.dir)
   const parentId = () => props.session?.parentID
+  const notifySupported = browserNotificationSupported()
 
   const pendingPermissions = createMemo(() => permission.pendingForSession(props.session?.id ?? ""))
 
@@ -243,43 +245,60 @@ export function SessionHeader(props: SessionHeaderProps) {
           <PanelBottom class="w-4 h-4" />
         </button>
 
-        {/* Notification toggle — hidden when Notification API is unsupported */}
-        <Show when={typeof window !== "undefined" && "Notification" in window}>
-          <div class="relative hidden sm:block">
-            <button
-              onClick={props.onToggleNotify}
-              class="p-1.5 rounded-md transition-colors"
-              style={{
-                color: props.notifyEnabled ? "var(--text-interactive-base)" : "var(--icon-weak)",
-                background: props.notifyEnabled ? "var(--surface-inset)" : "transparent",
-              }}
-              onMouseEnter={(e) => {
-                if (!props.notifyEnabled) (e.currentTarget as HTMLElement).style.background = "var(--surface-inset)"
-              }}
-              onMouseLeave={(e) => {
-                if (!props.notifyEnabled) (e.currentTarget as HTMLElement).style.background = "transparent"
-              }}
-              title={props.notifyEnabled ? "Disable completion notifications" : "Enable completion notifications"}
-              aria-label="Toggle completion notifications"
-            >
-              <Show when={props.notifyEnabled} fallback={<Bell class="w-4 h-4" />}>
-                <BellRing class="w-4 h-4" />
-              </Show>
-            </button>
-            <Show when={props.notifyDenied}>
-              <div
-                class="absolute right-0 top-full mt-1 whitespace-nowrap text-xs px-2 py-1 rounded shadow-lg z-30"
-                style={{
-                  background: "var(--background-base)",
-                  border: "1px solid var(--border-base)",
-                  color: "var(--text-weak)",
-                }}
-              >
-                Notifications blocked — enable in browser settings
-              </div>
+        <div class="relative hidden sm:block">
+          <button
+            onClick={() => {
+              if (!notifySupported) return
+              props.onToggleNotify()
+            }}
+            class="p-1.5 rounded-md transition-colors"
+            style={{
+              color: !notifySupported
+                ? "var(--icon-weak)"
+                : props.notifyEnabled
+                  ? "var(--text-interactive-base)"
+                  : "var(--icon-weak)",
+              background: props.notifyEnabled ? "var(--surface-inset)" : "transparent",
+              cursor: notifySupported ? "pointer" : "not-allowed",
+              opacity: notifySupported ? 1 : 0.6,
+            }}
+            title={!notifySupported
+              ? "Browser notifications are unavailable in this browser"
+              : props.notifyEnabled
+                ? "Disable completion notifications"
+                : "Enable completion notifications"}
+            aria-label="Toggle completion notifications"
+            disabled={!notifySupported}
+          >
+            <Show when={props.notifyEnabled} fallback={<Bell class="w-4 h-4" />}>
+              <BellRing class="w-4 h-4" />
             </Show>
-          </div>
-        </Show>
+          </button>
+          <Show when={!notifySupported}>
+            <div
+              class="absolute right-0 top-full mt-1 whitespace-nowrap text-xs px-2 py-1 rounded shadow-lg z-30"
+              style={{
+                background: "var(--background-base)",
+                border: "1px solid var(--border-base)",
+                color: "var(--text-weak)",
+              }}
+            >
+              Browser notifications unavailable here
+            </div>
+          </Show>
+          <Show when={props.notifyDenied}>
+            <div
+              class="absolute right-0 top-full mt-1 whitespace-nowrap text-xs px-2 py-1 rounded shadow-lg z-30"
+              style={{
+                background: "var(--background-base)",
+                border: "1px solid var(--border-base)",
+                color: "var(--text-weak)",
+              }}
+            >
+              Notifications blocked — enable in browser settings
+            </div>
+          </Show>
+        </div>
       </div>
     </header>
   )

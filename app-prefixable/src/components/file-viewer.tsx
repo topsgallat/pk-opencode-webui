@@ -145,21 +145,18 @@ export function FileViewer(props: FileViewerProps) {
   const [markdownPreview, setMarkdownPreview] = createSignal(true)
   const [htmlPreview, setHtmlPreview] = createSignal(true)
   const [htmlAllowJs, setHtmlAllowJs] = createSignal(false)
+  const [htmlReloadToken, setHtmlReloadToken] = createSignal(0)
   const [showHtmlJsWarning, setShowHtmlJsWarning] = createSignal(false)
   const [fullscreenPreview, setFullscreenPreview] = createSignal(false)
   let htmlJsWarningRef: HTMLDivElement | undefined
   let fullscreenRef: HTMLDivElement | undefined
   const htmlBlobUrl = createMemo(() => {
+    htmlReloadToken()
     if (!isHtml() || !fileContent()) return undefined
     const blob = new Blob([fileContent()], { type: "text/html" })
     const url = URL.createObjectURL(blob)
     onCleanup(() => URL.revokeObjectURL(url))
     return url
-  })
-  const htmlPreviewSrc = createMemo(() => {
-    const url = htmlBlobUrl()
-    if (!url) return undefined
-    return `${url}#js=${htmlAllowJs() ? "1" : "0"}`
   })
   const htmlSandbox = createMemo(() => (htmlAllowJs() ? "allow-scripts" : ""))
   const htmlJsReviewNote = "Please review this HTML file for JavaScript safety before enabling scripts in preview. Check inline and external scripts, network requests, storage access, redirects, popups, and any other risky behavior, then summarize whether it looks safe to trust."
@@ -272,6 +269,7 @@ export function FileViewer(props: FileViewerProps) {
 
   function handleHtmlJsToggle() {
     if (htmlAllowJs()) {
+      setHtmlReloadToken((v) => v + 1)
       setHtmlAllowJs(false)
       return
     }
@@ -280,6 +278,7 @@ export function FileViewer(props: FileViewerProps) {
   }
 
   function handleTrustHtmlFile() {
+    setHtmlReloadToken((v) => v + 1)
     setHtmlAllowJs(true)
     setShowHtmlJsWarning(false)
   }
@@ -574,7 +573,7 @@ export function FileViewer(props: FileViewerProps) {
                       }
                       >
                     <iframe
-                      src={htmlPreviewSrc()}
+                      src={htmlBlobUrl()}
                       sandbox={htmlSandbox()}
                       class="w-full border-0"
                       style={{ height: "calc(100vh - 120px)", background: "var(--background-base)" }}
@@ -695,7 +694,7 @@ export function FileViewer(props: FileViewerProps) {
                       }
                     >
                       <iframe
-                        src={htmlPreviewSrc()}
+                        src={htmlBlobUrl()}
                         sandbox={htmlSandbox()}
                         tabIndex={-1}
                         class="w-full h-full border-0"

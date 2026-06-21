@@ -2,14 +2,19 @@ import {
   createContext,
   createEffect,
   createSignal,
+  onMount,
   useContext,
   onCleanup,
   type ParentProps,
 } from "solid-js"
+import { getServerUrl } from "../utils/path"
+import { loadSettings, saveSetting } from "../utils/settings-api"
 
 type ThemePreference = "light" | "dark" | "system"
 
 const STORAGE_KEY = "opencode.theme"
+const SETTINGS_NAMESPACE = "ui"
+const SETTINGS_KEY = "theme"
 
 function loadPreference(): ThemePreference {
   try {
@@ -19,6 +24,19 @@ function loadPreference(): ThemePreference {
     // localStorage may be unavailable (e.g. privacy mode)
   }
   return "system"
+}
+
+function isThemePreference(value: unknown): value is ThemePreference {
+  return value === "light" || value === "dark" || value === "system"
+}
+
+function persistPreference(v: ThemePreference) {
+  try {
+    localStorage.setItem(STORAGE_KEY, v)
+  } catch {
+    // Ignore persistence errors (e.g. storage disabled or quota exceeded)
+  }
+  void saveSetting(getServerUrl(), SETTINGS_NAMESPACE, SETTINGS_KEY, v).catch(() => undefined)
 }
 
 function resolve(pref: ThemePreference, systemDark: boolean) {
@@ -56,13 +74,39 @@ export function ThemeProvider(props: ParentProps) {
     }
   }
 
+  onMount(() => {
+    const initial = theme()
+
+    function handleStorage(e: StorageEvent) {
+      if (e.key !== STORAGE_KEY) return
+      setThemeRaw(loadPreference())
+    }
+
+    window.addEventListener("storage", handleStorage)
+    onCleanup(() => window.removeEventListener("storage", handleStorage))
+
+    void (async () => {
+      const settings = await loadSettings(getServerUrl(), SETTINGS_NAMESPACE).catch(() => null)
+      const stored = settings ? settings[SETTINGS_KEY] : undefined
+      if (isThemePreference(stored)) {
+        if (theme() !== initial) return
+        setThemeRaw(stored)
+        try {
+          localStorage.setItem(STORAGE_KEY, stored)
+        } catch {
+          // Ignore persistence errors (e.g. storage disabled or quota exceeded)
+        }
+        return
+      }
+
+      if (theme() !== initial) return
+      persistPreference(initial)
+    })()
+  })
+
   const setTheme = (v: ThemePreference) => {
     setThemeRaw(v)
-    try {
-      localStorage.setItem(STORAGE_KEY, v)
-    } catch {
-      // Ignore persistence errors (e.g. storage disabled or quota exceeded)
-    }
+    persistPreference(v)
   }
 
   const resolved = () => resolve(theme(), systemDark())

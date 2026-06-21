@@ -25,6 +25,21 @@ export interface RankedFallbackCandidate extends FallbackCandidate {
 }
 
 const RETRYABLE_STATUS = new Set([429, 402, 503])
+const CONNECTION_FAILURE_TEXTS = [
+  "cannot connect to api",
+  "unable to connect",
+  "unable to reach",
+  "failed to fetch",
+  "fetch failed",
+  "network error",
+  "network down",
+  "connection refused",
+  "econnrefused",
+  "econnreset",
+  "socket hang up",
+  "timed out",
+  "timeout",
+]
 
 function collectStrings(value: unknown, out = new Set<string>()) {
   if (!value) return out
@@ -67,6 +82,8 @@ export function isRetryableModelFailure(error: unknown): boolean {
   const status = extractStatus(error)
   if (status !== undefined && RETRYABLE_STATUS.has(status)) return true
 
+  if (isConnectionModelFailure(error)) return true
+
   const text = [...collectStrings(error)].join(" ").toLowerCase()
   if (!text) return false
 
@@ -81,7 +98,27 @@ export function isRetryableModelFailure(error: unknown): boolean {
     "usage limit",
     "cooldown",
     "try again later",
+    "cannot connect to api",
+    "unable to connect",
+    "failed to fetch",
+    "fetch failed",
+    "network error",
+    "connection refused",
+    "econnrefused",
+    "ehostunreach",
+    "enotfound",
   ].some((needle) => text.includes(needle))
+}
+
+export function isConnectionModelFailure(error: unknown): boolean {
+  const text = [...collectStrings(error)].join(" ").toLowerCase()
+  if (!text) return false
+
+  return CONNECTION_FAILURE_TEXTS.some((needle) => text.includes(needle))
+}
+
+export function shouldFallbackAfterRetryAttempts(error: unknown, attempts: number, limit = 5): boolean {
+  return isConnectionModelFailure(error) && attempts >= limit
 }
 
 function getPrimaryQuotaPercentRemaining(provider: QuotaProviderView | null) {

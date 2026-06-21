@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { isRetryableModelFailure, pickFallbackCandidate, rankFallbackCandidates, type FallbackCandidate } from "./model-fallback"
+import { isConnectionModelFailure, isRetryableModelFailure, pickFallbackCandidate, rankFallbackCandidates, shouldFallbackAfterRetryAttempts, type FallbackCandidate } from "./model-fallback"
 
 function candidate(overrides: Partial<FallbackCandidate>): FallbackCandidate {
   return {
@@ -20,10 +20,17 @@ describe("isRetryableModelFailure", () => {
     expect(isRetryableModelFailure({ message: "Quota exceeded" })).toBe(true)
   })
 
+  it("matches connection failures", () => {
+    expect(isConnectionModelFailure({ message: "Cannot connect to API: Unable to connect. Is the computer able to access the url?" })).toBe(true)
+    expect(isRetryableModelFailure({ message: "Cannot connect to API: Unable to connect. Is the computer able to access the url?" })).toBe(true)
+    expect(shouldFallbackAfterRetryAttempts({ message: "Cannot connect to API: Unable to connect. Is the computer able to access the url?" }, 4)).toBe(false)
+    expect(shouldFallbackAfterRetryAttempts({ message: "Cannot connect to API: Unable to connect. Is the computer able to access the url?" }, 5)).toBe(true)
+  })
+
   it("rejects unrelated failures", () => {
     expect(isRetryableModelFailure({ status: 401, message: "Unauthorized" })).toBe(false)
     expect(isRetryableModelFailure({ message: "Context length exceeded" })).toBe(false)
-    expect(isRetryableModelFailure(new Error("Network down"))).toBe(false)
+    expect(isRetryableModelFailure(new Error("Something else failed"))).toBe(false)
   })
 })
 

@@ -59,7 +59,7 @@ import { errorMessage, withTimeout } from "../utils/request-timeout";
 import { applyQueuedPromptSubmission } from "../utils/chat-queue";
 import { findOptimisticMessageEcho, mergeOptimisticMessage, projectDisplayMessages, type OptimisticQueueMessage, type SyncMessageLike } from "../utils/message-reconcile";
 import { getQuota } from "../utils/extended-api";
-import { isRetryableModelFailure, pickFallbackCandidate } from "../utils/model-fallback";
+import { isConnectionModelFailure, isRetryableModelFailure, pickFallbackCandidate, shouldFallbackAfterRetryAttempts } from "../utils/model-fallback";
 import { loadFallbackSettings, resolveFallbackPolicyForAgent, resolveFallbackPolicies } from "../utils/fallback-settings";
 
 const ACCEPTED_IMAGE_TYPES = [
@@ -140,6 +140,7 @@ const FILE_TREE_DRAG_DATA = "application/x-opencode-file-path";
 const FILE_TREE_KIND_DATA = "application/x-opencode-file-kind";
 const MODEL_NOT_READY_ERROR = "Please select a model before sending messages. Click the model button in the header.";
 const LOAD_FAILED_SUBSTR = "Load failed";
+const CONNECTION_RETRY_LIMIT = 5;
 
 interface LocalSlashCommand {
   id: string;
@@ -675,6 +676,7 @@ export function Session() {
   const [modelPickerError, setModelPickerError] = createSignal<string | null>(null);
   const [failedPromptItem, setFailedPromptItem] = createSignal<PendingPromptItem | null>(null);
   const [retryAwaitingSelection, setRetryAwaitingSelection] = createSignal(false);
+  const [connectionRetryCounts, setConnectionRetryCounts] = createSignal<Record<string, number>>({});
   const [historyError, setHistoryError] = createSignal<string | null>(null);
   // Use session tree walk to find pending questions from this session or any descendant.
   // This surfaces child/grandchild session questions in the parent session view.
@@ -689,6 +691,26 @@ export function Session() {
     params.id;
     autoFallbackAttempts.clear();
   });
+
+  function connectionRetryCount(promptID: string) {
+    return connectionRetryCounts()[promptID] ?? 0
+  }
+
+  function incrementConnectionRetryCount(promptID: string) {
+    setConnectionRetryCounts((prev) => ({
+      ...prev,
+      [promptID]: (prev[promptID] ?? 0) + 1,
+    }))
+  }
+
+  function clearConnectionRetryCount(promptID: string) {
+    setConnectionRetryCounts((prev) => {
+      if (!(promptID in prev)) return prev
+      const next = { ...prev }
+      delete next[promptID]
+      return next
+    })
+  }
 
   const pendingPermissions = createMemo(() => permission.pendingForSession(sessionId() ?? ""));
   const inputBlocked = createMemo(() => !!pendingQuestion() || pendingPermissions().length > 0);
@@ -1943,6 +1965,7 @@ export function Session() {
           };
           if (props.sessionID === id && props.status.type === "idle") {
             setActivePrompt(null);
+            setConnectionRetryCounts({});
 
             // Reset local processing tracker (notifications now handled globally in Layout)
             wasProcessing.value = false;
@@ -1961,13 +1984,24 @@ export function Session() {
 
           if (props.sessionID !== id) return;
 
-          const prompt = activePrompt();
+          const prompt = activePrompt() ?? failedPromptItem();
           if (prompt) {
             void (async () => {
-              const fallback = await maybeAutoFallback(prompt, props.error)
-              if (fallback.attempted) {
-                void sync.session.sync(id).catch(() => {})
-                return
+              const connectionFailure = isConnectionModelFailure(props.error)
+              const retryCount = connectionFailure ? connectionRetryCount(prompt.id) + 1 : 0
+              if (connectionFailure) incrementConnectionRetryCount(prompt.id)
+
+              const fallbackReady = connectionFailure
+                ? shouldFallbackAfterRetryAttempts(props.error, retryCount, CONNECTION_RETRY_LIMIT)
+                : isRetryableModelFailure(props.error)
+
+              if (fallbackReady) {
+                const fallback = await maybeAutoFallback(prompt, props.error)
+                if (fallback.attempted) {
+                  clearConnectionRetryCount(prompt.id)
+                  void sync.session.sync(id).catch(() => {})
+                  return
+                }
               }
 
               batch(() => {
@@ -1975,7 +2009,7 @@ export function Session() {
                 setActivePrompt(null)
                 wasProcessing.value = false
                 setProcessing(false)
-                if (isRetryableModelFailure(props.error)) setFailedPromptItem(prompt)
+                if (isRetryableModelFailure(props.error) || connectionFailure) setFailedPromptItem(prompt)
               })
 
               void sync.session.sync(id).catch(() => {})
@@ -2254,6 +2288,7 @@ export function Session() {
       });
 
       setActivePrompt({ ...item, status: "running" });
+      clearConnectionRetryCount(item.id)
       startProcessing();
       return true;
     } catch (err) {
@@ -2631,6 +2666,7 @@ export function Session() {
       variant: providers.selectedVariant ?? undefined,
     });
     if (ok) {
+      clearConnectionRetryCount(item.id)
       setFailedPromptItem(null);
       setRetryAwaitingSelection(false);
     }

@@ -10,16 +10,13 @@ import { ConfigProvider } from "../context/config"
 import { useGlobalEvents } from "../context/global-events"
 import { useServer } from "../context/server"
 import { useBasePath } from "../context/base-path"
+import { useRecentProjects } from "../context/recent-projects"
 import { ProjectDialog } from "../components/project-dialog"
 import { Terminal } from "../components/terminal"
-import { getFilename, OpenCodeLogo, ProjectAvatar, ProjectIconItem, type Project } from "../components/shared"
+import { getFilename, OpenCodeLogo, ProjectAvatar, ProjectIconItem } from "../components/shared"
 import { Spinner } from "../components/ui/spinner"
 import { Plus, Settings, SquareTerminal, ChevronDown, Server, Check, BarChart3 } from "lucide-solid"
-import { dispatchStorageEvent } from "../utils/storage"
 import { getTargetServerUrl } from "../utils/servers"
-
-// Storage key
-const PROJECTS_STORAGE_KEY = "opencode.projects"
 
 /**
  * Layout for the home screen (no active project).
@@ -30,11 +27,9 @@ export function HomeLayout(props: ParentProps) {
   const globalEvents = useGlobalEvents()
   const server = useServer()
   const { serverUrl: basePathServerUrl } = useBasePath()
-  const projectsStorageKey = createMemo(() => `${PROJECTS_STORAGE_KEY}.${server.serverKey()}`)
+  const recent = useRecentProjects()
   const selectedServerLabel = createMemo(() => server.selectedServer()?.name || server.selectedServer()?.url || "Server")
   const [serverDropdownOpen, setServerDropdownOpen] = createSignal(false)
-
-  const [projects, setProjects] = createSignal<Project[]>([])
   const [projectDialogOpen, setProjectDialogOpen] = createSignal(false)
 
   // Terminal state
@@ -56,20 +51,6 @@ export function HomeLayout(props: ParentProps) {
     setTerminalPtyId(null)
     setProjectDialogOpen(false)
   }, { defer: true }))
-
-  createEffect(on(projectsStorageKey, (key) => {
-    try {
-      const stored = localStorage.getItem(key)
-      if (stored) {
-        setProjects(JSON.parse(stored))
-        return
-      }
-      setProjects([])
-    } catch (e) {
-      console.error("Failed to load projects:", e)
-      setProjects([])
-    }
-  }))
 
   // Cleanup PTY on unmount
   onCleanup(() => {
@@ -123,27 +104,12 @@ export function HomeLayout(props: ParentProps) {
     }
   }
 
-  function saveProjects(list: Project[]) {
-    setProjects(list)
-    const value = JSON.stringify(list)
-    try {
-      localStorage.setItem(projectsStorageKey(), value)
-    } catch (e) {
-      console.error("Failed to save projects:", e)
-      return
-    }
-    dispatchStorageEvent(projectsStorageKey(), value)
-  }
-
   function addProject(worktree: string) {
-    const existing = projects().find((p) => p.worktree === worktree)
-    if (!existing) {
-      saveProjects([...projects(), { worktree }])
-    }
+    recent.add(worktree)
   }
 
   function removeProject(worktree: string) {
-    saveProjects(projects().filter((p) => p.worktree !== worktree))
+    recent.remove(worktree)
   }
 
   function handleProjectSelect(worktree: string) {
@@ -152,6 +118,7 @@ export function HomeLayout(props: ParentProps) {
   }
 
   function navigateToProject(worktree: string) {
+    addProject(worktree)
     navigate(`/${base64Encode(worktree)}/session`)
   }
 
@@ -188,14 +155,19 @@ export function HomeLayout(props: ParentProps) {
 
                 {/* Project icons */}
                 <div class="flex-1 flex flex-col items-center gap-2 overflow-y-auto w-full px-2 py-3">
-                  <For each={projects()}>
+                  <For each={recent.projects()}>
                     {(project) => (
                       <ProjectIconItem
-                        onClick={() => navigateToProject(project.worktree)}
-                        onRemove={() => removeProject(project.worktree)}
-                        label={project.name || getFilename(project.worktree)}
+                        onClick={() => navigateToProject(project.path)}
+                        onRemove={() => removeProject(project.path)}
+                        label={project.name || getFilename(project.path)}
                       >
-                        <ProjectAvatar project={project} size="large" selected={false} badge={globalEvents.badge(project.worktree)} />
+                        <ProjectAvatar
+                          project={{ worktree: project.path, name: project.name }}
+                          size="large"
+                          selected={false}
+                          badge={globalEvents.badge(project.path)}
+                        />
                       </ProjectIconItem>
                     )}
                   </For>

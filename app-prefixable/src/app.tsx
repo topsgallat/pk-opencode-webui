@@ -19,6 +19,7 @@ import { Settings } from "./pages/settings"
 import { Logs } from "./pages/logs"
 import { ProjectPicker } from "./pages/project-picker"
 import { base64Decode, deriveDirectoryFromPathname } from "./utils/path"
+import { hydrateSoundSettingsFromDb } from "./utils/sound"
 import type { Project } from "./components/shared"
 
 const PROJECTS_STORAGE_KEY = "opencode.projects"
@@ -187,6 +188,10 @@ function ServerBoundary() {
 }
 
 export function App() {
+  onMount(() => {
+    void hydrateSoundSettingsFromDb()
+  })
+
   return (
     <BasePathProvider>
       <DeviceProvider>

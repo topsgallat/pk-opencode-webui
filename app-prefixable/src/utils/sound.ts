@@ -7,12 +7,16 @@
  */
 
 import { dispatchStorageEvent } from "./storage"
+import { getServerUrl } from "./path"
+import { loadSettings, saveSetting } from "./settings-api"
 
 // ---------------------------------------------------------------------------
 // localStorage persistence
 // ---------------------------------------------------------------------------
 
 export const SOUND_STORAGE_KEY = "opencode.soundSettings"
+const SETTINGS_NAMESPACE = "ui"
+const SETTINGS_KEY = "soundSettings"
 
 export interface SoundSettings {
   enabled: boolean
@@ -22,33 +26,63 @@ export interface SoundSettings {
 
 const DEFAULTS: SoundSettings = { enabled: false, sound: "chime" }
 
+function normalizeSoundSettings(value: unknown): SoundSettings | null {
+  if (!value || typeof value !== "object") return null
+  const settings = value as Partial<SoundSettings>
+  return {
+    enabled: typeof settings.enabled === "boolean" ? settings.enabled : DEFAULTS.enabled,
+    sound: typeof settings.sound === "string" && SOUND_OPTIONS.some((o) => o.id === settings.sound) ? settings.sound : DEFAULTS.sound,
+  }
+}
+
 export function readSoundSettings(): SoundSettings {
   if (typeof window === "undefined") return { ...DEFAULTS }
   try {
     const raw = window.localStorage.getItem(SOUND_STORAGE_KEY)
     if (!raw) return { ...DEFAULTS }
     const parsed = JSON.parse(raw) as unknown
-    if (!parsed || typeof parsed !== "object") return { ...DEFAULTS }
-    const settings = parsed as Partial<SoundSettings>
-    return {
-      enabled: typeof settings.enabled === "boolean" ? settings.enabled : DEFAULTS.enabled,
-      sound: typeof settings.sound === "string" && SOUND_OPTIONS.some((o) => o.id === settings.sound) ? settings.sound : DEFAULTS.sound,
-    }
+    return normalizeSoundSettings(parsed) || { ...DEFAULTS }
   } catch {
     try { window.localStorage.removeItem(SOUND_STORAGE_KEY) } catch { /* ignore */ }
     return { ...DEFAULTS }
   }
 }
 
+export async function hydrateSoundSettingsFromDb(): Promise<SoundSettings> {
+  const local = readSoundSettings()
+  const settings = await loadSettings(getServerUrl(), SETTINGS_NAMESPACE).catch(() => null)
+  const stored = settings ? normalizeSoundSettings(settings[SETTINGS_KEY]) : null
+
+  if (stored) {
+    if (JSON.stringify(readSoundSettings()) !== JSON.stringify(local)) return readSoundSettings()
+    if (typeof window !== "undefined") {
+      const next = JSON.stringify(stored)
+      try {
+        window.localStorage.setItem(SOUND_STORAGE_KEY, next)
+        dispatchStorageEvent(SOUND_STORAGE_KEY, next)
+      } catch {
+        // Ignore persistence errors (e.g. storage disabled or quota exceeded)
+      }
+    }
+    return stored
+  }
+
+  if (JSON.stringify(readSoundSettings()) !== JSON.stringify(local)) return readSoundSettings()
+  void saveSetting(getServerUrl(), SETTINGS_NAMESPACE, SETTINGS_KEY, local).catch(() => undefined)
+  return local
+}
+
 export function writeSoundSettings(settings: SoundSettings) {
-  if (typeof window === "undefined") return
   const value = JSON.stringify(settings)
   try {
-    window.localStorage.setItem(SOUND_STORAGE_KEY, value)
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SOUND_STORAGE_KEY, value)
+      dispatchStorageEvent(SOUND_STORAGE_KEY, value)
+    }
   } catch {
-    return
+    // Ignore persistence errors (e.g. storage disabled or quota exceeded)
   }
-  dispatchStorageEvent(SOUND_STORAGE_KEY, value)
+  void saveSetting(getServerUrl(), SETTINGS_NAMESPACE, SETTINGS_KEY, settings).catch(() => undefined)
 }
 
 // ---------------------------------------------------------------------------

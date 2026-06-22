@@ -120,6 +120,7 @@ export function ServerProvider(props: ParentProps) {
   const [selectedServerId, setSelectedServerId] = createSignal<string | null>(
     typeof window === "undefined" ? null : localStorage.getItem(SERVERS_STORAGE_KEY)
   )
+  let hydrationDone = false
 
   const selectedServer = () => resolveSelectedServer(selectedServerId(), servers())
 
@@ -131,6 +132,7 @@ export function ServerProvider(props: ParentProps) {
     ]).then(() => {
       setServers(getServers())
       setSelectedServerId(typeof window === "undefined" ? null : localStorage.getItem(SERVERS_STORAGE_KEY))
+      hydrationDone = true
     })
   })
 
@@ -159,6 +161,7 @@ export function ServerProvider(props: ParentProps) {
   createEffect(() => {
     const id = selectedServerId()
     if (!id) return
+    if (!hydrationDone) return
     if (servers().some((server) => server.id === id)) return
     const fallback = getDefaultServer(servers())
     setSelectedServer(fallback && fallback.id !== "builtin" ? fallback.id : null)

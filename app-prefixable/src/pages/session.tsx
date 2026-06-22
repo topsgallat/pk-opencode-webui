@@ -2193,10 +2193,11 @@ export function Session() {
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
+      const mime = isTextBased ? "text/plain" : file.type;
       const attachment: ImageAttachment = {
         id: generateUUID(),
         name: file.name,
-        mime: file.type,
+        mime,
         dataUrl,
       };
       setImageAttachments((prev) => [...prev, attachment]);

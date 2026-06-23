@@ -41,6 +41,7 @@ import {
   removeServer,
   generateServerId,
   isValidServerUrl,
+  getTargetServerUrl,
   type ServerConfig,
 } from "../utils/servers"
 import {
@@ -52,6 +53,8 @@ import {
 import { QuotaContent } from "../components/quota/quota-panel"
 import { SkillSourcesTab } from "../components/skill-sources-tab"
 import { browserNotificationStatus } from "../utils/notify"
+
+type ServerHealthState = "loading" | "online" | "offline"
 
 export function Settings() {
   const providers = useProviders()
@@ -134,6 +137,38 @@ export function Settings() {
   const [restartInfo, setRestartInfo] = createSignal<string | null>(null)
   const [restartError, setRestartError] = createSignal<string | null>(null)
   const [restartSuccess, setRestartSuccess] = createSignal<string | null>(null)
+  const [serverHealth, setServerHealth] = createSignal<Record<string, ServerHealthState>>({})
+  const [serverHealthLoading, setServerHealthLoading] = createSignal(false)
+  let serverHealthRun = 0
+
+  createEffect(() => {
+    if (activeTab() !== "servers") return
+
+    const list = servers()
+    const base = url
+    const run = ++serverHealthRun
+
+    setServerHealthLoading(true)
+
+    void (async () => {
+      const entries = await Promise.all(
+        list.map(async (item) => {
+          const result = await checkOpencodeHealth(base, getTargetServerUrl(item))
+          const state: ServerHealthState = result.ok && result.healthy !== false ? "online" : "offline"
+          return [item.id, state] as const
+        }),
+      )
+
+      if (run !== serverHealthRun) return
+
+      setServerHealth(Object.fromEntries(entries))
+      setServerHealthLoading(false)
+    })()
+  })
+
+  onCleanup(() => {
+    serverHealthRun += 1
+  })
 
   // Keep servers in sync with localStorage
   onMount(() => {
@@ -2733,9 +2768,51 @@ Add your project-specific instructions here.
                       {(server) => (
                         <div class="px-4 py-3 flex items-center justify-between gap-4">
                           <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
                               <span class="font-medium text-sm" style={{ color: "var(--text-strong)" }}>
                                 {server.name}
+                              </span>
+                              <span
+                                class="text-[11px] px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-medium"
+                                style={{
+                                  background: serverHealthLoading() || !serverHealth()[server.id]
+                                    ? "var(--surface-inset)"
+                                    : serverHealth()[server.id] === "online"
+                                      ? "rgba(5, 150, 105, 0.14)"
+                                      : "rgba(220, 38, 38, 0.14)",
+                                  color: serverHealthLoading() || !serverHealth()[server.id]
+                                    ? "var(--text-weak)"
+                                    : serverHealth()[server.id] === "online"
+                                      ? "var(--text-success-base)"
+                                      : "var(--text-critical-base)",
+                                  border: serverHealthLoading() || !serverHealth()[server.id]
+                                    ? "1px solid var(--border-base)"
+                                    : serverHealth()[server.id] === "online"
+                                      ? "1px solid rgba(5, 150, 105, 0.3)"
+                                      : "1px solid rgba(220, 38, 38, 0.3)",
+                                }}
+                                title={serverHealthLoading() || !serverHealth()[server.id]
+                                  ? "Checking backend status"
+                                  : serverHealth()[server.id] === "online"
+                                    ? "Backend server is online"
+                                    : "Backend server is offline"}
+                                role="status"
+                              >
+                                <span
+                                  class="w-1.5 h-1.5 rounded-full"
+                                  style={{
+                                    background: serverHealthLoading() || !serverHealth()[server.id]
+                                      ? "var(--text-weak)"
+                                      : serverHealth()[server.id] === "online"
+                                        ? "var(--icon-success-base)"
+                                        : "var(--icon-critical-base)",
+                                  }}
+                                />
+                                {serverHealthLoading() || !serverHealth()[server.id]
+                                  ? "Checking"
+                                  : serverHealth()[server.id] === "online"
+                                    ? "Online"
+                                    : "Offline"}
                               </span>
                               <Show when={server.isDefault}>
                                 <span

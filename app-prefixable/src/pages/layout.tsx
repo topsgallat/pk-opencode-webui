@@ -1644,13 +1644,13 @@ export function Layout(props: ParentProps) {
     });
   });
 
-  function fireNotification(sessionID: string, title: string, body: string, tag: string) {
+  function fireNotification(sessionID: string, title: string, body: string, tag: string, playSoundEnabled = true) {
     // Flash the tab title when the page is in the background, regardless of Notification permission
     if (typeof document !== "undefined" && document.hidden) flashTitle();
 
     // Play sound if enabled in settings
     const sound = soundCache();
-    if (sound.enabled) playSound(sound.sound);
+    if (playSoundEnabled && sound.enabled) playSound(sound.sound);
 
     fireBrowserNotification({
       title,
@@ -1714,12 +1714,14 @@ export function Layout(props: ParentProps) {
           busyTracker[sid] = false;
 
           const sess = sync.session.get(sid);
+          const sound = soundCache();
+          if (sound.enabled) playSound(sound.sound);
           const nc = notifyCache();
           const bellSid = rootAncestorId(sync.session.get, sid);
           if (nc[bellSid] !== true) return;
 
           const title = sess?.title || "Task complete";
-          fireNotification(sid, title, getSessionSummary(sid), `session-complete-${sid}`);
+          fireNotification(sid, title, getSessionSummary(sid), `session-complete-${sid}`, false);
         }
         return;
       }

@@ -2616,7 +2616,7 @@ Add your project-specific instructions here.
                     </span>
                   </div>
                   <p>
-                    Sound plays only when global sound is enabled and the session bell is turned on in the chat header.
+                    Completion sound plays when global sound is enabled. Browser notifications still require the session bell in the chat header.
                   </p>
                 </div>
                 <div class="px-4 py-3 flex items-center justify-between" style={{ "border-bottom": "1px solid var(--border-base)" }}>

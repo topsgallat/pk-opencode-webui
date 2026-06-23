@@ -27,6 +27,10 @@ describe("isRetryableModelFailure", () => {
     expect(shouldFallbackAfterRetryAttempts({ message: "Cannot connect to API: Unable to connect. Is the computer able to access the url?" }, 5)).toBe(true)
   })
 
+  it("matches plugin rate-limited messages", () => {
+    expect(isRetryableModelFailure({ message: "All 3 account(s) rate-limited. Waiting (120m 13s remaining)" })).toBe(true)
+  })
+
   it("rejects unrelated failures", () => {
     expect(isRetryableModelFailure({ status: 401, message: "Unauthorized" })).toBe(false)
     expect(isRetryableModelFailure({ message: "Context length exceeded" })).toBe(false)

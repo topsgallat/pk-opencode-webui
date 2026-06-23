@@ -90,6 +90,7 @@ export function isRetryableModelFailure(error: unknown): boolean {
   return [
     "rate limit",
     "rate limited",
+    "rate-limited",
     "too many requests",
     "insufficient_quota",
     "quota exceeded",

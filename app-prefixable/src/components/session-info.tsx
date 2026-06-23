@@ -12,7 +12,7 @@ import { isAnthropicProviderID } from "../../../shared/anthropic-models"
 import { getContextTokens } from "../utils/tokens"
 import { getQuota } from "../utils/extended-api"
 import { CornerDownLeft, Square, Zap } from "lucide-solid"
-import { ConnectionBadge } from "./connection-badge"
+import { ServerHealthBadge } from "./connection-badge"
 import { findPrimaryQuotaEntry, findQuotaProviderBySelectedModel, getQuotaPercentUsed } from "./session-info-helpers"
 import { Spinner } from "./ui/spinner"
 
@@ -856,7 +856,7 @@ export function SessionInfo(props: SessionInfoProps) {
                 </span>
               </Show>
 
-              <ConnectionBadge />
+              <ServerHealthBadge serverUrl={serverUrl} targetUrl={targetUrl} />
             </div>
           )}
         </Show>

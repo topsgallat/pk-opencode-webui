@@ -2190,17 +2190,21 @@ export function Session() {
       );
       return;
     }
+
+    const id = generateUUID();
+    const mime = isTextBased ? "text/plain" : file.type;
+    setImageAttachments((prev) => [...prev, { id, name: file.name, mime, dataUrl: "", status: "uploading" }]);
+
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
-      const mime = isTextBased ? "text/plain" : file.type;
-      const attachment: ImageAttachment = {
-        id: generateUUID(),
-        name: file.name,
-        mime,
-        dataUrl,
-      };
-      setImageAttachments((prev) => [...prev, attachment]);
+      setImageAttachments((prev) => prev.map((attachment) =>
+        attachment.id === id ? { ...attachment, dataUrl, status: "uploaded" } : attachment,
+      ));
+    };
+    reader.onerror = () => {
+      setImageAttachments((prev) => prev.filter((attachment) => attachment.id !== id));
+      setError(`Failed to read file: ${file.name}`);
     };
     reader.readAsDataURL(file);
   }
@@ -2265,6 +2269,7 @@ export function Session() {
     }
 
     for (const img of item.images) {
+      if (img.status === "uploading" || !img.dataUrl) continue;
       parts.push({
         type: "file",
         mime: img.mime,
@@ -2546,6 +2551,7 @@ export function Session() {
     }> = [];
 
     for (const file of files) {
+      if (file.status === "uploading" || !file.dataUrl) continue;
       const dir = currentDirectory || "";
       const absolute = file.path.startsWith("/")
         ? file.path
@@ -2706,6 +2712,10 @@ export function Session() {
     const images = imageAttachments();
     if ((!text && files.length === 0 && images.length === 0) || inputBlocked())
       return;
+    if (images.some((img) => img.status === "uploading")) {
+      setError("Please wait for uploads to finish before sending.");
+      return;
+    }
 
     const slash = parseSlashCommand(text);
     if (slash) {

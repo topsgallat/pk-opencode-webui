@@ -1,11 +1,12 @@
 import { Component, For, Show } from "solid-js"
-import { X, FileText } from "lucide-solid"
+import { X, FileText, Loader2, Check } from "lucide-solid"
 
 export interface ImageAttachment {
   id: string
   name: string
   mime: string
   dataUrl: string
+  status?: "uploading" | "uploaded"
 }
 
 interface Props {
@@ -15,6 +16,17 @@ interface Props {
 
 export const ImageAttachments: Component<Props> = (props) => {
   const isImage = (mime: string) => mime.startsWith("image/")
+  const statusText = (status?: ImageAttachment["status"]) => {
+    if (status === "uploading") return "Uploading"
+    if (status === "uploaded") return "Uploaded"
+    return null
+  }
+
+  const statusIcon = (status?: ImageAttachment["status"]) => {
+    if (status === "uploading") return <Loader2 class="w-3 h-3 animate-spin" />
+    if (status === "uploaded") return <Check class="w-3 h-3" />
+    return null
+  }
 
   return (
     <Show when={props.attachments.length > 0}>
@@ -26,9 +38,30 @@ export const ImageAttachments: Component<Props> = (props) => {
               style={{
                 background: "var(--surface-inset)",
                 border: "1px solid var(--border-base)",
+                opacity: attachment.status === "uploading" ? 0.72 : 1,
               }}
               title={attachment.name}
             >
+              <Show when={statusText(attachment.status)}>
+                {(text) => (
+                  <div
+                    class="absolute left-0.5 top-0.5 z-10 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium shadow-sm"
+                    style={{
+                      background: attachment.status === "uploading"
+                        ? "color-mix(in srgb, var(--surface-inset) 72%, var(--interactive-base) 28%)"
+                        : "color-mix(in srgb, var(--surface-inset) 72%, var(--icon-success-base) 28%)",
+                      color: attachment.status === "uploading" ? "var(--text-base)" : "var(--text-strong)",
+                      border: `1px solid ${attachment.status === "uploading" ? "var(--border-base)" : "var(--icon-success-base)"}`,
+                    }}
+                  >
+                    <span style={{ color: attachment.status === "uploading" ? "var(--text-weak)" : "var(--icon-success-base)" }}>
+                      {statusIcon(attachment.status)}
+                    </span>
+                    <span>{text()}</span>
+                  </div>
+                )}
+              </Show>
+
               {/* Thumbnail or icon */}
               <Show
                 when={isImage(attachment.mime)}

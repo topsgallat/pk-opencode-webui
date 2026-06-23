@@ -320,7 +320,7 @@ export type OpencodeHealthResult = {
 
 export async function checkOpencodeHealth(serverUrl: string, targetUrl?: string): Promise<OpencodeHealthResult> {
   try {
-    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/opencode/health`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended checkOpencodeHealth")
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/global/health`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended checkOpencodeHealth")
     const data = await res.json().catch(() => null)
     if (res.ok && data && typeof data === "object" && (data as { healthy?: boolean }).healthy === true) {
       return { ok: true, healthy: true, status: res.status }

@@ -71,33 +71,43 @@ test("preserves opencode restart error details", async () => {
 
 test("reads opencode health responses", async () => {
   const originalFetch = globalThis.fetch
-  globalThis.fetch = (async () => new Response(JSON.stringify({ healthy: true, version: "1.2.3" }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  })) as unknown as typeof fetch
+  let requestUrl = ""
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    requestUrl = typeof input === "string" ? input : input.toString()
+    return new Response(JSON.stringify({ healthy: true, version: "1.2.3" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as unknown as typeof fetch
 
   try {
     const result = await checkOpencodeHealth("http://127.0.0.1:4096")
     expect(result.ok).toBe(true)
     expect(result.healthy).toBe(true)
     expect(result.status).toBe(200)
+    expect(requestUrl).toContain("/global/health")
   } finally {
     globalThis.fetch = originalFetch
   }
 })
 
-test("reads opencode health through the ext endpoint", async () => {
+test("reads opencode health through the global endpoint", async () => {
   const originalFetch = globalThis.fetch
-  globalThis.fetch = (async () => new Response(JSON.stringify({ ok: true, healthy: true, status: 200 }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  })) as unknown as typeof fetch
+  let requestUrl = ""
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    requestUrl = typeof input === "string" ? input : input.toString()
+    return new Response(JSON.stringify({ ok: true, healthy: true, status: 200 }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as unknown as typeof fetch
 
   try {
     const result = await checkOpencodeHealth("http://127.0.0.1:4096")
     expect(result.ok).toBe(true)
     expect(result.healthy).toBe(true)
     expect(result.status).toBe(200)
+    expect(requestUrl).toContain("/global/health")
   } finally {
     globalThis.fetch = originalFetch
   }

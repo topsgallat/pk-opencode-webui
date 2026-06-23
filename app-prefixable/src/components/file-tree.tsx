@@ -5,7 +5,7 @@ import type { FileNode } from "../sdk/client"
 import { useFile } from "../context/file"
 import { useServer } from "../context/server"
 import { getServerCapabilities } from "../utils/server-capabilities"
-import { ChevronDown, ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Trash2, Pencil, MessageSquarePlus, Upload, Download } from "lucide-solid"
+import { ChevronDown, ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Trash2, Pencil, MessageSquarePlus, Upload, Download, Loader2, Check } from "lucide-solid"
 import { NewFileDialog } from "./new-file-dialog"
 import { resolveFileTreeArrowLeftAction } from "./file-tree-keyboard"
 
@@ -42,6 +42,9 @@ let autoExpandTimer: number | undefined
 let autoExpandPath: string | null = null
 let longPressTimer: number | undefined
 let suppressClickPath: string | null = null
+let uploadDoneTimer: number | undefined
+
+const [uploadProgress, setUploadProgress] = createSignal<{ total: number; current: number; phase: "idle" | "uploading" | "done" }>({ total: 0, current: 0, phase: "idle" })
 
 function clearAutoExpand(path?: string) {
   if (path && autoExpandPath !== path) return
@@ -333,6 +336,7 @@ async function readDirectory(entry: DropEntry): Promise<UploadEntry[]> {
 
   onCleanup(() => {
     saveScroll()
+    if (uploadDoneTimer !== undefined) window.clearTimeout(uploadDoneTimer)
   })
 
   // Auto-expand directories when in filtered mode
@@ -522,7 +526,8 @@ async function readDirectory(entry: DropEntry): Promise<UploadEntry[]> {
     input.value = ""
     setUploadState(null)
     if (!state || !files.length) return
-    await file.uploadFiles(state.parentPath, toUploadEntries(files, folder))
+    const uploads = toUploadEntries(files, folder)
+    await runUpload(state.parentPath, uploads)
   }
 
   async function handleDrop(e: DragEvent, parentPath: string) {
@@ -541,7 +546,25 @@ async function readDirectory(entry: DropEntry): Promise<UploadEntry[]> {
 
     const uploads = await collectDropEntries(e)
     if (!uploads.length) return
-    await file.uploadFiles(parentPath, uploads)
+    await runUpload(parentPath, uploads)
+  }
+
+  async function runUpload(parentPath: string, uploads: UploadEntry[]) {
+    if (!uploads.length) return
+    if (uploadDoneTimer !== undefined) window.clearTimeout(uploadDoneTimer)
+    setUploadProgress({ total: uploads.length, current: 0, phase: "uploading" })
+    const ok = await file.uploadFiles(parentPath, uploads, (current, total) => {
+      setUploadProgress({ total, current, phase: "uploading" })
+    })
+    if (ok) {
+      setUploadProgress({ total: uploads.length, current: uploads.length, phase: "done" })
+      uploadDoneTimer = window.setTimeout(() => {
+        uploadDoneTimer = undefined
+        setUploadProgress({ total: 0, current: 0, phase: "idle" })
+      }, 2000)
+    } else {
+      setUploadProgress({ total: 0, current: 0, phase: "idle" })
+    }
   }
 
 function handleDragEnter(e: DragEvent, path: string) {
@@ -723,6 +746,38 @@ function handleDragOverTarget(e: DragEvent, path: string) {
         class="hidden"
         onChange={(e) => void handleUploadChange(e, true)}
       />
+      <Show when={level() === 0 && uploadProgress().phase !== "idle"}>
+        <div
+          class="mx-1.5 px-2 py-1.5 rounded flex items-center gap-2 text-[11px] font-medium"
+          style={{
+            background: uploadProgress().phase === "done"
+              ? "color-mix(in srgb, var(--surface-inset) 72%, var(--icon-success-base) 28%)"
+              : "var(--surface-inset)",
+            color: "var(--text-weak)",
+            border: "1px solid var(--border-base)",
+          }}
+        >
+          <Show when={uploadProgress().phase === "uploading"} fallback={
+            <Check class="w-3.5 h-3.5 shrink-0" style={{ color: "var(--icon-success-base)" }} />
+          }>
+            <Loader2 class="w-3.5 h-3.5 shrink-0 animate-spin" style={{ color: "var(--interactive-base)" }} />
+          </Show>
+          <div class="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "color-mix(in srgb, var(--border-base) 50%, transparent)" }}>
+            <div
+              class="h-full rounded-full transition-all duration-300 ease-out"
+              style={{
+                width: `${uploadProgress().total > 0 ? (uploadProgress().current / uploadProgress().total) * 100 : 0}%`,
+                background: uploadProgress().phase === "done" ? "var(--icon-success-base)" : "var(--interactive-base)",
+              }}
+            />
+          </div>
+          <span class="shrink-0 whitespace-nowrap">
+            <Show when={uploadProgress().phase === "done"} fallback={`${uploadProgress().current}/${uploadProgress().total}`}>
+              Uploaded {uploadProgress().current}/{uploadProgress().total}
+            </Show>
+          </span>
+        </div>
+      </Show>
       <For each={nodes()}>
         {(node) => {
           const expanded = () => file.tree.state(node.path)?.expanded ?? false

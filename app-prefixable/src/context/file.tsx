@@ -66,7 +66,7 @@ interface FileContextValue {
   deleteFile: (path: string) => Promise<boolean>
   deleteDir: (path: string) => Promise<boolean>
   downloadFile: (path: string) => Promise<DownloadedFile | null>
-  uploadFiles: (parentPath: string, files: UploadEntry[]) => Promise<boolean>
+  uploadFiles: (parentPath: string, files: UploadEntry[], onProgress?: (current: number, total: number) => void) => Promise<boolean>
   moveItem: (source: string, destParent: string) => Promise<boolean>
 }
 
@@ -388,16 +388,18 @@ export function FileProvider(props: ParentProps) {
     }
   }
 
-  async function uploadFiles(parentPath: string, files: UploadEntry[]): Promise<boolean> {
+  async function uploadFiles(parentPath: string, files: UploadEntry[], onProgress?: (current: number, total: number) => void): Promise<boolean> {
     if (!capabilities().canUseLocalExtFileOps) return false
     if (!files.length) return false
 
-    for (const { file, relativePath } of files) {
+    for (let i = 0; i < files.length; i++) {
+      const { file, relativePath } = files[i]
       const relative = relativePath || file.name
       const targetPath = parentPath ? `${parentPath}/${relative}` : relative
       const fullPath = resolvePath(targetPath)
       const ok = await apiUploadFile(serverUrl, fullPath, file, targetUrl)
       if (!ok) return false
+      onProgress?.(i + 1, files.length)
     }
 
     await refreshDir(parentPath)

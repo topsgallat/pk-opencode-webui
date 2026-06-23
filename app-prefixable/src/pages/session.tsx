@@ -59,7 +59,7 @@ import { sessionQuestionRequest } from "../utils/session-tree-request";
 import { errorMessage, withTimeout } from "../utils/request-timeout";
 import { applyQueuedPromptSubmission } from "../utils/chat-queue";
 import { findOptimisticMessageEcho, mergeOptimisticMessage, projectDisplayMessages, type OptimisticQueueMessage, type SyncMessageLike } from "../utils/message-reconcile";
-import { getQuota } from "../utils/extended-api";
+import { getQuota, uploadFile, deleteFile } from "../utils/extended-api";
 import { isConnectionModelFailure, isRetryableModelFailure, pickFallbackCandidate, shouldFallbackAfterRetryAttempts } from "../utils/model-fallback";
 import { loadFallbackSettings, resolveFallbackPolicyForAgent, resolveFallbackPolicies } from "../utils/fallback-settings";
 
@@ -669,6 +669,7 @@ export function Session() {
   const [imageAttachments, setImageAttachments] = createSignal<
     ImageAttachment[]
   >([]);
+  const draftUploadId = generateUUID();
   const [mentionPath, setMentionPath] = createSignal<string | null>(null);
   const [mentionSelection, setMentionSelection] = createSignal<{ startLine: number; endLine: number } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
@@ -1053,15 +1054,21 @@ export function Session() {
       };
     });
 
-    const imageParts = item.images.map((image, index) => ({
-      id: `${item.id}-image-${index}`,
-      sessionID: sid,
-      messageID: "",
-      type: "file" as const,
-      mime: image.mime,
-      url: image.dataUrl,
-      filename: image.name,
-    }));
+    const imageParts = item.images.map((image, index) => {
+      const encoded = image.serverPath
+        .split("/")
+        .map((segment) => encodeURIComponent(segment))
+        .join("/");
+      return {
+        id: `${item.id}-image-${index}`,
+        sessionID: sid,
+        messageID: "",
+        type: "file" as const,
+        mime: image.mime,
+        url: `file://${encoded}`,
+        filename: image.name,
+      };
+    });
 
     const parts = [...textParts, ...fileCommentParts, ...fileParts, ...imageParts];
     if (parts.length > 0) return parts as Part[];
@@ -2172,7 +2179,7 @@ export function Session() {
   }
 
   function addUpload(file: File) {
-    setError(null); // Clear previous errors
+    setError(null);
     const name = file.name.toLowerCase();
     const isTextBased =
       file.type.startsWith("text/") ||
@@ -2193,30 +2200,41 @@ export function Session() {
 
     const id = generateUUID();
     const mime = isTextBased ? "text/plain" : file.type;
-    setImageAttachments((prev) => [...prev, { id, name: file.name, mime, dataUrl: "", status: "uploading" }]);
+    const dir = directory || "";
+    const sid = sessionId() || draftUploadId;
+    const filename = file.name.replace(/[\/\\:*?"<>|]/g, "_");
+    const serverPath = `${dir.replace(/\/$/, "")}/.opencode/uploads/${sid}/${id}-${filename}`;
+    setImageAttachments((prev) => [...prev, { id, name: file.name, mime, serverPath, status: "uploading" }]);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setImageAttachments((prev) => prev.map((attachment) =>
-        attachment.id === id ? { ...attachment, dataUrl, status: "uploaded" } : attachment,
-      ));
-    };
-    reader.onerror = () => {
-      setImageAttachments((prev) => prev.filter((attachment) => attachment.id !== id));
-      setError(`Failed to read file: ${file.name}`);
-    };
-    reader.readAsDataURL(file);
+    uploadFile(serverUrl, serverPath, file, targetUrl).then((ok) => {
+      if (ok) {
+        setImageAttachments((prev) => prev.map((a) =>
+          a.id === id ? { ...a, status: "uploaded" } : a,
+        ));
+      } else {
+        setImageAttachments((prev) => prev.filter((a) => a.id !== id));
+        setError(`Failed to upload file: ${file.name}`);
+      }
+    });
   }
 
   function removeUpload(id: string) {
+    const attachment = imageAttachments().find((a) => a.id === id);
     setImageAttachments((prev) => prev.filter((a) => a.id !== id));
+    if (attachment?.serverPath && attachment.status === "uploaded") {
+      deleteFile(serverUrl, attachment.serverPath, targetUrl);
+    }
   }
 
   function resetComposer() {
     setInput("");
     setDragHeight(0);
     if (inputRef) inputRef.style.height = "";
+    for (const a of imageAttachments()) {
+      if (a.serverPath && a.status === "uploaded") {
+        deleteFile(serverUrl, a.serverPath, targetUrl);
+      }
+    }
     setFileContext([]);
     setImageAttachments([]);
     drafts.delete(draftKey(server.serverKey(), params.dir, sessionId()));
@@ -2269,11 +2287,15 @@ export function Session() {
     }
 
     for (const img of item.images) {
-      if (img.status === "uploading" || !img.dataUrl) continue;
+      if (img.status === "uploading" || !img.serverPath) continue;
+      const encoded = img.serverPath
+        .split("/")
+        .map((segment) => encodeURIComponent(segment))
+        .join("/");
       parts.push({
         type: "file",
         mime: img.mime,
-        url: img.dataUrl,
+        url: `file://${encoded}`,
         filename: img.name,
       });
     }
@@ -2570,10 +2592,15 @@ export function Session() {
     }
 
     for (const img of images) {
+      if (img.status === "uploading" || !img.serverPath) continue;
+      const encoded = img.serverPath
+        .split("/")
+        .map((segment) => encodeURIComponent(segment))
+        .join("/");
       parts.push({
         type: "file",
         mime: img.mime,
-        url: img.dataUrl,
+        url: `file://${encoded}`,
         filename: img.name,
       });
     }

@@ -5,8 +5,8 @@ export interface ImageAttachment {
   id: string
   name: string
   mime: string
-  dataUrl: string
-  status?: "uploading" | "uploaded"
+  serverPath: string
+  status?: "uploading" | "uploaded" | "failed"
 }
 
 interface Props {
@@ -62,17 +62,9 @@ export const ImageAttachments: Component<Props> = (props) => {
                 )}
               </Show>
 
-              {/* Thumbnail or icon */}
-              <Show
-                when={isImage(attachment.mime)}
-                fallback={
-                  <div class="w-16 h-16 flex items-center justify-center">
-                    <FileText class="w-6 h-6" style={{ color: "var(--icon-weak)" }} />
-                  </div>
-                }
-              >
-                <img src={attachment.dataUrl} alt={attachment.name} class="w-16 h-16 object-cover" />
-              </Show>
+              <div class="w-16 h-16 flex items-center justify-center">
+                <FileText class="w-6 h-6" style={{ color: "var(--icon-weak)" }} />
+              </div>
 
               {/* Remove button overlay */}
               <button

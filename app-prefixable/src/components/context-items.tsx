@@ -7,6 +7,8 @@ export interface FileContext {
   comment?: string
   selection?: { startLine: number; endLine: number }
   preview?: string
+  status?: "uploading" | "uploaded"
+  dataUrl?: string
 }
 
 interface Props {

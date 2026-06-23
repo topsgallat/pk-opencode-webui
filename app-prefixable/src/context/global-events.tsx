@@ -3,6 +3,8 @@ import {
   useContext,
   onCleanup,
   createEffect,
+  createSignal,
+  onMount,
   type ParentProps,
 } from "solid-js"
 import { createStore, produce } from "solid-js/store"
@@ -12,6 +14,7 @@ import { globalSyncReady } from "./sync"
 import { appendTargetParam } from "../utils/path"
 import { getTargetServerUrl } from "../utils/servers"
 import { useClientAuth } from "./client-auth"
+import { playSound, primeAudioContext, readSoundSettings, SOUND_STORAGE_KEY } from "../utils/sound"
 
 /**
  * Alert priority: permission (highest) > question > busy
@@ -55,6 +58,7 @@ export function GlobalEventsProvider(props: ParentProps & {
 
   // Per-directory alert state
   const [alerts, setAlerts] = createStore<Record<string, ProjectAlerts>>({})
+  const [soundCache, setSoundCache] = createSignal(readSoundSettings())
 
   // Map of directory → SSE connection
   const connections = new Map<string, { source: EventSource }>()
@@ -69,6 +73,29 @@ export function GlobalEventsProvider(props: ParentProps & {
   // Debounce timers for permission reseeds — prevents multiple rapid permission.replied
   // events from spawning overlapping fetch requests that race each other
   const permReseedTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+  onMount(() => {
+    function handleStorage(e: StorageEvent) {
+      if (e.key === SOUND_STORAGE_KEY) setSoundCache(readSoundSettings())
+    }
+    window.addEventListener("storage", handleStorage)
+    setSoundCache(readSoundSettings())
+
+    function primeOnGesture() {
+      if (!soundCache().enabled) return
+      primeAudioContext()
+      window.removeEventListener("pointerdown", primeOnGesture)
+      window.removeEventListener("keydown", primeOnGesture)
+    }
+
+    window.addEventListener("pointerdown", primeOnGesture)
+    window.addEventListener("keydown", primeOnGesture)
+    onCleanup(() => {
+      window.removeEventListener("storage", handleStorage)
+      window.removeEventListener("pointerdown", primeOnGesture)
+      window.removeEventListener("keydown", primeOnGesture)
+    })
+  })
 
   // Per-directory tracking sets for deduplication
   const perDir = new Map<string, {
@@ -249,7 +276,11 @@ export function GlobalEventsProvider(props: ParentProps & {
           tracking.busySessions.add(sid)
         }
         if (type === "idle") {
-          tracking.busySessions.delete(sid)
+          const wasBusy = tracking.busySessions.delete(sid)
+          if (wasBusy) {
+            const sound = soundCache()
+            if (sound.enabled) playSound(sound.sound)
+          }
         }
         recalcAlerts(dir)
       }

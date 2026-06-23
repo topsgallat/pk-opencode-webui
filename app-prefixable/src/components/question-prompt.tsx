@@ -27,6 +27,24 @@ export function QuestionPrompt(props: Props) {
 
   let inputRef: HTMLInputElement | undefined
 
+  // Reset all per-question state when a new question arrives.
+  // The parent <Show when={pendingQuestion()}> re-renders this component
+  // with new props instead of destroying it, so stale signals from the
+  // previous question (tab, answers, submitting, etc.) must be cleared.
+  let prevRequestId: string | undefined
+  createEffect(() => {
+    const id = props.request.id
+    if (id !== prevRequestId) {
+      prevRequestId = id
+      setTab(0)
+      setAnswers([])
+      setCustom([])
+      setSelected(0)
+      setEditing(false)
+      setSubmitting(false)
+    }
+  })
+
   const question = createMemo(() => questions()[tab()])
   const confirm = createMemo(() => !single() && tab() === questions().length)
   const options = createMemo(() => question()?.options ?? [])

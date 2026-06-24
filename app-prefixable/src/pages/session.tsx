@@ -53,8 +53,7 @@ import {
   ImageAttachments,
   type ImageAttachment,
 } from "../components/image-attachments";
-import { readNotifyMap, writeNotifyMap, fireBrowserNotification } from "../utils/notify";
-import { readSoundSettings, playSound } from "../utils/sound";
+import { readNotifyMap, browserNotificationStatus, NOTIFY_STORAGE_KEY } from "../utils/notify";
 import { sessionQuestionRequest } from "../utils/session-tree-request";
 import { errorMessage, withTimeout } from "../utils/request-timeout";
 import { applyQueuedPromptSubmission } from "../utils/chat-queue";
@@ -725,86 +724,27 @@ export function Session() {
   // Double-Escape to abort: track last Escape press timestamp
   const lastEsc = { ts: 0 };
 
-  // --- Notification toggle (per-session, persisted in localStorage) ---
+  // --- Notification status (global, persisted in localStorage) ---
   const [notifyEnabled, setNotifyEnabled] = createSignal(
     (() => {
-      const id = params.id;
-      if (!id) return false;
-      return readNotifyMap()[id] === true;
+      return readNotifyMap().global === true;
     })(),
   );
-  const [notifyDenied, setNotifyDenied] = createSignal(false);
-  const deniedTimer = { id: null as ReturnType<typeof setTimeout> | null };
-  onCleanup(() => { if (deniedTimer.id !== null) clearTimeout(deniedTimer.id) });
-
-  function confirmNotifyEnabled(id: string) {
-    fireBrowserNotification({
-      title: "Notifications enabled",
-      body: "You will now get browser notifications for this session.",
-      tag: `session-notify-enabled-${id}`,
-      requireInteraction: false,
-    })
-
-    const sound = readSoundSettings()
-    if (sound.enabled) playSound(sound.sound)
-  }
+  const [notifyDenied, setNotifyDenied] = createSignal(browserNotificationStatus() === "denied");
 
   // Re-read notification state when session changes
   createEffect(() => {
-    const id = params.id;
-    setNotifyEnabled(id ? readNotifyMap()[id] === true : false);
-    setNotifyDenied(false);
+    setNotifyEnabled(readNotifyMap().global === true);
+    setNotifyDenied(browserNotificationStatus() === "denied");
   });
 
-  function toggleNotify() {
-    const id = sessionId();
-    if (!id) return;
-
-    // Turning off
-    if (notifyEnabled()) {
-      const map = readNotifyMap();
-      delete map[id];
-      writeNotifyMap(map);
-      setNotifyEnabled(false);
-      setNotifyDenied(false);
-      return;
+  onMount(() => {
+    function handleStorage(e: StorageEvent) {
+      if (e.key === NOTIFY_STORAGE_KEY) setNotifyEnabled(readNotifyMap().global === true)
     }
-
-    // Turning on — check permission
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-
-    const perm = Notification.permission;
-    if (perm === "granted") {
-      const map = readNotifyMap();
-      map[id] = true;
-      writeNotifyMap(map);
-      setNotifyEnabled(true);
-      confirmNotifyEnabled(id);
-      return;
-    }
-    if (perm === "denied") {
-      setNotifyDenied(true);
-      if (deniedTimer.id !== null) clearTimeout(deniedTimer.id);
-      deniedTimer.id = setTimeout(() => setNotifyDenied(false), 4000);
-      return;
-    }
-    // permission === "default" — request
-    Notification.requestPermission().then((result) => {
-      if (result === "granted") {
-        const map = readNotifyMap();
-        map[id] = true;
-        writeNotifyMap(map);
-        setNotifyEnabled(true);
-        confirmNotifyEnabled(id);
-        return;
-      }
-      if (result === "denied") {
-        setNotifyDenied(true);
-        if (deniedTimer.id !== null) clearTimeout(deniedTimer.id);
-        deniedTimer.id = setTimeout(() => setNotifyDenied(false), 4000);
-      }
-    });
-  }
+    window.addEventListener("storage", handleStorage)
+    onCleanup(() => window.removeEventListener("storage", handleStorage))
+  })
 
   // Track whether the agent was genuinely processing (not initial load)
   const wasProcessing = { value: false };
@@ -3127,7 +3067,7 @@ export function Session() {
           onOpenMCPDialog={() => setShowMCPDialog(true)}
           notifyEnabled={notifyEnabled()}
           notifyDenied={notifyDenied()}
-          onToggleNotify={toggleNotify}
+          onToggleNotify={() => navigate(`/${dirSlug()}/settings#sounds`)}
           instructionsActive={instructionsActive()}
           onOpenInstructions={() => navigate(`/${dirSlug()}/settings#instructions`)}
         />

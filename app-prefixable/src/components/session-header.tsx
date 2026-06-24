@@ -247,10 +247,7 @@ export function SessionHeader(props: SessionHeaderProps) {
 
         <div class="relative hidden sm:block">
           <button
-            onClick={() => {
-              if (!notifySupported) return
-              props.onToggleNotify()
-            }}
+            onClick={props.onToggleNotify}
             class="p-1.5 rounded-md transition-colors"
             style={{
               color: !notifySupported
@@ -263,12 +260,9 @@ export function SessionHeader(props: SessionHeaderProps) {
               opacity: notifySupported ? 1 : 0.6,
             }}
             title={!notifySupported
-              ? "Browser notifications are unavailable in this browser"
-              : props.notifyEnabled
-                ? "Disable completion notifications"
-                : "Enable completion notifications"}
-            aria-label="Toggle completion notifications"
-            disabled={!notifySupported}
+              ? "Browser notifications are unavailable here — open Settings"
+              : "Manage browser notifications in Settings"}
+            aria-label="Manage browser notifications in Settings"
           >
             <Show when={props.notifyEnabled} fallback={<Bell class="w-4 h-4" />}>
               <BellRing class="w-4 h-4" />
@@ -295,7 +289,7 @@ export function SessionHeader(props: SessionHeaderProps) {
                 color: "var(--text-weak)",
               }}
             >
-              Notifications blocked — enable in browser settings
+              Notifications blocked — manage them in Settings
             </div>
           </Show>
         </div>

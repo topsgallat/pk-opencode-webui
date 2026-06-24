@@ -23,6 +23,7 @@ import { generateUUID } from "../utils/uuid"
 import { writeFile } from "../utils/extended-api"
 import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCallback, restartOpencode, checkOpencodeHealth } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
+import { browserNotificationStatus, readNotifyMap, writeNotifyMap, NOTIFY_STORAGE_KEY } from "../utils/notify"
 import { extractOAuthCode, extractOAuthInstructionCode, needsOAuthReplay, normalizeOAuthCallbackUrl } from "../utils/oauth"
 import {
   loadFallbackSettings,
@@ -52,7 +53,6 @@ import {
 } from "../utils/server-auth"
 import { QuotaContent } from "../components/quota/quota-panel"
 import { SkillSourcesTab } from "../components/skill-sources-tab"
-import { browserNotificationStatus } from "../utils/notify"
 
 type ServerHealthState = "loading" | "online" | "offline"
 
@@ -95,15 +95,19 @@ export function Settings() {
   // Sound settings
   const [soundSettings, setSoundSettings] = createSignal<SoundSettings>(readSoundSettings())
   const [notificationStatus, setNotificationStatus] = createSignal(browserNotificationStatus())
+  const [notifyEnabled, setNotifyEnabled] = createSignal(readNotifyMap().global === true)
+  const [notifyDenied, setNotifyDenied] = createSignal(browserNotificationStatus() === "denied")
 
   // Keep soundSettings in sync with localStorage changes from other tabs
   onMount(() => {
     function handleStorage(e: StorageEvent) {
       if (e.key === SOUND_STORAGE_KEY) setSoundSettings(readSoundSettings())
+      if (e.key === NOTIFY_STORAGE_KEY) setNotifyEnabled(readNotifyMap().global === true)
     }
     window.addEventListener("storage", handleStorage)
     function refreshNotificationStatus() {
       setNotificationStatus(browserNotificationStatus())
+      setNotifyDenied(browserNotificationStatus() === "denied")
     }
     window.addEventListener("focus", refreshNotificationStatus)
     document.addEventListener("visibilitychange", refreshNotificationStatus)
@@ -117,6 +121,47 @@ export function Settings() {
     const next = { ...soundSettings(), ...patch }
     setSoundSettings(next)
     writeSoundSettings(next)
+  }
+
+  function toggleBrowserNotifications() {
+    if (typeof window === "undefined" || !("Notification" in window)) return
+
+    if (notifyEnabled()) {
+      const map = readNotifyMap()
+      map.global = false
+      writeNotifyMap(map)
+      setNotifyEnabled(false)
+      setNotifyDenied(false)
+      return
+    }
+
+    const perm = Notification.permission
+    if (perm === "granted") {
+      const map = readNotifyMap()
+      map.global = true
+      writeNotifyMap(map)
+      setNotifyEnabled(true)
+      setNotifyDenied(false)
+      return
+    }
+
+    if (perm === "denied") {
+      setNotifyDenied(true)
+      return
+    }
+
+    Notification.requestPermission().then((result) => {
+      if (result === "granted") {
+        const map = readNotifyMap()
+        map.global = true
+        writeNotifyMap(map)
+        setNotifyEnabled(true)
+        setNotifyDenied(false)
+        return
+      }
+
+      if (result === "denied") setNotifyDenied(true)
+    })
   }
 
   // Server management
@@ -2588,10 +2633,10 @@ Add your project-specific instructions here.
             <div class="space-y-6">
               <header>
                 <h1 class="text-lg font-medium" style={{ color: "var(--text-strong)" }}>
-                  Sound Notifications
+                  Notifications & Sound
                 </h1>
                 <p class="text-sm mt-1" style={{ color: "var(--text-weak)" }}>
-                  Play a sound when notification-worthy events occur (task complete, permission request, agent question)
+                  Manage browser notifications globally and choose the completion sound.
                 </p>
               </header>
 
@@ -2602,9 +2647,33 @@ Add your project-specific instructions here.
                   border: "1px solid var(--border-base)",
                 }}
               >
-                <div class="px-4 py-3 grid gap-2 text-xs" style={{ "border-bottom": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
+                <div class="px-4 py-3 grid gap-3 text-xs" style={{ "border-bottom": "1px solid var(--border-base)", color: "var(--text-weak)" }}>
                   <div class="flex items-center justify-between gap-4">
                     <span>Browser notifications</span>
+                    <button
+                      onClick={toggleBrowserNotifications}
+                      class="relative w-10 h-5 rounded-full transition-colors"
+                      style={{
+                        background: notifyEnabled() ? "var(--interactive-base)" : "var(--surface-inset)",
+                        cursor: notificationStatus() === "unsupported" ? "not-allowed" : "pointer",
+                        opacity: notificationStatus() === "unsupported" ? 0.6 : 1,
+                      }}
+                      role="switch"
+                      aria-checked={notifyEnabled()}
+                      aria-label="Enable browser notifications globally"
+                      disabled={notificationStatus() === "unsupported"}
+                    >
+                      <div
+                        class="absolute top-0.5 w-4 h-4 rounded-full transition-all"
+                        style={{
+                          background: "var(--background-base)",
+                          left: notifyEnabled() ? "calc(100% - 18px)" : "2px",
+                        }}
+                      />
+                    </button>
+                  </div>
+                  <div class="flex items-center justify-between gap-4">
+                    <span>Permission</span>
                     <span style={{ color: notificationStatus() === "granted" ? "var(--icon-success-base)" : notificationStatus() === "denied" ? "var(--icon-warning-base)" : "var(--text-base)" }}>
                       {notificationStatus() === "unsupported" ? "Unsupported" : notificationStatus()}
                     </span>
@@ -2616,8 +2685,13 @@ Add your project-specific instructions here.
                     </span>
                   </div>
                   <p>
-                    Completion sound plays when global sound is enabled. Browser notifications still require the session bell in the chat header.
+                    Browser notifications are a single global toggle shared across sessions. Completion sound plays when global sound is enabled.
                   </p>
+                  <Show when={notifyDenied()}>
+                    <p style={{ color: "var(--icon-warning-base)" }}>
+                      Notifications are blocked by the browser right now. Open browser settings to allow them.
+                    </p>
+                  </Show>
                 </div>
                 <div class="px-4 py-3 flex items-center justify-between" style={{ "border-bottom": "1px solid var(--border-base)" }}>
                   <h2 class="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
@@ -2649,7 +2723,7 @@ Add your project-specific instructions here.
 
                 <div class="p-4">
                   <p class="text-xs mb-3" style={{ color: "var(--text-weak)" }}>
-                    Sound only plays for sessions with the bell icon enabled. Enable the bell on individual sessions from the chat header.
+                    Browser notifications are managed above. Sound only depends on the global sound toggle.
                   </p>
 
                   <div class="space-y-2">

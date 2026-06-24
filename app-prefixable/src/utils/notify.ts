@@ -1,10 +1,15 @@
-/** Shared helpers for the per-session notification toggle stored in localStorage */
+/** Shared helpers for browser notifications stored in localStorage */
 
 import { dispatchStorageEvent } from "./storage"
 
 export const NOTIFY_STORAGE_KEY = "opencode.browserNotifyEnabled";
 const LEGACY_NOTIFY_STORAGE_KEY = "opencode.sessionNotify";
 const GLOBAL_NOTIFY_KEY = "global";
+
+export interface BrowserNotifySettings {
+  global: boolean
+  sessions: Record<string, boolean>
+}
 
 export type BrowserNotificationStatus = "unsupported" | NotificationPermission;
 
@@ -46,41 +51,67 @@ export function fireBrowserNotification(payload: BrowserNotificationPayload) {
 }
 
 /** Read the per-session notification toggle map from localStorage */
-export function readNotifyMap(): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
+function normalizeSettings(value: unknown): BrowserNotifySettings | null {
+  if (!value || typeof value !== "object") return null
+  const raw = value as Record<string, unknown>
+  const global = typeof raw.global === "boolean" ? raw.global : false
+  const sessions: Record<string, boolean> = {}
+
+  const nested = raw.sessions
+  if (nested && typeof nested === "object") {
+    for (const [id, enabled] of Object.entries(nested as Record<string, unknown>)) {
+      if (typeof enabled === "boolean") sessions[id] = enabled
+    }
+    return { global, sessions }
+  }
+
+  for (const [id, enabled] of Object.entries(raw)) {
+    if (id === GLOBAL_NOTIFY_KEY) continue
+    if (typeof enabled === "boolean") sessions[id] = enabled
+  }
+
+  return { global, sessions }
+}
+
+export function readNotifyMap(): BrowserNotifySettings {
+  if (typeof window === "undefined") return { global: false, sessions: {} };
   try {
     const raw = window.localStorage.getItem(NOTIFY_STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as Record<string, boolean>;
-      if (!parsed || typeof parsed !== "object") {
+      const parsed = normalizeSettings(JSON.parse(raw));
+      if (!parsed) {
         window.localStorage.removeItem(NOTIFY_STORAGE_KEY);
-        return {};
+        return { global: false, sessions: {} };
       }
       return parsed;
     }
 
     const legacy = window.localStorage.getItem(LEGACY_NOTIFY_STORAGE_KEY);
-    if (!legacy) return {};
+    if (!legacy) return { global: false, sessions: {} };
 
-    const parsed = JSON.parse(legacy) as Record<string, boolean>;
-    if (!parsed || typeof parsed !== "object") {
+    const parsed = normalizeSettings(JSON.parse(legacy));
+    if (!parsed) {
       window.localStorage.removeItem(LEGACY_NOTIFY_STORAGE_KEY);
-      return {};
+      return { global: false, sessions: {} };
     }
 
-    if (Object.values(parsed).some(Boolean)) return { [GLOBAL_NOTIFY_KEY]: true };
-    return {};
+    if (Object.values(parsed.sessions).some(Boolean)) return { global: true, sessions: {} };
+    return { global: parsed.global, sessions: parsed.sessions };
   } catch {
     try { window.localStorage.removeItem(NOTIFY_STORAGE_KEY); } catch {}
-    return {};
+    return { global: false, sessions: {} };
   }
+}
+
+export function readNotifySettings() {
+  return readNotifyMap()
 }
 
 /** Write the per-session notification toggle map to localStorage and dispatch
  *  a synthetic storage event so same-tab listeners update immediately. */
-export function writeNotifyMap(map: Record<string, boolean>) {
+export function writeNotifyMap(settings: BrowserNotifySettings) {
   if (typeof window === "undefined") return;
-  const value = JSON.stringify({ [GLOBAL_NOTIFY_KEY]: map[GLOBAL_NOTIFY_KEY] === true });
+  const value = JSON.stringify({ global: settings.global === true, sessions: settings.sessions ?? {} });
   try {
     window.localStorage.setItem(NOTIFY_STORAGE_KEY, value);
     window.localStorage.removeItem(LEGACY_NOTIFY_STORAGE_KEY);
@@ -90,7 +121,34 @@ export function writeNotifyMap(map: Record<string, boolean>) {
   dispatchStorageEvent(NOTIFY_STORAGE_KEY, value);
 }
 
+export function isSessionNotifyEnabled(id: string) {
+  const settings = readNotifyMap()
+  return settings.sessions[id] ?? settings.global
+}
+
+export function getSessionNotifyOverride(id: string) {
+  const settings = readNotifyMap()
+  return settings.sessions[id]
+}
+
+export function setGlobalNotifyEnabled(enabled: boolean) {
+  const settings = readNotifyMap()
+  writeNotifyMap({ ...settings, global: enabled })
+}
+
+export function setSessionNotifyOverride(id: string, enabled: boolean) {
+  const settings = readNotifyMap()
+  writeNotifyMap({
+    ...settings,
+    sessions: { ...settings.sessions, [id]: enabled },
+  })
+}
+
 /** Remove a session's entry from the notification toggle map */
 export function cleanupNotifyState(id: string) {
-  void id;
+  const settings = readNotifyMap();
+  if (!(id in settings.sessions)) return;
+  const sessions = { ...settings.sessions };
+  delete sessions[id];
+  writeNotifyMap({ ...settings, sessions });
 }

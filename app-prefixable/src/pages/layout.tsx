@@ -82,10 +82,10 @@ import {
 import type { DragEvent as SolidDragEvent } from "@thisbeyond/solid-dnd";
 import { ConstrainDragXAxis } from "../utils/solid-dnd";
 
-import { readNotifyMap, cleanupNotifyState, NOTIFY_STORAGE_KEY, fireBrowserNotification } from "../utils/notify";
+import { readNotifyMap, cleanupNotifyState, NOTIFY_STORAGE_KEY, fireBrowserNotification, isSessionNotifyEnabled } from "../utils/notify";
 import { readSoundSettings, playSound, playErrorSound, primeAudioContext, SOUND_STORAGE_KEY } from "../utils/sound";
 import { dispatchStorageEvent } from "../utils/storage";
-import { sessionHasQuestion, buildChildMap } from "../utils/session-tree-request";
+import { sessionHasQuestion, buildChildMap, rootAncestorId } from "../utils/session-tree-request";
 import { useDevice } from "../context/device";
 import { MobileLayout } from "./mobile-layout";
 import { getServerCapabilities } from "../utils/server-capabilities";
@@ -1716,8 +1716,8 @@ export function Layout(props: ParentProps) {
           const sess = sync.session.get(sid);
           const sound = soundCache();
           if (sound.enabled) playSound(sound.sound);
-          const nc = notifyCache();
-          if (nc.global !== true) return;
+          const rootId = rootAncestorId(sync.session.get, sid);
+          if (!isSessionNotifyEnabled(rootId)) return;
 
           const title = sess?.title || "Task complete";
           fireNotification(sid, title, getSessionSummary(sid), `session-complete-${sid}`, false);
@@ -1747,8 +1747,8 @@ export function Layout(props: ParentProps) {
         if (firedPermission.has(rid)) return;
 
         const sess = sync.session.get(sid);
-        const nc = notifyCache();
-        if (nc.global !== true) return;
+        const rootId = rootAncestorId(sync.session.get, sid);
+        if (!isSessionNotifyEnabled(rootId)) return;
         firedPermission.add(rid);
 
         const title = sess?.title || "Permission needed";
@@ -1780,8 +1780,8 @@ export function Layout(props: ParentProps) {
         // progress), rootAncestorId falls back to the session's own ID which
         // is a reasonable best-effort during the brief bootstrap window.
         const sess = sync.session.get(sid);
-        const nc = notifyCache();
-        if (nc.global !== true) return;
+        const rootId = rootAncestorId(sync.session.get, sid);
+        if (!isSessionNotifyEnabled(rootId)) return;
         firedQuestion.add(rid);
 
         const title = sess?.title || "Question from agent";

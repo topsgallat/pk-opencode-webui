@@ -260,9 +260,11 @@ export function SessionHeader(props: SessionHeaderProps) {
               opacity: notifySupported ? 1 : 0.6,
             }}
             title={!notifySupported
-              ? "Browser notifications are unavailable here — open Settings"
-              : "Manage browser notifications in Settings"}
-            aria-label="Manage browser notifications in Settings"
+              ? "Browser notifications are unavailable here"
+              : props.notifyEnabled
+                ? "Disable browser notifications for this session"
+                : "Enable browser notifications for this session"}
+            aria-label="Toggle browser notifications for this session"
           >
             <Show when={props.notifyEnabled} fallback={<Bell class="w-4 h-4" />}>
               <BellRing class="w-4 h-4" />
@@ -289,7 +291,7 @@ export function SessionHeader(props: SessionHeaderProps) {
                 color: "var(--text-weak)",
               }}
             >
-              Notifications blocked — manage them in Settings
+              Notifications blocked in browser settings
             </div>
           </Show>
         </div>

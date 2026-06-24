@@ -2685,7 +2685,7 @@ Add your project-specific instructions here.
                     </span>
                   </div>
                   <p>
-                    Browser notifications are a single global toggle shared across sessions. Completion sound plays when global sound is enabled.
+                    Browser notifications are the default for all sessions. You can override them per session from the chat header. Completion sound plays when global sound is enabled.
                   </p>
                   <Show when={notifyDenied()}>
                     <p style={{ color: "var(--icon-warning-base)" }}>

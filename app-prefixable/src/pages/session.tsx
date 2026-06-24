@@ -53,8 +53,8 @@ import {
   ImageAttachments,
   type ImageAttachment,
 } from "../components/image-attachments";
-import { readNotifyMap, browserNotificationStatus, NOTIFY_STORAGE_KEY } from "../utils/notify";
-import { sessionQuestionRequest } from "../utils/session-tree-request";
+import { browserNotificationStatus, isSessionNotifyEnabled, setSessionNotifyOverride, NOTIFY_STORAGE_KEY } from "../utils/notify";
+import { sessionQuestionRequest, rootAncestorId } from "../utils/session-tree-request";
 import { errorMessage, withTimeout } from "../utils/request-timeout";
 import { applyQueuedPromptSubmission } from "../utils/chat-queue";
 import { findOptimisticMessageEcho, mergeOptimisticMessage, projectDisplayMessages, type OptimisticQueueMessage, type SyncMessageLike } from "../utils/message-reconcile";
@@ -724,27 +724,47 @@ export function Session() {
   // Double-Escape to abort: track last Escape press timestamp
   const lastEsc = { ts: 0 };
 
-  // --- Notification status (global, persisted in localStorage) ---
+  // --- Notification status (global default + per-session override) ---
+  const notifyTargetId = createMemo(() => {
+    const id = sessionId();
+    if (!id) return params.id ?? ""
+    return rootAncestorId(sync.session.get, id)
+  })
   const [notifyEnabled, setNotifyEnabled] = createSignal(
     (() => {
-      return readNotifyMap().global === true;
+      const id = notifyTargetId()
+      return id ? isSessionNotifyEnabled(id) : false
     })(),
   );
   const [notifyDenied, setNotifyDenied] = createSignal(browserNotificationStatus() === "denied");
 
   // Re-read notification state when session changes
   createEffect(() => {
-    setNotifyEnabled(readNotifyMap().global === true);
+    const id = notifyTargetId()
+    setNotifyEnabled(id ? isSessionNotifyEnabled(id) : false);
     setNotifyDenied(browserNotificationStatus() === "denied");
   });
 
   onMount(() => {
     function handleStorage(e: StorageEvent) {
-      if (e.key === NOTIFY_STORAGE_KEY) setNotifyEnabled(readNotifyMap().global === true)
+      if (e.key === NOTIFY_STORAGE_KEY) {
+        const id = notifyTargetId()
+        setNotifyEnabled(id ? isSessionNotifyEnabled(id) : false)
+      }
     }
     window.addEventListener("storage", handleStorage)
     onCleanup(() => window.removeEventListener("storage", handleStorage))
   })
+
+  function toggleSessionNotify() {
+    const id = notifyTargetId()
+    if (!id) return
+    if (typeof window === "undefined" || !("Notification" in window)) return
+    if (browserNotificationStatus() === "denied" || browserNotificationStatus() === "unsupported") return
+
+    setSessionNotifyOverride(id, !notifyEnabled())
+    setNotifyEnabled(!notifyEnabled())
+  }
 
   // Track whether the agent was genuinely processing (not initial load)
   const wasProcessing = { value: false };
@@ -3067,7 +3087,7 @@ export function Session() {
           onOpenMCPDialog={() => setShowMCPDialog(true)}
           notifyEnabled={notifyEnabled()}
           notifyDenied={notifyDenied()}
-          onToggleNotify={() => navigate(`/${dirSlug()}/settings#sounds`)}
+          onToggleNotify={toggleSessionNotify}
           instructionsActive={instructionsActive()}
           onOpenInstructions={() => navigate(`/${dirSlug()}/settings#instructions`)}
         />

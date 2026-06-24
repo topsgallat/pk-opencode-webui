@@ -201,3 +201,8 @@ export function playSound(id: string) {
   const option = SOUND_OPTIONS.find((o) => o.id === id)
   if (option) option.play()
 }
+
+/** Play the dedicated error sound. */
+export function playErrorSound() {
+  playSound("alert")
+}

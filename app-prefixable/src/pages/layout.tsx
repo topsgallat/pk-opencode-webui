@@ -83,7 +83,7 @@ import type { DragEvent as SolidDragEvent } from "@thisbeyond/solid-dnd";
 import { ConstrainDragXAxis } from "../utils/solid-dnd";
 
 import { readNotifyMap, cleanupNotifyState, NOTIFY_STORAGE_KEY, fireBrowserNotification } from "../utils/notify";
-import { readSoundSettings, playSound, primeAudioContext, SOUND_STORAGE_KEY } from "../utils/sound";
+import { readSoundSettings, playSound, playErrorSound, primeAudioContext, SOUND_STORAGE_KEY } from "../utils/sound";
 import { dispatchStorageEvent } from "../utils/storage";
 import { sessionHasQuestion, buildChildMap, rootAncestorId } from "../utils/session-tree-request";
 import { useDevice } from "../context/device";
@@ -1723,6 +1723,17 @@ export function Layout(props: ParentProps) {
           const title = sess?.title || "Task complete";
           fireNotification(sid, title, getSessionSummary(sid), `session-complete-${sid}`, false);
         }
+        return;
+      }
+
+      if (event.type === "session.error") {
+        const props = event.properties as { sessionID?: string } | undefined;
+        const sid = props?.sessionID;
+        if (!sid) return;
+        if (busyTracker[sid]) busyTracker[sid] = false;
+
+        const sound = soundCache();
+        if (sound.enabled) playErrorSound();
         return;
       }
 

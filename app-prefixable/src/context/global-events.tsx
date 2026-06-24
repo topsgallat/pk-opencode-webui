@@ -14,7 +14,7 @@ import { globalSyncReady } from "./sync"
 import { appendTargetParam } from "../utils/path"
 import { getTargetServerUrl } from "../utils/servers"
 import { useClientAuth } from "./client-auth"
-import { playSound, primeAudioContext, readSoundSettings, SOUND_STORAGE_KEY } from "../utils/sound"
+import { playSound, playErrorSound, primeAudioContext, readSoundSettings, SOUND_STORAGE_KEY } from "../utils/sound"
 
 /**
  * Alert priority: permission (highest) > question > busy
@@ -288,7 +288,8 @@ export function GlobalEventsProvider(props: ParentProps & {
       if (event.type === "session.error") {
         const sid = (event.properties as { sessionID?: string })?.sessionID
         if (!sid) return
-        tracking.busySessions.delete(sid)
+        const wasBusy = tracking.busySessions.delete(sid)
+        if (wasBusy && soundCache().enabled) playErrorSound()
         recalcAlerts(dir)
       }
     }

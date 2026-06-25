@@ -301,6 +301,8 @@ export function Layout(props: ParentProps) {
   const searchTimer = { id: undefined as ReturnType<typeof setTimeout> | undefined };
   let searchInputRef: HTMLInputElement | undefined;
 
+  const [unseenSessions, setUnseenSessions] = createSignal<Set<string>>(new Set());
+
   // Keyboard navigation state for session list
   const [focusedId, setFocusedId] = createSignal<string | null>(null);
   const [menuFocusIndex, setMenuFocusIndex] = createSignal(-1);
@@ -537,8 +539,11 @@ export function Layout(props: ParentProps) {
                 {statusIcon()}
               </span>
               <span class="min-w-0 flex-1">
-                <span class="block truncate">
-                  {session.title || "Untitled"}
+                <span class="flex items-center gap-1 min-w-0">
+                  <span class="block truncate">{session.title || "Untitled"}</span>
+                  <Show when={unseenSessions().has(session.id)}>
+                    <span class="shrink-0 w-2 h-2 rounded-full" style={{ background: "var(--status-success-text)" }} title="Task completed" />
+                  </Show>
                 </span>
                 <Show when={renameError()?.id === session.id}>
                   <span class="block text-xs truncate" style={{ color: "var(--text-critical-base)" }}>
@@ -823,6 +828,13 @@ export function Layout(props: ParentProps) {
       .filter((s) => s.directory === directory && !s.time?.archived)
       .sort((a, b) => (b.time?.updated || 0) - (a.time?.updated || 0)),
   );
+
+  const unseenProjectCount = createMemo(() => {
+    const projectIds = new Set(projectSessions().map(s => s.id));
+    let count = 0;
+    unseenSessions().forEach(id => { if (projectIds.has(id)) count++; });
+    return count;
+  });
 
   const archivedSessions = createMemo(() =>
     sync
@@ -1565,6 +1577,12 @@ export function Layout(props: ParentProps) {
       () => currentSessionId(),
       (id) => {
         if (!id) return;
+        setUnseenSessions(prev => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
         const options: ScrollIntoViewOptions = smoothNextScroll
           ? { block: "nearest", behavior: "smooth" }
           : { block: "nearest" };
@@ -1713,10 +1731,19 @@ export function Layout(props: ParentProps) {
         if (type === "idle" && busyTracker[sid]) {
           busyTracker[sid] = false;
 
+          const rootId = rootAncestorId(sync.session.get, sid);
+          if (currentSessionId() !== rootId) {
+            setUnseenSessions(prev => {
+              if (prev.has(rootId)) return prev;
+              const next = new Set(prev);
+              next.add(rootId);
+              return next;
+            });
+          }
+
           const sess = sync.session.get(sid);
           const sound = soundCache();
           if (sound.enabled) playSound(sound.sound);
-          const rootId = rootAncestorId(sync.session.get, sid);
           if (!isSessionNotifyEnabled(rootId)) return;
 
           const title = sess?.title || "Task complete";
@@ -1730,6 +1757,16 @@ export function Layout(props: ParentProps) {
         const sid = props?.sessionID;
         if (!sid) return;
         if (busyTracker[sid]) busyTracker[sid] = false;
+
+        const rootId = rootAncestorId(sync.session.get, sid);
+        if (currentSessionId() !== rootId) {
+          setUnseenSessions(prev => {
+            if (prev.has(rootId)) return prev;
+            const next = new Set(prev);
+            next.add(rootId);
+            return next;
+          });
+        }
 
         const sound = soundCache();
         if (sound.enabled) playErrorSound();
@@ -2291,11 +2328,18 @@ export function Layout(props: ParentProps) {
                   {(project) => <ProjectAvatar project={{ worktree: project().path, name: project().name }} size="small" />}
                 </Show>
                 <div class="min-w-0 flex-1">
-                  <div
-                    class="text-sm font-medium truncate"
-                    style={{ color: "var(--text-strong)" }}
-                  >
-                    {projectName()}
+                  <div class="flex items-center gap-1.5">
+                    <div
+                      class="text-sm font-medium truncate min-w-0"
+                      style={{ color: "var(--text-strong)" }}
+                    >
+                      {projectName()}
+                    </div>
+                    <Show when={unseenProjectCount() > 0}>
+                      <span class="shrink-0 px-1.5 rounded-full text-[10px] font-semibold leading-4" style={{ background: "var(--status-success-text)", color: "white" }}>
+                        {unseenProjectCount()}
+                      </span>
+                    </Show>
                   </div>
                   <div
                     class="text-xs truncate"

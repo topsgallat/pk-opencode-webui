@@ -424,11 +424,26 @@ export function FileViewer(props: FileViewerProps) {
           </div>
         </Match>
         <Match when={fileLoaded() && isBinary()}>
-          <div class="flex flex-col items-center justify-center h-full text-center px-4">
+          <div class="flex flex-col items-center justify-center h-full text-center px-4 gap-3">
             <FileCode class="w-8 h-8 mb-2" style={{ color: "var(--icon-weak)", opacity: 0.3 }} />
             <div class="text-xs" style={{ color: "var(--text-weak)" }}>
               Binary file cannot be displayed
             </div>
+            <button
+              type="button"
+              class="px-3 py-2 min-h-[44px] rounded border flex items-center gap-2 text-xs font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+              style={{
+                background: "var(--surface-inset)",
+                borderColor: "var(--border-base)",
+                color: "var(--text-base)",
+              }}
+              onClick={() => void handleDownload()}
+              title="Download File"
+              aria-label="Download File"
+            >
+              <Download class="w-3.5 h-3.5" />
+              Download File
+            </button>
           </div>
         </Match>
         <Match when={fileLoaded()}>

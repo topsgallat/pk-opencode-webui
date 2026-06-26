@@ -1,9 +1,10 @@
 import { Component, For, Show } from "solid-js"
-import { X, FileText } from "lucide-solid"
+import { X, FileText, Folder } from "lucide-solid"
 
 export interface FileContext {
   path: string
   key: string
+  kind?: "file" | "directory"
   comment?: string
   selection?: { startLine: number; endLine: number }
   preview?: string
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export const ContextItems: Component<Props> = (props) => {
+  const isFolder = (item: FileContext) => item.kind === "directory"
   const filename = (path: string) => {
     const parts = path.split("/")
     return parts[parts.length - 1]
@@ -41,7 +43,12 @@ export const ContextItems: Component<Props> = (props) => {
               }}
               title={item.path}
             >
-              <FileText class="w-3.5 h-3.5 shrink-0" style={{ color: "var(--icon-weak)" }} />
+              <Show
+                when={isFolder(item)}
+                fallback={<FileText class="w-3.5 h-3.5 shrink-0" style={{ color: "var(--icon-weak)" }} />}
+              >
+                <Folder class="w-3.5 h-3.5 shrink-0" style={{ color: "var(--icon-weak)" }} />
+              </Show>
               <span class="text-xs font-medium whitespace-nowrap" style={{ color: "var(--text-strong)" }}>
                 {truncate(item.path, 16)}
               </span>

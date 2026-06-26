@@ -760,10 +760,37 @@ export function Session() {
     const id = notifyTargetId()
     if (!id) return
     if (typeof window === "undefined" || !("Notification" in window)) return
-    if (browserNotificationStatus() === "denied" || browserNotificationStatus() === "unsupported") return
 
-    setSessionNotifyOverride(id, !notifyEnabled())
-    setNotifyEnabled(!notifyEnabled())
+    if (notifyEnabled()) {
+      setSessionNotifyOverride(id, false)
+      setNotifyEnabled(false)
+      return
+    }
+
+    if (browserNotificationStatus() === "unsupported") return
+
+    if (browserNotificationStatus() === "granted") {
+      setSessionNotifyOverride(id, true)
+      setNotifyEnabled(true)
+      setNotifyDenied(false)
+      return
+    }
+
+    if (browserNotificationStatus() === "denied") {
+      setNotifyDenied(true)
+      return
+    }
+
+    Notification.requestPermission().then((result) => {
+      if (result === "granted") {
+        setSessionNotifyOverride(id, true)
+        setNotifyEnabled(true)
+        setNotifyDenied(false)
+        return
+      }
+
+      if (result === "denied") setNotifyDenied(true)
+    })
   }
 
   // Track whether the agent was genuinely processing (not initial load)
@@ -980,7 +1007,8 @@ export function Session() {
       : [];
 
     const fileCommentParts = item.files.flatMap((file, index) => {
-      if (!file.selection && !file.comment) return [];
+      if (!file.selection && !file.comment && file.kind !== "directory") return [];
+      const label = file.kind === "directory" ? "Folder" : "File";
       const selection = file.selection ? `\nLines: ${file.selection.startLine}-${file.selection.endLine}` : "";
       const note = file.comment ? `\nNote: ${file.comment}` : "";
       const body = file.preview ? `\n\n${file.preview}` : "";
@@ -989,11 +1017,12 @@ export function Session() {
         sessionID: sid,
         messageID: "",
         type: "text" as const,
-        text: `File: ${file.path}${selection}${note}${body}`,
+        text: `${label}: ${file.path}${selection}${note}${body}`,
       }];
     });
 
     const fileParts = item.files.map((file, index) => {
+      if (file.kind === "directory") return null;
       const dir = directory || "";
       const absolute = file.path.startsWith("/")
         ? file.path
@@ -1012,7 +1041,15 @@ export function Session() {
         url: `file://${encoded}`,
         filename,
       };
-    });
+    }).filter((part): part is {
+      id: string;
+      sessionID: string;
+      messageID: string;
+      type: "file";
+      mime: string;
+      url: string;
+      filename: string;
+    } => !!part);
 
     const imageParts = item.images.map((image, index) => {
       const encoded = image.serverPath
@@ -2086,21 +2123,27 @@ export function Session() {
     inputRef?.focus();
   });
 
-  function addFileToContext(path: string, comment?: string, selection?: { startLine: number; endLine: number }, preview?: string) {
+  function addFileToContext(
+    path: string,
+    kind: "file" | "directory" = "file",
+    comment?: string,
+    selection?: { startLine: number; endLine: number },
+    preview?: string,
+  ) {
     if (!comment) {
-      const key = `file:${path}`;
+      const key = `${kind}:${path}`;
       const existing = fileContext().find((f) => f.key === key);
       if (existing) return;
-      setFileContext((prev) => [...prev, { path, key, selection, preview }]);
+      setFileContext((prev) => [...prev, { path, key, kind, selection, preview }]);
       return;
     }
 
-    setFileContext((prev) => [...prev, { path, key: generateUUID(), comment, selection, preview }]);
+    setFileContext((prev) => [...prev, { path, key: generateUUID(), kind, comment, selection, preview }]);
   }
 
   function openFileMention(path: string, options?: { autoAddToContext?: boolean; note?: string }) {
     if (options?.autoAddToContext) {
-      addFileToContext(path, options.note)
+      addFileToContext(path, "file", options.note)
       setInput((prev) => prev || "Please review the attached HTML file before enabling JavaScript in preview.")
       closeFileMention()
       return
@@ -2123,7 +2166,7 @@ export function Session() {
   function submitFileMention(note: string, selection: { startLine: number; endLine: number }, preview: string) {
     const path = mentionPath();
     if (!path) return;
-    addFileToContext(path, note || undefined, selection, preview);
+    addFileToContext(path, "file", note || undefined, selection, preview);
     closeFileMention();
   }
 
@@ -2222,12 +2265,15 @@ export function Session() {
     )[] = [{ type: "text", text: item.text || "" }];
 
     for (const file of item.files) {
-      if (file.selection || file.comment) {
+      const label = file.kind === "directory" ? "Folder" : "File";
+      if (file.selection || file.comment || file.kind === "directory") {
         const selection = file.selection ? `\nLines: ${file.selection.startLine}-${file.selection.endLine}` : "";
         const note = file.comment ? `\nNote: ${file.comment}` : "";
         const body = file.preview ? `\n\n${file.preview}` : "";
-        parts.push({ type: "text", text: `File: ${file.path}${selection}${note}${body}` });
+        parts.push({ type: "text", text: `${label}: ${file.path}${selection}${note}${body}` });
       }
+
+      if (file.kind === "directory") continue;
 
       const dir = directory || "";
       const absolute = file.path.startsWith("/")
@@ -2349,10 +2395,15 @@ export function Session() {
   // Drag & Drop state and handlers
   const [isDragging, setIsDragging] = createSignal(false);
   const [dragMode, setDragMode] = createSignal<"upload" | "mention" | null>(null);
+  const [dragKind, setDragKind] = createSignal<"file" | "directory" | null>(null);
   const [treePreview, setTreePreview] = createSignal<"mention" | null>(null);
   let dragCounter = 0; // Track nested drag events
   const dragLabel = createMemo(() =>
-    (dragMode() ?? treePreview()) === "mention" ? "Drop to mention file" : "Drop files to upload",
+    (dragMode() ?? treePreview()) === "mention"
+      ? dragKind() === "directory"
+        ? "Drop to mention folder"
+        : "Drop to mention file"
+      : "Drop files to upload",
   );
   const dropActive = createMemo(() => dragMode() !== null || isDragging() || treePreview() !== null);
   const dragSurface = "color-mix(in srgb, var(--surface-inset) 90%, var(--interactive-base) 10%)";
@@ -2364,6 +2415,7 @@ export function Session() {
     dragCounter = 0;
     setIsDragging(false);
     setDragMode(null);
+    setDragKind(null);
   }
 
   function clearTreePreview() {
@@ -2372,11 +2424,21 @@ export function Session() {
 
   function getDragMode(e: DragEvent) {
     const types = Array.from(e.dataTransfer?.types ?? []);
-    if (types.includes("Files")) return "upload" as const;
-    if (!types.includes(FILE_TREE_DRAG_DATA)) return null;
+    if (types.includes("Files")) {
+      setDragKind(null);
+      return "upload" as const;
+    }
+    if (!types.includes(FILE_TREE_DRAG_DATA)) {
+      setDragKind(null);
+      return null;
+    }
 
     const kind = e.dataTransfer?.getData(FILE_TREE_KIND_DATA);
-    if (kind !== "file") return null;
+    if (kind !== "file" && kind !== "directory") {
+      setDragKind(null);
+      return null;
+    }
+    setDragKind(kind);
     return "mention" as const;
   }
 
@@ -2427,7 +2489,8 @@ export function Session() {
     if (mode === "mention") {
       const path = e.dataTransfer?.getData(FILE_TREE_DRAG_DATA);
       if (path) {
-        addFileToContext(path);
+        const kind = e.dataTransfer?.getData(FILE_TREE_KIND_DATA) === "directory" ? "directory" : "file";
+        addFileToContext(path, kind);
         requestAnimationFrame(() => inputRef?.focus());
       }
       return;
@@ -2533,6 +2596,7 @@ export function Session() {
     }> = [];
 
     for (const file of files) {
+      if (file.kind === "directory") continue;
       if (file.status === "uploading" || !file.dataUrl) continue;
       const dir = currentDirectory || "";
       const absolute = file.path.startsWith("/")

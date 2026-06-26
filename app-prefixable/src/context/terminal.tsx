@@ -1,8 +1,9 @@
-import { createContext, useContext, createEffect, createSignal, onCleanup, onMount, type ParentProps } from "solid-js"
+import { createContext, useContext, createEffect, createMemo, createSignal, onCleanup, onMount, type ParentProps } from "solid-js"
 import { useParams } from "@solidjs/router"
 import { useSDK } from "./sdk"
 import { useServer } from "./server"
 import { useEvents } from "./events"
+import { useSync } from "./sync"
 import { mkdir } from "../utils/extended-api"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { useClientAuth } from "./client-auth"
@@ -20,7 +21,7 @@ interface TerminalTabRecord {
   title: string
 }
 
-interface TerminalSessionRecord {
+interface TerminalProjectRecord {
   tabs: TerminalTabRecord[]
   version: number
   updatedAt: number
@@ -57,12 +58,16 @@ function terminalNamespace(serverKey: string) {
   return `${TERMINAL_NAMESPACE_PREFIX}.${base64Encode(serverKey)}`
 }
 
-function terminalSessionKey(directory: string, sessionID: string) {
+function terminalProjectKey(projectID: string) {
+  return `project:${projectID}`
+}
+
+function terminalLegacySessionKey(directory: string, sessionID: string) {
   return `session:${base64Encode(directory)}:${sessionID}`
 }
 
-function terminalUIKey(serverKey: string, directory: string, sessionID: string) {
-  return `${TERMINAL_UI_KEY_PREFIX}.${base64Encode(serverKey)}.${base64Encode(directory)}.${sessionID}`
+function terminalUIKey(serverKey: string, directory: string, projectID: string) {
+  return `${TERMINAL_UI_KEY_PREFIX}.${base64Encode(serverKey)}.${base64Encode(directory)}.${projectID}`
 }
 
 function normalizeTab(value: unknown, fallbackTitle: string): TerminalTabRecord | null {
@@ -74,7 +79,7 @@ function normalizeTab(value: unknown, fallbackTitle: string): TerminalTabRecord 
   return { ptyID, title }
 }
 
-function normalizeSessionRecord(value: unknown): TerminalSessionRecord | null {
+function normalizeSessionRecord(value: unknown): TerminalProjectRecord | null {
   if (!value || typeof value !== "object") return null
   const record = value as Record<string, unknown>
   const tabs = Array.isArray(record.tabs)
@@ -130,6 +135,7 @@ export function TerminalProvider(props: ParentProps) {
   const { client, url: serverUrl, targetUrl, directory } = useSDK()
   const server = useServer()
   const events = useEvents()
+  const sync = useSync()
   const auth = useClientAuth()
   const params = useParams<{ id?: string }>()
   const capabilities = () => getServerCapabilities(server.selectedServer())
@@ -139,42 +145,50 @@ export function TerminalProvider(props: ParentProps) {
   const [height, setHeight] = createSignal(280)
   const [error, setError] = createSignal<string | null>(null)
   const [creating, setCreating] = createSignal(false)
-  const [boundSessionID, setBoundSessionID] = createSignal<string | null>(params.id ?? null)
-  const [restoredSessionID, setRestoredSessionID] = createSignal<string | null>(null)
+  const [restoredProjectID, setRestoredProjectID] = createSignal<string | null>(null)
   const [hasStoredRecord, setHasStoredRecord] = createSignal(false)
   const tabID = readTabID()
   const restoreState = { version: 0 }
 
-  function currentSessionID() {
-    return params.id ?? boundSessionID()
-  }
+  const currentSession = createMemo(() => {
+    const id = params.id
+    if (!id) return undefined
+    return sync.session.get(id)
+  })
+
+  const currentProjectID = createMemo(() => currentSession()?.projectID ?? null)
 
   function sessionNamespace() {
     return terminalNamespace(server.serverKey())
   }
 
-  function sessionRecordKey(sessionID: string) {
-    if (!directory) return null
-    return terminalSessionKey(directory, sessionID)
+  function projectRecordKey(projectID: string) {
+    return terminalProjectKey(projectID)
   }
 
-  function sessionUIKey(sessionID: string) {
+  function legacySessionRecordKey(sessionID: string) {
     if (!directory) return null
-    return terminalUIKey(server.serverKey(), directory, sessionID)
+    return terminalLegacySessionKey(directory, sessionID)
   }
 
-  async function loadSessionRecord(sessionID: string) {
-    const key = sessionRecordKey(sessionID)
-    if (!key) return null
+  function projectUIKey(projectID: string) {
+    if (!directory) return null
+    return terminalUIKey(server.serverKey(), directory, projectID)
+  }
+
+  async function loadProjectAndLegacyRecord(projectID: string, sessionID?: string) {
     const data = await loadSettings(serverUrl, sessionNamespace()).catch(() => null)
-    if (!data) return null
-    return normalizeSessionRecord(data[key])
+    if (!data) return { record: null, legacyRecord: null }
+    const record = normalizeSessionRecord(data[projectRecordKey(projectID)])
+    const legacyKey = sessionID ? legacySessionRecordKey(sessionID) : null
+    const legacyRecord = legacyKey ? normalizeSessionRecord(data[legacyKey]) : null
+    return { record, legacyRecord }
   }
 
-  async function saveSessionRecord(sessionID: string, tabs: PTYSession[]) {
-    const key = sessionRecordKey(sessionID)
+  async function saveProjectRecord(projectID: string, tabs: PTYSession[]) {
+    const key = projectRecordKey(projectID)
     if (!key) return
-    const record: TerminalSessionRecord = {
+    const record: TerminalProjectRecord = {
       tabs: tabs.map((tab) => ({ ptyID: tab.id, title: tab.title })),
       version: 1,
       updatedAt: Date.now(),
@@ -183,8 +197,8 @@ export function TerminalProvider(props: ParentProps) {
     setHasStoredRecord(true)
   }
 
-  function persistUIState(sessionID: string) {
-    const key = sessionUIKey(sessionID)
+  function persistUIState(projectID: string) {
+    const key = projectUIKey(projectID)
     if (!key) return
     writeUIState(key, {
       active: active(),
@@ -193,16 +207,20 @@ export function TerminalProvider(props: ParentProps) {
     })
   }
 
-  async function restore(sessionID: string) {
+  async function restore(projectID: string) {
     if (!directory) return
     const version = ++restoreState.version
     setError(null)
     setCreating(false)
-    setRestoredSessionID(null)
+    setRestoredProjectID(null)
+    setHasStoredRecord(false)
+    setSessions([])
+    setActive(null)
+    setOpened(false)
 
     try {
-      const [record, ptys] = await Promise.all([
-        loadSessionRecord(sessionID),
+      const [{ record, legacyRecord }, ptys] = await Promise.all([
+        loadProjectAndLegacyRecord(projectID, params.id),
         client.pty.list({ directory }),
       ])
 
@@ -211,7 +229,8 @@ export function TerminalProvider(props: ParentProps) {
       const live = Array.isArray(ptys.data) ? ptys.data : []
       const liveMap = new Map(live.map((pty) => [pty.id, pty]))
       const nextTabs: PTYSession[] = []
-      const storedTabs = record?.tabs ?? []
+      const sourceRecord = record ?? legacyRecord
+      const storedTabs = sourceRecord?.tabs ?? []
 
       for (const tab of storedTabs) {
         const livePty = liveMap.get(tab.ptyID)
@@ -222,10 +241,10 @@ export function TerminalProvider(props: ParentProps) {
         })
       }
 
-      setHasStoredRecord(!!record)
+      setHasStoredRecord(!!sourceRecord)
       setSessions(nextTabs)
 
-      const ui = readUIState(keyForUI(sessionID))
+      const ui = readUIState(keyForUI(projectID))
       const nextActive = ui?.active && nextTabs.some((tab) => tab.id === ui.active)
         ? ui.active
         : nextTabs[0]?.id ?? null
@@ -233,12 +252,12 @@ export function TerminalProvider(props: ParentProps) {
       setActive(nextActive)
       setOpened(ui?.opened ?? false)
       setHeight(ui?.height ?? 280)
-      setRestoredSessionID(sessionID)
+      setRestoredProjectID(projectID)
 
-      const shouldPersist = !!record && nextTabs.length !== storedTabs.length
-      const titlesChanged = !!record && nextTabs.some((tab, index) => storedTabs[index]?.ptyID !== tab.id || storedTabs[index]?.title !== tab.title)
+      const shouldPersist = !!sourceRecord && nextTabs.length !== storedTabs.length
+      const titlesChanged = !!sourceRecord && nextTabs.some((tab, index) => storedTabs[index]?.ptyID !== tab.id || storedTabs[index]?.title !== tab.title)
       if (shouldPersist || titlesChanged) {
-        void saveSessionRecord(sessionID, nextTabs).catch(() => undefined)
+        void saveProjectRecord(projectID, nextTabs).catch(() => undefined)
       }
     } catch (e) {
       console.error("[Terminal] Failed to restore session:", e)
@@ -248,58 +267,58 @@ export function TerminalProvider(props: ParentProps) {
       setActive(null)
       setOpened(false)
       setHeight(280)
-      setRestoredSessionID(sessionID)
+      setRestoredProjectID(projectID)
     }
   }
 
-  function keyForUI(sessionID: string) {
-    const key = sessionUIKey(sessionID)
+  function keyForUI(projectID: string) {
+    const key = projectUIKey(projectID)
     return key ?? `opencode.terminal.ui.${tabID}`
   }
 
-  function activeSessionID() {
-    return currentSessionID()
+  function activeProjectID() {
+    return currentProjectID()
   }
 
   createEffect(() => {
-    const sessionID = params.id
-    if (!sessionID) return
-    setBoundSessionID(sessionID)
-    void restore(sessionID)
+    const projectID = currentProjectID()
+    if (!projectID) return
+    if (restoredProjectID() === projectID) return
+    void restore(projectID)
   })
 
   createEffect(() => {
-    const sessionID = activeSessionID()
-    const restored = restoredSessionID()
-    if (!sessionID || restored !== sessionID) return
-    persistUIState(sessionID)
+    const projectID = activeProjectID()
+    const restored = restoredProjectID()
+    if (!projectID || restored !== projectID) return
+    persistUIState(projectID)
   })
 
   createEffect(() => {
-    const sessionID = activeSessionID()
-    const restored = restoredSessionID()
-    if (!sessionID || restored !== sessionID) return
+    const projectID = activeProjectID()
+    const restored = restoredProjectID()
+    if (!projectID || restored !== projectID) return
     const tabs = sessions()
     if (!hasStoredRecord() && tabs.length === 0) return
-    void saveSessionRecord(sessionID, tabs).catch(() => undefined)
+    void saveProjectRecord(projectID, tabs).catch(() => undefined)
   })
 
   onMount(() => {
     const unsub = events.subscribe((event) => {
       if (event.type !== "pty.created" && event.type !== "pty.exited" && event.type !== "pty.deleted") return
-      const sessionID = activeSessionID()
-      if (!sessionID) return
-      if (restoredSessionID() !== sessionID) return
-      void restore(sessionID)
+      const projectID = activeProjectID()
+      if (!projectID) return
+      if (restoredProjectID() !== projectID) return
+      void restore(projectID)
     })
 
     onCleanup(unsub)
   })
 
   async function create(cwd?: string): Promise<string | null> {
-    const sessionID = currentSessionID()
-    if (!sessionID) {
-      setError("Open a session before creating a terminal")
+    const projectID = currentProjectID()
+    if (!projectID) {
+      setError("Open a project session before creating a terminal")
       return null
     }
     if (!auth.canReconnect()) {
@@ -327,7 +346,7 @@ export function TerminalProvider(props: ParentProps) {
         setSessions((prev) => [...prev, session])
         setActive(session.id)
         setOpened(true)
-        setRestoredSessionID(sessionID)
+        setRestoredProjectID(projectID)
         setHasStoredRecord(true)
         return session.id
       }
@@ -349,7 +368,7 @@ export function TerminalProvider(props: ParentProps) {
   }
 
   async function close(id: string): Promise<void> {
-    const sessionID = currentSessionID()
+    const projectID = currentProjectID()
     try {
       await client.pty.remove({ ptyID: id })
       setSessions((prev) => prev.filter((s) => s.id !== id))
@@ -360,7 +379,7 @@ export function TerminalProvider(props: ParentProps) {
           setOpened(false)
         }
       }
-      if (sessionID) setRestoredSessionID(sessionID)
+      if (projectID) setRestoredProjectID(projectID)
     } catch (e) {
       console.error("Failed to close PTY:", e)
     }

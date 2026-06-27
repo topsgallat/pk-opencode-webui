@@ -434,7 +434,7 @@ export function FileViewer(props: FileViewerProps) {
               class="px-3 py-2 min-h-[44px] rounded border flex items-center gap-2 text-xs font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5"
               style={{
                 background: "var(--surface-inset)",
-                borderColor: "var(--border-base)",
+                "border-color": "var(--border-base)",
                 color: "var(--text-base)",
               }}
               onClick={() => void handleDownload()}

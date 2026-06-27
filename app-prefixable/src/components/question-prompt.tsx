@@ -147,7 +147,6 @@ export function QuestionPrompt(props: Props) {
       return
     }
 
-    setSubmitting(true)
     pick(text, true)
     setEditing(false)
   }

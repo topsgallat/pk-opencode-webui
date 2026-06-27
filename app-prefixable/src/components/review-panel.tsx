@@ -4,7 +4,9 @@ import {
   createMemo,
   Show,
   onCleanup,
+  onMount,
   For,
+  type JSX,
 } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import * as Diff from "diff";
@@ -14,6 +16,7 @@ import { useFile } from "../context/file";
 import { useEvents } from "../context/events";
 import { useLayout } from "../context/layout";
 import { withTimeout } from "../utils/request-timeout";
+import { base64Encode } from "../utils/path";
 
 import { FileTree } from "./file-tree";
 import { FileViewer } from "./file-viewer";
@@ -23,6 +26,7 @@ import { Spinner } from "./ui/spinner";
 import { ChevronRight, FileCode, GitBranch, RefreshCw, Search, X } from "lucide-solid";
 
 const FILE_SEARCH_TIMEOUT_MS = 30_000;
+const reviewScrollStore = new Map<string, number>();
 
 // Helper to create unified diff patch string
 function createPatch(filename: string, before: string, after: string): string {
@@ -42,6 +46,60 @@ function createPatch(filename: string, before: string, after: string): string {
   return "";
 }
 
+function reviewScrollKey(sessionId: string, tab: "changes" | "all", query: string) {
+  return `review:${sessionId}:${tab}:${query || "__all__"}`;
+}
+
+function ScrollArea(props: { storageKey: string; class: string; style?: JSX.CSSProperties; children: JSX.Element }) {
+  let ref: HTMLDivElement | undefined;
+  let currentKey = "";
+  const [ready, setReady] = createSignal(false);
+
+  onMount(() => {
+    const node = ref;
+    if (!node) return;
+    const handle = () => {
+      if (!currentKey) return;
+      reviewScrollStore.set(currentKey, node.scrollTop);
+    };
+
+    node.addEventListener("scroll", handle, { passive: true });
+    onCleanup(() => {
+      node.removeEventListener("scroll", handle);
+      if (currentKey) reviewScrollStore.set(currentKey, node.scrollTop);
+    });
+
+    setReady(true);
+  });
+
+  createEffect(() => {
+    ready();
+    const node = ref;
+    if (!node) return;
+
+    const key = props.storageKey;
+    if (!currentKey) {
+      currentKey = key;
+      const top = reviewScrollStore.get(key);
+      if (top != null) node.scrollTop = top;
+      return;
+    }
+
+    if (currentKey === key) return;
+
+    reviewScrollStore.set(currentKey, node.scrollTop);
+    currentKey = key;
+    const top = reviewScrollStore.get(key);
+    if (top != null) node.scrollTop = top;
+  });
+
+  return (
+    <div ref={(el) => (ref = el)} class={props.class} style={props.style}>
+      {props.children}
+    </div>
+  );
+}
+
 interface ReviewPanelProps {
   sessionId: string;
   onMentionFile?: (path: string, options?: { autoAddToContext?: boolean; note?: string }) => void;
@@ -54,6 +112,21 @@ export function ReviewPanel(props: ReviewPanelProps) {
   const file = useFile();
   const events = useEvents();
   const layout = useLayout();
+
+  function parentPath(path: string) {
+    const p = path.replace(/\/+$/, "")
+    if (!p || p === "/") return ""
+    const i = p.lastIndexOf("/")
+    if (i < 0) return ""
+    if (i === 0) return "/"
+    return p.slice(0, i)
+  }
+
+  function navigateParentProject() {
+    const parent = directory ? parentPath(directory) : ""
+    if (!parent) return
+    navigate(`/${base64Encode(parent)}/session`)
+  }
 
   const [diffs, setDiffs] = createSignal<FileDiff[]>([]);
   const [selected, setSelected] = createSignal<string | null>(null);
@@ -493,7 +566,8 @@ export function ReviewPanel(props: ReviewPanelProps) {
                 class="flex-1 flex flex-col min-h-0 overflow-hidden"
               >
                 {/* File List */}
-                <div
+                <ScrollArea
+                  storageKey={reviewScrollKey(props.sessionId, "changes", searchQuery())}
                   class="shrink-0 max-h-40 overflow-auto"
                   style={{ "border-bottom": "1px solid var(--border-base)" }}
                 >
@@ -545,8 +619,8 @@ export function ReviewPanel(props: ReviewPanelProps) {
                           allowed={searchQuery() ? filteredDiffFiles() : diffFiles()}
                           kinds={kinds()}
                           active={selected() ?? undefined}
-                          viewKey={searchQuery() ? `changes:${searchQuery()}` : undefined}
-                          onExitProject={() => navigate("/")}
+                          viewKey={`review:${props.sessionId}:changes:${searchQuery() || "__all__"}`}
+                          onNavigateParentProject={navigateParentProject}
                           onFileClick={(node) => handleDiffClick(node.path)}
                           onMentionFile={props.onMentionFile}
                           onMentionFileLine={props.onMentionFileLine}
@@ -554,7 +628,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
                       </div>
                     </Show>
                   </Show>
-                </div>
+                </ScrollArea>
 
                 {/* Diff View */}
                 <div class="flex-1 overflow-auto min-h-0">
@@ -603,16 +677,16 @@ export function ReviewPanel(props: ReviewPanelProps) {
               </Tabs.Content>
 
               {/* All Files Tab */}
-              <Tabs.Content value="all" class="flex-1 overflow-auto min-h-0">
-                <div class="p-2">
+              <Tabs.Content value="all" class="flex-1 min-h-0">
+                <div class="p-2 h-full">
                   <FileTree
                     path=""
                     allowed={searchQuery() ? searchResults() : undefined}
                     modified={diffFiles()}
                     kinds={kinds()}
                     active={selected() ?? undefined}
-                    viewKey={searchQuery() ? `all:${searchQuery()}` : undefined}
-                    onExitProject={() => navigate("/")}
+                    viewKey={`review:${props.sessionId}:all:${searchQuery() || "__all__"}`}
+                    onNavigateParentProject={navigateParentProject}
                     onFileClick={handleFileClick}
                     onMentionFile={props.onMentionFile}
                     onMentionFileLine={props.onMentionFileLine}

@@ -364,19 +364,30 @@ export function MessageTimeline(props: {
                 const entry = () => timelineTurnById().get(id)
                 return (
                   <Show when={entry()}>
-                    {(item) => (
-                      <MessageTurn
-                        turn={item().turn}
-                        queueState={item().queueState}
-                        now={now}
-                        expanded={expanded()[item().turn.id] ?? (item().kind === "real" ? (props.processing && item().turn.id === visibleActiveTurnId()) || (!props.processing && item().isLastRealTurn) : true)}
-                        streaming={props.processing && item().kind === "real" && item().turn.id === visibleActiveTurnId()}
-                        onToggle={handleToggle}
-                        onDeleteQueued={props.onDeleteQueuedTurn}
-                        onRetry={props.onRetry}
-                        onOpenFile={props.onOpenFile}
-                      />
-                    )}
+                    {(item) => {
+                      const current = item()
+                      const isReal = current.kind === "real"
+                      const realExpanded = props.processing && current.turn.id === visibleActiveTurnId()
+                      let defaultExpanded = expanded()[current.turn.id] ?? true
+
+                      if (isReal) {
+                        defaultExpanded = expanded()[current.turn.id] ?? (realExpanded || (!props.processing && current.isLastRealTurn))
+                      }
+
+                      return (
+                        <MessageTurn
+                          turn={current.turn}
+                          queueState={current.queueState}
+                          now={now}
+                          expanded={defaultExpanded}
+                          streaming={props.processing && isReal && current.turn.id === visibleActiveTurnId()}
+                          onToggle={handleToggle}
+                          onDeleteQueued={props.onDeleteQueuedTurn}
+                          onRetry={props.onRetry}
+                          onOpenFile={props.onOpenFile}
+                        />
+                      )
+                    }}
                   </Show>
                 )
               }}

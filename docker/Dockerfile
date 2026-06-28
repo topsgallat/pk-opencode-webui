@@ -141,7 +141,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN npm install -g playwright && npx playwright install chromium
 
 ENV HOME=/home/opencode
-ENV XDG_CACHE_HOME=/home/opencode/.cache
+ENV PATH=$HOME/.local/bin:$PATH
+ENV XDG_CACHE_HOME=$HOME/.cache
 ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/lib/playwright
 ENV CHROMIUM_FLAGS="--no-sandbox --disable-gpu --headless"
 RUN ln -sf $(which chromium || which chromium-browser) /usr/bin/google-chrome 2>/dev/null || true

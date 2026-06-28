@@ -402,7 +402,6 @@ export function ReviewPanel(props: ReviewPanelProps) {
           classList={{ hidden: activeTab() !== null }}
         >
           {/* Review Tab Content */}
-          <>
             {/* Header */}
             <div
               class="flex items-center justify-between px-3 py-2 shrink-0"
@@ -620,7 +619,6 @@ export function ReviewPanel(props: ReviewPanelProps) {
                 </div>
               </Tabs.Content>
             </Tabs>
-          </>
         </div>
 
         <div

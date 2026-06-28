@@ -4,9 +4,7 @@ import {
   createMemo,
   Show,
   onCleanup,
-  onMount,
   For,
-  type JSX,
 } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import * as Diff from "diff";
@@ -26,7 +24,6 @@ import { Spinner } from "./ui/spinner";
 import { ChevronRight, FileCode, GitBranch, RefreshCw, Search, X } from "lucide-solid";
 
 const FILE_SEARCH_TIMEOUT_MS = 30_000;
-const reviewScrollStore = new Map<string, number>();
 
 // Helper to create unified diff patch string
 function createPatch(filename: string, before: string, after: string): string {
@@ -44,60 +41,6 @@ function createPatch(filename: string, before: string, after: string): string {
   }
   // Fallback: return empty patch (shouldn't happen)
   return "";
-}
-
-function reviewScrollKey(sessionId: string, tab: "changes" | "all", query: string) {
-  return `review:${sessionId}:${tab}:${query || "__all__"}`;
-}
-
-function ScrollArea(props: { storageKey: string; class: string; style?: JSX.CSSProperties; children: JSX.Element }) {
-  let ref: HTMLDivElement | undefined;
-  let currentKey = "";
-  const [ready, setReady] = createSignal(false);
-
-  onMount(() => {
-    const node = ref;
-    if (!node) return;
-    const handle = () => {
-      if (!currentKey) return;
-      reviewScrollStore.set(currentKey, node.scrollTop);
-    };
-
-    node.addEventListener("scroll", handle, { passive: true });
-    onCleanup(() => {
-      node.removeEventListener("scroll", handle);
-      if (currentKey) reviewScrollStore.set(currentKey, node.scrollTop);
-    });
-
-    setReady(true);
-  });
-
-  createEffect(() => {
-    ready();
-    const node = ref;
-    if (!node) return;
-
-    const key = props.storageKey;
-    if (!currentKey) {
-      currentKey = key;
-      const top = reviewScrollStore.get(key);
-      if (top != null) node.scrollTop = top;
-      return;
-    }
-
-    if (currentKey === key) return;
-
-    reviewScrollStore.set(currentKey, node.scrollTop);
-    currentKey = key;
-    const top = reviewScrollStore.get(key);
-    if (top != null) node.scrollTop = top;
-  });
-
-  return (
-    <div ref={(el) => (ref = el)} class={props.class} style={props.style}>
-      {props.children}
-    </div>
-  );
 }
 
 interface ReviewPanelProps {
@@ -453,26 +396,28 @@ export function ReviewPanel(props: ReviewPanelProps) {
       </div>
 
       {/* Content: Either Review tab or File Viewer */}
-      <Show
-        when={activeTab() !== null}
-        fallback={
-          /* Review Tab Content */
+      <div class="flex flex-col flex-1 min-h-0 relative">
+        <div
+          class="flex flex-col flex-1 min-h-0 overflow-hidden"
+          classList={{ hidden: activeTab() !== null }}
+        >
+          {/* Review Tab Content */}
           <>
             {/* Header */}
             <div
               class="flex items-center justify-between px-3 py-2 shrink-0"
               style={{ "border-bottom": "1px solid var(--border-base)" }}
             >
-                <div class="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      void file.tree.refresh()
-                      void loadDiffs()
-                    }}
-                    class="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                    style={{ color: "var(--icon-weak)" }}
-                    title="Refresh"
-                  >
+              <div class="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    void file.tree.refresh()
+                    void loadDiffs()
+                  }}
+                  class="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  style={{ color: "var(--icon-weak)" }}
+                  title="Refresh"
+                >
                   <RefreshCw
                     class="w-3.5 h-3.5"
                     classList={{ "animate-spin": loading() }}
@@ -489,11 +434,11 @@ export function ReviewPanel(props: ReviewPanelProps) {
             </div>
 
             {/* Tabs for Changed Files / All Files */}
-              <Tabs
+            <Tabs
               variant="pill"
               value={tab()}
               onChange={(value) => {
-                setTab(value as "changes" | "all");
+                setTab(value as "changes" | "all")
               }}
               class="flex flex-col flex-1 min-h-0"
             >
@@ -502,11 +447,11 @@ export function ReviewPanel(props: ReviewPanelProps) {
                 style={{ "border-bottom": "1px solid var(--border-base)" }}
               >
                 <Tabs.List class="flex gap-1" style={{ color: "var(--text-strong)" }}>
-                    <Tabs.Trigger
-                      value="changes"
-                      class="flex-1"
-                      classes={{ button: "w-full text-xs py-1" }}
-                    >
+                  <Tabs.Trigger
+                    value="changes"
+                    class="flex-1"
+                    classes={{ button: "w-full text-xs py-1" }}
+                  >
                     {count()} {count() === 1 ? "Change" : "Changes"}
                   </Tabs.Trigger>
                   <Tabs.Trigger
@@ -515,8 +460,8 @@ export function ReviewPanel(props: ReviewPanelProps) {
                     classes={{ button: "w-full text-xs py-1" }}
                   >
                     All Files
-                    </Tabs.Trigger>
-                  </Tabs.List>
+                  </Tabs.Trigger>
+                </Tabs.List>
               </div>
 
               <div
@@ -566,18 +511,14 @@ export function ReviewPanel(props: ReviewPanelProps) {
                 class="flex-1 flex flex-col min-h-0 overflow-hidden"
               >
                 {/* File List */}
-                <ScrollArea
-                  storageKey={reviewScrollKey(props.sessionId, "changes", searchQuery())}
+                <div
                   class="shrink-0 max-h-40 overflow-auto"
                   style={{ "border-bottom": "1px solid var(--border-base)" }}
                 >
                   <Show when={loading() && diffs().length === 0}>
                     <div class="flex items-center justify-center gap-2 p-4">
                       <Spinner class="w-4 h-4" />
-                      <span
-                        class="text-xs"
-                        style={{ color: "var(--text-weak)" }}
-                      >
+                      <span class="text-xs" style={{ color: "var(--text-weak)" }}>
                         Loading changes...
                       </span>
                     </div>
@@ -586,23 +527,14 @@ export function ReviewPanel(props: ReviewPanelProps) {
                     <Show
                       when={count() > 0}
                       fallback={
-                        <div
-                          class="p-4 text-center text-xs"
-                          style={{ color: "var(--text-weak)" }}
-                        >
+                        <div class="p-4 text-center text-xs" style={{ color: "var(--text-weak)" }}>
                           <Show
                             when={isGitRepo() === true}
                             fallback={
                               <div class="flex flex-col items-center gap-2">
-                                <GitBranch
-                                  class="w-5 h-5"
-                                  style={{ opacity: 0.5 }}
-                                />
+                                <GitBranch class="w-5 h-5" style={{ opacity: 0.5 }} />
                                 <span>Not a Git repository</span>
-                                <span
-                                  class="text-[10px]"
-                                  style={{ opacity: 0.7 }}
-                                >
+                                <span class="text-[10px]" style={{ opacity: 0.7 }}>
                                   Initialize Git to track changes
                                 </span>
                               </div>
@@ -619,7 +551,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
                           allowed={searchQuery() ? filteredDiffFiles() : diffFiles()}
                           kinds={kinds()}
                           active={selected() ?? undefined}
-                          viewKey={`review:${props.sessionId}:changes:${searchQuery() || "__all__"}`}
+                          viewKey={searchQuery() ? `changes:${searchQuery()}` : undefined}
                           onNavigateParentProject={navigateParentProject}
                           onFileClick={(node) => handleDiffClick(node.path)}
                           onMentionFile={props.onMentionFile}
@@ -628,7 +560,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
                       </div>
                     </Show>
                   </Show>
-                </ScrollArea>
+                </div>
 
                 {/* Diff View */}
                 <div class="flex-1 overflow-auto min-h-0">
@@ -640,10 +572,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
                           class="w-8 h-8 mb-2"
                           style={{ color: "var(--icon-weak)", opacity: 0.3 }}
                         />
-                        <span
-                          class="text-xs"
-                          style={{ color: "var(--text-weak)" }}
-                        >
+                        <span class="text-xs" style={{ color: "var(--text-weak)" }}>
                           {count() > 0
                             ? "Select a file to view changes"
                             : "No changes in this session"}
@@ -653,10 +582,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
                   >
                     {(diff) => (
                       <div class="p-2">
-                        <div
-                          class="rounded overflow-hidden"
-                          style={{ border: "1px solid var(--border-base)" }}
-                        >
+                        <div class="rounded overflow-hidden" style={{ border: "1px solid var(--border-base)" }}>
                           <div
                             class="px-3 py-1.5 text-xs truncate"
                             style={{
@@ -677,15 +603,15 @@ export function ReviewPanel(props: ReviewPanelProps) {
               </Tabs.Content>
 
               {/* All Files Tab */}
-              <Tabs.Content value="all" class="flex-1 min-h-0">
-                <div class="p-2 h-full">
+              <Tabs.Content value="all" class="flex-1 overflow-auto min-h-0">
+                <div class="p-2">
                   <FileTree
                     path=""
                     allowed={searchQuery() ? searchResults() : undefined}
                     modified={diffFiles()}
                     kinds={kinds()}
                     active={selected() ?? undefined}
-                    viewKey={`review:${props.sessionId}:all:${searchQuery() || "__all__"}`}
+                    viewKey={searchQuery() ? `all:${searchQuery()}` : undefined}
                     onNavigateParentProject={navigateParentProject}
                     onFileClick={handleFileClick}
                     onMentionFile={props.onMentionFile}
@@ -695,10 +621,13 @@ export function ReviewPanel(props: ReviewPanelProps) {
               </Tabs.Content>
             </Tabs>
           </>
-        }
-      >
-        {/* File Viewer Content */}
-        <div class="flex flex-col flex-1 min-h-0 relative">
+        </div>
+
+        <div
+          class="flex flex-col flex-1 min-h-0 relative"
+          classList={{ hidden: activeTab() === null }}
+        >
+          {/* File Viewer Content */}
           <div
             class="flex items-center justify-end px-2 py-1 shrink-0"
             style={{ "border-bottom": "1px solid var(--border-base)" }}
@@ -711,9 +640,9 @@ export function ReviewPanel(props: ReviewPanelProps) {
               <ChevronRight class="w-4 h-4" />
             </button>
           </div>
-            <FileViewer path={activeTab()!} onMentionFile={props.onMentionFile} onMentionFileLine={props.onMentionFileLine} />
+          <FileViewer path={activeTab()!} onMentionFile={props.onMentionFile} onMentionFileLine={props.onMentionFileLine} />
         </div>
-      </Show>
+      </div>
     </div>
   );
 }

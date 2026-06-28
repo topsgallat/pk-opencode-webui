@@ -90,13 +90,13 @@ import { useDevice } from "../context/device";
 import { MobileLayout } from "./mobile-layout";
 import { getServerCapabilities } from "../utils/server-capabilities";
 import { errorMessage, withTimeout } from "../utils/request-timeout";
+import { MAX_PINNED, loadPinnedSessionIds, savePinnedSessionIds } from "../utils/session-pins";
+import { getServerUrl } from "../utils/path";
 
 // Storage keys
 const PROJECTS_STORAGE_KEY = "opencode.projects";
 const SIDEBAR_EXPANDED_KEY = "opencode.sidebarExpanded";
 const SHOW_ARCHIVED_KEY = "opencode.showArchived";
-const PINNED_SESSIONS_PREFIX = "opencode.pinnedSessions.";
-const MAX_PINNED = 10;
 const SESSION_LIST_TIMEOUT_MS = 12_000;
 
 // Group sessions by date bucket
@@ -288,9 +288,10 @@ export function Layout(props: ParentProps) {
   const [promptDropdownIndex, setPromptDropdownIndex] = createSignal(0);
   const [confirmArchiveSession, setConfirmArchiveSession] = createSignal<Session | null>(null);
   const [pinnedIds, setPinnedIds] = createSignal<string[]>([]);
+  const pinnedLoadState = { id: 0 };
+  const pinnedSaveState = { promise: Promise.resolve() };
   const sidebarExpandedKey = createMemo(() => `${SIDEBAR_EXPANDED_KEY}.${server.serverKey()}`);
   const showArchivedKey = createMemo(() => `${SHOW_ARCHIVED_KEY}.${server.serverKey()}`);
-  const pinnedSessionsKey = createMemo(() => `${PINNED_SESSIONS_PREFIX}${server.serverKey()}.${directory ?? "global"}`);
   const selectedServerLabel = createMemo(() => server.selectedServer()?.name || server.selectedServer()?.url || "Server");
 
   // Search state
@@ -338,7 +339,25 @@ export function Layout(props: ParentProps) {
     void loadSessions();
   }, { defer: true }));
 
-  // Load state from storage
+  function refreshPinnedIds() {
+    const loadId = ++pinnedLoadState.id;
+    const serverKey = server.serverKey();
+    void loadPinnedSessionIds(getServerUrl(), serverKey, directory)
+      .then((ids) => {
+        if (loadId === pinnedLoadState.id) setPinnedIds(ids);
+      })
+      .catch((e: unknown) => {
+        if (loadId === pinnedLoadState.id) setPinnedIds([]);
+        console.error("Failed to load pinned sessions state:", e);
+      });
+  }
+
+  createEffect(() => {
+    server.serverKey();
+    directory;
+    refreshPinnedIds();
+  });
+
   onMount(() => {
 
     // Load sidebar state - default to open when a project is active
@@ -364,25 +383,27 @@ export function Layout(props: ParentProps) {
       console.error("Failed to load show archived state:", e);
     }
 
-    // Load pinned sessions for current directory
-    if (directory) {
-      try {
-        const stored = localStorage.getItem(pinnedSessionsKey());
-        if (stored) {
-          const parsed = JSON.parse(stored) as string[];
-          if (Array.isArray(parsed)) setPinnedIds(parsed.slice(0, MAX_PINNED));
-        }
-      } catch (e) {
-        console.error("Failed to load pinned sessions state:", e);
-      }
+    function handleFocus() {
+      refreshPinnedIds();
     }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") refreshPinnedIds();
+    }
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // Resize listener for responsive sidebar
     function handleResize() {
       setWindowWidth(window.innerWidth);
     }
     window.addEventListener("resize", handleResize);
-    onCleanup(() => window.removeEventListener("resize", handleResize));
+    onCleanup(() => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("resize", handleResize);
+    });
   });
 
   function toggleSidebar() {
@@ -407,12 +428,13 @@ export function Layout(props: ParentProps) {
 
   function savePinnedIds(ids: string[]) {
     setPinnedIds(ids);
-    if (!directory) return;
-    try {
-      localStorage.setItem(pinnedSessionsKey(), JSON.stringify(ids));
-    } catch (e) {
-      console.error("Failed to save pinned session IDs:", e);
-    }
+    const serverKey = server.serverKey();
+    pinnedSaveState.promise = pinnedSaveState.promise
+      .catch(() => undefined)
+      .then(() => savePinnedSessionIds(getServerUrl(), serverKey, directory, ids))
+      .catch((e: unknown) => {
+        console.error("Failed to save pinned session IDs:", e);
+      });
   }
 
   function pinSession(id: string) {
@@ -2080,7 +2102,15 @@ export function Layout(props: ParentProps) {
         onClose={() => setProjectDialogOpen(false)}
         onSelect={handleProjectSelect}
       />
-      <Show when={!device.isMobile()} fallback={<MobileLayout onOpenProject={() => setProjectDialogOpen(true)}>{props.children}</MobileLayout>}>
+      <Show when={!device.isMobile()} fallback={
+        <MobileLayout
+          onOpenProject={() => setProjectDialogOpen(true)}
+          unseenSessionIds={() => unseenSessions()}
+          unseenProjectCount={() => unseenProjectCount()}
+        >
+          {props.children}
+        </MobileLayout>
+      }>
         <div
           class="flex h-screen w-full"
           style={{ background: "var(--background-stronger)" }}

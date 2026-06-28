@@ -53,8 +53,14 @@ import { sessionHasQuestion, buildChildMap } from "../utils/session-tree-request
 import { useServer } from "../context/server"
 import { getServerKey, type ServerConfig } from "../utils/servers"
 import { suggestSessionTitle } from "../utils/ai-rename"
+import { MAX_PINNED, loadPinnedSessionIds, savePinnedSessionIds } from "../utils/session-pins"
+import { getServerUrl } from "../utils/path"
 
-export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }) {
+export function MobileLayout(props: ParentProps & {
+    onOpenProject?: () => void
+    unseenSessionIds?: () => Set<string>
+    unseenProjectCount?: () => number
+}) {
     const { client, directory } = useSDK()
     const events = useEvents()
     const sync = useSync()
@@ -85,29 +91,36 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     const [renameError, setRenameError] = createSignal<{ id: string; msg: string } | null>(null)
     const renameErrorTimer = { id: undefined as ReturnType<typeof setTimeout> | undefined }
 
-    function loadStoredPinnedIds(storeKey: string): string[] {
-        try {
-            const stored = localStorage.getItem(storeKey)
-            if (stored) {
-                const parsed = JSON.parse(stored) as string[]
-                if (Array.isArray(parsed)) return parsed.slice(0, 10)
-            }
-        } catch { /* ignore */ }
-        return []
+    const [pinnedIds, setPinnedIds] = createSignal<string[]>([])
+    const pinnedLoadState = { id: 0 }
+    const pinnedSaveState = { promise: Promise.resolve() }
+
+    function refreshPinnedIds() {
+        const loadId = ++pinnedLoadState.id
+        const serverKey = server.serverKey()
+        void loadPinnedSessionIds(getServerUrl(), serverKey, directory)
+            .then((ids) => {
+                if (loadId === pinnedLoadState.id) setPinnedIds(ids)
+            })
+            .catch((e: unknown) => {
+                if (loadId === pinnedLoadState.id) setPinnedIds([])
+                console.error("Failed to load pinned sessions state:", e)
+            })
     }
-    const pinnedStoreKey = () => `opencode.pinnedSessions.${server.serverKey()}.${directory ?? "global"}`
-    const [pinnedIds, setPinnedIds] = createSignal<string[]>(loadStoredPinnedIds(pinnedStoreKey()))
 
     function savePinnedIds(ids: string[]) {
         setPinnedIds(ids)
-        if (!directory) return
-        try {
-            localStorage.setItem(pinnedStoreKey(), JSON.stringify(ids))
-        } catch { /* ignore */ }
+        const serverKey = server.serverKey()
+        pinnedSaveState.promise = pinnedSaveState.promise
+            .catch(() => undefined)
+            .then(() => savePinnedSessionIds(getServerUrl(), serverKey, directory, ids))
+            .catch((e: unknown) => {
+                console.error("Failed to save pinned session IDs:", e)
+            })
     }
 
     function pinSession(id: string) {
-        if (pinnedIds().includes(id) || pinnedIds().length >= 10) return
+        if (pinnedIds().includes(id) || pinnedIds().length >= MAX_PINNED) return
         savePinnedIds([...pinnedIds(), id])
     }
 
@@ -207,16 +220,27 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     })
 
     createEffect(() => {
-        const key = server.serverKey()
-        if (!key) return
+        server.serverKey()
+        directory
         setShowProjectHistory(false)
         setHistoryProjects([])
         setShowServerSheet(false)
-        setPinnedIds(loadStoredPinnedIds(pinnedStoreKey()))
+        refreshPinnedIds()
     })
 
     onMount(() => {
         loadRootSessions()
+
+        function handleFocus() {
+            refreshPinnedIds()
+        }
+
+        function handleVisibilityChange() {
+            if (document.visibilityState === "visible") refreshPinnedIds()
+        }
+
+        window.addEventListener("focus", handleFocus)
+        document.addEventListener("visibilitychange", handleVisibilityChange)
         
         const dir = directory
         if (dir) {
@@ -229,6 +253,11 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                 }
             }
         }
+
+        onCleanup(() => {
+            window.removeEventListener("focus", handleFocus)
+            document.removeEventListener("visibilitychange", handleVisibilityChange)
+        })
     })
 
     createEffect(() => {
@@ -285,6 +314,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
     async function deleteSession(session: Session) {
         try {
             await client.session.delete({ sessionID: session.id })
+            unpinSession(session.id)
             setSessions((prev) => prev.filter((s) => s.id !== session.id))
             setMenuSession(null)
             // If deleting the currently active session, go to session list
@@ -303,6 +333,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                 sessionID: session.id,
                 time: { archived: Date.now() },
             })
+            unpinSession(session.id)
             setMenuSession(null)
             loadRootSessions()
         } catch (e) {
@@ -330,14 +361,34 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
         return list.filter((s) => (s.title || "").toLowerCase().includes(q))
     })
 
+    const pinnedSessions = createMemo(() => {
+        if (showArchived()) return []
+        const ids = pinnedIds()
+        if (!ids.length) return []
+        const list = filteredSessions()
+        return ids
+            .map((id) => list.find((s) => s.id === id))
+            .filter((s): s is Session => !!s)
+    })
+
+    const unpinnedSessions = createMemo(() => {
+        if (showArchived()) return filteredSessions()
+        const pins = new Set(pinnedIds())
+        return filteredSessions().filter((s) => !pins.has(s.id))
+    })
+
     const groupedSessions = createMemo(() =>
-        groupSessionsByDate(filteredSessions(), new Date())
+        groupSessionsByDate(unpinnedSessions(), new Date())
     )
 
     const childMap = createMemo(() => buildChildMap(sync.sessions()))
 
     function isActive(id: string) {
         return location.pathname.includes(id)
+    }
+
+    function hasUnseen(id: string) {
+        return props.unseenSessionIds?.().has(id) ?? false
     }
 
     // Session status icon
@@ -371,8 +422,15 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                         aria-label="Switch Project"
                     >
                         <OpenCodeLogo class="w-5 h-5 shrink-0 rounded" />
-                        <span class="font-semibold text-sm truncate" style={{ color: "var(--text-strong)" }}>
-                            {projectName() || "Select Project..."}
+                        <span class="flex items-center gap-1 min-w-0">
+                            <span class="font-semibold text-sm truncate" style={{ color: "var(--text-strong)" }}>
+                                {projectName() || "Select Project..."}
+                            </span>
+                            <Show when={(props.unseenProjectCount?.() ?? 0) > 0}>
+                                <span class="shrink-0 px-1.5 rounded-full text-[10px] font-semibold leading-4" style={{ background: "var(--status-success-text)", color: "white" }}>
+                                    {props.unseenProjectCount!()}
+                                </span>
+                            </Show>
                         </span>
                         <ChevronDown class="w-4 h-4 shrink-0" style={{ color: "var(--icon-weak)" }} />
                     </button>
@@ -456,6 +514,54 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                                 </span>
                             </div>
                         }>
+                            <Show when={!showArchived() && pinnedSessions().length > 0}>
+                                <div>
+                                    <div
+                                        class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider sticky top-0 z-10"
+                                        style={{ color: "var(--text-weak)", background: "var(--background-stronger)" }}
+                                    >
+                                        Pinned
+                                    </div>
+                                    <For each={pinnedSessions()}>
+                                        {(session) => (
+                                            <div
+                                                class="mobile-session-item"
+                                                style={{
+                                                    background: isActive(session.id) ? "var(--surface-inset)" : "transparent",
+                                                }}
+                                                onClick={() => navigateToSession(session.id)}
+                                            >
+                                                <span class="shrink-0" style={{ color: "var(--icon-weak)" }}>
+                                                    <SessionIcon session={session} />
+                                                </span>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="flex items-center gap-1 min-w-0">
+                                                        <div
+                                                            class="text-sm truncate min-w-0"
+                                                            style={{ color: isActive(session.id) ? "var(--text-interactive-base)" : "var(--text-base)" }}
+                                                        >
+                                                            {session.title || "Untitled"}
+                                                        </div>
+                                                        <Show when={hasUnseen(session.id)}>
+                                                            <span class="shrink-0 w-2 h-2 rounded-full" style={{ background: "var(--status-success-text)" }} />
+                                                        </Show>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        setMenuSession(menuSession()?.id === session.id ? null : session)
+                                                    }}
+                                                    class="p-2 -mr-2 shrink-0"
+                                                    style={{ color: "var(--icon-weak)" }}
+                                                >
+                                                    <MoreHorizontal class="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </For>
+                                </div>
+                            </Show>
                             <For each={groupedSessions()}>
                                 {(group) => (
                                     <div>
@@ -478,11 +584,16 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                                                         <SessionIcon session={session} />
                                                     </span>
                                                     <div class="flex-1 min-w-0">
-                                                        <div
-                                                            class="text-sm truncate"
-                                                            style={{ color: isActive(session.id) ? "var(--text-interactive-base)" : "var(--text-base)" }}
-                                                        >
-                                                            {session.title || "Untitled"}
+                                                        <div class="flex items-center gap-1 min-w-0">
+                                                            <div
+                                                                class="text-sm truncate min-w-0"
+                                                                style={{ color: isActive(session.id) ? "var(--text-interactive-base)" : "var(--text-base)" }}
+                                                            >
+                                                                {session.title || "Untitled"}
+                                                            </div>
+                                                            <Show when={hasUnseen(session.id)}>
+                                                                <span class="shrink-0 w-2 h-2 rounded-full" style={{ background: "var(--status-success-text)" }} />
+                                                            </Show>
                                                         </div>
                                                     </div>
                                                     <button
@@ -570,7 +681,7 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                                     </div>
                                 </Show>
                                 <div style={{ "border-top": "1px solid var(--border-base)" }}>
-                                    <Show when={!showArchived()}>
+                                    <Show when={!showArchived() && (pinnedIds().includes(session().id) || pinnedIds().length < MAX_PINNED)}>
                                         <button
                                             class="w-full flex items-center gap-3 px-4 py-3.5 text-sm"
                                             style={{ color: "var(--text-base)" }}
@@ -762,7 +873,14 @@ export function MobileLayout(props: ParentProps & { onOpenProject?: () => void }
                         void loadRootSessions()
                     }}
                 >
-                    <ChevronDown class="w-5 h-5" />
+                    <span class="relative inline-flex items-center justify-center">
+                        <ChevronDown class="w-5 h-5" />
+                        <Show when={(props.unseenProjectCount?.() ?? 0) > 0}>
+                            <span class="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-full text-[9px] font-semibold flex items-center justify-center" style={{ background: "var(--status-success-text)", color: "white" }}>
+                                {props.unseenProjectCount!()}
+                            </span>
+                        </Show>
+                    </span>
                     <span>Sessions</span>
                 </button>
                 <button

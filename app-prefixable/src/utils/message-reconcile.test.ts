@@ -20,6 +20,13 @@ function assistantMessage(id: string, text: string, completed?: number): SyncMes
   }
 }
 
+function assistantMessageAt(id: string, text: string, created: number, completed?: number): SyncMessageLike {
+  return {
+    info: { id, role: "assistant", time: { created, completed } },
+    parts: [textPart(`${id}-part`, text)],
+  }
+}
+
 describe("projectDisplayMessages", () => {
   test("reuses unchanged projected messages by id", () => {
     const raw = [userMessage("u1", "hello"), assistantMessage("a1", "world")]
@@ -41,6 +48,17 @@ describe("projectDisplayMessages", () => {
 
     expect(second[0]).toBe(first[0])
     expect(second[1]).not.toBe(first[1])
+  })
+
+  test("does not reuse a row when the same parts array reference is mutated with new text", () => {
+    const assistant = assistantMessage("a1", "world")
+    const first = projectDisplayMessages([], [assistant])
+
+    assistant.parts[0] = textPart("a1-part", "world!")
+    const second = projectDisplayMessages(first, [assistant])
+
+    expect(second[0]).not.toBe(first[0])
+    expect((second[0].parts[0] as Part & { text: string }).text).toBe("world!")
   })
 })
 
@@ -97,6 +115,57 @@ describe("mergeOptimisticMessage", () => {
     expect(first.slice(-2).map((message) => message.id)).toEqual(["temp-1", "temp-2"])
     expect(second).toHaveLength(2)
     expect(second[1].id).toBe("temp-2")
+  })
+
+  test("inserts the active optimistic user before trailing incomplete assistant stream messages", () => {
+    const optimisticItem = optimistic("temp-2", "pending two", 2)
+    const sync = projectDisplayMessages([], [
+      userMessage("u1", "hello"),
+      assistantMessageAt("a1", "done", 1, 5),
+      assistantMessageAt("a2", "stream", 2),
+    ])
+
+    const merged = mergeOptimisticMessage([], sync, [optimisticItem])
+    const turns = reconcileTurns([], merged)
+
+    expect(merged.map((message) => message.id)).toEqual(["u1", "a1", "temp-2", "a2"])
+    expect(turns).toHaveLength(2)
+    expect(turns[1].userMessage.id).toBe("temp-2")
+    expect(turns[1].assistantMessages.map((message) => message.id)).toEqual(["a2"])
+  })
+
+  test("keeps the optimistic user before a trailing completed assistant when the echo still has not arrived", () => {
+    const optimisticItem = optimistic("temp-2", "pending two", 4)
+    const sync = projectDisplayMessages([], [
+      userMessage("u1", "hello"),
+      assistantMessageAt("a1", "done", 1, 5),
+      assistantMessageAt("a2", "finished before echo", 4, 9),
+    ])
+
+    const merged = mergeOptimisticMessage([], sync, [optimisticItem])
+    const turns = reconcileTurns([], merged)
+
+    expect(merged.map((message) => message.id)).toEqual(["u1", "a1", "temp-2", "a2"])
+    expect(turns[1].userMessage.id).toBe("temp-2")
+    expect(turns[1].assistantMessages.map((message) => message.id)).toEqual(["a2"])
+  })
+
+  test("does not steal an already-attached live assistant from an echoed user when a newer prompt is queued", () => {
+    const optimisticItem = optimistic("temp-3", "queued next", 3)
+    const sync = projectDisplayMessages([], [
+      userMessage("u1", "hello"),
+      assistantMessageAt("a1", "done", 1, 5),
+      userMessage("u2", "echoed current"),
+      assistantMessageAt("a2", "still streaming", 2),
+    ])
+
+    const merged = mergeOptimisticMessage([], sync, [optimisticItem])
+    const turns = reconcileTurns([], merged)
+
+    expect(merged.map((message) => message.id)).toEqual(["u1", "a1", "u2", "a2", "temp-3"])
+    expect(turns[1].userMessage.id).toBe("u2")
+    expect(turns[1].assistantMessages.map((message) => message.id)).toEqual(["a2"])
+    expect(turns[2].userMessage.id).toBe("temp-3")
   })
 
   test("finds the backend echo for the accepted optimistic item", () => {

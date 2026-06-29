@@ -35,6 +35,14 @@ function sameAssistantMeta(prev: DisplayMessage, next: SyncMessageLike["info"]) 
   )
 }
 
+function sameProjectedParts(prev: Part[], next: Part[]) {
+  return JSON.stringify(comparableParts(prev)) === JSON.stringify(comparableParts(next))
+}
+
+function cloneParts(parts: Part[]) {
+  return parts.map((part) => ({ ...part }))
+}
+
 export function projectDisplayMessages(prev: DisplayMessage[], messages: SyncMessageLike[]) {
   const prevById = new Map(prev.map((message) => [message.id, message]))
 
@@ -45,7 +53,7 @@ export function projectDisplayMessages(prev: DisplayMessage[], messages: SyncMes
     if (
       existing &&
       existing.role === info.role &&
-      existing.parts === message.parts &&
+      sameProjectedParts(existing.parts, message.parts) &&
       sameTime(existing.time, info.time) &&
       (info.role !== "assistant" || sameAssistantMeta(existing, info))
     ) {
@@ -56,7 +64,7 @@ export function projectDisplayMessages(prev: DisplayMessage[], messages: SyncMes
       return {
         id: info.id,
         role: info.role,
-        parts: message.parts,
+        parts: cloneParts(message.parts),
         error: info.error,
         time: { created: info.time.created, completed: info.time.completed },
         modelID: info.modelID,
@@ -69,7 +77,7 @@ export function projectDisplayMessages(prev: DisplayMessage[], messages: SyncMes
     return {
       id: info.id,
       role: info.role,
-      parts: message.parts,
+      parts: cloneParts(message.parts),
       time: { created: info.time.created },
     } satisfies DisplayMessage
   })
@@ -135,6 +143,19 @@ function hasQueuedMessageEcho(syncMessages: DisplayMessage[], optimistic: Optimi
   return !!findOptimisticMessageEcho(syncMessages, optimistic)
 }
 
+function detachedAssistantInsertIndex(messages: DisplayMessage[], optimisticCreatedAt: number | undefined) {
+  if (optimisticCreatedAt == null || !Number.isFinite(optimisticCreatedAt)) return messages.length
+  let index = messages.length
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.role !== "assistant") break
+    const created = message.time?.created
+    if (created == null || !Number.isFinite(created) || created < optimisticCreatedAt) break
+    index = i
+  }
+  return index
+}
+
 export function mergeOptimisticMessage(
   prev: DisplayMessage[],
   syncMessages: DisplayMessage[],
@@ -142,19 +163,18 @@ export function mergeOptimisticMessage(
 ) {
   const unresolved = optimisticMessages
     .filter((message) => !hasQueuedMessageEcho(syncMessages, message))
-    .map((message) => message.message)
 
   if (unresolved.length === 0) return syncMessages
 
-  if (
-    prev.length === syncMessages.length + unresolved.length &&
-    syncMessages.every((message, index) => prev[index] === message) &&
-    unresolved.every((message, index) => prev[syncMessages.length + index] === message)
-  ) {
-    return prev
+  const merged = [...syncMessages]
+  const detachedIndex = detachedAssistantInsertIndex(syncMessages, unresolved[0].message.time?.created)
+  for (const [index, optimistic] of unresolved.entries()) {
+    const insertAt = index === 0 ? detachedIndex : merged.length
+    merged.splice(insertAt, 0, optimistic.message)
   }
 
-  return [...syncMessages, ...unresolved]
+  if (merged.length === prev.length && merged.every((message, index) => prev[index] === message)) return prev
+  return merged
 }
 
 function computeTurnTime(user: DisplayMessage, assistants: DisplayMessage[]): Turn["time"] {

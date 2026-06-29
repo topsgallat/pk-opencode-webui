@@ -191,6 +191,7 @@ interface SessionSelection {
 interface PendingPromptItem {
   id: string;
   createdAt: number;
+  expectedUserMessageIndex?: number;
   text: string;
   files: FileContext[];
   images: ImageAttachment[];
@@ -990,7 +991,11 @@ export function Session() {
       projectedMessages = emptyMessages;
       return projectedMessages;
     }
-    projectedMessages = projectDisplayMessages(projectedMessages, sync.messages(id) as SyncMessageLike[]);
+    const source = sync.messages(id).map((message) => ({
+      info: { ...message.info },
+      parts: message.parts.map((part) => ({ ...part })),
+    })) as SyncMessageLike[]
+    projectedMessages = projectDisplayMessages(projectedMessages, source);
     return projectedMessages;
   });
 
@@ -1088,7 +1093,7 @@ export function Session() {
     const userCount = countUserMessages(syncMessages());
     setOptimisticMessages([{
       id: item.id,
-      expectedUserMessageIndex: userCount + 1,
+      expectedUserMessageIndex: item.expectedUserMessageIndex ?? (userCount + 1),
       message: {
         id: item.id,
         role: "user",
@@ -2314,6 +2319,7 @@ export function Session() {
     setLoading(true);
     setShowTodoTray(false);
     resetComposer();
+    const expectedUserMessageIndex = countUserMessages(syncMessages()) + 1
 
     try {
       let id = sessionId();
@@ -2336,7 +2342,7 @@ export function Session() {
         variant: item.variant ?? undefined,
       });
 
-      setActivePrompt({ ...item, status: "running" });
+      setActivePrompt({ ...item, status: "running", expectedUserMessageIndex });
       clearConnectionRetryCount(item.id)
       startProcessing();
       return true;

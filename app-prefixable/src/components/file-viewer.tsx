@@ -18,7 +18,9 @@ interface FileViewerProps {
   onMentionFileLine?: (path: string, selection: { startLine: number; endLine: number }) => void
 }
 
-function getLanguage(path: string) {
+function getLanguage(path: string | null | undefined) {
+  if (!path) return undefined
+
   const idx = path.lastIndexOf("/")
   const filename = idx === -1 ? path : path.slice(idx + 1)
   const lower = filename.toLowerCase()

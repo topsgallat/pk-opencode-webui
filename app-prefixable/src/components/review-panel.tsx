@@ -621,25 +621,24 @@ export function ReviewPanel(props: ReviewPanelProps) {
             </Tabs>
         </div>
 
-        <div
-          class="flex flex-col flex-1 min-h-0 relative"
-          classList={{ hidden: activeTab() === null }}
-        >
-          {/* File Viewer Content */}
-          <div
-            class="flex items-center justify-end px-2 py-1 shrink-0"
-            style={{ "border-bottom": "1px solid var(--border-base)" }}
-          >
-            <button
-              onClick={() => layout.review.close()}
-              class="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5"
-              style={{ color: "var(--icon-weak)" }}
+        <Show when={activeTab() !== null}>
+          <div class="flex flex-col flex-1 min-h-0 relative">
+            {/* File Viewer Content */}
+            <div
+              class="flex items-center justify-end px-2 py-1 shrink-0"
+              style={{ "border-bottom": "1px solid var(--border-base)" }}
             >
-              <ChevronRight class="w-4 h-4" />
-            </button>
+              <button
+                onClick={() => layout.review.close()}
+                class="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5"
+                style={{ color: "var(--icon-weak)" }}
+              >
+                <ChevronRight class="w-4 h-4" />
+              </button>
+            </div>
+            <FileViewer path={activeTab()!} onMentionFile={props.onMentionFile} onMentionFileLine={props.onMentionFileLine} />
           </div>
-          <FileViewer path={activeTab()!} onMentionFile={props.onMentionFile} onMentionFileLine={props.onMentionFileLine} />
-        </div>
+        </Show>
       </div>
     </div>
   );

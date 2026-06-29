@@ -364,8 +364,9 @@ export function MessageTimeline(props: {
               {(id) => {
                 const entry = () => timelineTurnById().get(id)
                 return (
-                  <Show when={entry()} keyed>
-                    {(current) => {
+                  <Show when={entry()}>
+                    {(item) => {
+                      const current = item()
                       const isReal = current.kind === "real"
                       const isActiveRealTurn = props.processing && isReal && current.turn.id === visibleActiveTurnId()
                       let defaultExpanded = expanded()[current.turn.id] ?? true

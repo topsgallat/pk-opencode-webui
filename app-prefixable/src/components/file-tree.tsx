@@ -5,7 +5,7 @@ import type { FileNode } from "../sdk/client"
 import { useFile } from "../context/file"
 import { useServer } from "../context/server"
 import { getServerCapabilities } from "../utils/server-capabilities"
-import { ChevronDown, ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Trash2, Pencil, MessageSquarePlus, Upload, Download, Loader2, Check } from "lucide-solid"
+import { ArrowLeft, ChevronDown, ChevronRight, File, Folder, FolderOpen, FilePlus, FolderPlus, Trash2, Pencil, MessageSquarePlus, Upload, Download, Loader2, Check } from "lucide-solid"
 import { NewFileDialog } from "./new-file-dialog"
 import { resolveFileTreeArrowLeftAction } from "./file-tree-keyboard"
 
@@ -167,7 +167,7 @@ interface FileTreeProps {
   onFileClick?: (node: FileNode) => void
   onMentionFile?: (path: string) => void
   onMentionFileLine?: (path: string, selection: { startLine: number; endLine: number }) => void
-  onExitProject?: () => void
+  onNavigateParentProject?: () => void
 }
 
 export function FileTree(props: FileTreeProps) {
@@ -302,10 +302,10 @@ async function readDirectory(entry: DropEntry): Promise<UploadEntry[]> {
     }
     if (action.type === "focus-parent") {
       if (focusTreePath(action.path)) return
-      props.onExitProject?.()
+      props.onNavigateParentProject?.()
       return
     }
-    props.onExitProject?.()
+    props.onNavigateParentProject?.()
   }
 
   function restoreScroll() {
@@ -681,7 +681,25 @@ function handleDragOverTarget(e: DragEvent, path: string) {
     >
       <Show when={level() === 0}>
         <div class="flex items-center justify-between px-2 py-1 mb-1 border-b border-white/5 dark:border-black/5" style={{ "border-color": "var(--border-base)" }}>
-          <span class="text-xs font-semibold" style={{ color: "var(--text-weak)" }}>FILES</span>
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-xs font-semibold shrink-0" style={{ color: "var(--text-weak)" }}>FILES</span>
+            <Show when={props.onNavigateParentProject}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  props.onNavigateParentProject?.()
+                }}
+                class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                style={{ color: "var(--text-weak)" }}
+                title="Up one level"
+                aria-label="Up one level"
+              >
+                <ArrowLeft class="w-3.5 h-3.5" />
+                <span>Up</span>
+              </button>
+            </Show>
+          </div>
             <Show when={canCreateFile() || canCreateDirectory() || canUpload()}>
             <div class="flex gap-1">
               <Show when={canCreateFile()}>
@@ -883,7 +901,7 @@ function handleDragOverTarget(e: DragEvent, path: string) {
                         onFileClick={props.onFileClick}
                         onMentionFile={props.onMentionFile}
                         onMentionFileLine={props.onMentionFileLine}
-                        onExitProject={props.onExitProject}
+                        onNavigateParentProject={props.onNavigateParentProject}
                       />
                     </div>
                   </Show>

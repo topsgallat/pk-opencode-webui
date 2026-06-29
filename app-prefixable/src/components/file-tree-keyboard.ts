@@ -1,7 +1,7 @@
 type ArrowLeftAction =
   | { type: "collapse" }
   | { type: "focus-parent"; path: string }
-  | { type: "exit" }
+  | { type: "project-parent" }
 
 function parentPath(path: string) {
   const idx = path.lastIndexOf("/")
@@ -11,6 +11,6 @@ function parentPath(path: string) {
 export function resolveFileTreeArrowLeftAction(path: string, expanded: boolean): ArrowLeftAction {
   if (expanded) return { type: "collapse" }
   const parent = parentPath(path)
-  if (!parent) return { type: "exit" }
+  if (!parent) return { type: "project-parent" }
   return { type: "focus-parent", path: parent }
 }

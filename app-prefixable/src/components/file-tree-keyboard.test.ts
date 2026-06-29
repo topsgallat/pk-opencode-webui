@@ -18,7 +18,7 @@ describe("resolveFileTreeArrowLeftAction", () => {
     })
   })
 
-  it("exits when the item is already at the project boundary", () => {
-    expect(resolveFileTreeArrowLeftAction("docs", false)).toEqual({ type: "exit" })
+  it("navigates to the parent project when the item is already at the project boundary", () => {
+    expect(resolveFileTreeArrowLeftAction("docs", false)).toEqual({ type: "project-parent" })
   })
 })

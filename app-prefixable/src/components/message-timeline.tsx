@@ -379,7 +379,7 @@ export function MessageTimeline(props: {
                           turn={current.turn}
                           queueState={current.queueState}
                           now={now}
-                          expanded={defaultExpanded}
+                          defaultExpanded={defaultExpanded}
                           streaming={props.processing && isReal && current.turn.id === visibleActiveTurnId()}
                           onToggle={handleToggle}
                           onDeleteQueued={props.onDeleteQueuedTurn}

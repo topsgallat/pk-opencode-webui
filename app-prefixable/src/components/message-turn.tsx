@@ -178,13 +178,14 @@ export function MessageTurn(props: {
   turn: Turn
   queueState?: QueueTurnState
   now: Accessor<number>
-  expanded?: boolean
+  defaultExpanded?: boolean
   streaming?: boolean
   onToggle?: (turnId: string, expanded: boolean) => void
   onDeleteQueued?: (turnId: string) => void
   onRetry?: (messageId: string) => void
   onOpenFile?: (path: string) => void
 }) {
+  const [expanded, setExpanded] = createSignal(props.defaultExpanded ?? false)
   const [previewUrl, setPreviewUrl] = createSignal<string | null>(null)
   const [textExpanded, setTextExpanded] = createSignal(false)
   const [canExpand, setCanExpand] = createSignal(false)
@@ -237,7 +238,14 @@ export function MessageTurn(props: {
       })
   )
 
-  const expanded = () => !!props.expanded
+  let turnId = props.turn.id
+
+  createEffect(() => {
+    const id = props.turn.id
+    if (id === turnId) return
+    turnId = id
+    setExpanded(props.defaultExpanded ?? false)
+  })
 
   const parsedUser = createMemo(() => parseUserText(props.turn.userMessage.parts))
   const userText = createMemo(() => parsedUser().text)
@@ -295,6 +303,7 @@ export function MessageTurn(props: {
 
   const toggle = () => {
     const next = !expanded()
+    setExpanded(next)
     props.onToggle?.(props.turn.id, next)
   }
 

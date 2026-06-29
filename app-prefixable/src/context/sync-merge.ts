@@ -36,12 +36,26 @@ function comparePartPayloadSize(message: MergeMessage) {
   return JSON.stringify(comparableParts(message.parts)).length
 }
 
+function sameComparableParts(a: MergeMessage, b: MergeMessage) {
+  return JSON.stringify(comparableParts(a.parts)) === JSON.stringify(comparableParts(b.parts))
+}
+
 export function choosePreferredMessageForSyncMerge<T extends MergeMessage>(synced: T, existing: T) {
-  if (synced.info.role === "assistant" && synced.info.time.completed) return synced
+  const syncedCompleted = synced.info.time.completed
+  const existingCompleted = existing.info.time.completed
+
+  if (syncedCompleted != null && existingCompleted == null) return synced
+  if (syncedCompleted == null && existingCompleted != null) return existing
+
+  if (synced.info.role === "assistant" && existing.info.role === "assistant" && syncedCompleted != null && existingCompleted != null && syncedCompleted !== existingCompleted) {
+    return syncedCompleted > existingCompleted ? synced : existing
+  }
 
   const syncedRank = messageStatusRank(synced)
   const existingRank = messageStatusRank(existing)
   if (syncedRank !== existingRank) return syncedRank > existingRank ? synced : existing
+
+  if (sameComparableParts(synced, existing)) return existing
 
   if (existing.parts.length !== synced.parts.length) return existing.parts.length > synced.parts.length ? existing : synced
 

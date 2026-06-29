@@ -8,6 +8,7 @@ import type { DisplayMessage, QueueTurnState, Turn } from "../types/message"
 import type { Part } from "../sdk/client"
 import { extractTextContent, parseUserText } from "../utils/message"
 import { formatRelativeTime, formatAbsoluteTime, formatDuration } from "../utils/time"
+import { shouldReopenExpandedState, shouldRestoreExpandedState } from "./message-turn-state"
 
 // Type for file parts with image/PDF data
 interface FilePart {
@@ -239,12 +240,47 @@ export function MessageTurn(props: {
   )
 
   let turnId = props.turn.id
+  let prevStreamingTurnState = {
+    turnId: props.turn.id,
+    streaming: !!props.streaming,
+    defaultExpanded: !!props.defaultExpanded,
+  }
 
   createEffect(() => {
     const id = props.turn.id
     if (id === turnId) return
     turnId = id
     setExpanded(props.defaultExpanded ?? false)
+  })
+
+  createEffect(() => {
+    const turnId = props.turn.id
+    const streaming = !!props.streaming
+    const defaultExpanded = !!props.defaultExpanded
+    const savedExpanded = props.defaultExpanded
+    const shouldReopen = shouldReopenExpandedState({
+      prevTurnId: prevStreamingTurnState.turnId,
+      prevStreaming: prevStreamingTurnState.streaming,
+      prevDefaultExpanded: prevStreamingTurnState.defaultExpanded,
+      turnId,
+      streaming,
+      defaultExpanded,
+    })
+    const shouldRestore = shouldRestoreExpandedState({
+      prevTurnId: prevStreamingTurnState.turnId,
+      prevStreaming: prevStreamingTurnState.streaming,
+      turnId,
+      streaming,
+      savedExpanded,
+    })
+
+    prevStreamingTurnState = { turnId, streaming, defaultExpanded }
+    if (shouldReopen) {
+      setExpanded(true)
+      return
+    }
+    if (!shouldRestore) return
+    setExpanded(savedExpanded ?? false)
   })
 
   const parsedUser = createMemo(() => parseUserText(props.turn.userMessage.parts))

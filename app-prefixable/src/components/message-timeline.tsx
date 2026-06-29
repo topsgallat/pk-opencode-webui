@@ -10,6 +10,7 @@ import type { DisplayMessage, QueueTurnState, Turn } from "../types/message"
 import { extractTextContent } from "../utils/message"
 import type { SessionStatus } from "../sdk/client"
 import { reconcileTurns } from "../utils/message-reconcile"
+import { getRealTurnDefaultExpanded } from "./message-turn-state"
 
 // Number of turns to render initially and on each "load more"
 const TURNS_PER_BATCH = 10
@@ -363,15 +364,19 @@ export function MessageTimeline(props: {
               {(id) => {
                 const entry = () => timelineTurnById().get(id)
                 return (
-                  <Show when={entry()}>
-                    {(item) => {
-                      const current = item()
+                  <Show when={entry()} keyed>
+                    {(current) => {
                       const isReal = current.kind === "real"
-                      const realExpanded = props.processing && current.turn.id === visibleActiveTurnId()
+                      const isActiveRealTurn = props.processing && isReal && current.turn.id === visibleActiveTurnId()
                       let defaultExpanded = expanded()[current.turn.id] ?? true
 
                       if (isReal) {
-                        defaultExpanded = expanded()[current.turn.id] ?? (realExpanded || (!props.processing && current.isLastRealTurn))
+                        defaultExpanded = getRealTurnDefaultExpanded({
+                          savedExpanded: expanded()[current.turn.id],
+                          processing: props.processing,
+                          isActiveRealTurn,
+                          isLastRealTurn: current.isLastRealTurn,
+                        })
                       }
 
                       return (
@@ -380,7 +385,7 @@ export function MessageTimeline(props: {
                           queueState={current.queueState}
                           now={now}
                           defaultExpanded={defaultExpanded}
-                          streaming={props.processing && isReal && current.turn.id === visibleActiveTurnId()}
+                          streaming={isActiveRealTurn}
                           onToggle={handleToggle}
                           onDeleteQueued={props.onDeleteQueuedTurn}
                           onRetry={props.onRetry}

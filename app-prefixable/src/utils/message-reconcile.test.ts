@@ -20,6 +20,19 @@ function assistantMessage(id: string, text: string, completed?: number): SyncMes
   }
 }
 
+function reasoningPart(id: string, text: string): Part {
+  return { id, type: "reasoning", text } as Part
+}
+
+function toolPart(id: string, tool: string, status: string): Part {
+  return {
+    id,
+    type: "tool",
+    tool,
+    state: { status },
+  } as Part
+}
+
 function assistantMessageAt(id: string, text: string, created: number, completed?: number): SyncMessageLike {
   return {
     info: { id, role: "assistant", time: { created, completed } },
@@ -59,6 +72,34 @@ describe("projectDisplayMessages", () => {
 
     expect(second[0]).not.toBe(first[0])
     expect((second[0].parts[0] as Part & { text: string }).text).toBe("world!")
+  })
+
+  test("replaces a row when only reasoning text changes", () => {
+    const first = projectDisplayMessages([], [{
+      info: { id: "a1", role: "assistant", time: { created: 2 } },
+      parts: [reasoningPart("a1-reasoning", "thinking"), textPart("a1-text", "answer")],
+    }])
+
+    const second = projectDisplayMessages(first, [{
+      info: { id: "a1", role: "assistant", time: { created: 2 } },
+      parts: [reasoningPart("a1-reasoning", "thinking more"), textPart("a1-text", "answer")],
+    }])
+
+    expect(second[0]).not.toBe(first[0])
+  })
+
+  test("replaces a row when only tool state changes", () => {
+    const first = projectDisplayMessages([], [{
+      info: { id: "a1", role: "assistant", time: { created: 2 } },
+      parts: [toolPart("a1-tool", "search", "running")],
+    }])
+
+    const second = projectDisplayMessages(first, [{
+      info: { id: "a1", role: "assistant", time: { created: 2 } },
+      parts: [toolPart("a1-tool", "search", "completed")],
+    }])
+
+    expect(second[0]).not.toBe(first[0])
   })
 })
 

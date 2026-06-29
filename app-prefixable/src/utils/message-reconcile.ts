@@ -109,12 +109,24 @@ function comparableParts(parts: Part[]) {
       return { type: part.type, text: part.text }
     }
 
+    if (part.type === "reasoning") {
+      return { type: part.type, text: part.text }
+    }
+
     if (part.type === "file") {
       return {
         type: part.type,
         mime: part.mime,
         filename: part.filename,
         url: part.url,
+      }
+    }
+
+    if (part.type === "tool") {
+      return {
+        type: part.type,
+        tool: part.tool,
+        state: part.state,
       }
     }
 

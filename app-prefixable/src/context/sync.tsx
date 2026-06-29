@@ -6,6 +6,7 @@ import { useSDK } from "./sdk"
 import { appendTargetParam } from "../utils/path"
 import { useClientAuth } from "./client-auth"
 import { errorMessage, fetchWithTimeout, withTimeout } from "../utils/request-timeout"
+import { choosePreferredMessageForSyncMerge } from "./sync-merge"
 
 export type SyncEvent = {
   type: string
@@ -30,7 +31,6 @@ function createSyntheticTextPart(sessionID: string, messageID: string, partID: s
     messageID,
     type: "text",
     text: "",
-    synthetic: true,
   }
 }
 
@@ -55,6 +55,13 @@ function createSyntheticAssistantMessage(sessionID: string, messageID: string, p
         cache: { read: 0, write: 0 },
       },
     },
+    parts,
+  }
+}
+
+function createMessageWithInfo(info: Message, parts: Part[] = []): MessageWithParts {
+  return {
+    info,
     parts,
   }
 }
@@ -559,10 +566,18 @@ export function SyncProvider(props: ParentProps) {
       if (!info?.sessionID) return
 
       setStore("message", info.sessionID, (existing: MessageWithParts[]) => {
-        if (!existing || existing.length === 0) return existing
-        return existing.map((m) => {
-          if (m.info.id !== info.id) return m
-          // Merge info and optionally update parts if provided
+        const nextParts = parts ? sortParts(parts) : []
+        if (!existing || existing.length === 0) return [createMessageWithInfo(info, nextParts)]
+
+        const match = binarySearch(existing, info.id, (m) => m.info.id)
+        if (!match.found) {
+          const next = [...existing]
+          next.splice(match.index, 0, createMessageWithInfo(info, nextParts))
+          return next
+        }
+
+        return existing.map((m, index) => {
+          if (index !== match.index) return m
           const updatedParts = parts ? sortParts(parts) : m.parts
           return { info, parts: updatedParts }
         })
@@ -694,15 +709,9 @@ export function SyncProvider(props: ParentProps) {
 
               const merged = synced.map((s) => {
                 const e = existing.find((m) => m.info.id === s.info.id)
-                if (!e) return s
-                if (s.info.role === "assistant" && s.info.time.completed) return s
-
-                const syncedRank = messageStatusRank(s)
-                const existingRank = messageStatusRank(e)
-                if (syncedRank !== existingRank) return syncedRank > existingRank ? s : e
-
-                return e.parts.length > s.parts.length ? e : s
-              })
+                 if (!e) return s
+                 return choosePreferredMessageForSyncMerge(s, e)
+               })
 
               // Add any messages from existing that aren't in synced (new SSE messages)
               for (const e of existing) {

@@ -40,7 +40,7 @@ export function EventProvider(props: ParentProps) {
     const e = event as Event
     const eventType = e.type as string
     if (!e || !e.type) return
-    if (typeof localStorage !== "undefined" && localStorage.getItem("opencode:debug") === "true") console.debug("[Events] Received:", e.type, e.properties)
+    console.log("[Events] Received:", e.type, e.properties)
 
     if (eventType === "server.connected") {
       setConnected(true)
@@ -98,10 +98,10 @@ export function EventProvider(props: ParentProps) {
     const dirParam = directory ? `?directory=${encodeURIComponent(directory)}` : ""
     const eventUrl = appendTargetParam(`${url}/event${dirParam}`, targetUrl)
     eventSource = new EventSource(eventUrl)
-    if (typeof localStorage !== "undefined" && localStorage.getItem("opencode:debug") === "true") console.debug("[Events] Connecting to SSE:", eventUrl)
+    console.log("[Events] Connecting to SSE:", eventUrl)
 
     eventSource.onopen = () => {
-      if (typeof localStorage !== "undefined" && localStorage.getItem("opencode:debug") === "true") console.debug("[Events] Connected")
+      console.log("[Events] Connected")
       setConnected(true)
       setReconnecting(false)
     }

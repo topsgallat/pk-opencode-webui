@@ -57,7 +57,7 @@ import { browserNotificationStatus, isSessionNotifyEnabled, setSessionNotifyOver
 import { sessionQuestionRequest, rootAncestorId } from "../utils/session-tree-request";
 import { errorMessage, withTimeout } from "../utils/request-timeout";
 import { applyQueuedPromptSubmission } from "../utils/chat-queue";
-import { findOptimisticMessageEcho, mergeOptimisticMessage, projectDisplayMessages, type OptimisticQueueMessage, type SyncMessageLike } from "../utils/message-reconcile";
+import { findOptimisticMessageEcho, projectDisplayMessages, type OptimisticQueueMessage, type SyncMessageLike } from "../utils/message-reconcile";
 import { getQuota, uploadFile, deleteFile } from "../utils/extended-api";
 import { isConnectionModelFailure, isRetryableModelFailure, pickFallbackCandidate, shouldFallbackAfterRetryAttempts } from "../utils/model-fallback";
 import { loadFallbackSettings, resolveFallbackPolicyForAgent, resolveFallbackPolicies } from "../utils/fallback-settings";
@@ -1100,22 +1100,38 @@ export function Session() {
         parts: previewPromptParts(item),
         time: { created: item.createdAt },
       },
-    }]);
+      }]);
   }));
 
-  // Includes optimistic message if present and not yet in sync
-  let mergedMessages = emptyMessages;
+  createEffect(() => {
+    const prompt = activePrompt();
+    const optimistic = optimisticMessages()[0];
+    if (!prompt || !optimistic) return;
+    if (!findOptimisticMessageEcho(messages(), optimistic)) return;
+    setActivePrompt(null);
+  });
+
   const messages = createMemo(() => {
-    const syncMsgs = syncMessages();
-    if (syncMsgs.length === 0 && optimisticMessages().length === 0) {
-      mergedMessages = syncMsgs;
-      return mergedMessages;
-    }
-    mergedMessages = mergeOptimisticMessage(mergedMessages, syncMsgs, optimisticMessages());
-    return mergedMessages;
+    return syncMessages();
+  });
+  const activeQueuedTurn = createMemo(() => {
+    const prompt = activePrompt();
+    if (!prompt) return null;
+
+    return {
+      id: prompt.id,
+      userMessage: {
+        id: prompt.id,
+        role: "user" as const,
+        parts: previewPromptParts(prompt),
+        time: { created: prompt.createdAt },
+      },
+      assistantMessages: [],
+      queueState: { status: "thinking" } satisfies QueueTurnState,
+    };
   });
   const queuedTurns = createMemo(() =>
-    pendingQueue()
+    [activeQueuedTurn(), ...pendingQueue()
       .filter((item) => item.id !== activePrompt()?.id)
       .map((item) => ({
         id: item.id,
@@ -1127,7 +1143,7 @@ export function Session() {
         },
         assistantMessages: [],
         queueState: { status: "queued", canDelete: true } satisfies QueueTurnState,
-      }))
+      }))].filter((turn): turn is NonNullable<typeof turn> => !!turn)
   );
   const activeTurnId = createMemo(() => {
     const active = activePrompt();
@@ -1878,7 +1894,6 @@ export function Session() {
 
       if (wasBusy) {
         batch(() => {
-          setActivePrompt(null);
           wasProcessing.value = false;
           setProcessing(false);
         });
@@ -1988,7 +2003,6 @@ export function Session() {
             status: { type: string };
           };
           if (props.sessionID === id && props.status.type === "idle") {
-            setActivePrompt(null);
             setConnectionRetryCounts({});
 
             // Reset local processing tracker (notifications now handled globally in Layout)
@@ -2334,6 +2348,9 @@ export function Session() {
         navigate(`/${dirSlug()}/session/${id}`, { replace: true });
       }
 
+      setActivePrompt({ ...item, status: "running", expectedUserMessageIndex });
+      clearConnectionRetryCount(item.id)
+      startProcessing();
       await client.session.promptAsync({
         sessionID: id,
         parts: buildPromptParts(item),
@@ -2341,10 +2358,6 @@ export function Session() {
         model: item.model,
         variant: item.variant ?? undefined,
       });
-
-      setActivePrompt({ ...item, status: "running", expectedUserMessageIndex });
-      clearConnectionRetryCount(item.id)
-      startProcessing();
       return true;
     } catch (err) {
       if (options?.allowAutoFallback !== false) {
@@ -2359,6 +2372,8 @@ export function Session() {
         setFailedPromptItem(item);
       }
       setActivePrompt(null);
+      setProcessing(false);
+      wasProcessing.value = false;
       return false;
     } finally {
       setLoading(false);

@@ -1,7 +1,6 @@
 import { createContext, useContext, onCleanup, batch, createSignal, type ParentProps } from "solid-js"
 import { createStore, reconcile, produce } from "solid-js/store"
 import type { Session, Message, Part, Provider } from "../sdk/client"
-import { useBasePath } from "./base-path"
 import { useSDK } from "./sdk"
 import { appendTargetParam } from "../utils/path"
 import { useClientAuth } from "./client-auth"
@@ -64,6 +63,16 @@ function createMessageWithInfo(info: Message, parts: Part[] = []): MessageWithPa
     info,
     parts,
   }
+}
+
+function hasMeaningfulPartPayload(parts: Part[]) {
+  return parts.some((part) => {
+    if (part.type === "text") return part.text.trim().length > 0
+    if (part.type === "reasoning") return part.text.trim().length > 0
+    if (part.type === "file") return true
+    if (part.type === "tool") return true
+    return false
+  })
 }
 
 type SyncStore = {
@@ -138,8 +147,7 @@ function binarySearch<T>(arr: T[], id: string, getId: (item: T) => string): { fo
 }
 
 export function SyncProvider(props: ParentProps) {
-  const { prefix } = useBasePath()
-  const { client, directory, targetUrl } = useSDK()
+  const { client, directory, url, targetUrl } = useSDK()
   const auth = useClientAuth()
 
   const [store, setStore] = createStore<SyncStore>({
@@ -155,6 +163,7 @@ export function SyncProvider(props: ParentProps) {
 
   const inflight = new Map<string, Promise<void>>()
   const externalListeners = new Set<(event: SyncEvent) => void>()
+  const [messageVersion, setMessageVersion] = createSignal(0)
   // Queue for frame-batching incoming part delta events to avoid many
   // synchronous setStore calls which block the main thread during heavy streams.
   // Keyed by `${messageID}:${partID}` and accumulates per-field string deltas
@@ -296,7 +305,7 @@ export function SyncProvider(props: ParentProps) {
     }
 
     const dirParam = directory ? `?directory=${encodeURIComponent(directory)}` : ""
-    const eventUrl = appendTargetParam(prefix(`/event${dirParam}`), targetUrl)
+    const eventUrl = appendTargetParam(`${url}/event${dirParam}`, targetUrl)
     eventSource = new EventSource(eventUrl)
     console.log("[Sync] Connecting to SSE:", eventUrl)
 
@@ -322,7 +331,7 @@ export function SyncProvider(props: ParentProps) {
 
       const dirParam = directory ? `?directory=${encodeURIComponent(directory)}` : ""
       const authProbe = fetchWithTimeout(
-        appendTargetParam(prefix(`/session/status${dirParam}`), targetUrl),
+        appendTargetParam(`${url}/session/status${dirParam}`, targetUrl),
         {},
         SYNC_PROBE_TIMEOUT_MS,
         "Sync reconnect probe",
@@ -351,6 +360,7 @@ export function SyncProvider(props: ParentProps) {
 
   function handleEvent(event: SyncEvent) {
     const props = event.properties
+    const messageEvent = event.type.startsWith("message.")
 
     // Session events
     if (event.type === "session.created") {
@@ -542,9 +552,19 @@ export function SyncProvider(props: ParentProps) {
         const match = binarySearch(existing, msg.info.id, (m) => m.info.id)
         if (match.found) {
           // Update info on the existing synthesized placeholder with the real message info,
-          // but preserve existing parts (which may have more recent streaming content)
+          // but preserve existing parts only when they carry real streamed payload.
+          // User messages can arrive after an empty synthetic placeholder; in that case
+          // the created event's parts are authoritative and must replace the placeholder.
           const next = [...existing]
-          next[match.index] = { ...existing[match.index], info: msg.info }
+          const current = existing[match.index]
+          const currentHasPayload = hasMeaningfulPartPayload(current.parts)
+          const createdParts = msg.parts ? sortParts(msg.parts) : []
+          const createdHasPayload = hasMeaningfulPartPayload(createdParts)
+          next[match.index] = {
+            ...current,
+            info: msg.info,
+            parts: createdHasPayload && !currentHasPayload ? createdParts : current.parts,
+          }
           return next
         }
         const next = [...existing]
@@ -598,6 +618,7 @@ export function SyncProvider(props: ParentProps) {
       }
     }
 
+    if (messageEvent) setMessageVersion((version) => version + 1)
     for (const fn of externalListeners) fn(event)
   }
 
@@ -722,6 +743,7 @@ export function SyncProvider(props: ParentProps) {
 
               return merged.sort((a, b) => cmp(a.info.id, b.info.id))
             })
+            setMessageVersion((version) => version + 1)
 
             // Update parts
             const msgs = store.message[sessionID] ?? []
@@ -782,7 +804,10 @@ export function SyncProvider(props: ParentProps) {
     },
     sessions: () => store.session,
     archivedSessions: () => store.archivedSession,
-    messages: (sessionID: string) => store.message[sessionID] ?? [],
+    messages: (sessionID: string) => {
+      messageVersion()
+      return store.message[sessionID] ?? []
+    },
     parts: (messageID: string) => store.part[messageID] ?? [],
     providers: () => store.provider,
     session: {

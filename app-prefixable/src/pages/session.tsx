@@ -414,6 +414,9 @@ export function Session() {
   const [dragHeight, setDragHeight] = createSignal(0);
   const [optimisticMessages, setOptimisticMessages] =
     createSignal<OptimisticQueueMessage[]>([]);
+  const [directSyncMessages, setDirectSyncMessages] =
+    createSignal<Record<string, SyncMessageLike[]>>({});
+  const directSyncRefreshSeq = new Map<string, number>();
   const [loading, setLoading] = createSignal(false);
   const [processing, setProcessing] = createSignal(false);
   const [loadingHistory, setLoadingHistory] = createSignal(false);
@@ -442,6 +445,37 @@ export function Session() {
       .join(separator);
     if (maxLen && text.length > maxLen) return text.slice(0, maxLen) + "...";
     return text;
+  }
+
+  function directMessagePayloadScore(message: SyncMessageLike) {
+    return JSON.stringify(message.parts).length + (message.info.time.completed ?? 0);
+  }
+
+  function mergeSyncSources(base: SyncMessageLike[], direct: SyncMessageLike[]) {
+    if (direct.length === 0) return base;
+    const byId = new Map(base.map((message) => [message.info.id, message]));
+    for (const message of direct) {
+      const current = byId.get(message.info.id);
+      if (!current || directMessagePayloadScore(message) >= directMessagePayloadScore(current)) {
+        byId.set(message.info.id, message);
+      }
+    }
+    return Array.from(byId.values()).sort((a, b) => a.info.id.localeCompare(b.info.id));
+  }
+
+  async function refreshDirectMessages(id: string) {
+    const seq = (directSyncRefreshSeq.get(id) ?? 0) + 1;
+    directSyncRefreshSeq.set(id, seq);
+    const res = await client.session.messages({ sessionID: id });
+    if (directSyncRefreshSeq.get(id) !== seq) return;
+    const source = (res.data ?? [])
+      .filter((message) => !!message?.info?.id)
+      .map((message) => ({
+        info: { ...message.info },
+        parts: message.parts.map((part) => ({ ...part })),
+      }) as SyncMessageLike)
+      .sort((a, b) => a.info.id.localeCompare(b.info.id));
+    setDirectSyncMessages((prev) => ({ ...prev, [id]: source }));
   }
 
   // Viewport-aware maximum matching the CSS max-height on the textarea
@@ -995,7 +1029,7 @@ export function Session() {
       info: { ...message.info },
       parts: message.parts.map((part) => ({ ...part })),
     })) as SyncMessageLike[]
-    projectedMessages = projectDisplayMessages(projectedMessages, source);
+    projectedMessages = projectDisplayMessages(projectedMessages, mergeSyncSources(source, directSyncMessages()[id] ?? []));
     return projectedMessages;
   });
 
@@ -1129,6 +1163,16 @@ export function Session() {
       assistantMessages: [],
       queueState: { status: "thinking" } satisfies QueueTurnState,
     };
+  });
+  createEffect(() => {
+    const active = activePrompt();
+    const optimistic = optimisticMessages()[0];
+    if (!active || !optimistic || processing()) return;
+    if (!findOptimisticMessageEcho(syncMessages(), optimistic)) return;
+    batch(() => {
+      setActivePrompt(null);
+      setOptimisticMessages([]);
+    });
   });
   const queuedTurns = createMemo(() =>
     [activeQueuedTurn(), ...pendingQueue()
@@ -1898,6 +1942,7 @@ export function Session() {
           setProcessing(false);
         });
         void sync.session.sync(sessionID).catch(() => {});
+        void refreshDirectMessages(sessionID).catch(() => {});
         return;
       }
 
@@ -1909,14 +1954,30 @@ export function Session() {
 
   createEffect(() => {
     const id = sessionId();
-    if (!id || !processing()) return;
+    const prompt = activePrompt();
+    if (!id || !prompt) return;
 
     void refreshProcessingState(id);
-    const interval = setInterval(() => {
-      void refreshProcessingState(id);
-    }, 15_000);
 
-    onCleanup(() => clearInterval(interval));
+    const statusInterval = setInterval(() => {
+      void refreshProcessingState(id);
+    }, 3_000);
+
+    let syncInterval: ReturnType<typeof setInterval> | undefined;
+    const syncTimeout = setTimeout(() => {
+      void sync.session.sync(id).catch(() => {});
+      void refreshDirectMessages(id).catch(() => {});
+      syncInterval = setInterval(() => {
+        void sync.session.sync(id).catch(() => {});
+        void refreshDirectMessages(id).catch(() => {});
+      }, 5_000);
+    }, 10_000);
+
+    onCleanup(() => {
+      clearInterval(statusInterval);
+      clearTimeout(syncTimeout);
+      if (syncInterval !== undefined) clearInterval(syncInterval);
+    });
   });
 
   // Clear stale localStorage key when sessions are loaded and ID is not found
@@ -2004,6 +2065,8 @@ export function Session() {
           };
           if (props.sessionID === id && props.status.type === "idle") {
             setConnectionRetryCounts({});
+            void sync.session.sync(id).catch(() => {});
+            void refreshDirectMessages(id).catch(() => {});
 
             // Reset local processing tracker (notifications now handled globally in Layout)
             wasProcessing.value = false;
@@ -2348,9 +2411,21 @@ export function Session() {
         navigate(`/${dirSlug()}/session/${id}`, { replace: true });
       }
 
-      setActivePrompt({ ...item, status: "running", expectedUserMessageIndex });
+      const activeItem = { ...item, status: "running" as const, expectedUserMessageIndex };
+      setActivePrompt(activeItem);
+      setOptimisticMessages([{
+        id: item.id,
+        expectedUserMessageIndex,
+        message: {
+          id: item.id,
+          role: "user",
+          parts: previewPromptParts(activeItem),
+          time: { created: item.createdAt },
+        },
+      }]);
       clearConnectionRetryCount(item.id)
       startProcessing();
+
       await client.session.promptAsync({
         sessionID: id,
         parts: buildPromptParts(item),
@@ -2358,6 +2433,16 @@ export function Session() {
         model: item.model,
         variant: item.variant ?? undefined,
       });
+      void sync.session.sync(id).catch(() => {});
+      void refreshDirectMessages(id).catch(() => {});
+      setTimeout(() => {
+        void sync.session.sync(id).catch(() => {});
+        void refreshDirectMessages(id).catch(() => {});
+      }, 1_000);
+      setTimeout(() => {
+        void sync.session.sync(id).catch(() => {});
+        void refreshDirectMessages(id).catch(() => {});
+      }, 3_000);
       return true;
     } catch (err) {
       if (options?.allowAutoFallback !== false) {

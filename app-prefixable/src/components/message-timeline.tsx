@@ -186,6 +186,17 @@ export function MessageTimeline(props: {
   const timelineTurnIds = createMemo(() => timelineEntries().map((entry) => entry.turn.id))
   const timelineTurnById = createMemo(() => new Map(timelineEntries().map((entry) => [entry.turn.id, entry])))
 
+  function defaultExpandedForEntry(entry: NonNullable<ReturnType<typeof timelineTurnById> extends Map<string, infer T> ? T : never>) {
+    if (entry.kind !== "real") return expanded()[entry.turn.id] ?? true
+
+    return getRealTurnDefaultExpanded({
+      savedExpanded: expanded()[entry.turn.id],
+      processing: props.processing,
+      isActiveRealTurn: props.processing && entry.turn.id === visibleActiveTurnId(),
+      isLastRealTurn: entry.isLastRealTurn,
+    })
+  }
+
   let containerRef: HTMLDivElement | undefined
 
   function loadMore() {
@@ -365,35 +376,19 @@ export function MessageTimeline(props: {
                 const entry = () => timelineTurnById().get(id)
                 return (
                   <Show when={entry()}>
-                    {(item) => {
-                      const current = item()
-                      const isReal = current.kind === "real"
-                      const isActiveRealTurn = props.processing && isReal && current.turn.id === visibleActiveTurnId()
-                      let defaultExpanded = expanded()[current.turn.id] ?? true
-
-                      if (isReal) {
-                        defaultExpanded = getRealTurnDefaultExpanded({
-                          savedExpanded: expanded()[current.turn.id],
-                          processing: props.processing,
-                          isActiveRealTurn,
-                          isLastRealTurn: current.isLastRealTurn,
-                        })
-                      }
-
-                      return (
-                        <MessageTurn
-                          turn={current.turn}
-                          queueState={current.queueState}
-                          now={now}
-                          defaultExpanded={defaultExpanded}
-                          streaming={isActiveRealTurn}
-                          onToggle={handleToggle}
-                          onDeleteQueued={props.onDeleteQueuedTurn}
-                          onRetry={props.onRetry}
-                          onOpenFile={props.onOpenFile}
-                        />
-                      )
-                    }}
+                    {(current) => (
+                      <MessageTurn
+                        turn={current().turn}
+                        queueState={current().queueState}
+                        now={now}
+                        defaultExpanded={defaultExpandedForEntry(current())}
+                        streaming={props.processing && current().kind === "real" && current().turn.id === visibleActiveTurnId()}
+                        onToggle={handleToggle}
+                        onDeleteQueued={props.onDeleteQueuedTurn}
+                        onRetry={props.onRetry}
+                        onOpenFile={props.onOpenFile}
+                      />
+                    )}
                   </Show>
                 )
               }}

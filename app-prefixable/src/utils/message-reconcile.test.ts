@@ -101,6 +101,21 @@ describe("projectDisplayMessages", () => {
 
     expect(second[0]).not.toBe(first[0])
   })
+
+  test("keeps row identity when only ignored part metadata changes", () => {
+    const first = projectDisplayMessages([], [{
+      info: { id: "a1", role: "assistant", time: { created: 2 } },
+      parts: [{ ...textPart("a1-text", "answer"), sessionID: "old-session", messageID: "old-message" } as Part],
+    }])
+
+    const second = projectDisplayMessages(first, [{
+      info: { id: "a1", role: "assistant", time: { created: 2 } },
+      parts: [{ ...textPart("different-part-id", "answer"), sessionID: "new-session", messageID: "new-message" } as Part],
+    }])
+
+    expect(second).toBe(first)
+    expect(second[0]).toBe(first[0])
+  })
 })
 
 describe("mergeOptimisticMessage", () => {

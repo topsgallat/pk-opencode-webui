@@ -1,4 +1,5 @@
 import type { Part } from "../sdk/client"
+import { projectedPartsWeight, sameProjectedParts } from "../utils/part-compare"
 
 export type MergeMessage = {
   info: {
@@ -22,22 +23,12 @@ function messageStatusRank(message: MergeMessage) {
   return message.parts.reduce((rank, part) => Math.max(rank, partStatusRank(part)), 0)
 }
 
-function comparableParts(parts: Part[]) {
-  return parts.map((part) => {
-    if (part.type === "text") return { type: part.type, text: part.text }
-    if (part.type === "reasoning") return { type: part.type, text: part.text }
-    if (part.type === "file") return { type: part.type, mime: part.mime, filename: part.filename, url: part.url }
-    if (part.type === "tool") return { type: part.type, tool: part.tool, state: part.state }
-    return { type: part.type }
-  })
-}
-
 function comparePartPayloadSize(message: MergeMessage) {
-  return JSON.stringify(comparableParts(message.parts)).length
+  return projectedPartsWeight(message.parts)
 }
 
 function sameComparableParts(a: MergeMessage, b: MergeMessage) {
-  return JSON.stringify(comparableParts(a.parts)) === JSON.stringify(comparableParts(b.parts))
+  return sameProjectedParts(a.parts, b.parts)
 }
 
 export function choosePreferredMessageForSyncMerge<T extends MergeMessage>(synced: T, existing: T) {

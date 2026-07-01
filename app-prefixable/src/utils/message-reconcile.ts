@@ -1,5 +1,6 @@
 import type { Part, AssistantMessage } from "../sdk/client"
 import type { DisplayMessage, Turn } from "../types/message"
+import { sameProjectedParts } from "./part-compare"
 
 export interface SyncMessageLike {
   info: {
@@ -33,10 +34,6 @@ function sameAssistantMeta(prev: DisplayMessage, next: SyncMessageLike["info"]) 
     prev.agent === next.agent &&
     prev.tokens === next.tokens
   )
-}
-
-function sameProjectedParts(prev: Part[], next: Part[]) {
-  return JSON.stringify(comparableParts(prev)) === JSON.stringify(comparableParts(next))
 }
 
 function cloneParts(parts: Part[]) {
@@ -103,40 +100,9 @@ function getUserMessageAt(messages: DisplayMessage[], index: number) {
   return null
 }
 
-function comparableParts(parts: Part[]) {
-  return parts.map((part) => {
-    if (part.type === "text") {
-      return { type: part.type, text: part.text }
-    }
-
-    if (part.type === "reasoning") {
-      return { type: part.type, text: part.text }
-    }
-
-    if (part.type === "file") {
-      return {
-        type: part.type,
-        mime: part.mime,
-        filename: part.filename,
-        url: part.url,
-      }
-    }
-
-    if (part.type === "tool") {
-      return {
-        type: part.type,
-        tool: part.tool,
-        state: part.state,
-      }
-    }
-
-    return { type: part.type }
-  })
-}
-
 function sameUserParts(a: DisplayMessage, b: DisplayMessage) {
   if (a.role !== "user" || b.role !== "user") return false
-  return JSON.stringify(comparableParts(a.parts)) === JSON.stringify(comparableParts(b.parts))
+  return sameProjectedParts(a.parts, b.parts)
 }
 
 export function findOptimisticMessageEcho(

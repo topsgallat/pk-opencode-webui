@@ -58,6 +58,7 @@ import { sessionQuestionRequest, rootAncestorId } from "../utils/session-tree-re
 import { errorMessage, withTimeout } from "../utils/request-timeout";
 import { applyQueuedPromptSubmission } from "../utils/chat-queue";
 import { findOptimisticMessageEcho, projectDisplayMessages, type OptimisticQueueMessage, type SyncMessageLike } from "../utils/message-reconcile";
+import { projectedPartsWeight } from "../utils/part-compare";
 import { getQuota, uploadFile, deleteFile } from "../utils/extended-api";
 import { isConnectionModelFailure, isRetryableModelFailure, pickFallbackCandidate, shouldFallbackAfterRetryAttempts } from "../utils/model-fallback";
 import { loadFallbackSettings, resolveFallbackPolicyForAgent, resolveFallbackPolicies } from "../utils/fallback-settings";
@@ -448,7 +449,7 @@ export function Session() {
   }
 
   function directMessagePayloadScore(message: SyncMessageLike) {
-    return JSON.stringify(message.parts).length + (message.info.time.completed ?? 0);
+    return projectedPartsWeight(message.parts) + (message.info.time.completed ?? 0);
   }
 
   function mergeSyncSources(base: SyncMessageLike[], direct: SyncMessageLike[]) {

@@ -23,7 +23,7 @@ interface EventContextValue {
 export const EventContext = createContext<EventContextValue>()
 
 export function EventProvider(props: ParentProps) {
-  const { client, directory, url, targetUrl } = useSDK()
+  const { directory, url, targetUrl } = useSDK()
   const sync = useContext(SyncContext)
   const auth = useClientAuth()
   const handlers = new Set<EventHandler>()
@@ -35,12 +35,23 @@ export function EventProvider(props: ParentProps) {
   const sseAskedQuestions = new Set<string>()
   const sseClearedRequests = new Set<string>()
   const sseSeenStatuses = new Set<string>()
+  let debugEvents = false
+
+  function loadDebugEvents() {
+    try {
+      debugEvents = localStorage.getItem("opencode.debug.events") === "1"
+    } catch {
+      debugEvents = false
+    }
+  }
 
   function handleRawEvent(event: Event | SyncEvent) {
     const e = event as Event
     const eventType = e.type as string
     if (!e || !e.type) return
-    console.log("[Events] Received:", e.type, e.properties)
+    if (debugEvents && eventType !== "message.part.delta") {
+      console.log("[Events] Received:", e.type, e.properties)
+    }
 
     if (eventType === "server.connected") {
       setConnected(true)
@@ -156,6 +167,8 @@ export function EventProvider(props: ParentProps) {
   }
 
   onMount(() => {
+    loadDebugEvents()
+
     if (sync) {
       const unsub = sync.registerExternalListener(handleRawEvent)
       onCleanup(unsub)

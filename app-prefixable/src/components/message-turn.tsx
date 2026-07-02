@@ -6,7 +6,7 @@ import { ImagePreview } from "./image-preview"
 import { errorText } from "../types/message"
 import type { DisplayMessage, QueueTurnState, Turn } from "../types/message"
 import type { Part } from "../sdk/client"
-import { extractTextContent, parseUserText } from "../utils/message"
+import { extractTextToolSummary, parseUserText } from "../utils/message"
 import { formatRelativeTime, formatAbsoluteTime, formatDuration } from "../utils/time"
 import { shouldReopenExpandedState, shouldRestoreExpandedState } from "./message-turn-state"
 
@@ -28,10 +28,6 @@ function isImageOrPdf(file: FilePart): boolean {
 
 // Re-export Turn type for convenience
 export type { Turn, DisplayMessage }
-
-function hasTools(message: DisplayMessage): boolean {
-  return message.parts.some((p) => p.type === "tool")
-}
 
 // Extract completed tool parts with timing from all assistant messages
 function extractToolTimings(messages: DisplayMessage[]): { name: string; duration: number }[] {
@@ -316,25 +312,16 @@ export function MessageTurn(props: {
     copyTimeoutId = setTimeout(() => setCopied(false), 2000)
   }
 
-  const assistantText = createMemo(() => {
-    const msgs = props.turn.assistantMessages
-    if (msgs.length === 0) return ""
-    // Get text from last assistant message
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      const text = extractTextContent(msgs[i].parts).trim()
-      if (text) return text
-    }
-    return ""
-  })
-
-  const hasError = createMemo(() => props.turn.assistantMessages.some((m) => m.error))
-
-  const toolCount = createMemo(() => {
+  const assistantSummary = createMemo(() => {
     let count = 0
+    let error = false
     for (const msg of props.turn.assistantMessages) {
-      count += msg.parts.filter((p) => p.type === "tool").length
+      if (msg.error) error = true
+      for (const part of msg.parts) {
+        if (part.type === "tool") count += 1
+      }
     }
-    return count
+    return { error, toolCount: count }
   })
 
   const toggle = () => {
@@ -511,13 +498,13 @@ export function MessageTurn(props: {
                 </span>
                 <span>·</span>
               </Show>
-              <Show when={toolCount() > 0}>
+              <Show when={assistantSummary().toolCount > 0}>
                 <span>
-                  {toolCount()} tool{toolCount() > 1 ? "s" : ""}
+                  {assistantSummary().toolCount} tool{assistantSummary().toolCount > 1 ? "s" : ""}
                 </span>
                 <span>·</span>
               </Show>
-              <Show when={hasError()}>
+              <Show when={assistantSummary().error}>
                 <button
                   type="button"
                   onClick={() => props.onRetry?.(props.turn.userMessage.id)}
@@ -804,8 +791,10 @@ export function MessageTurn(props: {
           {/* Assistant messages */}
           <For each={props.turn.assistantMessages}>
             {(message, index) => {
-              const text = extractTextContent(message.parts).trim()
-              const tools = hasTools(message)
+              const summary = createMemo(() => {
+                const data = extractTextToolSummary(message.parts)
+                return { text: data.text.trim(), hasTools: data.toolCount > 0 }
+              })
               const colors = () => getAgentColors(message.agent)
               const streamingText = () => props.streaming && index() === props.turn.assistantMessages.length - 1 && !message.error
 
@@ -859,21 +848,21 @@ export function MessageTurn(props: {
                       )}
                     </Show>
                     {/* Text content */}
-                    <Show when={text}>
+                    <Show when={summary().text}>
                       <Show
                         when={streamingText()}
-                        fallback={<Markdown content={text} class="text-sm" onFileClick={props.onOpenFile} linkifyFiles={!!props.onOpenFile} copyCodeBlocks={true} />}
+                        fallback={<Markdown content={summary().text} class="text-sm" onFileClick={props.onOpenFile} linkifyFiles={!!props.onOpenFile} copyCodeBlocks={true} />}
                       >
                         <div
                           class="text-sm whitespace-pre-wrap break-words"
                           style={{ color: "var(--text-strong)" }}
                         >
-                          {text}
+                          {summary().text}
                         </div>
                       </Show>
                     </Show>
                     {/* Tool calls */}
-                    <Show when={tools}>
+                    <Show when={summary().hasTools}>
                       <div class="mt-2">
                         <MessageParts parts={message.parts} />
                       </div>

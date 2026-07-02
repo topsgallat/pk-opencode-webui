@@ -43,3 +43,15 @@ export function extractTextContent(parts: Part[]): string {
     .map((p) => stripSystemBlocks(p.text))
     .join("")
 }
+
+export function extractTextToolSummary(parts: Part[]) {
+  let text = ""
+  let toolCount = 0
+
+  for (const part of parts) {
+    if (part.type === "text" && !part.synthetic) text += stripSystemBlocks(part.text)
+    if (part.type === "tool") toolCount += 1
+  }
+
+  return { text, toolCount }
+}

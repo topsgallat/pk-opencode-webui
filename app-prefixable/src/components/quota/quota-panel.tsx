@@ -3,6 +3,7 @@ import { useBasePath } from '../../context/base-path'
 import { useSDK } from '../../context/sdk'
 import { getQuota } from '../../utils/extended-api'
 import { loadSettings, saveSetting } from '../../utils/settings-api'
+import { extractOpenCodeGoAuthCookie, extractOpenCodeGoWorkspaceId } from '../../utils/opencode-go-config-paste'
 import { QuotaProviderView } from '../../types/quota'
 import { QUOTA_PROVIDER_CATALOG } from '../../../../shared/quota/provider-catalog'
 import { QuotaProviderCard } from './quota-provider-card'
@@ -307,7 +308,15 @@ export function QuotaContent() {
                 type="text"
                 value={goWorkspaceId()}
                 onInput={(e) => setGoWorkspaceId(e.currentTarget.value)}
-                placeholder="e.g. wk_abc123"
+                onPaste={(e) => {
+                  const text = e.clipboardData?.getData('text') ?? ''
+                  const id = extractOpenCodeGoWorkspaceId(text)
+                  if (id) {
+                    e.preventDefault()
+                    setGoWorkspaceId(id)
+                  }
+                }}
+                placeholder="wk_abc123 or paste workspace URL"
                 class="w-full rounded-md px-3 py-2 text-sm"
                 style={{
                   background: 'var(--background-base)',
@@ -315,6 +324,9 @@ export function QuotaContent() {
                   border: '1px solid var(--border-base)',
                 }}
               />
+              <span class="text-[10px]" style={{ color: 'var(--text-weak)' }}>
+                Paste the workspace URL or just the ID.
+              </span>
             </label>
             <label class="flex-1 space-y-1">
               <span class="text-xs font-medium" style={{ color: 'var(--text-weak)' }}>Auth cookie</span>
@@ -322,6 +334,14 @@ export function QuotaContent() {
                 type="password"
                 value={goAuthCookie()}
                 onInput={(e) => setGoAuthCookie(e.currentTarget.value)}
+                onPaste={(e) => {
+                  const text = e.clipboardData?.getData('text') ?? ''
+                  const cookie = extractOpenCodeGoAuthCookie(text)
+                  if (cookie) {
+                    e.preventDefault()
+                    setGoAuthCookie(cookie)
+                  }
+                }}
                 placeholder="auth cookie value"
                 class="w-full rounded-md px-3 py-2 text-sm font-mono"
                 style={{
@@ -330,6 +350,9 @@ export function QuotaContent() {
                   border: '1px solid var(--border-base)',
                 }}
               />
+              <span class="text-[10px]" style={{ color: 'var(--text-weak)' }}>
+                Paste the cookie value, auth=… string, DevTools row, or cURL header.
+              </span>
             </label>
             <button
               type="button"

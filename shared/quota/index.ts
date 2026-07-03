@@ -3,6 +3,7 @@ import { AnthropicProvider } from './providers/anthropic'
 import { CopilotProvider } from './providers/copilot'
 import { OpenAIProvider } from './providers/openai'
 import { GeminiProvider } from './providers/gemini-cli'
+import { OpenCodeGoProvider } from './providers/opencode-go'
 
 export async function getQuotaData(options: {
   refresh?: boolean
@@ -20,6 +21,7 @@ export async function getQuotaData(options: {
     new OpenAIProvider(),
     new AnthropicProvider(),
     new GeminiProvider(),
+    new OpenCodeGoProvider(),
   ]
 
   const providerViews: QuotaProviderView[] = []

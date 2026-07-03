@@ -56,54 +56,28 @@ async function installPerfProbe(page: Page) {
   });
 }
 
-async function installClickProbe(page: Page) {
-  await page.evaluate(() => {
-    document.querySelector('[data-testid="stream-click-probe"]')?.remove();
-
-    const button = document.createElement('button');
-    button.dataset.testid = 'stream-click-probe';
-    button.textContent = 'stream click probe';
-    button.style.position = 'fixed';
-    button.style.left = '8px';
-    button.style.top = '8px';
-    button.style.zIndex = '2147483647';
-    button.style.opacity = '0.01';
-    button.style.pointerEvents = 'auto';
-
-    const state = { clicks: [] as number[], started: 0 };
-    (window as Window & { __streamClickProbe?: typeof state }).__streamClickProbe = state;
-
-    button.addEventListener('click', () => {
-      const probe = (window as Window & { __streamClickProbe?: typeof state }).__streamClickProbe;
-      if (!probe) return;
-      probe.clicks.push(performance.now() - probe.started);
-    });
-
-    document.body.appendChild(button);
-  });
+async function measureTurnToggleLatency(page: Page, expanded: string) {
+  const button = page.getByRole('button', { name: /Collapse conversation turn|Expand conversation turn/ }).last();
+  const started = Date.now();
+  await button.click({ timeout: 5_000 });
+  await expect(button).toHaveAttribute('aria-expanded', expanded, { timeout: 5_000 });
+  return Date.now() - started;
 }
 
-async function measureClickLatency(page: Page) {
-  const count = await page.evaluate(() => {
-    const probe = (window as Window & { __streamClickProbe?: { clicks: number[]; started: number } }).__streamClickProbe;
-    if (!probe) return 0;
-    probe.started = performance.now();
-    return probe.clicks.length;
-  });
-
+async function measureFabClickLatency(page: Page) {
+  const fab = page.getByRole('button', { name: 'Scroll to bottom' });
   const started = Date.now();
-  await page.locator('[data-testid="stream-click-probe"]').click({ timeout: 5_000 });
-  const roundTrip = Date.now() - started;
+  await fab.click({ timeout: 5_000 });
+  await expect(fab).toBeHidden({ timeout: 5_000 });
+  return Date.now() - started;
+}
 
-  const handled = await page.waitForFunction((expectedCount) => {
-    const probe = (window as Window & { __streamClickProbe?: { clicks: number[] } }).__streamClickProbe;
-    return probe && probe.clicks.length > expectedCount ? probe.clicks[probe.clicks.length - 1] : null;
-  }, count, { timeout: 5_000 });
-
-  return {
-    handlerLatency: (await handled.jsonValue()) as number,
-    roundTrip,
-  };
+async function measureStopLatency(page: Page) {
+  const stop = visibleStop(page);
+  const started = Date.now();
+  await stop.click({ timeout: 5_000 });
+  await expect(stop).toBeHidden({ timeout: 10_000 });
+  return Date.now() - started;
 }
 
 async function readPerfProbe(page: Page) {
@@ -166,7 +140,6 @@ test.describe('Chat streaming performance regression', () => {
 
     await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
     await installPerfProbe(page);
-    await installClickProbe(page);
 
     const token = promptToken();
     const composer = page.locator('textarea[placeholder^="Type a message"]');
@@ -177,7 +150,7 @@ test.describe('Chat streaming performance regression', () => {
 
     await expect(page.getByRole('button', { name: /Model: Big Pickle/ })).toBeVisible({ timeout: 20_000 });
 
-    const prompt = `${token}\nPrint the exact token on the first line, then count from 1 to 180 with one number per line. Do not use markdown tables or code blocks.`;
+    const prompt = `${token}\nPrint the exact token on the first line, then count from 1 to 400 with one number per line. Do not use markdown tables or code blocks.`;
     await composer.fill(prompt);
     await send.click();
 
@@ -198,17 +171,21 @@ test.describe('Chat streaming performance regression', () => {
     await expect(scroller).toHaveJSProperty('scrollTop', 0);
     await expect(fab).toBeVisible({ timeout: 10_000 });
 
-    const clickLatencies = [];
-    for (let i = 0; i < 3; i += 1) {
-      clickLatencies.push(await measureClickLatency(page));
-      await page.waitForTimeout(250);
-    }
+    const realInteractionLatencies = {
+      collapseTurn: await measureTurnToggleLatency(page, 'false'),
+      expandTurn: await measureTurnToggleLatency(page, 'true'),
+      scrollToBottom: await measureFabClickLatency(page),
+      stop: 0,
+    };
 
-    await expect(stop).toBeHidden({ timeout: 60_000 });
+    await scroller.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await expect(fab).toBeVisible({ timeout: 10_000 });
+    realInteractionLatencies.stop = await measureStopLatency(page);
     await expect(page.getByText('(empty message)')).toHaveCount(0);
 
-    await fab.click();
-    await expect(fab).toBeHidden({ timeout: 10_000 });
+    await measureFabClickLatency(page);
 
     const perf = await readPerfProbe(page);
     await testInfo.attach('perf.json', {
@@ -220,7 +197,7 @@ test.describe('Chat streaming performance regression', () => {
         {
           consoleMessages,
           pageErrors,
-          clickLatencies,
+          realInteractionLatencies,
         },
         null,
         2,
@@ -231,9 +208,8 @@ test.describe('Chat streaming performance regression', () => {
     expect(pageErrors).toEqual([]);
     expect(consoleMessages.filter((line) => line.includes('[Events] Received'))).toHaveLength(0);
     expect(consoleMessages.filter((line) => line.includes('message.part.delta'))).toHaveLength(0);
-    expect(clickLatencies.length).toBe(3);
-    expect(Math.max(...clickLatencies.map((item) => item.roundTrip))).toBeLessThan(2_000);
-    expect(Math.max(...clickLatencies.map((item) => item.handlerLatency))).toBeLessThan(1_000);
+    expect(Math.max(realInteractionLatencies.collapseTurn, realInteractionLatencies.expandTurn, realInteractionLatencies.scrollToBottom)).toBeLessThan(2_000);
+    expect(realInteractionLatencies.stop).toBeLessThan(5_000);
     expect(perf.frameCount).toBeGreaterThan(0);
   });
 });

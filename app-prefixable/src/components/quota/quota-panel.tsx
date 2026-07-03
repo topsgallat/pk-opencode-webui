@@ -15,15 +15,41 @@ export function QuotaContent() {
   const [clock, setClock] = createSignal(Date.now())
   const [disabledProviders, setDisabledProviders] = createSignal<string[]>([])
 
+  const [goWorkspaceId, setGoWorkspaceId] = createSignal('')
+  const [goAuthCookie, setGoAuthCookie] = createSignal('')
+  const [goSaving, setGoSaving] = createSignal(false)
+  const [goSavedAt, setGoSavedAt] = createSignal<string | null>(null)
+
   const [settings] = createResource(
     () => serverUrl,
     async (url) => {
-      const data = await loadSettings(url, "quota")
-      const ids = Array.isArray(data?.disabledProviders) ? data.disabledProviders.filter((id: unknown): id is string => typeof id === "string") : []
+      const [quotaData, goData] = await Promise.all([
+        loadSettings(url, "quota"),
+        loadSettings(url, "opencode-go"),
+      ])
+      const ids = Array.isArray(quotaData?.disabledProviders) ? quotaData.disabledProviders.filter((id: unknown): id is string => typeof id === "string") : []
       setDisabledProviders(ids)
-      return data
+      if (typeof goData?.workspaceId === "string") setGoWorkspaceId(goData.workspaceId)
+      if (typeof goData?.authCookie === "string") setGoAuthCookie(goData.authCookie)
+      return { quota: quotaData, go: goData }
     },
   )
+
+  const goConfigured = createMemo(() => Boolean(goWorkspaceId().trim() && goAuthCookie().trim()))
+
+  const handleSaveGoConfig = async () => {
+    setGoSaving(true)
+    try {
+      await saveSetting(serverUrl, "opencode-go", "workspaceId", goWorkspaceId().trim())
+      await saveSetting(serverUrl, "opencode-go", "authCookie", goAuthCookie().trim())
+      setGoSavedAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
+      refetch()
+    } catch (error) {
+      console.error("Failed to save OpenCode Go config:", error)
+    } finally {
+      setGoSaving(false)
+    }
+  }
 
   const toggleProvider = async (id: string) => {
     const next = disabledProviders().includes(id)
@@ -216,6 +242,110 @@ export function QuotaContent() {
             Anthropic is cooling down to avoid 429s. Manual refresh will re-enable after the retry window.
           </div>
         </Show>
+
+        <div
+          class="mx-4 my-4 rounded-lg p-4 space-y-3"
+          style={{
+            background: 'var(--surface-inset)',
+            border: '1px solid var(--border-base)',
+          }}
+        >
+          <div class="flex flex-wrap items-center gap-2">
+            <h3 class="text-sm font-medium" style={{ color: 'var(--text-strong)' }}>
+              OpenCode Go credentials
+            </h3>
+            <span
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+              style={{
+                background: goConfigured() ? 'var(--surface-raised)' : 'var(--background-base)',
+                color: goConfigured() ? 'var(--icon-success-base)' : 'var(--text-weak)',
+                border: '1px solid var(--border-base)',
+              }}
+            >
+              {goConfigured() ? 'Configured' : 'Not configured'}
+            </span>
+            <Show when={goSavedAt()}>
+              <span class="text-xs" style={{ color: 'var(--text-weak)' }}>
+                Saved at {goSavedAt()}
+              </span>
+            </Show>
+          </div>
+          <p class="text-xs" style={{ color: 'var(--text-weak)' }}>
+            Enter your OpenCode workspace ID and auth cookie to display Go plan usage. Both values come from the opencode.ai website while you are logged in.
+          </p>
+          <details class="text-xs" style={{ color: 'var(--text-weak)' }}>
+            <summary class="cursor-pointer select-none" style={{ color: 'var(--text-weak)' }}>
+              How to find these values
+            </summary>
+            <div class="mt-2 space-y-2 pl-1">
+              <div>
+                <strong style={{ color: 'var(--text-base)' }}>Workspace ID</strong>
+                <ol class="mt-1 list-decimal list-inside space-y-0.5">
+                  <li>Open <a href="https://opencode.ai/" target="_blank" rel="noreferrer" style={{ color: 'var(--text-base)', 'text-decoration': 'underline' }}>opencode.ai</a> and sign in.</li>
+                  <li>Go to your dashboard — the URL will look like <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>https://opencode.ai/workspace/<strong>wk_xxx…</strong>/usage</code>.</li>
+                  <li>The <strong>workspace ID</strong> is the <code>wk_…</code> segment in that URL. Copy it into the field above.</li>
+                </ol>
+              </div>
+              <div>
+                <strong style={{ color: 'var(--text-base)' }}>Auth cookie</strong>
+                <ol class="mt-1 list-decimal list-inside space-y-0.5">
+                  <li>While on the opencode.ai site, open your browser DevTools (F12, or right-click → Inspect).</li>
+                  <li>Go to the <strong>Application</strong> tab → <strong>Storage</strong> → <strong>Cookies</strong> → <code>https://opencode.ai</code>.</li>
+                  <li>Find the cookie named <code>auth</code> (it is httpOnly, so you may need to copy the value via the row's edit field).</li>
+                  <li>Copy the cookie <em>value</em> (not the name) into the field above. It is a long opaque string.</li>
+                </ol>
+              </div>
+              <p class="text-[11px]" style={{ color: 'var(--text-weak)' }}>
+                The cookie is stored locally on this server only and is sent directly to opencode.ai. Sign out of opencode.ai to invalidate it.
+              </p>
+            </div>
+          </details>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label class="flex-1 space-y-1">
+              <span class="text-xs font-medium" style={{ color: 'var(--text-weak)' }}>Workspace ID</span>
+              <input
+                type="text"
+                value={goWorkspaceId()}
+                onInput={(e) => setGoWorkspaceId(e.currentTarget.value)}
+                placeholder="e.g. wk_abc123"
+                class="w-full rounded-md px-3 py-2 text-sm"
+                style={{
+                  background: 'var(--background-base)',
+                  color: 'var(--text-strong)',
+                  border: '1px solid var(--border-base)',
+                }}
+              />
+            </label>
+            <label class="flex-1 space-y-1">
+              <span class="text-xs font-medium" style={{ color: 'var(--text-weak)' }}>Auth cookie</span>
+              <input
+                type="password"
+                value={goAuthCookie()}
+                onInput={(e) => setGoAuthCookie(e.currentTarget.value)}
+                placeholder="auth cookie value"
+                class="w-full rounded-md px-3 py-2 text-sm font-mono"
+                style={{
+                  background: 'var(--background-base)',
+                  color: 'var(--text-strong)',
+                  border: '1px solid var(--border-base)',
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={handleSaveGoConfig}
+              disabled={goSaving()}
+              class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              style={{
+                background: 'var(--surface-raised)',
+                border: '1px solid var(--border-base)',
+                color: 'var(--text-strong)',
+              }}
+            >
+              {goSaving() ? 'Saving…' : 'Save & refresh'}
+            </button>
+          </div>
+        </div>
 
         <div class="space-y-4 p-4">
         <div

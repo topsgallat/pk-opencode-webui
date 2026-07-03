@@ -74,6 +74,16 @@ describe("projectDisplayMessages", () => {
     expect((second[0].parts[0] as Part & { text: string }).text).toBe("world!")
   })
 
+  test("can reuse source parts for streaming hot path", () => {
+    const assistant = assistantMessage("a1", "world")
+    const first = projectDisplayMessages([], [assistant], { reuseSourceParts: true })
+    const second = projectDisplayMessages(first, [assistant], { reuseSourceParts: true })
+
+    expect(first[0].parts).toBe(assistant.parts)
+    expect(second).toBe(first)
+    expect(second[0]).toBe(first[0])
+  })
+
   test("replaces a row when only reasoning text changes", () => {
     const first = projectDisplayMessages([], [{
       info: { id: "a1", role: "assistant", time: { created: 2 } },

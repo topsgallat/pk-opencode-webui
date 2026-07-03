@@ -1026,11 +1026,8 @@ export function Session() {
       projectedMessages = emptyMessages;
       return projectedMessages;
     }
-    const source = sync.messages(id).map((message) => ({
-      info: { ...message.info },
-      parts: message.parts.map((part) => ({ ...part })),
-    })) as SyncMessageLike[]
-    projectedMessages = projectDisplayMessages(projectedMessages, mergeSyncSources(source, directSyncMessages()[id] ?? []));
+    const source: SyncMessageLike[] = sync.messages(id);
+    projectedMessages = projectDisplayMessages(projectedMessages, mergeSyncSources(source, directSyncMessages()[id] ?? []), { reuseSourceParts: true });
     return projectedMessages;
   });
 

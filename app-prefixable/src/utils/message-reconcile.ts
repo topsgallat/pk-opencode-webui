@@ -36,11 +36,16 @@ function sameAssistantMeta(prev: DisplayMessage, next: SyncMessageLike["info"]) 
   )
 }
 
-function cloneParts(parts: Part[]) {
+type ProjectDisplayMessagesOptions = {
+  reuseSourceParts?: boolean
+}
+
+function projectParts(parts: Part[], options?: ProjectDisplayMessagesOptions) {
+  if (options?.reuseSourceParts) return parts
   return parts.map((part) => ({ ...part }))
 }
 
-export function projectDisplayMessages(prev: DisplayMessage[], messages: SyncMessageLike[]) {
+export function projectDisplayMessages(prev: DisplayMessage[], messages: SyncMessageLike[], options?: ProjectDisplayMessagesOptions) {
   const prevById = new Map(prev.map((message) => [message.id, message]))
 
   const next = messages.map((message) => {
@@ -61,7 +66,7 @@ export function projectDisplayMessages(prev: DisplayMessage[], messages: SyncMes
       return {
         id: info.id,
         role: info.role,
-        parts: cloneParts(message.parts),
+        parts: projectParts(message.parts, options),
         error: info.error,
         time: { created: info.time.created, completed: info.time.completed },
         modelID: info.modelID,
@@ -74,7 +79,7 @@ export function projectDisplayMessages(prev: DisplayMessage[], messages: SyncMes
     return {
       id: info.id,
       role: info.role,
-      parts: cloneParts(message.parts),
+      parts: projectParts(message.parts, options),
       time: { created: info.time.created },
     } satisfies DisplayMessage
   })

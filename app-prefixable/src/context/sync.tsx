@@ -133,6 +133,10 @@ function messageStatusRank(message: MessageWithParts) {
   return message.parts.reduce((rank, part) => Math.max(rank, partStatusRank(part)), 0)
 }
 
+export function shouldBumpMessageVersionForEvent(type: string) {
+  return type.startsWith("message.") && type !== "message.part.delta"
+}
+
 function binarySearch<T>(arr: T[], id: string, getId: (item: T) => string): { found: boolean; index: number } {
   let low = 0
   let high = arr.length - 1
@@ -291,6 +295,8 @@ export function SyncProvider(props: ParentProps) {
           return nextMsgs
         })
       }
+
+      if (updatesBySession.size > 0) setMessageVersion((version) => version + 1)
     })
   }
 
@@ -360,7 +366,7 @@ export function SyncProvider(props: ParentProps) {
 
   function handleEvent(event: SyncEvent) {
     const props = event.properties
-    const messageEvent = event.type.startsWith("message.")
+    const bumpMessageVersion = shouldBumpMessageVersionForEvent(event.type)
 
     // Session events
     if (event.type === "session.created") {
@@ -618,7 +624,7 @@ export function SyncProvider(props: ParentProps) {
       }
     }
 
-    if (messageEvent) setMessageVersion((version) => version + 1)
+    if (bumpMessageVersion) setMessageVersion((version) => version + 1)
     for (const fn of externalListeners) fn(event)
   }
 

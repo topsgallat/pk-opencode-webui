@@ -21,7 +21,8 @@ services:
       - HOME=/home/sgallat # Do not change this!
       - OPENCODE_WORKSPACE_ROOT=/home/sgallat # Do not change this!
       - XDG_CACHE_HOME=/home/sgallat/.cache
-      - OPENCODE_SERVER_PASSWORD=RnM1t61kfO6tG7
+      - OPENCODE_SERVER_PASSWORD=
+      - CODEX_AUTH_PER_PROJECT_ACCOUNTS=0
     volumes: # Do not change this!
       - /home/sgallat/syncthing/Ubuntu-24.04:/home/sgallat
       - /DATA/AppData/Opencode/data:/home/sgallat/.local/share/opencode

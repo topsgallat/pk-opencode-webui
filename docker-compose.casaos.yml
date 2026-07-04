@@ -1,0 +1,107 @@
+name: opencode-web-solo-prod
+services:
+  opencode-solo-prod:
+    build:
+      context: /DATA/AppData/pk-opencode-webui
+      dockerfile: docker/Dockerfile.local
+      args:
+        ENABLE_SUDO: "1"
+    container_name: opencode-web-solo-prod
+    environment:
+      API_HOSTNAME: 0.0.0.0
+      BASE_PATH: /
+      CODEX_AUTH_PER_PROJECT_ACCOUNTS: "0"
+      HOME: /home/sgallat
+      OPENCODE_SERVE_ARGS: --mdns
+      OPENCODE_SERVER_PASSWORD: ""
+      OPENCODE_WORKSPACE_ROOT: /home/sgallat
+      OPERATION_MODE: solo
+      XDG_CACHE_HOME: /home/sgallat/.cache
+    group_add:
+      - "144"
+    image: opencode-web-solo-prod:latest
+    labels:
+      icon: https://raw.githubusercontent.com/nicepkg/opencode/main/resources/icon.png
+    ports:
+      - mode: ingress
+        target: 8080
+        published: "8681"
+        protocol: tcp
+      - mode: ingress
+        target: 4096
+        published: "4097"
+        protocol: tcp
+      - mode: ingress
+        target: 1455
+        published: "1455"
+        protocol: tcp
+      - mode: ingress
+        target: 8085
+        published: "8085"
+        protocol: tcp
+      - mode: ingress
+        target: 19876
+        published: "19876"
+        protocol: tcp
+    restart: unless-stopped
+    user: 1000:1000
+    volumes:
+      - type: bind
+        source: /home/sgallat/syncthing/Ubuntu-24.04
+        target: /home/sgallat
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /DATA/AppData/Opencode/data
+        target: /home/sgallat/.local/share/opencode
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /home/sgallat/syncthing/opencode-config
+        target: /home/sgallat/Syncthing/opencode-config
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /home/sgallat/syncthing/opencode-config/opencode
+        target: /home/sgallat/.config/opencode
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /DATA/AppData
+        target: /home/sgallat/AppData
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /usr/local/bin/docker-compose
+        target: /usr/local/bin/docker-compose
+        read_only: true
+        bind:
+          create_host_path: true
+networks:
+  default:
+    name: opencode-web-solo-prod_default
+x-casaos:
+  architectures:
+    - amd64
+  author: Sisyphus
+  category: Developer
+  description:
+    en_us: OpenCode WebUI Solo — Standalone web interface for OpenCode AI coding assistant. Runs on port 8681 with full API access.
+  developer: OpenCode
+  icon: https://raw.githubusercontent.com/nicepkg/opencode/main/resources/icon.png
+  index: /
+  is_uncontrolled: false
+  main: opencode-solo-prod
+  port_map: "8681"
+  scheme: http
+  store_app_id: opencode-web-solo-prod
+  tagline:
+    en_us: OpenCode AI WebUI — Standalone coding assistant
+  thumbnail: https://raw.githubusercontent.com/nicepkg/opencode/main/resources/icon.png
+  title:
+    en_us: OpenCode WebUI Solo

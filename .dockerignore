@@ -1,0 +1,9 @@
+.git/
+.gitignore
+.gitattributes
+.cache/
+node_modules/
+docker-compose*.yml
+.env*
+*.md
+AGENTS.md

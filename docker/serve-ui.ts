@@ -123,10 +123,11 @@ if (OPERATION_MODE === "solo") {
     console.error(`[solo] ERROR: XDG_CACHE_HOME points to forbidden host location (${xdgCache}); must be container-local (e.g. /container-user/.cache). Aborting.`)
     process.exit(1)
   }
+  const { OPENCODE_SERVER_PASSWORD: serverPasswordEnv, ...baseEnv } = process.env
   const opencodeServerEnv = {
-    ...process.env,
+    ...baseEnv,
     HOME: homeDir,
-    OPENCODE_SERVER_PASSWORD: process.env.OPENCODE_SERVER_PASSWORD || "opencode-local",
+    ...(serverPasswordEnv ? { OPENCODE_SERVER_PASSWORD: serverPasswordEnv } : {}),
   }
   const dirs = [
     `${homeDir}/.cache/opencode`,

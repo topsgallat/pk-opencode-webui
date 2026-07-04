@@ -186,7 +186,7 @@ docker restart opencode
 | `BRANDING_URL`         | (empty)                 | Optional URL for branding link                       |
 | `XDG_CACHE_HOME`       | (empty)                 | Path for cache files (see Security Warning below)    |
 | `XDG_CONFIG_HOME`      | (empty)                 | Path for config files (see Security Warning below)   |
-| `OPENCODE_SERVER_PASSWORD` | (empty)             | API server password (recommended for production)     |
+| `OPENCODE_SERVER_PASSWORD` | (empty)             | Optional API server password; leave empty to disable auth |
 
 ---
 

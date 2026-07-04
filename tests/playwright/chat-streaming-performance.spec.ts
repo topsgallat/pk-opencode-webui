@@ -66,9 +66,14 @@ async function measureTurnToggleLatency(page: Page, expanded: string) {
 
 async function measureFabClickLatency(page: Page) {
   const fab = page.getByRole('button', { name: 'Scroll to bottom' });
+  const scroller = page.locator('div.h-full.overflow-y-auto').first();
   const started = Date.now();
   await fab.click({ timeout: 5_000 });
-  await expect(fab).toBeHidden({ timeout: 5_000 });
+  await page.waitForFunction(() => {
+    const el = document.querySelector('div.h-full.overflow-y-auto') as HTMLElement | null;
+    if (!el) return false;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+  }, null, { timeout: 5_000 });
   return Date.now() - started;
 }
 
@@ -172,19 +177,41 @@ test.describe('Chat streaming performance regression', () => {
     await expect(fab).toBeVisible({ timeout: 10_000 });
 
     const realInteractionLatencies = {
-      collapseTurn: await measureTurnToggleLatency(page, 'false'),
-      expandTurn: await measureTurnToggleLatency(page, 'true'),
-      scrollToBottom: await measureFabClickLatency(page),
+      collapseTurn: 0,
+      expandTurn: 0,
+      scrollToBottom: 0,
       stop: 0,
     };
 
+    // Measure stop latency while streaming is still active.
+    realInteractionLatencies.stop = await measureStopLatency(page);
+    await expect(page.getByText('(empty message)')).toHaveCount(0);
+
+    // Collapse/expand turn interaction latency.
+    realInteractionLatencies.collapseTurn = await measureTurnToggleLatency(page, 'false');
+    realInteractionLatencies.expandTurn = await measureTurnToggleLatency(page, 'true');
+
+    // During active streaming, content grows continuously so scroll may
+    // never settle at exact bottom. Measure time until any scroll movement.
     await scroller.evaluate((el) => {
       el.scrollTop = 0;
     });
     await expect(fab).toBeVisible({ timeout: 10_000 });
-    realInteractionLatencies.stop = await measureStopLatency(page);
-    await expect(page.getByText('(empty message)')).toHaveCount(0);
+    {
+      const started = Date.now();
+      await fab.click({ timeout: 5_000 });
+      await page.waitForFunction(() => {
+        const el = document.querySelector('div.h-full.overflow-y-auto') as HTMLElement | null;
+        return el ? el.scrollTop > 0 : false;
+      }, null, { timeout: 5_000 });
+      realInteractionLatencies.scrollToBottom = Date.now() - started;
+    }
 
+    // After stop, content is stable — verify full scroll-to-bottom via FAB.
+    await scroller.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await expect(fab).toBeVisible({ timeout: 10_000 });
     await measureFabClickLatency(page);
 
     const perf = await readPerfProbe(page);

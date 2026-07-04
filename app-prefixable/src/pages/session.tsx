@@ -1961,20 +1961,8 @@ export function Session() {
       void refreshProcessingState(id);
     }, 3_000);
 
-    let syncInterval: ReturnType<typeof setInterval> | undefined;
-    const syncTimeout = setTimeout(() => {
-      void sync.session.sync(id).catch(() => {});
-      void refreshDirectMessages(id).catch(() => {});
-      syncInterval = setInterval(() => {
-        void sync.session.sync(id).catch(() => {});
-        void refreshDirectMessages(id).catch(() => {});
-      }, 5_000);
-    }, 10_000);
-
     onCleanup(() => {
       clearInterval(statusInterval);
-      clearTimeout(syncTimeout);
-      if (syncInterval !== undefined) clearInterval(syncInterval);
     });
   });
 
@@ -2431,16 +2419,11 @@ export function Session() {
         model: item.model,
         variant: item.variant ?? undefined,
       });
+      // SSE is the primary update path after a successful promptAsync.
+      // One immediate sync covers the edge case where the server already
+      // persisted the message before the SSE subscription catches up.
       void sync.session.sync(id).catch(() => {});
       void refreshDirectMessages(id).catch(() => {});
-      setTimeout(() => {
-        void sync.session.sync(id).catch(() => {});
-        void refreshDirectMessages(id).catch(() => {});
-      }, 1_000);
-      setTimeout(() => {
-        void sync.session.sync(id).catch(() => {});
-        void refreshDirectMessages(id).catch(() => {});
-      }, 3_000);
       return true;
     } catch (err) {
       if (options?.allowAutoFallback !== false) {

@@ -11,6 +11,7 @@ import { extractTextContent } from "../utils/message"
 import type { SessionStatus } from "../sdk/client"
 import { reconcileTurns } from "../utils/message-reconcile"
 import { getRealTurnDefaultExpanded } from "./message-turn-state"
+import { shouldResetTimelineState } from "./message-timeline-state"
 
 // Number of turns to render initially and on each "load more"
 const TURNS_PER_BATCH = 10
@@ -86,6 +87,7 @@ export function MessageTimeline(props: {
   processing: boolean
   loadingHistory: boolean
   historyError?: string | null
+  sessionKey?: string
   sessionStatus?: SessionStatus
   activeTurnId?: string
   activeTurnState?: QueueTurnState
@@ -117,7 +119,10 @@ export function MessageTimeline(props: {
 
   const [expanded, setExpanded] = createSignal<Record<string, boolean>>({})
   const [renderCount, setRenderCount] = createSignal(INITIAL_TURNS)
-  const [prevTurnIds, setPrevTurnIds] = createSignal<Set<string>>(new Set())
+  const [prevTimelineState, setPrevTimelineState] = createSignal<{ sessionKey: string | undefined; turnIds: string[] }>({
+    sessionKey: undefined,
+    turnIds: [],
+  })
 
   let turnCache: Turn[] = []
   const turns = createMemo(() => {
@@ -245,24 +250,23 @@ export function MessageTimeline(props: {
   }
 
   createEffect(() => {
+    const sessionKey = props.sessionKey
+    const previous = untrack(() => prevTimelineState())
     const currentTurns = turns()
-    const currentIds = new Set(currentTurns.map((t) => t.id))
-    const prevIds = untrack(() => prevTurnIds())
+    const currentTurnIds = currentTurns.map((turn) => turn.id)
+    const current = { sessionKey, turnIds: currentTurnIds }
 
-    if (prevIds.size > 0) {
-      let overlap = 0
-      for (const id of prevIds) {
-        if (currentIds.has(id)) overlap++
-      }
-      if (overlap < prevIds.size / 2) {
-        setRenderCount(INITIAL_TURNS)
-        setExpanded({})
-      }
+    if (shouldResetTimelineState({
+      previous,
+      current,
+    })) {
+      setRenderCount(INITIAL_TURNS)
+      setExpanded({})
     }
 
     if (currentTurns.length <= INITIAL_TURNS) setRenderCount(INITIAL_TURNS)
 
-    setPrevTurnIds(currentIds)
+    setPrevTimelineState(current)
   })
 
   createEffect(() => {

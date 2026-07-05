@@ -1,10 +1,11 @@
-import { createContext, useContext, createResource, createEffect, createMemo, type ParentProps, onMount } from "solid-js"
+import { createContext, useContext, createResource, createEffect, createMemo, createSignal, type ParentProps, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useSDK } from "./sdk"
 import { useConfig } from "./config"
 import { useServer } from "./server"
 import { getAnthropicModelPricing, getCopilotModelMultipliers, getOpenAIModelPricing, normalizeCopilotModelKey } from "../utils/path"
 import { clearProviderAuth, getProviderAccounts, readErrorMessage, removeProviderAccount, saveProviderAccounts, syncProviderAuth, syncProviderAuthFromBackend, type ProviderAccount } from "../utils/extended-api"
+import { loadSettings, saveSetting } from "../utils/settings-api"
 import { withTimeout } from "../utils/request-timeout"
 import { modelPolicyEnabled, providerBaseID } from "../utils/model-policy"
 
@@ -132,6 +133,8 @@ interface ProviderContextValue {
   selectedAgent: string
   modelsByAgent: Record<string, ModelKey>
   eligibleModels: () => EligibleModel[]
+  disabledProviders: () => string[]
+  toggleProvider: (providerID: string) => Promise<void>
   setSelectedModel: (model: ModelKey | null) => void
   setSelectedVariant: (variant: string | null) => void
   setSelectedAgent: (agent: string) => void
@@ -165,6 +168,24 @@ export function ProviderProvider(props: ParentProps) {
   let userChangedAgent = false
   let providerFetchError: string | null = null
   let agentFetchError: string | null = null
+
+  const [disabledProviders, setDisabledProviders] = createSignal<string[]>([])
+
+  loadSettings(serverUrl, "providers").then((data) => {
+    const ids = Array.isArray(data?.disabled) ? data.disabled.filter((id: unknown): id is string => typeof id === "string") : []
+    setDisabledProviders(ids)
+  }).catch(() => {})
+
+  async function toggleProvider(providerID: string) {
+    const base = providerBaseID(providerID)
+    const next = disabledProviders().includes(base)
+      ? disabledProviders().filter((id) => id !== base)
+      : [...disabledProviders(), base]
+    setDisabledProviders(next)
+    saveSetting(serverUrl, "providers", "disabled", next).catch((e) => {
+      console.error("Failed to save provider toggle:", e)
+    })
+  }
 
   function formatOAuthError(error: unknown): { status?: number; error: string } {
     const status = typeof error === "object" && error !== null && "status" in error && typeof (error as { status?: unknown }).status === "number"
@@ -261,9 +282,7 @@ export function ProviderProvider(props: ParentProps) {
 
   function providerAllowed(providerID: string) {
     const base = providerBaseID(providerID)
-    if (cfg.project.enabled_providers) return cfg.project.enabled_providers.includes(base)
-    if (cfg.project.disabled_providers) return !cfg.project.disabled_providers.includes(base)
-    return true
+    return !disabledProviders().includes(base)
   }
 
   const providersView = createMemo(() => rawProviders()
@@ -635,6 +654,10 @@ export function ProviderProvider(props: ParentProps) {
       return store.modelsByAgent
     },
     eligibleModels: () => eligibleModels(),
+    get disabledProviders() {
+      return disabledProviders()
+    },
+    toggleProvider,
     setSelectedModel,
     setSelectedVariant,
     setSelectedAgent,

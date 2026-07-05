@@ -4998,9 +4998,7 @@ function ProjectProvidersTab() {
 
   function projectProviderEnabled(providerID: string) {
     const base = providerBaseID(providerID)
-    if (config.project.enabled_providers) return config.project.enabled_providers.includes(base)
-    if (config.project.disabled_providers) return !config.project.disabled_providers.includes(base)
-    return true
+    return !providers.disabledProviders().includes(base)
   }
 
   function globalModelListExpanded(providerID: string) {
@@ -5030,25 +5028,10 @@ function ProjectProvidersTab() {
   }
 
   async function toggleProjectProvider(providerID: string) {
-    const base = providerBaseID(providerID)
     setSaving(true)
-    if (config.project.enabled_providers) {
-      const next = config.project.enabled_providers.includes(base)
-        ? config.project.enabled_providers.filter((item) => item !== base)
-        : [...config.project.enabled_providers, base]
-      const result = await config.updateProject({ enabled_providers: next })
-      setSaving(false)
-      if (result) showSaved()
-      return
-    }
-
-    const disabled = config.project.disabled_providers ?? []
-    const next = disabled.includes(base)
-      ? disabled.filter((item) => item !== base)
-      : [...disabled, base]
-    const result = await config.updateProject({ disabled_providers: next })
+    await providers.toggleProvider(providerID)
     setSaving(false)
-    if (result) showSaved()
+    showSaved()
   }
 
   function globalProviderModelConfig(providerID: string) {

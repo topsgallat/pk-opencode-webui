@@ -40,7 +40,8 @@ import { ReviewPanel } from "../components/review-panel";
 import { Terminal } from "../components/terminal";
 import { SessionHeader } from "../components/session-header";
 import { ResizeHandle } from "../components/resize-handle";
-import { base64Encode, base64Decode } from "../utils/path";
+import { base64Encode, base64Decode, getServerUrl } from "../utils/path";
+import { loadSettings, saveSetting } from "../utils/settings-api";
 import type { Command as BackendCommand, Part, TextPart } from "../sdk/client";
 import type { DisplayMessage, QueueTurnState } from "../types/message";
 import { Plus, Settings, Paperclip, Upload, Bookmark, BookOpen, X as XIcon, SquareTerminal, RefreshCw, Clock } from "lucide-solid";
@@ -215,16 +216,12 @@ interface PendingPromptStorage {
   }>;
 }
 
-const SESSION_SELECTIONS_KEY = "opencode.sessionSelections";
+const SESSION_SELECTIONS_NS = "session-selections";
 
 // Composite key for the drafts Map so drafts are scoped to a directory+session
 // pair. Uses "__new__" as sentinel when there is no session id yet.
 function draftKey(serverKey: string, dir: string, id?: string) {
   return `${serverKey}:${dir}:${id ?? "__new__"}`;
-}
-
-function selectionKey(serverKey: string, dir: string) {
-  return `${SESSION_SELECTIONS_KEY}.${serverKey}.${dir}`;
 }
 
 function parseDraftKey(key: string) {
@@ -238,23 +235,71 @@ function parseDraftKey(key: string) {
   };
 }
 
-function readSelections(serverKey: string, dir: string) {
+// DB-backed session selections — load once per server+dir pair, cache in memory.
+let _selectionsCache: Record<string, SessionSelection> = {};
+let _selectionsCacheKey = "";
+
+function selectionsStorageKey(serverKey: string, dir: string) {
+  return `${serverKey}:${dir}`;
+}
+
+function selectionRowKey(serverKey: string, dir: string, sessionId: string) {
+  return `${serverKey}:${dir}:${sessionId}`;
+}
+
+function readSelectionsSync(serverKey: string, dir: string): Record<string, SessionSelection> {
   try {
-    const raw = localStorage.getItem(selectionKey(serverKey, dir));
+    const raw = localStorage.getItem(`opencode.sessionSelections.${serverKey}.${dir}`);
     return raw ? (JSON.parse(raw) as Record<string, SessionSelection>) : {};
-  } catch (e) {
-    console.error("Failed to load session selections:", e);
+  } catch {
     return {};
   }
 }
 
-  function writeSelections(serverKey: string, dir: string, selections: Record<string, SessionSelection>) {
-    try {
-      localStorage.setItem(selectionKey(serverKey, dir), JSON.stringify(selections));
-    } catch (e) {
-      console.error("Failed to save session selections:", e);
+function writeSelectionsSync(serverKey: string, dir: string, selections: Record<string, SessionSelection>) {
+  try {
+    localStorage.setItem(`opencode.sessionSelections.${serverKey}.${dir}`, JSON.stringify(selections));
+  } catch {}
+}
+
+async function loadSelections(serverKey: string, dir: string): Promise<Record<string, SessionSelection>> {
+  const cacheKey = selectionsStorageKey(serverKey, dir);
+  if (cacheKey === _selectionsCacheKey) return _selectionsCache;
+
+  try {
+    const url = getServerUrl();
+    const data = await loadSettings(url, SESSION_SELECTIONS_NS);
+    const prefix = `${serverKey}:${dir}:`;
+    const result: Record<string, SessionSelection> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (key.startsWith(prefix)) {
+        const sid = key.slice(prefix.length);
+        if (typeof sid === "string" && sid) result[sid] = value as SessionSelection;
+      }
     }
+    _selectionsCache = result;
+    _selectionsCacheKey = cacheKey;
+    return result;
+  } catch {
+    const fallback = readSelectionsSync(serverKey, dir);
+    _selectionsCache = fallback;
+    _selectionsCacheKey = cacheKey;
+    return fallback;
   }
+}
+
+function saveSelection(serverKey: string, dir: string, sessionId: string, selection: SessionSelection) {
+  const cacheKey = selectionsStorageKey(serverKey, dir);
+  if (cacheKey === _selectionsCacheKey) _selectionsCache[sessionId] = selection;
+
+  try {
+    const url = getServerUrl();
+    void saveSetting(url, SESSION_SELECTIONS_NS, selectionRowKey(serverKey, dir, sessionId), selection);
+  } catch {
+    writeSelectionsSync(serverKey, dir, _selectionsCache);
+  }
+}
+
 
 function consumeServerSwitchHome() {
   try {
@@ -833,6 +878,7 @@ export function Session() {
   const wasProcessing = { value: false };
 
   const syncGen = { value: 0 };
+  const restoreGen = { value: 0 };
 
   // Keep sessionId in sync with URL params and sync session data.
   // Track the composite dir+id key so the effect fires on directory changes too,
@@ -848,16 +894,13 @@ export function Session() {
       const prev = parseDraftKey(prevKey);
       const prevDir = prev?.dir;
       if (prevId && prevDir) {
-        const selections = readSelections(prev?.serverKey ?? server.serverKey(), prevDir);
         const model = untrack(() => providers.selectedModel);
-        const variant = untrack(() => providers.selectedVariant);
         if (model) {
-          selections[prevId] = {
+          void saveSelection(prev?.serverKey ?? server.serverKey(), prevDir, prevId, {
             agent: untrack(() => providers.selectedAgent),
             model: { providerID: model.providerID, modelID: model.modelID },
-            variant,
-          };
-          writeSelections(prev?.serverKey ?? server.serverKey(), prevDir, selections);
+            variant: untrack(() => providers.selectedVariant),
+          });
         }
       }
 
@@ -919,13 +962,15 @@ export function Session() {
 
   createEffect(on(
     () => draftKey(server.serverKey(), params.dir, sessionId()),
-    () => {
+    async () => {
       const id = sessionId();
       const dir = params.dir;
       if (!id || typeof dir !== "string" || !dir) return;
 
       setHydratingSelection(true);
-      const selections = readSelections(server.serverKey(), dir);
+      const gen = ++restoreGen.value;
+      const selections = await loadSelections(server.serverKey(), dir);
+      if (restoreGen.value !== gen) return;
       const saved = selections[id];
       const next = saved ?? defaultSelection();
       if (next) {
@@ -947,13 +992,11 @@ export function Session() {
     const serverKey = server.serverKey();
     if (!id || !dir || !serverKey) return;
 
-    const selections = readSelections(serverKey, dir);
-    selections[id] = {
+    void saveSelection(serverKey, dir, id, {
       agent: selection.agent,
       model: { providerID: selection.model.providerID, modelID: selection.model.modelID },
       variant: selection.variant ?? null,
-    };
-    writeSelections(serverKey, dir, selections);
+    });
   });
 
   // Auto-send saved prompt stored in sessionStorage by layout's createSessionWithPrompt.

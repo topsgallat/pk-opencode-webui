@@ -266,26 +266,25 @@ async function loadSelections(serverKey: string, dir: string): Promise<Record<st
   const cacheKey = selectionsStorageKey(serverKey, dir);
   if (cacheKey === _selectionsCacheKey) return _selectionsCache;
 
+  // localStorage is written synchronously, so it survives page unloads and is the primary read source
+  const result = readSelectionsSync(serverKey, dir);
+
   try {
     const url = getServerUrl();
     const data = await loadSettings(url, SESSION_SELECTIONS_NS);
     const prefix = `${serverKey}:${dir}:`;
-    const result: Record<string, SessionSelection> = {};
     for (const [key, value] of Object.entries(data)) {
       if (key.startsWith(prefix)) {
         const sid = key.slice(prefix.length);
         if (typeof sid === "string" && sid) result[sid] = value as SessionSelection;
       }
     }
-    _selectionsCache = result;
-    _selectionsCacheKey = cacheKey;
-    return result;
-  } catch {
-    const fallback = readSelectionsSync(serverKey, dir);
-    _selectionsCache = fallback;
-    _selectionsCacheKey = cacheKey;
-    return fallback;
-  }
+    writeSelectionsSync(serverKey, dir, result);
+  } catch {}
+
+  _selectionsCache = result;
+  _selectionsCacheKey = cacheKey;
+  return result;
 }
 
 function saveSelection(serverKey: string, dir: string, sessionId: string, selection: SessionSelection) {
@@ -4080,9 +4079,14 @@ export function Session() {
             items={providers.providers
               .filter((p) => providers.connected.includes(p.id))
               .flatMap((p) => {
+                const models = Object.values(p.models).sort((a, b) => {
+                  const totalA = a.cost ? a.cost.input + a.cost.output : 0
+                  const totalB = b.cost ? b.cost.input + b.cost.output : 0
+                  return totalA - totalB
+                })
                 const colonIdx = p.id.indexOf(":")
                 const accountName = colonIdx > 0 ? p.id.slice(colonIdx + 1) : null
-                return Object.values(p.models).map((m) => {
+                return models.map((m) => {
                   let description = `${p.id}/${m.id}`
                   const fmt = (n: number) => Number(n.toFixed(2)).toString()
                   const isOpenAI = p.id === "openai" || p.id.startsWith("openai:")

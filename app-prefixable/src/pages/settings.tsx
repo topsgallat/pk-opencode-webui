@@ -4998,7 +4998,7 @@ function ProjectProvidersTab() {
 
   function projectProviderEnabled(providerID: string) {
     const base = providerBaseID(providerID)
-    return !providers.disabledProviders().includes(base)
+    return !providers.disabledProviders.includes(base)
   }
 
   function globalModelListExpanded(providerID: string) {

@@ -602,6 +602,7 @@ export function Session() {
   const [savePromptBody, setSavePromptBody] = createSignal("");
   const [sessionSelection, setSessionSelection] = createSignal<SessionSelection | null>(null);
   const [hydratingSelection, setHydratingSelection] = createSignal(false);
+  const [pendingRestoreSelection, setPendingRestoreSelection] = createSignal<SessionSelection | null>(null);
 
   function defaultSelection(): SessionSelection | null {
     const agentNames = providers.agents.map((a) => a.name);
@@ -671,6 +672,7 @@ export function Session() {
   }
 
   function selectAgent(agent: string) {
+    setPendingRestoreSelection(null);
     providers.setSelectedAgent(agent);
     const model = providers.selectedModel;
     if (!model) return;
@@ -682,6 +684,7 @@ export function Session() {
   }
 
   function selectModel(model: { providerID: string; modelID: string }) {
+    setPendingRestoreSelection(null);
     providers.setSelectedModel(model);
     providers.setSelectedVariant(null);
     setModelPickerError(null);
@@ -732,6 +735,7 @@ export function Session() {
   }
 
   function selectVariant(variant: string | null) {
+    setPendingRestoreSelection(null);
     providers.setSelectedVariant(variant);
     setSessionSelection((prev) => {
       const current = prev ?? activeSelection()
@@ -970,19 +974,35 @@ export function Session() {
       if (!id || typeof dir !== "string" || !dir) return;
 
       setHydratingSelection(true);
+      setPendingRestoreSelection(null);
       const gen = ++restoreGen.value;
       const selections = await loadSelections(server.serverKey(), dir);
       if (restoreGen.value !== gen) return;
       const saved = selections[id];
       const next = saved ?? defaultSelection();
       if (next) {
-        applySelection(next);
-        setHydratingSelection(false);
+        setPendingRestoreSelection(next);
         return;
       }
       setHydratingSelection(false);
     },
   ));
+
+  // Apply the restored selection once providers have loaded. setSelectedModel
+  // silently rejects models that are not currently allowed, which happens when
+  // provider data is still being fetched. Waiting here prevents the saved model
+  // from being overwritten by the fallback default.
+  createEffect(() => {
+    const pending = pendingRestoreSelection();
+    if (!pending) return;
+    if (providers.loading) return;
+
+    batch(() => {
+      applySelection(pending);
+      setPendingRestoreSelection(null);
+      setHydratingSelection(false);
+    });
+  });
 
   createEffect(() => {
     if (hydratingSelection()) return;

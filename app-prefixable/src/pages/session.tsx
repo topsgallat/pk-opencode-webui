@@ -292,12 +292,15 @@ function saveSelection(serverKey: string, dir: string, sessionId: string, select
   const cacheKey = selectionsStorageKey(serverKey, dir);
   if (cacheKey === _selectionsCacheKey) _selectionsCache[sessionId] = selection;
 
+  // Sync write to localStorage — survives page unloads
+  const stored = readSelectionsSync(serverKey, dir);
+  stored[sessionId] = selection;
+  writeSelectionsSync(serverKey, dir, stored);
+
   try {
     const url = getServerUrl();
     void saveSetting(url, SESSION_SELECTIONS_NS, selectionRowKey(serverKey, dir, sessionId), selection);
-  } catch {
-    writeSelectionsSync(serverKey, dir, _selectionsCache);
-  }
+  } catch {}
 }
 
 

@@ -375,6 +375,7 @@ export function MessageTurn(props: {
 
   return (
     <div
+      data-turn-id={props.turn.id}
       class="rounded-lg overflow-hidden"
       style={{
         border: "1px solid var(--border-base)",

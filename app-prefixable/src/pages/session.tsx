@@ -774,6 +774,7 @@ export function Session() {
   const [activePrompt, setActivePrompt] = createSignal<PendingPromptItem | null>(null);
   const [pendingQueue, setPendingQueue] = createSignal<PendingPromptItem[]>([]);
   const autoFallbackAttempts = new Set<string>();
+  const [scrollToTopTrigger, setScrollToTopTrigger] = createSignal(0);
 
   createEffect(() => {
     params.id;
@@ -2489,6 +2490,7 @@ export function Session() {
       // persisted the message before the SSE subscription catches up.
       void sync.session.sync(id).catch(() => {});
       void refreshDirectMessages(id).catch(() => {});
+      setScrollToTopTrigger((v) => v + 1);
       return true;
     } catch (err) {
       if (options?.allowAutoFallback !== false) {
@@ -3342,6 +3344,7 @@ export function Session() {
                   setLoadingHistory(false);
                 });
             }}
+            scrollToTopTrigger={scrollToTopTrigger()}
           />
 
           <Show when={historyError() && !loadingHistory()}>

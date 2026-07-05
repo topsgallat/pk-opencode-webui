@@ -1,4 +1,4 @@
-import { createSignal, createMemo, createEffect, For, Show, onMount, onCleanup, untrack } from "solid-js"
+import { createSignal, createMemo, createEffect, For, Show, onMount, onCleanup, untrack, on } from "solid-js"
 import { Spinner } from "./ui/spinner"
 import { MessageTurn } from "./message-turn"
 // Note: Markdown and MessageParts are used in the FlatMessageList component below
@@ -97,6 +97,7 @@ export function MessageTimeline(props: {
   onRetry?: (turnId: string) => void
   onRetryHistory?: () => void
   onOpenFile?: (path: string) => void
+  scrollToTopTrigger?: number
 }) {
   const autoScroll = createAutoScroll()
 
@@ -272,6 +273,17 @@ export function MessageTimeline(props: {
   createEffect(() => {
     props.onScroll?.(!autoScroll.showScrollToBottom())
   })
+
+  createEffect(on(() => props.scrollToTopTrigger, (trigger) => {
+    if (!trigger || trigger === 0) return
+    const el = containerRef
+    if (!el) return
+    requestAnimationFrame(() => {
+      const turns = el.querySelectorAll("[data-turn-id]")
+      const last = turns[turns.length - 1]
+      if (last instanceof HTMLElement) last.scrollIntoView({ block: "start", behavior: "smooth" })
+    })
+  }))
 
   const showScrollToBottom = createMemo(() => !props.loadingHistory && autoScroll.showScrollToBottom())
 

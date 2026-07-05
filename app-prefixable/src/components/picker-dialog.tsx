@@ -1,6 +1,6 @@
 import { createSignal, createEffect, createMemo, Show, onMount, onCleanup, For } from "solid-js"
 import { Portal } from "solid-js/web"
-import { X, Search } from "lucide-solid"
+import { X, Search, ChevronsDown, ChevronsRight } from "lucide-solid"
 import { createBackdropDismiss } from "../utils/backdrop"
 import { Spinner } from "./ui/spinner"
 
@@ -37,6 +37,7 @@ interface Props {
 export function PickerDialog(props: Props) {
   const [filter, setFilter] = createSignal(props.initialFilter ?? "")
   const [activeIndex, setActiveIndex] = createSignal(0)
+  const [collapsedGroups, setCollapsedGroups] = createSignal<Set<string>>(new Set())
   let inputRef: HTMLInputElement | undefined
   let listRef: HTMLDivElement | undefined
   let headerActionRef: HTMLButtonElement | undefined
@@ -72,6 +73,7 @@ export function PickerDialog(props: Props) {
   createEffect(() => {
     filter()
     setActiveIndex(0)
+    setCollapsedGroups(new Set())
   })
 
   createEffect(() => {
@@ -86,20 +88,34 @@ export function PickerDialog(props: Props) {
 
     const handler = (e: KeyboardEvent) => {
       const items = filtered()
+      const collapsed = collapsedGroups()
+      const groupOf = (idx: number) => items[idx]?.group?.trim() || ""
+
+      const nextVisible = (start: number, dir: 1 | -1): number => {
+        if (collapsed.size === 0) return start
+        for (let i = 0; i < items.length; i++) {
+          const idx = (start + dir * i + items.length) % items.length
+          if (!collapsed.has(groupOf(idx))) return idx
+        }
+        return start
+      }
+
       if (e.key === "Escape") {
         e.preventDefault()
         e.stopPropagation()
         props.onClose()
       } else if (e.key === "ArrowDown" && items.length > 0) {
         e.preventDefault()
-        setActiveIndex((i) => (i + 1) % items.length)
+        setActiveIndex((i) => nextVisible((i + 1) % items.length, 1))
       } else if (e.key === "ArrowUp" && items.length > 0) {
         e.preventDefault()
-        setActiveIndex((i) => (i - 1 + items.length) % items.length)
+        setActiveIndex((i) => nextVisible((i - 1 + items.length) % items.length, -1))
       } else if (e.key === "Enter" && items.length > 0) {
         if (document.activeElement === headerActionRef || document.activeElement === closeButtonRef) return
         e.preventDefault()
-        const item = items[activeIndex()]
+        const idx = activeIndex()
+        if (collapsed.has(groupOf(idx))) return
+        const item = items[idx]
         if (item) {
           props.onSelect(item)
           props.onClose()
@@ -255,57 +271,78 @@ export function PickerDialog(props: Props) {
             </Show>
 
             <For each={grouped()}>
-              {(section) => (
+              {(section) => {
+                const isCollapsed = () => collapsedGroups().has(section.group)
+                return (
                 <div>
                   <Show when={section.group}>
-                    <div
-                      class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider sticky top-0 z-10"
+                    <button
+                      type="button"
+                      onClick={() => setCollapsedGroups((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(section.group)) next.delete(section.group)
+                        else next.add(section.group)
+                        return next
+                      })}
+                      class="w-full px-4 py-2 text-[11px] font-medium uppercase tracking-wider sticky top-0 z-10 flex items-center gap-1.5 transition-colors"
                       style={{
                         color: "var(--text-weak)",
                         background: "var(--background-base)",
                         "border-bottom": "1px solid var(--border-base)",
                       }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "var(--surface-inset)"
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "var(--background-base)"
+                      }}
                     >
+                      {isCollapsed()
+                        ? <ChevronsRight class="w-3.5 h-3.5 shrink-0" style={{ color: "var(--icon-weak)" }} />
+                        : <ChevronsDown class="w-3.5 h-3.5 shrink-0" style={{ color: "var(--icon-weak)" }} />
+                      }
                       {section.group}
-                    </div>
+                    </button>
                   </Show>
-                  <For each={section.items}>
-                    {(row) => {
-                      const isActive = () => row.idx === activeIndex()
-                      return (
-                        <button
-                          type="button"
-                          id={`picker-option-${row.idx}`}
-                          role="option"
-                          aria-selected={isActive()}
-                          data-index={row.idx}
-                          onClick={() => {
-                            props.onSelect(row.item)
-                            props.onClose()
-                          }}
-                          onMouseEnter={() => setActiveIndex(row.idx)}
-                          class="w-full px-4 py-2.5 text-left flex flex-col gap-0.5 transition-colors"
-                          style={{
-                            background: isActive()
-                              ? "color-mix(in srgb, var(--interactive-base) 15%, transparent)"
-                              : "transparent",
-                            "border-left": isActive() ? "3px solid var(--interactive-base)" : "3px solid transparent",
-                          }}
-                        >
-                          <span class="font-medium text-sm" style={{ color: "var(--text-strong)" }}>
-                            {row.item.title}
-                          </span>
-                          <Show when={row.item.description}>
-                            <span class="text-xs" style={{ color: "var(--text-weak)" }}>
-                              {row.item.description}
+                  <Show when={!isCollapsed()}>
+                    <For each={section.items}>
+                      {(row) => {
+                        const isActive = () => row.idx === activeIndex()
+                        return (
+                          <button
+                            type="button"
+                            id={`picker-option-${row.idx}`}
+                            role="option"
+                            aria-selected={isActive()}
+                            data-index={row.idx}
+                            onClick={() => {
+                              props.onSelect(row.item)
+                              props.onClose()
+                            }}
+                            onMouseEnter={() => setActiveIndex(row.idx)}
+                            class="w-full px-4 py-2.5 text-left flex flex-col gap-0.5 transition-colors"
+                            style={{
+                              background: isActive()
+                                ? "color-mix(in srgb, var(--interactive-base) 15%, transparent)"
+                                : "transparent",
+                              "border-left": isActive() ? "3px solid var(--interactive-base)" : "3px solid transparent",
+                            }}
+                          >
+                            <span class="font-medium text-sm" style={{ color: "var(--text-strong)" }}>
+                              {row.item.title}
                             </span>
-                          </Show>
-                        </button>
-                      )
-                    }}
-                  </For>
+                            <Show when={row.item.description}>
+                              <span class="text-xs" style={{ color: "var(--text-weak)" }}>
+                                {row.item.description}
+                              </span>
+                            </Show>
+                          </button>
+                        )
+                      }}
+                    </For>
+                  </Show>
                 </div>
-              )}
+              )}}
             </For>
           </div>
         </div>

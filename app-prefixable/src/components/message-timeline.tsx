@@ -97,6 +97,7 @@ export function MessageTimeline(props: {
   onRetry?: (turnId: string) => void
   onRetryHistory?: () => void
   onOpenFile?: (path: string) => void
+  scrollToTopTrigger?: number
 }) {
   const autoScroll = createAutoScroll()
 
@@ -273,96 +274,26 @@ export function MessageTimeline(props: {
     props.onScroll?.(!autoScroll.showScrollToBottom())
   })
 
-  // Auto-follow active streaming turn: keep turn visible while it fits,
-  // align top once it overflows, stop if user scrolls away.
-  let programmaticScroll = false
-  const [autoFollowActive, setAutoFollowActive] = createSignal(false)
-  let activeTurnObserver: ResizeObserver | undefined
-  let observedTurnId: string | undefined
-
-  function followActiveTurn() {
-    if (!containerRef) return
-    const activeId = visibleActiveTurnId()
-    if (!activeId || !props.processing || !autoFollowActive()) return
-    const turnEl = containerRef.querySelector(`[data-turn-id="${activeId}"]`)
-    if (!(turnEl instanceof HTMLElement)) return
-
-    const containerRect = containerRef.getBoundingClientRect()
-    const turnRect = turnEl.getBoundingClientRect()
-
-    let target: number
-    if (turnEl.offsetHeight >= containerRef.clientHeight) {
-      // Turn overflows container: align turn top to container top
-      target = containerRef.scrollTop + (turnRect.top - containerRect.top)
-    } else {
-      // Turn fits: align turn bottom to container bottom
-      target = containerRef.scrollTop + (turnRect.bottom - containerRect.bottom)
-    }
-
-    const clamped = Math.max(0, Math.min(target, containerRef.scrollHeight - containerRef.clientHeight))
-    if (Math.abs(clamped - containerRef.scrollTop) < 1) return
-
-    programmaticScroll = true
-    containerRef.scrollTop = clamped
-    requestAnimationFrame(() => { programmaticScroll = false })
-  }
-
-  createEffect(() => {
-    const activeId = visibleActiveTurnId()
-    const processing = props.processing
-
-    // Reset follow state on new active turn
-    if (activeId !== observedTurnId) {
-      if (activeTurnObserver) {
-        activeTurnObserver.disconnect()
-        activeTurnObserver = undefined
-      }
-      observedTurnId = activeId
-      setAutoFollowActive(!!activeId && processing)
-    }
-
-    if (!activeId || !processing || !autoFollowActive() || !containerRef) return
-
-    // Wait for DOM then attach observer
+  createEffect(on(() => props.scrollToTopTrigger, (trigger) => {
+    if (!trigger || trigger === 0) return
+    const el = containerRef
+    if (!el) return
+    const startCount = el.querySelectorAll("[data-turn-id]").length
     let attempts = 0
-    const tryAttach = () => {
-      if (!containerRef || !autoFollowActive()) return
-      const turnEl = containerRef.querySelector(`[data-turn-id="${activeId}"]`)
-      if (turnEl instanceof HTMLElement) {
-        followActiveTurn()
-        if (typeof ResizeObserver !== "undefined") {
-          activeTurnObserver = new ResizeObserver(() => followActiveTurn())
-          activeTurnObserver.observe(turnEl)
-        }
+    const tryScroll = () => {
+      const current = containerRef
+      if (!current) return
+      const turns = current.querySelectorAll("[data-turn-id]")
+      if (turns.length > startCount || attempts > 20) {
+        const last = turns[turns.length - 1]
+        if (last instanceof HTMLElement) last.scrollIntoView({ block: "start", behavior: "smooth" })
         return
       }
-      if (attempts++ < 30) requestAnimationFrame(tryAttach)
+      attempts++
+      requestAnimationFrame(tryScroll)
     }
-    setTimeout(tryAttach, 0)
-  })
-
-  onCleanup(() => {
-    if (activeTurnObserver) activeTurnObserver.disconnect()
-  })
-
-  function handleScrollWithInterruption() {
-    if (!programmaticScroll && visibleActiveTurnId() && props.processing) {
-      const el = containerRef
-      if (el) {
-        const distance = el.scrollHeight - el.clientHeight - el.scrollTop
-        if (distance > 50) {
-          setAutoFollowActive(false)
-        } else {
-          const activeId = visibleActiveTurnId()
-          const turnEl = activeId ? el.querySelector(`[data-turn-id="${activeId}"]`) : null
-          if (turnEl instanceof HTMLElement && turnEl.offsetHeight <= el.clientHeight) {
-            setAutoFollowActive(true)
-          }
-        }
-      }
-    }
-    autoScroll.handleScroll()
-  }
+    setTimeout(tryScroll, 0)
+  }))
 
   const showScrollToBottom = createMemo(() => !props.loadingHistory && autoScroll.showScrollToBottom())
 
@@ -370,7 +301,7 @@ export function MessageTimeline(props: {
     <div class="relative flex-1 min-h-0">
       <div
         ref={(el) => { containerRef = el; autoScroll.scrollRef(el) }}
-        onScroll={handleScrollWithInterruption}
+        onScroll={autoScroll.handleScroll}
         class="h-full overflow-y-auto p-6"
         style={{ background: "var(--background-stronger)" }}
       >

@@ -774,7 +774,7 @@ export function Session() {
   const [activePrompt, setActivePrompt] = createSignal<PendingPromptItem | null>(null);
   const [pendingQueue, setPendingQueue] = createSignal<PendingPromptItem[]>([]);
   const autoFallbackAttempts = new Set<string>();
-  const [scrollToTopTrigger, setScrollToTopTrigger] = createSignal(0);
+  const [scrollToTopTarget, setScrollToTopTarget] = createSignal<{ turnId: string } | null>(null);
 
   createEffect(() => {
     params.id;
@@ -2477,7 +2477,7 @@ export function Session() {
       }]);
       clearConnectionRetryCount(item.id)
       startProcessing();
-      setScrollToTopTrigger((v) => v + 1);
+      setScrollToTopTarget({ turnId: item.id });
 
       await client.session.promptAsync({
         sessionID: id,
@@ -3329,6 +3329,7 @@ export function Session() {
             onDeleteQueuedTurn={deleteQueuedPrompt}
             onRetry={retryTurn}
             onOpenFile={openFilePreview}
+            scrollToTopTarget={scrollToTopTarget()}
             onRetryHistory={() => {
               const id = params.id;
               if (!id) return;
@@ -4605,9 +4606,8 @@ function SavePromptDialog(props: {
                         console.error("SavePromptDialog: save failed", err);
                       }
                     }
-}}
-            scrollToTopTrigger={scrollToTopTrigger()}
-          />
+                  }}
+              />
             </div>
             <p class="text-xs" style={{ color: "var(--text-weak)" }}>
               The current input text will be saved as the prompt body.

@@ -31,7 +31,15 @@ function createAutoScroll(options: { bottomThreshold?: number } = {}) {
   let resizeObserver: ResizeObserver | undefined
   const threshold = options.bottomThreshold ?? 24
 
-  const distanceFromBottom = (el: HTMLElement) => el.scrollHeight - el.clientHeight - el.scrollTop
+  // Measured via getBoundingClientRect against `content` (the turn list),
+  // not `el.scrollHeight` -- the scroll container also holds a trailing
+  // spacer (for scrollToTopTarget) that inflates scrollHeight past the
+  // actual content, which would otherwise make this always look "not at
+  // the bottom" once that spacer is present.
+  const distanceFromBottom = (el: HTMLElement) => {
+    if (!content) return el.scrollHeight - el.clientHeight - el.scrollTop
+    return content.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom
+  }
   const [showFab, setShowFab] = createSignal(false)
 
   const update = () => {
@@ -76,7 +84,12 @@ function createAutoScroll(options: { bottomThreshold?: number } = {}) {
     scrollToBottom: () => {
       const el = scroll
       if (!el) return
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+      if (!content) {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+        return
+      }
+      const target = el.scrollTop + (content.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom)
+      el.scrollTo({ top: target, behavior: "smooth" })
     },
     showScrollToBottom: () => showFab(),
   }
@@ -97,9 +110,30 @@ export function MessageTimeline(props: {
   onRetry?: (turnId: string) => void
   onRetryHistory?: () => void
   onOpenFile?: (path: string) => void
-  scrollToTopTrigger?: number
+  scrollToTopTarget?: { turnId: string } | null
 }) {
   const autoScroll = createAutoScroll()
+
+  // The trailing spacer below the turn list reserves just enough room to scroll
+  // the newest turn up to the top, and no more. Its height is
+  // max(0, containerHeight - lastTurnHeight): when the last turn is short (e.g.
+  // right after sending, before the reply streams in) it reserves the leftover
+  // viewport so the turn can still reach the top; as the reply grows, the turn
+  // fills the viewport and the spacer shrinks to 0 -- so there is never a
+  // permanent screen of blank space below the conversation.
+  const [containerHeight, setContainerHeight] = createSignal(0)
+  const [lastTurnHeight, setLastTurnHeight] = createSignal(0)
+  const spacerHeight = createMemo(() => Math.max(0, containerHeight() - lastTurnHeight()))
+  let containerHeightObserver: ResizeObserver | undefined
+  let contentEl: HTMLElement | undefined
+  let contentObserver: ResizeObserver | undefined
+  const measureLastTurn = () => {
+    if (!contentEl) return
+    const nodes = contentEl.querySelectorAll("[data-turn-id]")
+    const last = nodes[nodes.length - 1] as HTMLElement | undefined
+    setLastTurnHeight(last ? last.getBoundingClientRect().height : 0)
+  }
+  onCleanup(() => { containerHeightObserver?.disconnect(); contentObserver?.disconnect() })
 
   function latestIncompleteAssistantTurnId(items: Turn[]) {
     for (let i = items.length - 1; i >= 0; i--) {
@@ -274,25 +308,74 @@ export function MessageTimeline(props: {
     props.onScroll?.(!autoScroll.showScrollToBottom())
   })
 
-  createEffect(on(() => props.scrollToTopTrigger, (trigger) => {
-    if (!trigger || trigger === 0) return
-    const el = containerRef
-    if (!el) return
-    const startCount = el.querySelectorAll("[data-turn-id]").length
-    let attempts = 0
-    const tryScroll = () => {
-      const current = containerRef
-      if (!current) return
-      const turns = current.querySelectorAll("[data-turn-id]")
-      if (turns.length > startCount || attempts > 20) {
-        const last = turns[turns.length - 1]
-        if (last instanceof HTMLElement) last.scrollIntoView({ block: "start", behavior: "smooth" })
-        return
-      }
-      attempts++
-      requestAnimationFrame(tryScroll)
+  // Small gap left above the aligned turn so its header is never clipped by the
+  // top edge (a pixel-flush target intermittently lands a few px too high while
+  // the optimistic turn is swapped for the real one).
+  const SCROLL_TOP_GAP = 16
+
+  createEffect(on(() => props.scrollToTopTarget, (target) => {
+    if (!target) return
+
+    // Resolve the turn to align as the LAST rendered turn rather than by id: the
+    // just-sent turn starts as an optimistic entry (id = item.id) and is then
+    // swapped for the real backend turn with a *different* id, so a fixed-id
+    // lookup goes stale mid-correction. The newest turn is always last.
+    const lastTurn = (current: HTMLElement) => {
+      const nodes = current.querySelectorAll<HTMLElement>("[data-turn-id]")
+      return nodes.length ? nodes[nodes.length - 1] : null
     }
-    setTimeout(tryScroll, 0)
+
+    // Bring the turn's top to SCROLL_TOP_GAP below the container's top, scrolling
+    // only this container (never scrollIntoView, which can also scroll outer
+    // ancestors and push the whole page/header off-screen). Instant, not smooth:
+    // the jump is often thousands of px and a long smooth animation both looks
+    // janky and races the correction loop below.
+    const align = (current: HTMLElement, node: HTMLElement) => {
+      const gap = node.getBoundingClientRect().top - current.getBoundingClientRect().top
+      if (Math.abs(gap - SCROLL_TOP_GAP) <= 1) return
+      current.scrollTo({ top: current.scrollTop + (gap - SCROLL_TOP_GAP) })
+    }
+
+    // Re-align every frame until the layout settles rather than for a fixed
+    // window: the target turn mounts a frame or two late, the spacer that
+    // provides scroll headroom updates via ResizeObserver after that, and the
+    // container itself resizes when the "processing" bar appears -- each shifts
+    // the turn and can otherwise leave it short of (or past) the top. We stop
+    // once the gap has held on target for a few consecutive frames (with a hard
+    // cap), and bail immediately if the user scrolls so we never fight them.
+    // (Scroll-anchoring, which would otherwise nudge scrollTop as the reply
+    // streams in, is disabled on the container via overflow-anchor: none.)
+    let aborted = false
+    const onUserScroll = () => { aborted = true }
+    const current0 = containerRef
+    current0?.addEventListener("wheel", onUserScroll, { passive: true })
+    current0?.addEventListener("touchmove", onUserScroll, { passive: true })
+    const cleanup = () => {
+      current0?.removeEventListener("wheel", onUserScroll)
+      current0?.removeEventListener("touchmove", onUserScroll)
+    }
+
+    let frames = 0
+    let onTarget = 0
+    const MIN_FRAMES = 90  // ~1.5s: keep correcting past the processing-bar
+                           // resize, which shrinks the container ~0.5s in and
+                           // would otherwise shift the turn after an early exit.
+    const MAX_FRAMES = 240 // ~4s hard cap
+    const loop = () => {
+      if (aborted) { cleanup(); return }
+      const current = containerRef
+      const node = current ? lastTurn(current) : null
+      if (current && node) {
+        const gap = node.getBoundingClientRect().top - current.getBoundingClientRect().top
+        if (Math.abs(gap - SCROLL_TOP_GAP) <= 1) onTarget++
+        else { onTarget = 0; align(current, node) }
+      }
+      frames++
+      const settled = onTarget >= 8 && frames >= MIN_FRAMES
+      if (!settled && frames < MAX_FRAMES) requestAnimationFrame(loop)
+      else cleanup()
+    }
+    requestAnimationFrame(loop)
   }))
 
   const showScrollToBottom = createMemo(() => !props.loadingHistory && autoScroll.showScrollToBottom())
@@ -300,10 +383,24 @@ export function MessageTimeline(props: {
   return (
     <div class="relative flex-1 min-h-0">
       <div
-        ref={(el) => { containerRef = el; autoScroll.scrollRef(el) }}
+        ref={(el) => {
+          containerRef = el
+          autoScroll.scrollRef(el)
+          containerHeightObserver?.disconnect()
+          if (el && typeof ResizeObserver !== "undefined") {
+            containerHeightObserver = new ResizeObserver(() => setContainerHeight(el.clientHeight))
+            containerHeightObserver.observe(el)
+          }
+        }}
         onScroll={autoScroll.handleScroll}
         class="h-full overflow-y-auto p-6"
-        style={{ background: "var(--background-stronger)" }}
+        style={{
+          background: "var(--background-stronger)",
+          // Disable browser scroll-anchoring: while a reply streams in it would
+          // otherwise nudge scrollTop to keep prior content stable, dragging the
+          // just-aligned newest turn up past the top edge (see scrollToTopTarget).
+          "overflow-anchor": "none",
+        }}
       >
         {/* Loading history indicator */}
         <Show when={props.loadingHistory}>
@@ -396,7 +493,19 @@ export function MessageTimeline(props: {
           </Show>
 
           {/* Turns */}
-          <div ref={autoScroll.contentRef} class="space-y-4">
+          <div
+            ref={(el) => {
+              autoScroll.contentRef(el)
+              contentEl = el
+              contentObserver?.disconnect()
+              if (el && typeof ResizeObserver !== "undefined") {
+                contentObserver = new ResizeObserver(() => measureLastTurn())
+                contentObserver.observe(el)
+              }
+            }}
+            class="space-y-4"
+            style={{ "overflow-anchor": "none" }}
+          >
             <For each={timelineTurnIds()}>
               {(id) => {
                 const entry = () => timelineTurnById().get(id)
@@ -420,6 +529,13 @@ export function MessageTimeline(props: {
               }}
             </For>
           </div>
+
+          {/* Dynamic headroom so scrollToTopTarget can align the newest turn to
+              the top, sized to only the leftover viewport and shrinking to 0 as
+              the reply fills the screen (see spacerHeight above). */}
+          <Show when={turns().length > 0 && spacerHeight() > 0}>
+            <div aria-hidden="true" style={{ height: `${spacerHeight()}px` }} />
+          </Show>
 
           {/* Empty state */}
           <Show when={turns().length === 0 && !props.processing}>

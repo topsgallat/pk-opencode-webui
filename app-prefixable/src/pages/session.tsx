@@ -775,6 +775,7 @@ export function Session() {
   const [pendingQueue, setPendingQueue] = createSignal<PendingPromptItem[]>([]);
   const autoFallbackAttempts = new Set<string>();
   const [scrollToTopTarget, setScrollToTopTarget] = createSignal<{ turnId: string } | null>(null);
+  const [sseActive, setSseActive] = createSignal(false);
 
   createEffect(() => {
     params.id;
@@ -2001,6 +2002,7 @@ export function Session() {
       }
 
       if (wasBusy) {
+        if (!sseActive()) return;
         batch(() => {
           wasProcessing.value = false;
           setProcessing(false);
@@ -2116,6 +2118,7 @@ export function Session() {
             status: { type: string };
           };
           if (props.sessionID === id && props.status.type === "idle") {
+            setSseActive(false);
             setConnectionRetryCounts({});
             void sync.session.sync(id).catch(() => {});
             void refreshDirectMessages(id).catch(() => {});
@@ -2124,6 +2127,7 @@ export function Session() {
             wasProcessing.value = false;
             setProcessing(false);
           } else if (props.sessionID === id && !error()) {
+            setSseActive(true);
             wasProcessing.value = true;
             setProcessing(true);
           }

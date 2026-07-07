@@ -766,7 +766,7 @@ export function MessageTurn(props: {
                 </div>
                 <Show when={props.queueState?.status === "thinking"}>
                   <div class="inline-flex items-center gap-2 text-sm font-medium whitespace-nowrap leading-none" style={{ color: "var(--text-strong)" }}>
-                    Thinking
+                    {props.streaming ? "Responding" : "Thinking"}
                     <Loader2 class="w-3.5 h-3.5 animate-spin" />
                   </div>
                 </Show>

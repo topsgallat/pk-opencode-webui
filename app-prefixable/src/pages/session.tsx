@@ -3936,6 +3936,7 @@ export function Session() {
                     }
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
+                      e.stopPropagation();
                       if (device.isTouchDevice()) {
                         const textarea = e.target as HTMLTextAreaElement;
                         const start = textarea.selectionStart;

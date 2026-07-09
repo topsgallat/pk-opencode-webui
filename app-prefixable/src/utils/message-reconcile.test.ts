@@ -246,6 +246,18 @@ describe("mergeOptimisticMessage", () => {
     expect(echoed?.id).toBe("u2")
   })
 
+  test("finds the backend echo even when a system-reminder was appended to the same text part", () => {
+    const optimisticItem = optimistic("temp-1", "pending one", 2)
+    const sync = projectDisplayMessages([], [
+      userMessage("u1", "hello"),
+      userMessage("u2", "pending one<system-reminder>context refresh</system-reminder>"),
+    ])
+
+    const echoed = findOptimisticMessageEcho(sync, optimisticItem)
+
+    expect(echoed?.id).toBe("u2")
+  })
+
   test("does not match the wrong duplicate-text user turn", () => {
     const optimisticItem = optimistic("temp-2", "duplicate", 2)
     const sync = projectDisplayMessages([], [

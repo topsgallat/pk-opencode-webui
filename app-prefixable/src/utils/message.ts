@@ -37,6 +37,17 @@ function stripSystemBlocks(text: string): string {
   return text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim()
 }
 
+// Strips everything parseUserText() would peel off into systemBlocks, leaving only
+// the text the user actually typed. Used to compare a locally-sent prompt against
+// its server echo, which arrives with the backend's injected reminders/comments
+// already appended to the same text part.
+export function stripInjectedContent(text: string): string {
+  return text
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .trim()
+}
+
 export function extractTextContent(parts: Part[]): string {
   return parts
     .filter((p): p is Part & { type: "text" } => p.type === "text" && !p.synthetic)

@@ -1,6 +1,7 @@
 import type { Part, AssistantMessage } from "../sdk/client"
 import type { DisplayMessage, Turn } from "../types/message"
 import { sameProjectedParts } from "./part-compare"
+import { stripInjectedContent } from "./message"
 
 export interface SyncMessageLike {
   info: {
@@ -105,9 +106,21 @@ function getUserMessageAt(messages: DisplayMessage[], index: number) {
   return null
 }
 
+// Lenient echo comparison for a just-sent optimistic prompt vs. its server echo.
+// The backend appends reminders/comments (e.g. <system-reminder>) into the same
+// text part before persisting, and may re-encode file urls, so this ignores both
+// rather than requiring byte-for-byte equality like the shared part comparator.
+function sameEchoedUserPart(a: Part, b: Part) {
+  if (a.type !== b.type) return false
+  if (a.type === "text" && b.type === "text") return stripInjectedContent(a.text) === stripInjectedContent(b.text)
+  if (a.type === "file" && b.type === "file") return a.mime === b.mime && a.filename === b.filename
+  return true
+}
+
 function sameUserParts(a: DisplayMessage, b: DisplayMessage) {
   if (a.role !== "user" || b.role !== "user") return false
-  return sameProjectedParts(a.parts, b.parts)
+  if (a.parts.length !== b.parts.length) return false
+  return a.parts.every((part, index) => sameEchoedUserPart(part, b.parts[index]))
 }
 
 export function findOptimisticMessageEcho(

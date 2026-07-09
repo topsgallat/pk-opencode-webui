@@ -1202,14 +1202,6 @@ export function Session() {
       }]);
   }));
 
-  createEffect(() => {
-    const prompt = activePrompt();
-    const optimistic = optimisticMessages()[0];
-    if (!prompt || !optimistic) return;
-    if (!findOptimisticMessageEcho(messages(), optimistic)) return;
-    setActivePrompt(null);
-  });
-
   const messages = createMemo(() => {
     return syncMessages();
   });

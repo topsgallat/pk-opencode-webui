@@ -1250,12 +1250,9 @@ export function ToolPartDisplay(props: { part: ToolPart; subtask?: SubtaskPart; 
                 <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
                   Output:
                 </div>
-                <pre
-                  class="whitespace-pre-wrap text-xs max-h-64 overflow-y-auto"
-                  style={{ color: "var(--text-base)" }}
-                >
-                  {output()}
-                </pre>
+                <div class="max-h-64 overflow-y-auto" data-scrollable>
+                  <Markdown content={output()} class="text-xs" />
+                </div>
               </div>
             )}
           </Show>

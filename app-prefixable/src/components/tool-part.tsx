@@ -5,12 +5,14 @@ import { ChevronDown, ExternalLink, Users, Sparkles, Brain } from "lucide-solid"
 import { ContentDiff } from "./diff/content-diff";
 import { ContentCode } from "./diff/content-code";
 import { useSync } from "../context/sync";
+import { useEvents } from "../context/events";
 import { useParams, useNavigate } from "@solidjs/router";
 import { base64Encode } from "../utils/path";
 import { useSDK } from "../context/sdk";
 import { Markdown } from "./markdown";
 import { getBashCommandColors } from "../utils/bash-command-colors";
 import { FancyAnsi } from "fancy-ansi";
+import { isBackgroundTaskMetadata, isChildSessionBusy, resolveTaskDisplayStatus } from "./tool-part-task-status";
 
 const fa = new FancyAnsi();
 
@@ -513,10 +515,13 @@ function getChildSessionId(state: ToolState): string | undefined {
   const metadata = getMetadata(state);
   if (metadata?.sessionId) return metadata.sessionId as string;
 
-  // Fallback: parse from output if metadata not available
+  // Fallback: parse from output if metadata not available. The task tool
+  // (and the pentesters_task fork) emit a <task_metadata> block containing
+  // both `session_id:` and `task_id:` lines.
   const output = getOutput(state);
   if (output) {
-    const match = output.match(/task_id:\s*([a-zA-Z0-9_-]+)/);
+    const match = output.match(/session_id:\s*([a-zA-Z0-9_-]+)/) ||
+      output.match(/task_id:\s*([a-zA-Z0-9_-]+)/);
     if (match) return match[1];
   }
   return undefined;
@@ -542,6 +547,7 @@ function getChildToolSummary(
 // Task tool display with child session visualization
 function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPart?: AgentPart }) {
   const sync = useSync();
+  const events = useEvents();
   const params = useParams<{ dir: string; id?: string }>();
   const navigate = useNavigate();
   const { directory } = useSDK();
@@ -557,9 +563,24 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
     description?: string;
     prompt?: string;
     agent?: string;
+    // pentesters_task fork uses subagent_type / category instead of `agent`
+    subagent_type?: string;
+    category?: string;
     model?: { providerID?: string; modelID?: string };
   } | undefined);
   const childId = () => getChildSessionId(state());
+  const isBackgroundTask = createMemo(() => isBackgroundTaskMetadata(metadata()));
+  const childIsBusy = createMemo(() => {
+    const id = childId();
+    if (!id) return false;
+    return isChildSessionBusy(events.status[id]);
+  });
+  const displayStatus = createMemo(() => resolveTaskDisplayStatus({
+    status: status(),
+    isBackgroundTask: isBackgroundTask(),
+    hasChildId: Boolean(childId()),
+    childIsBusy: childIsBusy(),
+  }));
 
   // Get child session messages to show tool usage
   const childMessages = createMemo(() => {
@@ -584,7 +605,13 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
     return { agent: info.agent, providerID: info.providerID, modelID: info.modelID };
   });
 
-  const taskAgent = createMemo(() => props.agentPart?.name || props.subtask?.agent || taskInput()?.agent || childAgent()?.agent);
+  const taskAgent = createMemo(() =>
+    props.agentPart?.name ||
+    props.subtask?.agent ||
+    taskInput()?.agent ||
+    childAgent()?.agent ||
+    taskInput()?.subagent_type ||
+    taskInput()?.category);
 
   const taskModel = createMemo(() => {
     const subtaskModel = props.subtask?.model;
@@ -604,7 +631,7 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
   // Sync child session data when we have a child ID
   createEffect(() => {
     const id = childId();
-    if (!id || status() === "completed" || status() === "error") return;
+    if (!id || displayStatus() === "completed" || displayStatus() === "error") return;
 
     void sync.session.sync(id);
     if (childMessages().length > 0) return;
@@ -622,7 +649,7 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
   // persist indefinitely.
   createEffect(() => {
     const id = childId();
-    if (!id || status() === "completed" || status() === "error") return;
+    if (!id || displayStatus() === "completed" || displayStatus() === "error") return;
 
     const parentId = params.id;
     if (!parentId) return;
@@ -672,7 +699,7 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
         {/* Task/Agent icon */}
         <Users
           class="w-4 h-4 shrink-0"
-          style={{ color: getStatusColor(status()) }}
+          style={{ color: getStatusColor(displayStatus()) }}
         />
 
         {/* Title + optional agent badge */}
@@ -712,11 +739,11 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
         {/* Status indicator */}
         <span
           class="text-xs shrink-0"
-          style={{ color: getStatusColor(status()) }}
+          style={{ color: getStatusColor(displayStatus()) }}
         >
-          {status() === "running" && "delegating..."}
-          {status() === "pending" && "pending"}
-          {status() === "error" && "error"}
+          {displayStatus() === "running" && "delegating..."}
+          {displayStatus() === "pending" && "pending"}
+          {displayStatus() === "error" && "error"}
         </span>
 
         {/* Expand arrow */}
@@ -832,15 +859,24 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
 
           {/* Output (collapsed by default, only shown if no child tools) */}
           <Show when={childTools().length === 0}>
-            <Show when={getOutput(state())}>
-              {(output) => (
-                <div class="mt-2">
-                  <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
-                    Result:
-                  </div>
-                  <Markdown content={output()} class="text-xs" />
+            <Show
+              when={!(isBackgroundTask() && childIsBusy())}
+              fallback={
+                <div class="mt-2 text-xs" style={{ color: "var(--text-weak)" }}>
+                  Running in background…
                 </div>
-              )}
+              }
+            >
+              <Show when={getOutput(state())}>
+                {(output) => (
+                  <div class="mt-2">
+                    <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
+                      Result:
+                    </div>
+                    <Markdown content={output()} class="text-xs" />
+                  </div>
+                )}
+              </Show>
             </Show>
           </Show>
 
@@ -908,9 +944,16 @@ function ReasoningPartDisplay(props: { parts: ReasoningPart[] }) {
   );
 }
 
+// Task-style delegation tools that render as a sub-agent card. Covers the
+// built-in `task` tool and the oh-my-openagent `pentesters_task` fork, which
+// share the same input/metadata shape (description, child sessionId, etc.).
+function isTaskTool(tool: string): boolean {
+  return tool === "task" || tool === "pentesters_task";
+}
+
 export function ToolPartDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPart?: AgentPart }) {
   // Use special rendering for task tool
-  if (props.part.tool === "task") {
+  if (isTaskTool(props.part.tool)) {
     return <TaskToolDisplay part={props.part} subtask={props.subtask} agentPart={props.agentPart} />;
   }
 

@@ -1209,6 +1209,12 @@ export function Session() {
     const prompt = activePrompt();
     if (!prompt) return null;
 
+    // Once the backend has echoed the user message, the real turn takes over
+    // (it receives activeTurnState via activeTurnId); keeping this optimistic
+    // ghost around would render the prompt twice for the rest of the turn.
+    const optimistic = optimisticMessages()[0];
+    if (optimistic && findOptimisticMessageEcho(syncMessages(), optimistic)) return null;
+
     return {
       id: prompt.id,
       userMessage: {
@@ -1983,6 +1989,11 @@ export function Session() {
         SESSION_STATUS_TIMEOUT_MS,
         "Loading session status",
       );
+      // processing() flipped while the request was in flight (e.g. a prompt
+      // was just submitted, or SSE reported idle), so this snapshot predates
+      // the current state and acting on it would stomp the fresh value.
+      if (processing() !== wasBusy) return;
+
       const statuses = res.data;
       const status = statuses?.[sessionID];
       const isBusy = !error() && (status?.type === "busy" || status?.type === "retry");

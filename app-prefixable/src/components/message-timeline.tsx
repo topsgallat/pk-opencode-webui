@@ -11,7 +11,7 @@ import { extractTextContent } from "../utils/message"
 import type { SessionStatus } from "../sdk/client"
 import { reconcileTurns } from "../utils/message-reconcile"
 import { getRealTurnDefaultExpanded } from "./message-turn-state"
-import { shouldResetTimelineState } from "./message-timeline-state"
+import { resolveActiveTurnId, shouldResetTimelineState } from "./message-timeline-state"
 
 // Number of turns to render initially and on each "load more"
 const TURNS_PER_BATCH = 10
@@ -135,13 +135,6 @@ export function MessageTimeline(props: {
   }
   onCleanup(() => { containerHeightObserver?.disconnect(); contentObserver?.disconnect() })
 
-  function latestIncompleteAssistantTurnId(items: Turn[]) {
-    for (let i = items.length - 1; i >= 0; i--) {
-      if (items[i].assistantMessages.some((message) => message.time?.completed == null)) return items[i].id
-    }
-    return undefined
-  }
-
   const [now, setNow] = createSignal(Date.now())
   let tick: number | undefined
   onMount(() => {
@@ -178,22 +171,14 @@ export function MessageTimeline(props: {
     const all = turns()
     return all.length > 0 ? all[all.length - 1] : null
   })
-  const visibleActiveTurnId = createMemo(() => {
-    const all = turns()
-    if (all.length === 0) return props.activeTurnId
-
-    const explicit = props.activeTurnId && all.some((turn) => turn.id === props.activeTurnId)
-      ? props.activeTurnId
-      : undefined
-
-    if (!props.processing) return explicit
-
-    const assistantTurnId = latestIncompleteAssistantTurnId(all)
-    if (assistantTurnId) return assistantTurnId
-    if (explicit) return explicit
-
-    return all[all.length - 1]?.id
-  })
+  const visibleActiveTurnId = createMemo(() => resolveActiveTurnId({
+    turns: turns().map((turn) => ({
+      id: turn.id,
+      hasIncompleteAssistant: turn.assistantMessages.some((message) => message.time?.completed == null),
+    })),
+    activeTurnId: props.activeTurnId,
+    processing: props.processing,
+  }))
   const detachedStreamingTurnId = createMemo(() => {
     if (!props.processing) return undefined
 

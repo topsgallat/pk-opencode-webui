@@ -755,13 +755,14 @@ export function MessageTurn(props: {
           <Show when={props.queueState && props.turn.assistantMessages.length === 0}>
             <div class="flex gap-3 rounded-lg border px-3 py-3" style={{ background: "var(--background-base)", border: "1px solid var(--border-base)" }}>
               <div
-                class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                class="w-6 h-6 rounded-full items-center justify-center shrink-0 mt-0.5 hidden md:flex"
                 style={{ background: "var(--surface-inset)" }}
               >
                 <Bot class="w-3 h-3" style={{ color: "var(--text-strong)" }} />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-xs font-medium mb-1" style={{ color: "var(--text-weak)" }}>
+                <div class="flex items-center gap-1.5 text-xs font-medium mb-1" style={{ color: "var(--text-weak)" }}>
+                  <Bot class="w-3 h-3 md:hidden" />
                   ASSISTANT
                 </div>
                 <Show when={props.queueState?.status === "thinking"}>
@@ -802,7 +803,7 @@ export function MessageTurn(props: {
               return (
                 <div class="flex gap-3">
                   <div
-                    class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                    class="w-6 h-6 rounded-full items-center justify-center shrink-0 mt-0.5 hidden md:flex"
                     style={{ background: "var(--surface-inset)" }}
                   >
                     <Bot class="w-3 h-3" style={{ color: "var(--text-strong)" }} />
@@ -811,12 +812,14 @@ export function MessageTurn(props: {
                     <Show
                       when={message.agent}
                       fallback={
-                        <div class="text-xs font-medium mb-1" style={{ color: "var(--text-weak)" }}>
+                        <div class="flex items-center gap-1.5 text-xs font-medium mb-1" style={{ color: "var(--text-weak)" }}>
+                          <Bot class="w-3 h-3 md:hidden" />
                           ASSISTANT
                         </div>
                       }
                     >
                       <div class="flex items-center gap-1.5 flex-wrap text-xs font-medium mb-1">
+                        <Bot class="w-3 h-3 md:hidden" style={{ color: "var(--text-weak)" }} />
                         <span
                           style={{
                             background: colors().bg,

@@ -928,26 +928,24 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
             </button>
           </Show>
 
-          {/* Output (collapsed by default, only shown if no child tools) */}
-          <Show when={childTools().length === 0}>
-            <Show
-              when={!(isBackgroundTask() && childIsBusy())}
-              fallback={
-                <div class="mt-2 text-xs" style={{ color: "var(--text-weak)" }}>
-                  Running in background…
-                </div>
-              }
-            >
-              <Show when={getOutput(state())}>
-                {(output) => (
-                  <div class="mt-2">
-                    <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
-                      Result:
-                    </div>
-                    <Markdown content={output()} class="text-xs" />
+          {/* Output */}
+          <Show
+            when={!(isBackgroundTask() && childIsBusy())}
+            fallback={
+              <div class="mt-2 text-xs" style={{ color: "var(--text-weak)" }}>
+                Running in background…
+              </div>
+            }
+          >
+            <Show when={getOutput(state())}>
+              {(output) => (
+                <div class="mt-2">
+                  <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
+                    Result:
                   </div>
-                )}
-              </Show>
+                  <Markdown content={output()} class="text-xs" />
+                </div>
+              )}
             </Show>
           </Show>
 

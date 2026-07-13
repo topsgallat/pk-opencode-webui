@@ -1,7 +1,7 @@
 import { createSignal, createEffect, createMemo, Show, For, createRoot, JSX, onCleanup } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import type { Part, ToolPart as SDKToolPart, ToolState, ReasoningPart as SDKReasoningPart, SubtaskPart as SDKSubtaskPart, AgentPart as SDKAgentPart } from "../sdk/client";
-import { ChevronDown, ExternalLink, Users, Sparkles, Brain } from "lucide-solid";
+import { ChevronDown, ExternalLink, Users, Sparkles, Brain, Wrench } from "lucide-solid";
 import { ContentDiff } from "./diff/content-diff";
 import { ContentCode } from "./diff/content-code";
 import { useSync } from "../context/sync";
@@ -13,6 +13,7 @@ import { Markdown } from "./markdown";
 import { getBashCommandColors } from "../utils/bash-command-colors";
 import { FancyAnsi } from "fancy-ansi";
 import { isBackgroundTaskMetadata, isChildSessionBusy, resolveTaskDisplayStatus } from "./tool-part-task-status";
+import { extractDelegatedSkills, summarizeUsedSkills } from "./tool-part-skills";
 
 const fa = new FancyAnsi();
 
@@ -566,9 +567,12 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
     // pentesters_task fork uses subagent_type / category instead of `agent`
     subagent_type?: string;
     category?: string;
+    // pentesters_task fork preloads skills into the sub-agent via this field
+    load_skills?: string[];
     model?: { providerID?: string; modelID?: string };
   } | undefined);
   const childId = () => getChildSessionId(state());
+  const delegatedSkills = createMemo(() => extractDelegatedSkills(taskInput()));
   const isBackgroundTask = createMemo(() => isBackgroundTaskMetadata(metadata()));
   const childIsBusy = createMemo(() => {
     const id = childId();
@@ -594,9 +598,12 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
     return childMessages().flatMap((msg) =>
       msg.parts
         .filter((p): p is ToolPart => p.type === "tool")
-        .map((p) => ({ tool: p.tool, status: getStatus(p.state) })),
+        .map((p) => ({ tool: p.tool, status: getStatus(p.state), input: getInput(p.state) })),
     );
   });
+
+  // Skills the sub-agent invoked via the `skill` tool, deduped and counted
+  const usedSkills = createMemo(() => summarizeUsedSkills(childTools()));
 
   const childAgent = createMemo(() => {
     const first = childMessages().find((m) => m.info.role === "assistant" && (m.info as { agent?: string }).agent);
@@ -809,6 +816,53 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
                   {[taskModel()?.providerID, taskModel()?.modelID].filter(Boolean).join("/")}
                 </span>
               </Show>
+            </div>
+          </Show>
+
+          {/* Skills preloaded into the sub-agent at delegation time */}
+          <Show when={delegatedSkills().length > 0}>
+            <div class="flex items-center gap-1.5 flex-wrap mb-2">
+              <span class="text-xs" style={{ color: "var(--text-weak)" }}>With Skill:</span>
+              <For each={delegatedSkills()}>
+                {(skill) => (
+                  <span
+                    class="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono"
+                    style={{
+                      background: "var(--surface-inset)",
+                      color: "var(--text-interactive-base)",
+                    }}
+                  >
+                    <Wrench class="w-3 h-3 shrink-0" />
+                    {skill}
+                  </span>
+                )}
+              </For>
+            </div>
+          </Show>
+
+          {/* Skills used by the sub-agent */}
+          <Show when={usedSkills().length > 0}>
+            <div class="mb-2">
+              <div class="text-xs mb-1" style={{ color: "var(--text-weak)" }}>
+                Skills used ({usedSkills().length}):
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <For each={usedSkills()}>
+                  {(skill) => (
+                    <span
+                      class="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono"
+                      style={{
+                        background: "var(--surface-inset)",
+                        color: "var(--text-interactive-base)",
+                      }}
+                    >
+                      <Wrench class="w-3 h-3 shrink-0" />
+                      {skill.name}
+                      {skill.count > 1 ? ` (${skill.count})` : ""}
+                    </span>
+                  )}
+                </For>
+              </div>
             </div>
           </Show>
 

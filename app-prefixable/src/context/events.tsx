@@ -18,6 +18,7 @@ interface EventContextValue {
   dismissQuestion: (sessionID: string, requestID: string) => void
   connected: () => boolean
   reconnecting: () => boolean
+  refreshStatuses: () => Promise<void>
 }
 
 export const EventContext = createContext<EventContextValue>()
@@ -166,6 +167,39 @@ export function EventProvider(props: ParentProps) {
     }
   }
 
+  // Fetches the ground-truth status map from the server. Used both to seed
+  // statuses on mount and, from consumers like the sub-agent task card, to
+  // recover a session's real status when its `session.status` SSE event
+  // (e.g. the "idle" transition for a background delegated session) never
+  // arrives — the only prior fallback was a full page reload, which re-runs
+  // this same fetch.
+  // Multiple sub-agent task cards can all be polling for a missed status at
+  // once; share a single in-flight request instead of firing one per card.
+  let refreshStatusesInFlight: Promise<void> | null = null
+  function refreshStatuses(): Promise<void> {
+    if (!directory) return Promise.resolve()
+    if (refreshStatusesInFlight) return refreshStatusesInFlight
+
+    refreshStatusesInFlight = fetchWithTimeout(
+      appendTargetParam(`${url}/session/status?directory=${encodeURIComponent(directory)}`, targetUrl),
+      {},
+      EVENT_SEED_TIMEOUT_MS,
+      "Refreshing session statuses",
+    )
+      .then((r) => r.json())
+      .then((res) => {
+        const statuses = (res.data ?? {}) as Record<string, SessionStatus>
+        for (const [sessionID, s] of Object.entries(statuses)) {
+          setStatus(sessionID, s)
+        }
+      })
+      .catch((err) => console.error("[Events] Failed to refresh statuses:", err))
+      .finally(() => {
+        refreshStatusesInFlight = null
+      })
+    return refreshStatusesInFlight
+  }
+
   onMount(() => {
     loadDebugEvents()
 
@@ -224,7 +258,7 @@ export function EventProvider(props: ParentProps) {
     }))
   }
 
-  return <EventContext.Provider value={{ subscribe, status, pendingQuestions, dismissQuestion, connected, reconnecting }}>{props.children}</EventContext.Provider>
+  return <EventContext.Provider value={{ subscribe, status, pendingQuestions, dismissQuestion, connected, reconnecting, refreshStatuses }}>{props.children}</EventContext.Provider>
 }
 
 export function useEvents() {

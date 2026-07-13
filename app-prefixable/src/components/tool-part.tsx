@@ -668,6 +668,23 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
     onCleanup(() => clearInterval(interval));
   });
 
+  // Safety net: for background tasks, the outer ToolPart's "completed"
+  // status is overridden until the child session's session.status SSE
+  // event reports "idle" (see resolveTaskDisplayStatus). If that one SSE
+  // event is missed, the card is stuck showing "Running in background…"
+  // indefinitely — previously only a full page reload (which re-seeds
+  // statuses from the server) would recover it. Poll the same status
+  // endpoint here instead.
+  createEffect(() => {
+    if (!isBackgroundTask() || !childIsBusy()) return;
+
+    const interval = setInterval(() => {
+      void events.refreshStatuses();
+    }, 15000);
+
+    onCleanup(() => clearInterval(interval));
+  });
+
   const dirSlug = createMemo(() =>
     directory ? base64Encode(directory) : params.dir,
   );

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { isBackgroundTaskMetadata, isChildSessionBusy, resolveTaskDisplayStatus } from "./tool-part-task-status"
+import { isBackgroundTaskMetadata, isChildSessionBusy, resolveTaskDisplayStatus, resolveChildSyncAction } from "./tool-part-task-status"
 
 describe("isBackgroundTaskMetadata", () => {
   test("true when backgroundTaskId is present (pentesters_task background launch)", () => {
@@ -89,5 +89,59 @@ describe("resolveTaskDisplayStatus", () => {
       hasChildId: true,
       childIsBusy: true,
     })).toBe("pending")
+  })
+})
+
+describe("resolveChildSyncAction", () => {
+  const mustNotRead = () => {
+    throw new Error("childMessages must not be read in a terminal state (would create a sync loop)")
+  }
+
+  test("skip when there is no child session id yet", () => {
+    expect(resolveChildSyncAction({
+      hasChildId: false,
+      displayStatus: "running",
+      hasChildMessages: () => false,
+    })).toBe("skip")
+  })
+
+  test("sync-once when completed, without reading child messages (regression: card frozen at 'Sent to:')", () => {
+    expect(resolveChildSyncAction({
+      hasChildId: true,
+      displayStatus: "completed",
+      hasChildMessages: mustNotRead,
+    })).toBe("sync-once")
+  })
+
+  test("sync-once when errored, also without reading child messages", () => {
+    expect(resolveChildSyncAction({
+      hasChildId: true,
+      displayStatus: "error",
+      hasChildMessages: mustNotRead,
+    })).toBe("sync-once")
+  })
+
+  test("sync-once while running once messages exist (SSE keeps them fresh; no interval)", () => {
+    expect(resolveChildSyncAction({
+      hasChildId: true,
+      displayStatus: "running",
+      hasChildMessages: () => true,
+    })).toBe("sync-once")
+  })
+
+  test("sync-and-poll while running with no messages yet", () => {
+    expect(resolveChildSyncAction({
+      hasChildId: true,
+      displayStatus: "running",
+      hasChildMessages: () => false,
+    })).toBe("sync-and-poll")
+  })
+
+  test("pending behaves like running", () => {
+    expect(resolveChildSyncAction({
+      hasChildId: true,
+      displayStatus: "pending",
+      hasChildMessages: () => false,
+    })).toBe("sync-and-poll")
   })
 })

@@ -12,7 +12,7 @@ import { useSDK } from "../context/sdk";
 import { Markdown } from "./markdown";
 import { getBashCommandColors } from "../utils/bash-command-colors";
 import { FancyAnsi } from "fancy-ansi";
-import { isBackgroundTaskMetadata, isChildSessionBusy, resolveTaskDisplayStatus } from "./tool-part-task-status";
+import { isBackgroundTaskMetadata, isChildSessionBusy, resolveTaskDisplayStatus, resolveChildSyncAction } from "./tool-part-task-status";
 import { extractDelegatedSkills, summarizeUsedSkills } from "./tool-part-skills";
 
 const fa = new FancyAnsi();
@@ -571,7 +571,7 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
     load_skills?: string[];
     model?: { providerID?: string; modelID?: string };
   } | undefined);
-  const childId = () => getChildSessionId(state());
+  const childId = createMemo(() => getChildSessionId(state()));
   const delegatedSkills = createMemo(() => extractDelegatedSkills(taskInput()));
   const isBackgroundTask = createMemo(() => isBackgroundTaskMetadata(metadata()));
   const childIsBusy = createMemo(() => {
@@ -635,14 +635,32 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
     return undefined;
   });
 
-  // Sync child session data when we have a child ID
+  // Sync child session data when we have a child ID. Terminal states
+  // (completed/error) still get ONE sync — the child's "idle" status can
+  // arrive before this effect has ever fetched the child's messages (see
+  // resolveChildSyncAction), which used to freeze the card at "Sent to:"
+  // with no tools/skills/result.
   createEffect(() => {
     const id = childId();
-    if (!id || displayStatus() === "completed" || displayStatus() === "error") return;
+    const action = resolveChildSyncAction({
+      hasChildId: Boolean(id),
+      displayStatus: displayStatus(),
+      hasChildMessages: () => childMessages().length > 0,
+    });
+    if (!id || action === "skip") return;
 
-    void sync.session.sync(id);
-    if (childMessages().length > 0) return;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    void sync.session.sync(id).catch(() => {
+      // Single bounded retry: a terminal-state card has no other in-view
+      // recovery path if this one fetch fails (the parent safety net and
+      // the status poll below are both gated off once completed).
+      retryTimer = setTimeout(() => {
+        void sync.session.sync(id).catch(() => {});
+      }, 5000);
+    });
+    onCleanup(() => clearTimeout(retryTimer));
 
+    if (action !== "sync-and-poll") return;
     const interval = setInterval(() => {
       void sync.session.sync(id);
     }, 5000);

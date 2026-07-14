@@ -70,7 +70,7 @@ fs.writeFileSync(configPath, JSON.stringify({
   },
 }, null, 2));
 
-const child = spawn('bunx', ['@playwright/mcp@latest', '--config', configPath], {
+const child = spawn('bunx', ['@playwright/mcp@latest', '--config', configPath, '--isolated'], {
   cwd: appRoot,
   stdio: 'inherit',
 });

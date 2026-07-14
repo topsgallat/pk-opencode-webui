@@ -1,7 +1,7 @@
 import { createSignal, createEffect, createMemo, Show, For, createRoot, JSX, onCleanup } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import type { Part, ToolPart as SDKToolPart, ToolState, ReasoningPart as SDKReasoningPart, SubtaskPart as SDKSubtaskPart, AgentPart as SDKAgentPart } from "../sdk/client";
-import { ChevronDown, ExternalLink, Users, Sparkles, Brain, Wrench } from "lucide-solid";
+import { ChevronDown, ExternalLink, Users, Sparkles, Brain, Wrench, ListTodo } from "lucide-solid";
 import { ContentDiff } from "./diff/content-diff";
 import { ContentCode } from "./diff/content-code";
 import { useSync } from "../context/sync";
@@ -14,6 +14,8 @@ import { getBashCommandColors } from "../utils/bash-command-colors";
 import { FancyAnsi } from "fancy-ansi";
 import { isBackgroundTaskMetadata, isChildSessionBusy, resolveTaskDisplayStatus, resolveChildSyncAction, findChildSessionIdByParentAndTitle } from "./tool-part-task-status";
 import { extractDelegatedSkills, summarizeUsedSkills } from "./tool-part-skills";
+import { useSessionTodos, summarizeTodos } from "../utils/session-todos";
+import { TodoListSections } from "./session-sidebar";
 
 const fa = new FancyAnsi();
 
@@ -618,6 +620,13 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
   // Skills the sub-agent invoked via the `skill` tool, deduped and counted
   const usedSkills = createMemo(() => summarizeUsedSkills(childTools()));
 
+  // Live todo progress from the child session, so the card shows what the
+  // sub-agent is working on without navigating into it.
+  const childTodos = useSessionTodos(childId);
+  const todoSummary = createMemo(() => summarizeTodos(childTodos.todos()));
+  const todoExpandKey = () => `${props.part.id}:todos`;
+  const todosExpanded = () => expandedStore.get(todoExpandKey());
+
   const childAgent = createMemo(() => {
     const first = childMessages().find((m) => m.info.role === "assistant" && (m.info as { agent?: string }).agent);
     if (!first) return undefined;
@@ -935,6 +944,54 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
                   )}
                 </For>
               </div>
+            </div>
+          </Show>
+
+          {/* Live todo progress from the sub-agent's own session */}
+          <Show when={todoSummary().total > 0}>
+            <div class="mb-2">
+              <button
+                onClick={() => expandedStore.toggle(todoExpandKey())}
+                class="w-full flex items-center gap-2 text-left"
+              >
+                <ListTodo class="w-3 h-3 shrink-0" style={{ color: "var(--text-weak)" }} />
+                <span class="text-xs" style={{ color: "var(--text-weak)" }}>
+                  Sub-task progress
+                </span>
+                <span class="text-xs font-mono" style={{ color: "var(--text-base)" }}>
+                  {todoSummary().done}/{todoSummary().total}
+                </span>
+                <div
+                  class="flex-1 h-1 rounded-full overflow-hidden"
+                  style={{ background: "var(--surface-inset)" }}
+                >
+                  <div
+                    class="h-full rounded-full transition-all"
+                    style={{
+                      width: `${(todoSummary().done / todoSummary().total) * 100}%`,
+                      background: "var(--icon-success-base)",
+                    }}
+                  />
+                </div>
+                <ChevronDown
+                  class="w-3 h-3 shrink-0 transition-transform"
+                  style={{ transform: todosExpanded() ? "rotate(180deg)" : "rotate(0deg)" }}
+                />
+              </button>
+              <Show
+                when={!todosExpanded()}
+                fallback={<TodoListSections todos={childTodos.todos} />}
+              >
+                <Show when={todoSummary().focus}>
+                  {(focus) => (
+                    <div class="flex items-center gap-1.5 mt-1 pl-5">
+                      <span class="text-xs truncate" style={{ color: "var(--text-weak)" }}>
+                        › {focus().content}
+                      </span>
+                    </div>
+                  )}
+                </Show>
+              </Show>
             </div>
           </Show>
 

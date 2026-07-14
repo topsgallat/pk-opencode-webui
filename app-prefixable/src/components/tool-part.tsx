@@ -12,7 +12,7 @@ import { useSDK } from "../context/sdk";
 import { Markdown } from "./markdown";
 import { getBashCommandColors } from "../utils/bash-command-colors";
 import { FancyAnsi } from "fancy-ansi";
-import { isBackgroundTaskMetadata, isChildSessionBusy, resolveTaskDisplayStatus, resolveChildSyncAction } from "./tool-part-task-status";
+import { isBackgroundTaskMetadata, isChildSessionBusy, resolveTaskDisplayStatus, resolveChildSyncAction, findChildSessionIdByParentAndTitle } from "./tool-part-task-status";
 import { extractDelegatedSkills, summarizeUsedSkills } from "./tool-part-skills";
 
 const fa = new FancyAnsi();
@@ -571,7 +571,20 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
     load_skills?: string[];
     model?: { providerID?: string; modelID?: string };
   } | undefined);
-  const childId = createMemo(() => getChildSessionId(state()));
+  const childId = createMemo(() => {
+    const direct = getChildSessionId(state());
+    if (direct) return direct;
+    // opencode only attaches metadata.sessionId once the tool call is
+    // "completed" (see resolveChildSyncAction's comment). Before then, find
+    // the child by matching session.created/updated's parentID + title
+    // against this task's own parent id + description, so the card can show
+    // live tool usage instead of waiting for completion.
+    return findChildSessionIdByParentAndTitle({
+      parentId: params.id,
+      description: taskInput()?.description,
+      sessions: sync.sessions(),
+    });
+  });
   const delegatedSkills = createMemo(() => extractDelegatedSkills(taskInput()));
   const isBackgroundTask = createMemo(() => isBackgroundTaskMetadata(metadata()));
   const childIsBusy = createMemo(() => {

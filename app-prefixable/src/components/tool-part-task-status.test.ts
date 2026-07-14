@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { isBackgroundTaskMetadata, isChildSessionBusy, resolveTaskDisplayStatus, resolveChildSyncAction } from "./tool-part-task-status"
+import { isBackgroundTaskMetadata, isChildSessionBusy, resolveTaskDisplayStatus, resolveChildSyncAction, findChildSessionIdByParentAndTitle } from "./tool-part-task-status"
 
 describe("isBackgroundTaskMetadata", () => {
   test("true when backgroundTaskId is present (pentesters_task background launch)", () => {
@@ -143,5 +143,76 @@ describe("resolveChildSyncAction", () => {
       displayStatus: "pending",
       hasChildMessages: () => false,
     })).toBe("sync-and-poll")
+  })
+})
+
+describe("findChildSessionIdByParentAndTitle", () => {
+  const now = 1_700_000_000_000
+
+  test("matches a child whose parentID and title-prefix line up (live, before metadata.sessionId arrives)", () => {
+    const sessions = [
+      { id: "ses_parent", title: "Delegating task to bizlogic-hunter", time: { created: now } },
+      {
+        id: "ses_child",
+        parentID: "ses_parent",
+        title: "Pentesters_task round 2 (@bizlogic-hunter subagent)",
+        time: { created: now + 1000 },
+      },
+    ]
+    expect(findChildSessionIdByParentAndTitle({
+      parentId: "ses_parent",
+      description: "Pentesters_task round 2",
+      sessions,
+    })).toBe("ses_child")
+  })
+
+  test("returns undefined when there is no parentId", () => {
+    expect(findChildSessionIdByParentAndTitle({
+      parentId: undefined,
+      description: "Some task",
+      sessions: [],
+    })).toBeUndefined()
+  })
+
+  test("returns undefined when there is no description", () => {
+    expect(findChildSessionIdByParentAndTitle({
+      parentId: "ses_parent",
+      description: undefined,
+      sessions: [{ id: "ses_child", parentID: "ses_parent", title: "Anything", time: { created: now } }],
+    })).toBeUndefined()
+  })
+
+  test("returns undefined when no session matches parentID + title prefix", () => {
+    const sessions = [
+      { id: "ses_other", parentID: "ses_different_parent", title: "Some task (@agent)", time: { created: now } },
+    ]
+    expect(findChildSessionIdByParentAndTitle({
+      parentId: "ses_parent",
+      description: "Some task",
+      sessions,
+    })).toBeUndefined()
+  })
+
+  test("picks the most recently created match when a description repeats across concurrent delegations", () => {
+    const sessions = [
+      { id: "ses_first", parentID: "ses_parent", title: "Recon sweep (@recon)", time: { created: now } },
+      { id: "ses_second", parentID: "ses_parent", title: "Recon sweep (@recon)", time: { created: now + 5000 } },
+    ]
+    expect(findChildSessionIdByParentAndTitle({
+      parentId: "ses_parent",
+      description: "Recon sweep",
+      sessions,
+    })).toBe("ses_second")
+  })
+
+  test("ignores sessions under a different parent even if the title matches", () => {
+    const sessions = [
+      { id: "ses_unrelated", parentID: "ses_other_parent", title: "Recon sweep (@recon)", time: { created: now } },
+    ]
+    expect(findChildSessionIdByParentAndTitle({
+      parentId: "ses_parent",
+      description: "Recon sweep",
+      sessions,
+    })).toBeUndefined()
   })
 })

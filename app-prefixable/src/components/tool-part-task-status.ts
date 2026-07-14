@@ -57,3 +57,31 @@ export function resolveChildSyncAction(args: {
   if (args.hasChildMessages()) return "sync-once";
   return "sync-and-poll";
 }
+
+// Fallback for finding a background task's child session before the task
+// tool call has completed. opencode only attaches `metadata.sessionId` to
+// the tool part once it's "completed" (this is a real opencode limitation,
+// not something the task/pentesters_task plugin controls) — but the child
+// session itself already exists and streams via session.created/updated
+// SSE events well before then, with `parentID` pointing back to this
+// session and a `title` that starts with the delegated task's description
+// (both the built-in task tool and delegate-task-style plugins name
+// sessions this way). Matching on that lets the card resolve childId, and
+// therefore show live tool usage, while the task is still running.
+export function findChildSessionIdByParentAndTitle(args: {
+  parentId: string | undefined;
+  description: string | undefined;
+  sessions: readonly { id: string; parentID?: string; title: string; time: { created: number } }[];
+}): string | undefined {
+  const description = args.description?.trim();
+  if (!args.parentId || !description) return undefined;
+
+  const candidates = args.sessions.filter(
+    (s) => s.parentID === args.parentId && s.title.startsWith(description),
+  );
+  if (candidates.length === 0) return undefined;
+
+  // Best-effort correlation: when a description repeats across concurrent
+  // delegations, prefer whichever matching child was created most recently.
+  return candidates.reduce((latest, s) => (s.time.created > latest.time.created ? s : latest)).id;
+}

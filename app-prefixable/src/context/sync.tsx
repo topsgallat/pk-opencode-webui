@@ -370,7 +370,7 @@ export function SyncProvider(props: ParentProps) {
 
     // Session events
     if (event.type === "session.created") {
-      const session = props as unknown as Session
+      const session = props.info as Session | undefined
       if (!session?.id) return
       const target = session.time?.archived ? "archivedSession" : "session"
       setStore(
@@ -383,7 +383,7 @@ export function SyncProvider(props: ParentProps) {
     }
 
     if (event.type === "session.updated") {
-      const session = props as unknown as Session
+      const session = props.info as Session | undefined
       if (!session?.id) return
       const wasArchived = binarySearch(store.archivedSession, session.id, (s) => s.id).found
       const isArchived = !!session.time?.archived
@@ -435,7 +435,7 @@ export function SyncProvider(props: ParentProps) {
     }
 
     if (event.type === "session.deleted") {
-      const session = props as unknown as Session
+      const session = props.info as Session | undefined
       if (!session?.id) return
       // Remove from both lists
       setStore(

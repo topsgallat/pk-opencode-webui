@@ -5029,6 +5029,26 @@ function ProjectProvidersTab() {
 
   async function toggleProjectProvider(providerID: string) {
     setSaving(true)
+    const base = providerBaseID(providerID)
+    const isCurrentlyEnabled = !providers.disabledProviders.includes(base)
+
+    // Cascade model toggles: turning OFF → disable all models, turning ON → enable all models
+    const opt = providerOptions().find((p) => p.id === providerID || providerBaseID(p.id) === base)
+    if (opt && opt.modelIDs.length > 0) {
+      const policyProviderID = providerBaseID(providerID)
+      const existing = globalProviderConfigMap()[policyProviderID]
+      await config.updateGlobal({
+        provider: {
+          ...globalProviderConfigMap(),
+          [policyProviderID]: {
+            ...existing,
+            whitelist: undefined,
+            blacklist: isCurrentlyEnabled ? [...opt.modelIDs] : [],
+          },
+        },
+      })
+    }
+
     await providers.toggleProvider(providerID)
     setSaving(false)
     showSaved()
@@ -5045,6 +5065,10 @@ function ProjectProvidersTab() {
   async function toggleGlobalModel(providerID: string, modelID: string) {
     const policyProviderID = providerBaseID(providerID)
     setSaving(true)
+
+    if (!globalModelEnabled(providerID, modelID) && !projectProviderEnabled(providerID))
+      await providers.toggleProvider(providerID)
+
     const current = globalProviderModelConfig(policyProviderID)
     const existing = globalProviderConfigMap()[policyProviderID]
     const nextProvider: ProviderConfig = {

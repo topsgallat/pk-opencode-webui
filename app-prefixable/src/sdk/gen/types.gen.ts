@@ -115,6 +115,14 @@ export type FileDiff = {
   status?: "added" | "deleted" | "modified"
 }
 
+export type VcsFileDiff = {
+  file: string
+  patch?: string
+  additions: number
+  deletions: number
+  status?: "added" | "deleted" | "modified"
+}
+
 export type UserMessage = {
   id: string
   sessionID: string
@@ -4929,6 +4937,26 @@ export type VcsGetResponses = {
 }
 
 export type VcsGetResponse = VcsGetResponses[keyof VcsGetResponses]
+
+export type VcsDiffData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    mode?: "git" | "branch"
+    context?: number
+  }
+  url: "/vcs/diff"
+}
+
+export type VcsDiffResponses = {
+  /**
+   * VCS file diffs
+   */
+  200: Array<VcsFileDiff>
+}
+
+export type VcsDiffResponse = VcsDiffResponses[keyof VcsDiffResponses]
 
 export type CommandListData = {
   body?: never

@@ -7,8 +7,7 @@ import {
   For,
 } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import * as Diff from "diff";
-import type { FileDiff, FileNode } from "../sdk/client";
+import type { VcsFileDiff, FileNode } from "../sdk/client";
 import { useSDK } from "../context/sdk";
 import { useFile } from "../context/file";
 import { useEvents } from "../context/events";
@@ -24,24 +23,6 @@ import { Spinner } from "./ui/spinner";
 import { ChevronRight, FileCode, GitBranch, RefreshCw, Search, X } from "lucide-solid";
 
 const FILE_SEARCH_TIMEOUT_MS = 30_000;
-
-// Helper to create unified diff patch string
-function createPatch(filename: string, before: string, after: string): string {
-  // Use diff library's createTwoFilesPatch if available (runtime)
-  const diffLib = Diff as unknown as {
-    createTwoFilesPatch?: (
-      oldFileName: string,
-      newFileName: string,
-      oldStr: string,
-      newStr: string,
-    ) => string;
-  };
-  if (diffLib.createTwoFilesPatch) {
-    return diffLib.createTwoFilesPatch(filename, filename, before, after);
-  }
-  // Fallback: return empty patch (shouldn't happen)
-  return "";
-}
 
 interface ReviewPanelProps {
   sessionId: string;
@@ -71,7 +52,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
     navigate(`/${base64Encode(parent)}/session`)
   }
 
-  const [diffs, setDiffs] = createSignal<FileDiff[]>([]);
+  const [diffs, setDiffs] = createSignal<VcsFileDiff[]>([]);
   const [selected, setSelected] = createSignal<string | null>(null);
   const [loading, setLoading] = createSignal(false);
   const [tab, setTab] = createSignal<"changes" | "all">("all");
@@ -98,19 +79,21 @@ export function ReviewPanel(props: ReviewPanelProps) {
     const current = ++version;
     setLoading(true);
     try {
-      const res = await client.session.diff({ sessionID: props.sessionId, directory });
+      const res = await client.vcs.diff({ mode: "git", directory });
       // Only update state if this is still the latest request
       if (current !== version) return;
-      if (res.data) {
-        setDiffs(res.data);
+      const data = res.data ?? [];
+      if (data.length > 0) {
+        setDiffs(data);
         setIsGitRepo(true); // If we got diffs, it's definitely a git repo
         // Auto-select first file if none selected or selection no longer exists
-        const files = res.data.map((d) => d.file);
+        const files = data.map((d) => d.file);
         const sel = selected();
         if (!sel || !files.includes(sel)) {
-          setSelected(res.data.length > 0 ? res.data[0].file : null);
+          setSelected(data[0].file);
         }
       } else {
+        setDiffs([]);
         // No diffs returned - check if it's because no git repo
         await checkGitRepo();
       }
@@ -146,7 +129,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
       if (event.type === "session.diff") {
         const eventProps = event.properties as {
           sessionID?: string;
-          diff?: FileDiff[];
+          diff?: VcsFileDiff[];
         };
         if (eventProps.sessionID === id && eventProps.diff) {
           setDiffs(eventProps.diff);
@@ -184,7 +167,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
   const patch = createMemo(() => {
     const diff = selectedDiff();
     if (!diff) return "";
-    return createPatch(diff.file, diff.before, diff.after);
+    return diff.patch ?? "";
   });
 
   const lang = createMemo(() => {

@@ -16,7 +16,7 @@ import { generateUUID } from "../utils/uuid";
 import { Button } from "../components/ui/button";
 import { useSDK } from "../context/sdk";
 import { useEvents } from "../context/events";
-import { useSync } from "../context/sync";
+import { useSync, compareMessagesByTime } from "../context/sync";
 import { useProviders } from "../context/providers";
 import { usePermission } from "../context/permission";
 import { useLayout } from "../context/layout";
@@ -500,7 +500,7 @@ export function Session() {
   }
 
   function mergeSyncSources(base: SyncMessageLike[], direct: SyncMessageLike[]) {
-    if (direct.length === 0) return base;
+    if (direct.length === 0) return [...base].sort(compareMessagesByTime);
     const byId = new Map(base.map((message) => [message.info.id, message]));
     for (const message of direct) {
       const current = byId.get(message.info.id);
@@ -508,7 +508,7 @@ export function Session() {
         byId.set(message.info.id, message);
       }
     }
-    return Array.from(byId.values()).sort((a, b) => a.info.id.localeCompare(b.info.id));
+    return Array.from(byId.values()).sort(compareMessagesByTime);
   }
 
   async function refreshDirectMessages(id: string) {
@@ -522,7 +522,7 @@ export function Session() {
         info: { ...message.info },
         parts: message.parts.map((part) => ({ ...part })),
       }) as SyncMessageLike)
-      .sort((a, b) => a.info.id.localeCompare(b.info.id));
+      .sort(compareMessagesByTime);
     setDirectSyncMessages((prev) => ({ ...prev, [id]: source }));
   }
 

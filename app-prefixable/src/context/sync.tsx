@@ -115,6 +115,15 @@ const SYNC_PROBE_TIMEOUT_MS = 5_000
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
+// msg_ IDs do not sort chronologically (msg_00... can be newer than msg_ff...),
+// so order by creation time and fall back to ID only on ties/missing times.
+export function compareMessagesByTime<T extends { info: { id: string; time?: { created?: number } } }>(a: T, b: T): number {
+  const at = a.info.time?.created
+  const bt = b.info.time?.created
+  if (at != null && bt != null && at !== bt) return at - bt
+  return cmp(a.info.id, b.info.id)
+}
+
 function sortParts(parts: Part[]): Part[] {
   const withId = parts.filter((p) => !!p?.id).sort((a, b) => cmp(a.id, b.id))
   const withoutId = parts.filter((p) => !p?.id)

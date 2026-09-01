@@ -110,7 +110,7 @@ export const SyncContext = createContext<SyncContextValue>()
 const [globalSyncReady, setGlobalSyncReady] = createSignal(false)
 export { globalSyncReady }
 const SYNC_BOOTSTRAP_TIMEOUT_MS = 30_000
-const SYNC_SESSION_TIMEOUT_MS = 30_000
+const SYNC_SESSION_TIMEOUT_MS = 60_000
 const SYNC_PROBE_TIMEOUT_MS = 5_000
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)

@@ -345,7 +345,7 @@ export function ClaudeSession() {
   }
 
   return (
-    <div class="flex flex-col h-screen" style={{ background: "var(--background-base)" }}>
+    <div class="flex flex-col mobile-viewport" style={{ background: "var(--background-base)" }}>
       <header
         class="flex items-center gap-2 px-2 md:px-4 h-12 shrink-0"
         style={{ background: "var(--background-base)", "border-bottom": "1px solid var(--border-base)" }}

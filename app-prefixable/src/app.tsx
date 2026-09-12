@@ -15,6 +15,7 @@ import { ServerProvider, useServer } from "./context/server"
 import { DirectoryLayout } from "./pages/directory-layout"
 import { HomeLayout } from "./pages/home-layout"
 import { Session } from "./pages/session"
+import { ClaudeSession } from "./pages/claude-session"
 import { Settings } from "./pages/settings"
 import { Logs } from "./pages/logs"
 import { ProjectPicker } from "./pages/project-picker"
@@ -88,6 +89,13 @@ function AppRoutes() {
         <Route path="/settings" component={Settings} />
         <Route path="/logs" component={Logs} />
       </Route>
+
+      {/*
+        Claude Code chat: deliberately outside DirectoryLayout so it doesn't
+        instantiate the OpenCode SDK/event/sync providers, which assume an
+        `opencode serve` backend. See shared/claude-api.ts for the backend.
+      */}
+      <Route path="/:dir/claude" component={ClaudeSession} />
     </Router>
   )
 }

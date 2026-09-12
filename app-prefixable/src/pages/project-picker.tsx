@@ -2,7 +2,7 @@ import { createSignal, Show, For, createMemo, createEffect, on } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import { base64Encode } from "../utils/path"
 import { formatRelativeTime } from "../utils/time"
-import { Folder, GitBranch } from "lucide-solid"
+import { Folder, GitBranch, Bot } from "lucide-solid"
 import { ProjectDialog } from "../components/project-dialog"
 import { useBranding } from "../context/branding"
 import { useSDK } from "../context/sdk"
@@ -102,6 +102,11 @@ export function ProjectPicker() {
     navigate(`/${base64Encode(path)}/session`)
   }
 
+  function openRecentProjectWithClaude(path: string) {
+    recent.add(path)
+    navigate(`/${base64Encode(path)}/claude`)
+  }
+
   return (
     <div class="mx-auto mt-24 flex w-full min-h-0 flex-col px-4 max-w-xl md:mt-40 md:w-auto">
       {/* Logo */}
@@ -158,17 +163,29 @@ export function ProjectPicker() {
           <div class="min-h-0 flex-1 overflow-y-auto pr-1 md:flex-none md:overflow-visible md:pr-0">
             <For each={recentProjects()}>
               {(project) => (
-                <Button
-                  variant="ghost"
-                  size="large"
-                  class="text-left justify-between px-3 font-mono text-sm"
-                  onClick={() => openRecentProject(project.path)}
-                >
-                  <span class="truncate">{shortenPath(project.path, homeDir())}</span>
-                  <span class="text-sm font-sans" style={{ color: "var(--text-weak)" }}>
-                    {formatRelativeTime(project.lastOpened)}
-                  </span>
-                </Button>
+                <div class="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="large"
+                    class="flex-1 min-w-0 text-left justify-between px-3 font-mono text-sm"
+                    onClick={() => openRecentProject(project.path)}
+                  >
+                    <span class="truncate">{shortenPath(project.path, homeDir())}</span>
+                    <span class="text-sm font-sans" style={{ color: "var(--text-weak)" }}>
+                      {formatRelativeTime(project.lastOpened)}
+                    </span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="large"
+                    class="px-2 shrink-0"
+                    title="Open with Claude Code"
+                    aria-label="Open with Claude Code"
+                    onClick={() => openRecentProjectWithClaude(project.path)}
+                  >
+                    <Bot class="w-4 h-4" />
+                  </Button>
+                </div>
               )}
             </For>
           </div>

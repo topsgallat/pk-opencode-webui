@@ -22,6 +22,7 @@
 
 
 import { handleExtendedEndpoint, handleSkillEndpoint, isApiPath } from "../shared/extended-api"
+import { handleClaudeEndpoint } from "../shared/claude-api"
 import { loadCopilotModelMultipliers } from "../shared/copilot-model-multipliers"
 import { loadAnthropicPricing } from "../shared/anthropic-pricing"
 import { loadOpenAIPricing } from "../shared/openai-pricing"
@@ -468,6 +469,10 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       fetchUpstreamSkills: () => fetch(buildUpstreamUrl(path, url, req).toString()),
     })
     if (skillResponse) return skillResponse
+
+    // Claude Code backend (not proxied to OpenCode)
+    const claudeResponse = await handleClaudeEndpoint(path, req.method, url, req)
+    if (claudeResponse) return claudeResponse
 
     // Check if this is an API request (after stripping prefix)
     if (isApiPath(path)) {

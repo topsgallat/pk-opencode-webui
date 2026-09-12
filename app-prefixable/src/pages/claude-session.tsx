@@ -90,8 +90,13 @@ export function ClaudeSession() {
       return
     }
 
-    if (evt.type === "assistant" && Array.isArray(evt.content)) {
-      for (const block of evt.content as Array<Record<string, unknown>>) {
+    // The raw CLI's stream-json wraps the Anthropic message under `message`,
+    // e.g. {type: "assistant", message: {content: [...]}} — unlike the Agent
+    // SDK's flattened SDKMessage shape. Verified against a live container.
+    const inner = evt.message as Record<string, unknown> | undefined
+
+    if (evt.type === "assistant" && inner && Array.isArray(inner.content)) {
+      for (const block of inner.content as Array<Record<string, unknown>>) {
         if (block.type === "text" && typeof block.text === "string") {
           appendAssistantText(block.text)
         } else if (block.type === "tool_use") {
@@ -101,8 +106,8 @@ export function ClaudeSession() {
       return
     }
 
-    if (evt.type === "user" && Array.isArray(evt.content)) {
-      for (const block of evt.content as Array<Record<string, unknown>>) {
+    if (evt.type === "user" && inner && Array.isArray(inner.content)) {
+      for (const block of inner.content as Array<Record<string, unknown>>) {
         if (block.type === "tool_result") {
           setItems((prev) => [
             ...prev,

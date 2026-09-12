@@ -30,10 +30,14 @@ function validateCwd(inputPath: string, allowedRoot: string): string | null {
   return resolved
 }
 
+const CLAUDE_MODELS = ["sonnet", "opus", "haiku"] as const
+type ClaudeModel = (typeof CLAUDE_MODELS)[number]
+
 type ClaudeChatBody = {
   cwd?: string
   prompt?: string
   sessionId?: string
+  model?: string
 }
 
 export async function handleClaudeEndpoint(
@@ -58,6 +62,8 @@ export async function handleClaudeEndpoint(
     return Response.json({ error: "cwd must be within allowed directory" }, { status: 403 })
   }
 
+  const model: ClaudeModel = CLAUDE_MODELS.includes(body.model as ClaudeModel) ? (body.model as ClaudeModel) : "sonnet"
+
   const homeDir = process.env.HOME || os.homedir()
   let claudeBin: string
   try {
@@ -74,6 +80,12 @@ export async function handleClaudeEndpoint(
     "--output-format",
     "stream-json",
     "--verbose",
+    // Emits incremental `stream_event` records (message/content-block
+    // deltas) alongside the coarse per-message records, so the frontend can
+    // render assistant text token-by-token instead of one paint per turn.
+    "--include-partial-messages",
+    "--model",
+    model,
     // Full access, no approval UI yet (matches the reference cc-chat-ui's
     // default). --permission-prompts none keeps the rare still-gated actions
     // (critical-path rm/rmdir, AskUserQuestion, etc.) from hanging with no

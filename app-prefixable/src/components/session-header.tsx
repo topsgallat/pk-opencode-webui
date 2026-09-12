@@ -6,7 +6,7 @@ import { useMCP } from "../context/mcp"
 import { usePermission } from "../context/permission"
 import { useTerminal } from "../context/terminal"
 import { useSDK } from "../context/sdk"
-import { PanelBottom, FileCode, ListTodo, Plug, ArrowLeft, Users, Bell, BellRing, BookOpen } from "lucide-solid"
+import { PanelBottom, FileCode, ListTodo, Plug, ArrowLeft, Users, Bell, BellRing, BookOpen, Bot } from "lucide-solid"
 import { base64Encode } from "../utils/path"
 import { browserNotificationSupported } from "../utils/notify"
 import type { Session } from "../sdk/client"
@@ -155,6 +155,19 @@ export function SessionHeader(props: SessionHeaderProps) {
       </div>
 
       <div class="flex items-center gap-1 shrink-0">
+        {/* Switch to Claude Code for this project */}
+        <button
+          onClick={() => navigate(`/${dirSlug()}/claude`)}
+          class="p-1.5 rounded-md transition-colors"
+          style={{ color: "var(--icon-base)" }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-inset)")}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+          title="Switch to Claude Code"
+          aria-label="Switch to Claude Code"
+        >
+          <Bot class="w-4 h-4" />
+        </button>
+
         {/* MCP toggle */}
         <button
           data-hint-target

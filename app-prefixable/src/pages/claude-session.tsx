@@ -28,12 +28,30 @@ function isClaudeModel(value: string | null): value is ClaudeModel {
   return value === "sonnet" || value === "opus" || value === "haiku"
 }
 
+type ClaudeEffort = "low" | "medium" | "high" | "xhigh" | "max"
+
+const EFFORT_LABELS: Record<ClaudeEffort, string> = {
+  low: "Low effort",
+  medium: "Medium effort",
+  high: "High effort",
+  xhigh: "X-high effort",
+  max: "Max effort",
+}
+
+function isClaudeEffort(value: string | null): value is ClaudeEffort {
+  return value === "low" || value === "medium" || value === "high" || value === "xhigh" || value === "max"
+}
+
 function sessionStorageKey(dir: string) {
   return `claude.session.${dir}`
 }
 
 function modelStorageKey(dir: string) {
   return `claude.model.${dir}`
+}
+
+function effortStorageKey(dir: string) {
+  return `claude.effort.${dir}`
 }
 
 type SessionSummary = {
@@ -81,6 +99,7 @@ export function ClaudeSession() {
   const [sending, setSending] = createSignal(false)
   const [sessionId, setSessionId] = createSignal<string | undefined>(undefined)
   const [model, setModel] = createSignal<ClaudeModel>("sonnet")
+  const [effort, setEffort] = createSignal<ClaudeEffort>("medium")
   const [hasOutputThisTurn, setHasOutputThisTurn] = createSignal(false)
   const [error, setError] = createSignal<string | undefined>(undefined)
   const [showHistoryPicker, setShowHistoryPicker] = createSignal(false)
@@ -106,8 +125,10 @@ export function ClaudeSession() {
       }
       const savedModel = localStorage.getItem(modelStorageKey(dir))
       if (isClaudeModel(savedModel)) setModel(savedModel)
+      const savedEffort = localStorage.getItem(effortStorageKey(dir))
+      if (isClaudeEffort(savedEffort)) setEffort(savedEffort)
     } catch {
-      // localStorage unavailable — session/model simply won't resume across reloads
+      // localStorage unavailable — session/model/effort simply won't resume across reloads
     }
   })
 
@@ -185,6 +206,18 @@ export function ClaudeSession() {
     if (!dir) return
     try {
       localStorage.setItem(modelStorageKey(dir), value)
+    } catch {
+      // ignore
+    }
+  }
+
+  function selectEffort(value: string) {
+    if (!isClaudeEffort(value)) return
+    setEffort(value)
+    const dir = directory()
+    if (!dir) return
+    try {
+      localStorage.setItem(effortStorageKey(dir), value)
     } catch {
       // ignore
     }
@@ -301,7 +334,7 @@ export function ClaudeSession() {
       const res = await fetch("api/claude/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cwd: dir, prompt, sessionId: sessionId(), model: model() }),
+        body: JSON.stringify({ cwd: dir, prompt, sessionId: sessionId(), model: model(), effort: effort() }),
       })
 
       if (!res.ok || !res.body) {
@@ -577,6 +610,22 @@ export function ClaudeSession() {
               aria-label="Claude model"
             >
               <For each={Object.entries(MODEL_LABELS)}>
+                {([value, label]) => <option value={value}>{label}</option>}
+              </For>
+            </select>
+            <select
+              class="appearance-none px-2 py-1 rounded-md text-xs font-medium border focus:outline-none"
+              style={{
+                background: "var(--background-base)",
+                "border-color": "var(--border-base)",
+                color: "var(--text-strong)",
+              }}
+              value={effort()}
+              onChange={(e) => selectEffort(e.currentTarget.value)}
+              disabled={sending()}
+              aria-label="Claude effort"
+            >
+              <For each={Object.entries(EFFORT_LABELS)}>
                 {([value, label]) => <option value={value}>{label}</option>}
               </For>
             </select>

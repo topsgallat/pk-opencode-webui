@@ -34,11 +34,15 @@ function validateCwd(inputPath: string, allowedRoot: string): string | null {
 const CLAUDE_MODELS = ["sonnet", "opus", "haiku"] as const
 type ClaudeModel = (typeof CLAUDE_MODELS)[number]
 
+const CLAUDE_EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const
+type ClaudeEffort = (typeof CLAUDE_EFFORT_LEVELS)[number]
+
 type ClaudeChatBody = {
   cwd?: string
   prompt?: string
   sessionId?: string
   model?: string
+  effort?: string
 }
 
 export async function handleClaudeEndpoint(
@@ -95,6 +99,7 @@ async function handleClaudeChat(req: Request): Promise<Response> {
   }
 
   const model: ClaudeModel = CLAUDE_MODELS.includes(body.model as ClaudeModel) ? (body.model as ClaudeModel) : "sonnet"
+  const effort: ClaudeEffort = CLAUDE_EFFORT_LEVELS.includes(body.effort as ClaudeEffort) ? (body.effort as ClaudeEffort) : "medium"
 
   const homeDir = process.env.HOME || os.homedir()
   let claudeBin: string
@@ -118,6 +123,8 @@ async function handleClaudeChat(req: Request): Promise<Response> {
     "--include-partial-messages",
     "--model",
     model,
+    "--effort",
+    effort,
     // Full access, no approval UI yet (matches the reference cc-chat-ui's
     // default). --permission-prompts none keeps the rare still-gated actions
     // (critical-path rm/rmdir, AskUserQuestion, etc.) from hanging with no

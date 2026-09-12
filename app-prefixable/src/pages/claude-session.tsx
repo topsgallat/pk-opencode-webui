@@ -1,10 +1,12 @@
 import { createSignal, createEffect, For, Show, Switch, Match, onMount } from "solid-js"
 import { useParams, useNavigate } from "@solidjs/router"
-import { ArrowLeft, Bot, Loader2, SendHorizontal } from "lucide-solid"
+import { ArrowLeft, Bot, History, Loader2, Plus, SendHorizontal } from "lucide-solid"
 import { base64Decode } from "../utils/path"
 import { getFilename } from "../components/shared"
 import { Markdown } from "../components/markdown"
 import { Button } from "../components/ui/button"
+import { PickerDialog } from "../components/picker-dialog"
+import { formatRelativeTime } from "../utils/time"
 import { useDevice } from "../context/device"
 
 type ToolStatus = "running" | "done" | "error"
@@ -32,6 +34,13 @@ function sessionStorageKey(dir: string) {
 
 function modelStorageKey(dir: string) {
   return `claude.model.${dir}`
+}
+
+type SessionSummary = {
+  id: string
+  preview: string
+  updatedAt: string
+  messageCount: number
 }
 
 function toolResultText(content: unknown): string {
@@ -74,6 +83,9 @@ export function ClaudeSession() {
   const [model, setModel] = createSignal<ClaudeModel>("sonnet")
   const [hasOutputThisTurn, setHasOutputThisTurn] = createSignal(false)
   const [error, setError] = createSignal<string | undefined>(undefined)
+  const [showHistoryPicker, setShowHistoryPicker] = createSignal(false)
+  const [historySessions, setHistorySessions] = createSignal<SessionSummary[]>([])
+  const [loadingHistoryList, setLoadingHistoryList] = createSignal(false)
 
   // Set once per turn when a `stream_event` text delta lands, so the final
   // full-snapshot `assistant` record for that turn doesn't get re-appended
@@ -88,13 +100,71 @@ export function ClaudeSession() {
     if (!dir) return
     try {
       const saved = localStorage.getItem(sessionStorageKey(dir))
-      if (saved) setSessionId(saved)
+      if (saved) {
+        setSessionId(saved)
+        void loadHistory(dir, saved)
+      }
       const savedModel = localStorage.getItem(modelStorageKey(dir))
       if (isClaudeModel(savedModel)) setModel(savedModel)
     } catch {
       // localStorage unavailable — session/model simply won't resume across reloads
     }
   })
+
+  async function loadHistory(dir: string, id: string) {
+    try {
+      const res = await fetch(`api/claude/sessions/${encodeURIComponent(id)}/messages?cwd=${encodeURIComponent(dir)}`)
+      if (!res.ok) return
+      const data = (await res.json()) as { items?: ChatItem[] }
+      if (Array.isArray(data.items)) setItems(data.items)
+    } catch {
+      // history is best-effort — leave the transcript empty rather than block the page
+    }
+  }
+
+  async function openHistoryPicker() {
+    const dir = directory()
+    if (!dir) return
+    setShowHistoryPicker(true)
+    setLoadingHistoryList(true)
+    try {
+      const res = await fetch(`api/claude/sessions?cwd=${encodeURIComponent(dir)}`)
+      const data = (await res.json().catch(() => null)) as { sessions?: SessionSummary[] } | null
+      setHistorySessions(data?.sessions ?? [])
+    } catch {
+      setHistorySessions([])
+    } finally {
+      setLoadingHistoryList(false)
+    }
+  }
+
+  function selectHistorySession(id: string) {
+    const dir = directory()
+    setShowHistoryPicker(false)
+    if (!dir) return
+    setSessionId(id)
+    setItems([])
+    setError(undefined)
+    try {
+      localStorage.setItem(sessionStorageKey(dir), id)
+    } catch {
+      // ignore
+    }
+    void loadHistory(dir, id)
+  }
+
+  function startNewChat() {
+    const dir = directory()
+    setSessionId(undefined)
+    setItems([])
+    setError(undefined)
+    if (!dir) return
+    try {
+      localStorage.removeItem(sessionStorageKey(dir))
+    } catch {
+      // ignore
+    }
+  }
 
   createEffect(() => {
     items()
@@ -301,7 +371,46 @@ export function ClaudeSession() {
             </Show>
           </div>
         </div>
+        <div class="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            class="p-1.5 rounded transition-colors"
+            style={{ color: "var(--text-weak)" }}
+            onClick={() => void openHistoryPicker()}
+            aria-label="Session history"
+            title="Session history"
+          >
+            <History class="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            class="p-1.5 rounded transition-colors"
+            style={{ color: "var(--text-weak)" }}
+            onClick={startNewChat}
+            aria-label="New chat"
+            title="New chat"
+          >
+            <Plus class="w-4 h-4" />
+          </button>
+        </div>
       </header>
+
+      <Show when={showHistoryPicker()}>
+        <PickerDialog
+          title="Session history"
+          placeholder="Filter sessions..."
+          emptyMessage="No previous sessions for this project."
+          loading={loadingHistoryList()}
+          loadingMessage="Loading sessions…"
+          items={historySessions().map((session) => ({
+            id: session.id,
+            title: session.preview,
+            description: `${formatRelativeTime(new Date(session.updatedAt).getTime())} · ${session.messageCount} messages`,
+          }))}
+          onSelect={(item) => selectHistorySession(item.id)}
+          onClose={() => setShowHistoryPicker(false)}
+        />
+      </Show>
 
       <div ref={scrollRef} class="flex-1 overflow-y-auto px-3 md:px-4 py-4">
         <div class="max-w-3xl mx-auto flex flex-col gap-4">

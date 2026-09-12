@@ -20,6 +20,7 @@ import * as nodePath from "node:path"
 import * as os from "node:os"
 import { getAllowedRoot } from "./extended-api"
 import { resolveClaudeBinary } from "./claude-cli"
+import { listClaudeSessions, loadClaudeSessionMessages } from "./claude-history"
 
 function validateCwd(inputPath: string, allowedRoot: string): string | null {
   const resolved = nodePath.resolve(allowedRoot, inputPath)
@@ -43,11 +44,42 @@ type ClaudeChatBody = {
 export async function handleClaudeEndpoint(
   path: string,
   method: string,
-  _url: URL,
+  url: URL,
   req: Request,
 ): Promise<Response | undefined> {
-  if (path !== "/api/claude/chat" || method !== "POST") return undefined
+  if (path === "/api/claude/chat" && method === "POST") return handleClaudeChat(req)
+  if (path === "/api/claude/sessions" && method === "GET") return handleListSessions(url)
+  const messagesMatch = method === "GET" ? path.match(/^\/api\/claude\/sessions\/([^/]+)\/messages$/) : null
+  if (messagesMatch) return handleSessionMessages(url, decodeURIComponent(messagesMatch[1]))
+  return undefined
+}
 
+function resolveRequestCwd(url: URL): { cwd: string; error?: undefined } | { cwd?: undefined; error: Response } {
+  const rawCwd = url.searchParams.get("cwd")
+  if (!rawCwd) return { error: Response.json({ error: "cwd is required" }, { status: 400 }) }
+  const cwd = validateCwd(rawCwd, getAllowedRoot())
+  if (!cwd) return { error: Response.json({ error: "cwd must be within allowed directory" }, { status: 403 }) }
+  return { cwd }
+}
+
+async function handleListSessions(url: URL): Promise<Response> {
+  const resolved = resolveRequestCwd(url)
+  if (resolved.error) return resolved.error
+  const homeDir = process.env.HOME || os.homedir()
+  const sessions = await listClaudeSessions(homeDir, resolved.cwd)
+  return Response.json({ sessions })
+}
+
+async function handleSessionMessages(url: URL, sessionId: string): Promise<Response> {
+  const resolved = resolveRequestCwd(url)
+  if (resolved.error) return resolved.error
+  const homeDir = process.env.HOME || os.homedir()
+  const items = await loadClaudeSessionMessages(homeDir, resolved.cwd, sessionId)
+  if (!items) return Response.json({ error: "session not found" }, { status: 404 })
+  return Response.json({ items })
+}
+
+async function handleClaudeChat(req: Request): Promise<Response> {
   const body = (await req.json().catch(() => null)) as ClaudeChatBody | null
   if (!body || typeof body.prompt !== "string" || !body.prompt.trim()) {
     return Response.json({ error: "prompt is required" }, { status: 400 })

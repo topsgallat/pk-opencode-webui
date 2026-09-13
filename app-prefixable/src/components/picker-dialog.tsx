@@ -3,6 +3,7 @@ import { Portal } from "solid-js/web"
 import { X, Search, ChevronsDown, ChevronsRight } from "lucide-solid"
 import { createBackdropDismiss } from "../utils/backdrop"
 import { Spinner } from "./ui/spinner"
+import { useDevice } from "../context/device"
 
 interface PickerItem {
   id: string
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export function PickerDialog(props: Props) {
+  const device = useDevice()
   const [filter, setFilter] = createSignal(props.initialFilter ?? "")
   const [activeIndex, setActiveIndex] = createSignal(0)
   const [collapsedGroups, setCollapsedGroups] = createSignal<Set<string>>(new Set())
@@ -84,7 +86,10 @@ export function PickerDialog(props: Props) {
   })
 
   onMount(() => {
-    inputRef?.focus()
+    // Autofocusing the filter input pops the on-screen keyboard on touch
+    // devices even when the user only meant to tap an option — only claim
+    // focus on devices with a physical keyboard.
+    if (!device.isTouchDevice()) inputRef?.focus()
 
     const handler = (e: KeyboardEvent) => {
       const items = filtered()

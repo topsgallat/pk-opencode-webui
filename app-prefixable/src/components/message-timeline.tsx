@@ -12,6 +12,7 @@ import type { SessionStatus } from "../sdk/client"
 import { reconcileTurns } from "../utils/message-reconcile"
 import { getRealTurnDefaultExpanded } from "./message-turn-state"
 import { resolveActiveTurnId, shouldResetTimelineState } from "./message-timeline-state"
+import { createAutoScroll } from "../utils/auto-scroll"
 
 // Number of turns to render initially and on each "load more"
 const TURNS_PER_BATCH = 10
@@ -22,83 +23,6 @@ function hasVisibleContent(message: DisplayMessage): boolean {
   if (message.role === "user") return true
   if (message.parts.some((p) => p.type === "tool")) return true
   return extractTextContent(message.parts).trim().length > 0
-}
-
-function createAutoScroll(options: { bottomThreshold?: number; pinned?: () => boolean } = {}) {
-  let scroll: HTMLElement | undefined
-  let content: HTMLElement | undefined
-  let scrollResizeObserver: ResizeObserver | undefined
-  let resizeObserver: ResizeObserver | undefined
-  const threshold = options.bottomThreshold ?? 24
-
-  // Measured via getBoundingClientRect against `content` (the turn list),
-  // not `el.scrollHeight` -- the scroll container also holds a trailing
-  // spacer (for scrollToTopTarget) that inflates scrollHeight past the
-  // actual content, which would otherwise make this always look "not at
-  // the bottom" once that spacer is present.
-  const distanceFromBottom = (el: HTMLElement) => {
-    if (!content) return el.scrollHeight - el.clientHeight - el.scrollTop
-    return content.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom
-  }
-  const [showFab, setShowFab] = createSignal(false)
-
-  const scrollToBottomNow = () => {
-    const el = scroll
-    if (!el) return
-    if (!content) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
-      return
-    }
-    const target = el.scrollTop + (content.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom)
-    el.scrollTo({ top: target, behavior: "smooth" })
-  }
-
-  const update = () => {
-    const el = scroll
-    if (!el) return
-    // While pinned, re-snap to the true bottom on every content resize (i.e.
-    // every streamed chunk) instead of only tracking distance for the FAB --
-    // this is what reproduces a continuous "follow the stream" feel.
-    if (options.pinned?.()) scrollToBottomNow()
-    setShowFab(distanceFromBottom(el) > threshold)
-  }
-
-  const observe = () => {
-    if (!content || typeof ResizeObserver === "undefined") return
-    if (resizeObserver) resizeObserver.disconnect()
-    resizeObserver = new ResizeObserver(() => update())
-    resizeObserver.observe(content)
-  }
-
-  const observeScroll = (el: HTMLElement) => {
-    if (typeof ResizeObserver === "undefined") return
-    if (scrollResizeObserver) scrollResizeObserver.disconnect()
-    scrollResizeObserver = new ResizeObserver(() => update())
-    scrollResizeObserver.observe(el)
-  }
-
-  onCleanup(() => {
-    if (scrollResizeObserver) scrollResizeObserver.disconnect()
-    if (resizeObserver) resizeObserver.disconnect()
-  })
-
-  return {
-    scrollRef: (el: HTMLElement | undefined) => {
-      scroll = el
-      if (!el) return
-      observeScroll(el)
-      update()
-    },
-    contentRef: (el: HTMLElement | undefined) => {
-      content = el
-      if (!el) return
-      observe()
-      update()
-    },
-    handleScroll: update,
-    scrollToBottom: scrollToBottomNow,
-    showScrollToBottom: () => showFab(),
-  }
 }
 
 export function MessageTimeline(props: {

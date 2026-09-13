@@ -1,12 +1,13 @@
-import { createSignal, createEffect, For, Show, Switch, Match, onMount } from "solid-js"
+import { createSignal, For, Show, Switch, Match, onCleanup, onMount } from "solid-js"
 import { useParams, useNavigate } from "@solidjs/router"
-import { ArrowLeft, Bot, History, Loader2, Plus, SendHorizontal } from "lucide-solid"
+import { ArrowDown, ArrowLeft, Bot, History, Lock, LockOpen, Loader2, Plus, SendHorizontal } from "lucide-solid"
 import { base64Decode } from "../utils/path"
 import { getFilename } from "../components/shared"
 import { Markdown } from "../components/markdown"
 import { Button } from "../components/ui/button"
 import { PickerDialog } from "../components/picker-dialog"
 import { formatRelativeTime } from "../utils/time"
+import { createAutoScroll } from "../utils/auto-scroll"
 import { useDevice } from "../context/device"
 
 type ToolStatus = "running" | "done" | "error"
@@ -142,6 +143,7 @@ export function ClaudeSession() {
   const [showEffortPicker, setShowEffortPicker] = createSignal(false)
   const [historySessions, setHistorySessions] = createSignal<SessionSummary[]>([])
   const [loadingHistoryList, setLoadingHistoryList] = createSignal(false)
+  const [pinned, setPinned] = createSignal(false)
 
   // Set once per turn when a `stream_event` text delta lands, so the final
   // full-snapshot `assistant` record for that turn doesn't get re-appended
@@ -156,8 +158,18 @@ export function ClaudeSession() {
   let turnModel: string | undefined
   let turnEffort: string | undefined
 
+  const autoScroll = createAutoScroll({ pinned })
+  // While pinned, block manual scroll input entirely (hard lock, matching
+  // the OpenCode chat's message-timeline.tsx behavior) instead of letting it
+  // move and snap back -- scrolling up requires pressing unlock first.
+  let scrollEl: HTMLDivElement | undefined
+  const blockWheelOrTouch = (e: Event) => { if (pinned()) e.preventDefault() }
+  onCleanup(() => {
+    scrollEl?.removeEventListener("wheel", blockWheelOrTouch)
+    scrollEl?.removeEventListener("touchmove", blockWheelOrTouch)
+  })
+
   let textareaRef: HTMLTextAreaElement | undefined
-  let scrollRef: HTMLDivElement | undefined
 
   onMount(() => {
     const dir = directory()
@@ -211,6 +223,7 @@ export function ClaudeSession() {
     setSessionId(id)
     setItems([])
     setError(undefined)
+    setPinned(false)
     try {
       localStorage.setItem(sessionStorageKey(dir), id)
     } catch {
@@ -224,6 +237,7 @@ export function ClaudeSession() {
     setSessionId(undefined)
     setItems([])
     setError(undefined)
+    setPinned(false)
     if (!dir) return
     try {
       localStorage.removeItem(sessionStorageKey(dir))
@@ -232,11 +246,6 @@ export function ClaudeSession() {
     }
   }
 
-  createEffect(() => {
-    items()
-    hasOutputThisTurn()
-    queueMicrotask(() => scrollRef?.scrollTo({ top: scrollRef.scrollHeight, behavior: "smooth" }))
-  })
 
   function autoResize() {
     if (!textareaRef) return
@@ -523,8 +532,18 @@ export function ClaudeSession() {
         />
       </Show>
 
-      <div ref={scrollRef} class="flex-1 overflow-y-auto px-3 md:px-4 py-4">
-        <div class="max-w-3xl mx-auto flex flex-col gap-4">
+      <div class="relative flex-1 min-h-0">
+      <div
+        ref={(el) => {
+          scrollEl = el
+          autoScroll.scrollRef(el)
+          el?.addEventListener("wheel", blockWheelOrTouch, { passive: false })
+          el?.addEventListener("touchmove", blockWheelOrTouch, { passive: false })
+        }}
+        onScroll={autoScroll.handleScroll}
+        class="h-full overflow-y-auto px-3 md:px-4 py-4"
+      >
+        <div ref={autoScroll.contentRef} class="max-w-3xl mx-auto flex flex-col gap-4">
           <Show when={items().length === 0}>
             <div class="text-sm text-center py-12" style={{ color: "var(--text-weak)" }}>
               Ask Claude Code anything about this project.
@@ -662,6 +681,41 @@ export function ClaudeSession() {
             <div class="text-sm" style={{ color: "var(--text-critical-base)" }}>{error()}</div>
           </Show>
         </div>
+      </div>
+
+      <div class="pointer-events-none absolute bottom-6 right-6 z-10">
+        <button
+          type="button"
+          class="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all duration-200 hover:-translate-y-0.5 focus-visible:-translate-y-0.5"
+          style={{
+            background: pinned() || autoScroll.showScrollToBottom() ? "var(--interactive-base)" : "var(--surface-inset)",
+            color: pinned() || autoScroll.showScrollToBottom() ? "var(--text-on-interactive)" : "var(--text-weak)",
+            border: "1px solid color-mix(in srgb, var(--interactive-hover) 55%, transparent)",
+            opacity: pinned() || autoScroll.showScrollToBottom() ? 1 : 0.6,
+          }}
+          onMouseEnter={(e) => {
+            if (pinned() || autoScroll.showScrollToBottom()) e.currentTarget.style.background = "var(--interactive-hover)"
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = pinned() || autoScroll.showScrollToBottom() ? "var(--interactive-base)" : "var(--surface-inset)"
+          }}
+          onClick={() => {
+            if (pinned()) { setPinned(false); return }
+            if (autoScroll.showScrollToBottom()) { autoScroll.scrollToBottom(); return }
+            setPinned(true)
+          }}
+          aria-label={pinned() ? "Unlock auto-scroll" : autoScroll.showScrollToBottom() ? "Scroll to bottom" : "Lock auto-scroll to bottom"}
+          title={pinned() ? "Unlock auto-scroll" : autoScroll.showScrollToBottom() ? "Scroll to bottom" : "Lock auto-scroll to bottom"}
+        >
+          <Show when={pinned()} fallback={
+            <Show when={autoScroll.showScrollToBottom()} fallback={<LockOpen class="w-5 h-5" />}>
+              <ArrowDown class="w-5 h-5" />
+            </Show>
+          }>
+            <Lock class="w-5 h-5" />
+          </Show>
+        </button>
+      </div>
       </div>
 
       <div class="px-3 md:px-4 pb-3 md:pb-4 pt-2 shrink-0" style={{ background: "var(--background-base)" }}>

@@ -45,6 +45,30 @@ export function MessageTimeline(props: {
   const [pinned, setPinned] = createSignal(false)
   const autoScroll = createAutoScroll({ pinned })
 
+  // The FAB shows solid for a few seconds right after locking (clear
+  // confirmation it engaged), then fades to the same quiet look as the
+  // unlocked-at-bottom state so it isn't a loud, distracting fixture for the
+  // rest of a long streamed reply.
+  const [justLocked, setJustLocked] = createSignal(false)
+  let lockFadeTimer: ReturnType<typeof setTimeout> | undefined
+  function engagePin() {
+    setPinned(true)
+    setJustLocked(true)
+    if (lockFadeTimer) clearTimeout(lockFadeTimer)
+    lockFadeTimer = setTimeout(() => setJustLocked(false), 3000)
+  }
+  function disengagePin() {
+    setPinned(false)
+    setJustLocked(false)
+    if (lockFadeTimer) {
+      clearTimeout(lockFadeTimer)
+      lockFadeTimer = undefined
+    }
+  }
+  onCleanup(() => {
+    if (lockFadeTimer) clearTimeout(lockFadeTimer)
+  })
+
   // While pinned, block manual scroll input entirely rather than letting it
   // move and then snapping back -- the user asked for a hard lock: scrolling
   // up must require pressing unlock first, not just be overridden a moment
@@ -315,6 +339,7 @@ export function MessageTimeline(props: {
   }))
 
   const showScrollToBottom = createMemo(() => !props.loadingHistory && autoScroll.showScrollToBottom())
+  const fabVivid = createMemo(() => (pinned() ? justLocked() : showScrollToBottom()))
 
   return (
     <div class="relative flex-1 min-h-0">
@@ -511,23 +536,23 @@ export function MessageTimeline(props: {
         <div class="pointer-events-none absolute bottom-6 right-6 z-10">
           <button
             type="button"
-            class="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all duration-200 hover:-translate-y-0.5 focus-visible:-translate-y-0.5"
+            class="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all duration-700 hover:-translate-y-0.5 focus-visible:-translate-y-0.5"
             style={{
-              background: pinned() || showScrollToBottom() ? "var(--interactive-base)" : "var(--surface-inset)",
-              color: pinned() || showScrollToBottom() ? "var(--text-on-interactive)" : "var(--text-weak)",
+              background: fabVivid() ? "var(--interactive-base)" : "var(--surface-inset)",
+              color: fabVivid() ? "var(--text-on-interactive)" : "var(--text-weak)",
               border: "1px solid color-mix(in srgb, var(--interactive-hover) 55%, transparent)",
-              opacity: pinned() || showScrollToBottom() ? 1 : 0.6,
+              opacity: fabVivid() ? 1 : 0.6,
             }}
             onMouseEnter={(e) => {
-              if (pinned() || showScrollToBottom()) e.currentTarget.style.background = "var(--interactive-hover)"
+              if (fabVivid()) e.currentTarget.style.background = "var(--interactive-hover)"
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = pinned() || showScrollToBottom() ? "var(--interactive-base)" : "var(--surface-inset)"
+              e.currentTarget.style.background = fabVivid() ? "var(--interactive-base)" : "var(--surface-inset)"
             }}
             onClick={() => {
-              if (pinned()) { setPinned(false); return }
+              if (pinned()) { disengagePin(); return }
               if (showScrollToBottom()) { autoScroll.scrollToBottom(); return }
-              setPinned(true)
+              engagePin()
             }}
             aria-label={pinned() ? "Unlock auto-scroll" : showScrollToBottom() ? "Scroll to bottom" : "Lock auto-scroll to bottom"}
             title={pinned() ? "Unlock auto-scroll" : showScrollToBottom() ? "Scroll to bottom" : "Lock auto-scroll to bottom"}

@@ -11,7 +11,13 @@ import { createSignal, onCleanup } from "solid-js"
  *   always look "not at the bottom" once that spacer exists.
  * - When `pinned()` is true, every observed content resize (i.e. every
  *   streamed chunk) re-snaps to the true bottom, reproducing a continuous
- *   "follow the stream" feel instead of a one-shot scroll.
+ *   "follow the stream" feel instead of a one-shot scroll. That re-snap is
+ *   instant (`behavior: "auto"`), not smooth: a `smooth` scroll animates for
+ *   ~300-500ms, and fast streaming re-triggers this before the previous
+ *   animation finishes, so the view perpetually chases the target and the
+ *   line currently being typed stays just offscreen until streaming pauses.
+ *   `scrollToBottom()` (the FAB's one-shot jump) is unaffected and still
+ *   animates smoothly, since it only fires once per click.
  */
 export function createAutoScroll(options: { bottomThreshold?: number; pinned?: () => boolean } = {}) {
   let scroll: HTMLElement | undefined
@@ -26,21 +32,21 @@ export function createAutoScroll(options: { bottomThreshold?: number; pinned?: (
   }
   const [showFab, setShowFab] = createSignal(false)
 
-  const scrollToBottomNow = () => {
+  const scrollToBottomNow = (behavior: ScrollBehavior) => {
     const el = scroll
     if (!el) return
     if (!content) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+      el.scrollTo({ top: el.scrollHeight, behavior })
       return
     }
     const target = el.scrollTop + (content.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom)
-    el.scrollTo({ top: target, behavior: "smooth" })
+    el.scrollTo({ top: target, behavior })
   }
 
   const update = () => {
     const el = scroll
     if (!el) return
-    if (options.pinned?.()) scrollToBottomNow()
+    if (options.pinned?.()) scrollToBottomNow("auto")
     setShowFab(distanceFromBottom(el) > threshold)
   }
 
@@ -77,7 +83,7 @@ export function createAutoScroll(options: { bottomThreshold?: number; pinned?: (
       update()
     },
     handleScroll: update,
-    scrollToBottom: scrollToBottomNow,
+    scrollToBottom: () => scrollToBottomNow("smooth"),
     showScrollToBottom: () => showFab(),
   }
 }

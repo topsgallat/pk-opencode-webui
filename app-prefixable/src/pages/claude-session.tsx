@@ -14,7 +14,17 @@ type ToolStatus = "running" | "done" | "error"
 type ChatItem =
   | { kind: "user"; text: string }
   | { kind: "assistant"; text: string }
-  | { kind: "tool"; id: string; name: string; input: unknown; status: ToolStatus; result?: string }
+  | { kind: "tool"; id: string; name: string; input: unknown; status: ToolStatus; result?: string; subagent?: string }
+  | {
+      kind: "usage"
+      inputTokens: number
+      outputTokens: number
+      cacheReadInputTokens?: number
+      cacheCreationInputTokens?: number
+      costUsd?: number
+      model?: string
+      effort?: string
+    }
 
 type ClaudeModel = "sonnet" | "opus" | "haiku"
 
@@ -72,6 +82,31 @@ function toolResultText(content: unknown): string {
   return ""
 }
 
+// Claude's `-p` print-mode result summary reports usage for the whole
+// turn (`usage`) plus a total spend (`total_cost_usd`) — both documented,
+// stable fields of the CLI's non-interactive JSON output.
+function extractUsage(
+  evt: Record<string, unknown>,
+  turnModel: string | undefined,
+  turnEffort: string | undefined,
+): Extract<ChatItem, { kind: "usage" }> | undefined {
+  const usage = evt.usage as Record<string, unknown> | undefined
+  if (!usage || typeof usage !== "object") return undefined
+  const inputTokens = usage.input_tokens
+  const outputTokens = usage.output_tokens
+  if (typeof inputTokens !== "number" || typeof outputTokens !== "number") return undefined
+  return {
+    kind: "usage",
+    inputTokens,
+    outputTokens,
+    ...(typeof usage.cache_read_input_tokens === "number" ? { cacheReadInputTokens: usage.cache_read_input_tokens } : {}),
+    ...(typeof usage.cache_creation_input_tokens === "number" ? { cacheCreationInputTokens: usage.cache_creation_input_tokens } : {}),
+    ...(typeof evt.total_cost_usd === "number" ? { costUsd: evt.total_cost_usd } : {}),
+    ...(turnModel ? { model: turnModel } : {}),
+    ...(turnEffort ? { effort: turnEffort } : {}),
+  }
+}
+
 /**
  * Claude Code chat page (Phase 1 MVP). Deliberately separate from the OpenCode
  * `Session` page/context stack — the message shapes and streaming protocol
@@ -103,13 +138,23 @@ export function ClaudeSession() {
   const [hasOutputThisTurn, setHasOutputThisTurn] = createSignal(false)
   const [error, setError] = createSignal<string | undefined>(undefined)
   const [showHistoryPicker, setShowHistoryPicker] = createSignal(false)
+  const [showModelPicker, setShowModelPicker] = createSignal(false)
+  const [showEffortPicker, setShowEffortPicker] = createSignal(false)
   const [historySessions, setHistorySessions] = createSignal<SessionSummary[]>([])
   const [loadingHistoryList, setLoadingHistoryList] = createSignal(false)
 
   // Set once per turn when a `stream_event` text delta lands, so the final
   // full-snapshot `assistant` record for that turn doesn't get re-appended
-  // on top of text we already streamed in incrementally.
+  // on top of text we already streamed in incrementally. Subagent text
+  // (tagged with `parent_tool_use_id`) is deduped per tool call instead,
+  // since a turn can involve several Task calls each streaming their own text.
   let streamedTextThisTurn = false
+  let streamedSubagentIds = new Set<string>()
+  // Captured from the main thread's `assistant` records so the eventual
+  // usage summary can report what was actually used this turn (the CLI
+  // stamps both fields on every top-level assistant record).
+  let turnModel: string | undefined
+  let turnEffort: string | undefined
 
   let textareaRef: HTMLTextAreaElement | undefined
   let scrollRef: HTMLDivElement | undefined
@@ -250,13 +295,31 @@ export function ClaudeSession() {
     )
   }
 
+  function appendSubagentText(parentToolUseId: string, text: string) {
+    if (!text) return
+    setItems((prev) =>
+      prev.map((item) =>
+        item.kind === "tool" && item.id === parentToolUseId
+          ? { ...item, subagent: (item.subagent ?? "") + text }
+          : item,
+      ),
+    )
+  }
+
   function handleEvent(evt: Record<string, unknown>) {
+    const parentToolUseId = typeof evt.parent_tool_use_id === "string" ? evt.parent_tool_use_id : undefined
+
     if (evt.type === "stream_event") {
       const event = evt.event as Record<string, unknown> | undefined
       const delta = event?.delta as Record<string, unknown> | undefined
       if (event?.type === "content_block_delta" && delta?.type === "text_delta" && typeof delta.text === "string") {
-        streamedTextThisTurn = true
-        appendAssistantText(delta.text)
+        if (parentToolUseId) {
+          streamedSubagentIds.add(parentToolUseId)
+          appendSubagentText(parentToolUseId, delta.text)
+        } else {
+          streamedTextThisTurn = true
+          appendAssistantText(delta.text)
+        }
       }
       return
     }
@@ -287,11 +350,19 @@ export function ClaudeSession() {
     const inner = evt.message as Record<string, unknown> | undefined
 
     if (evt.type === "assistant" && inner && Array.isArray(inner.content)) {
+      if (!parentToolUseId) {
+        if (typeof inner.model === "string") turnModel = inner.model
+        if (typeof evt.effort === "string") turnEffort = evt.effort
+      }
       for (const block of inner.content as Array<Record<string, unknown>>) {
         if (block.type === "text" && typeof block.text === "string") {
           // Already rendered progressively via stream_event deltas above.
-          if (!streamedTextThisTurn) appendAssistantText(block.text)
-        } else if (block.type === "tool_use") {
+          if (parentToolUseId) {
+            if (!streamedSubagentIds.has(parentToolUseId)) appendSubagentText(parentToolUseId, block.text)
+          } else if (!streamedTextThisTurn) {
+            appendAssistantText(block.text)
+          }
+        } else if (block.type === "tool_use" && !parentToolUseId) {
           const id = typeof block.id === "string" && block.id ? block.id : `tool-${Date.now()}-${Math.random()}`
           addToolCall(id, String(block.name), block.input)
         }
@@ -312,8 +383,12 @@ export function ClaudeSession() {
       return
     }
 
-    if (evt.type === "result" && evt.subtype && evt.subtype !== "success") {
-      setError(`Session ended: ${String(evt.subtype)}`)
+    if (evt.type === "result") {
+      if (evt.subtype && evt.subtype !== "success") {
+        setError(`Session ended: ${String(evt.subtype)}`)
+      }
+      const usage = extractUsage(evt, turnModel, turnEffort)
+      if (usage) setItems((prev) => [...prev, usage])
     }
   }
 
@@ -328,6 +403,9 @@ export function ClaudeSession() {
     setSending(true)
     setHasOutputThisTurn(false)
     streamedTextThisTurn = false
+    streamedSubagentIds = new Set()
+    turnModel = undefined
+    turnEffort = undefined
     setError(undefined)
 
     try {
@@ -515,6 +593,14 @@ export function ClaudeSession() {
                             </Show>
                           </span>
                         </div>
+                        <Show when={tool.subagent}>
+                          <div
+                            class="text-xs px-3 py-2 whitespace-pre-wrap max-h-40 overflow-y-auto italic"
+                            style={{ color: "var(--text-weak)", "border-top": "1px solid var(--border-base)" }}
+                          >
+                            {tool.subagent}
+                          </div>
+                        </Show>
                         <Show when={tool.result}>
                           <div
                             class="text-xs font-mono px-3 py-2 whitespace-pre-wrap max-h-48 overflow-y-auto"
@@ -523,6 +609,23 @@ export function ClaudeSession() {
                             {tool.result}
                           </div>
                         </Show>
+                      </div>
+                    )
+                  })()}
+                </Match>
+
+                <Match when={item.kind === "usage"}>
+                  {(() => {
+                    const usage = item as Extract<ChatItem, { kind: "usage" }>
+                    const parts = []
+                    if (usage.model) parts.push(usage.model)
+                    if (usage.effort) parts.push(EFFORT_LABELS[usage.effort as ClaudeEffort] ?? usage.effort)
+                    parts.push(`${usage.inputTokens.toLocaleString()} in`, `${usage.outputTokens.toLocaleString()} out`)
+                    if (usage.cacheReadInputTokens) parts.push(`${usage.cacheReadInputTokens.toLocaleString()} cached`)
+                    if (usage.costUsd !== undefined) parts.push(`$${usage.costUsd.toFixed(4)}`)
+                    return (
+                      <div class="ml-0 md:ml-9 text-[11px]" style={{ color: "var(--text-weak)" }}>
+                        {parts.join(" · ")}
                       </div>
                     )
                   })()}
@@ -594,44 +697,56 @@ export function ClaudeSession() {
             </Button>
           </div>
           <div
-            class="flex items-center gap-2 px-3 pb-2 pt-1"
-            style={{ "border-top": "1px solid var(--border-base)" }}
+            class="relative flex items-center gap-2 px-2 py-1.5 text-xs sm:gap-3 sm:px-4"
+            style={{ color: "var(--text-weak)", "border-top": "1px solid var(--border-base)" }}
           >
-            <select
-              class="appearance-none px-2 py-1 rounded-md text-xs font-medium border focus:outline-none"
-              style={{
-                background: "var(--background-base)",
-                "border-color": "var(--border-base)",
-                color: "var(--text-strong)",
-              }}
-              value={model()}
-              onChange={(e) => selectModel(e.currentTarget.value)}
-              disabled={sending()}
-              aria-label="Claude model"
-            >
-              <For each={Object.entries(MODEL_LABELS)}>
-                {([value, label]) => <option value={value}>{label}</option>}
-              </For>
-            </select>
-            <select
-              class="appearance-none px-2 py-1 rounded-md text-xs font-medium border focus:outline-none"
-              style={{
-                background: "var(--background-base)",
-                "border-color": "var(--border-base)",
-                color: "var(--text-strong)",
-              }}
-              value={effort()}
-              onChange={(e) => selectEffort(e.currentTarget.value)}
-              disabled={sending()}
-              aria-label="Claude effort"
-            >
-              <For each={Object.entries(EFFORT_LABELS)}>
-                {([value, label]) => <option value={value}>{label}</option>}
-              </For>
-            </select>
+            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+              <button
+                type="button"
+                class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setShowModelPicker(true)}
+                disabled={sending()}
+              >
+                <span class="opacity-60 shrink-0">Model:</span>
+                <span class="truncate" style={{ color: "var(--text-base)" }}>{MODEL_LABELS[model()]}</span>
+              </button>
+              <button
+                type="button"
+                class="flex items-center gap-1 min-w-0 hover:opacity-80 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setShowEffortPicker(true)}
+                disabled={sending()}
+              >
+                <span class="opacity-60 shrink-0">Effort:</span>
+                <span class="truncate" style={{ color: "var(--text-base)" }}>{EFFORT_LABELS[effort()]}</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>
+
+      <Show when={showModelPicker()}>
+        <PickerDialog
+          title="Select model"
+          items={Object.entries(MODEL_LABELS).map(([id, title]) => ({ id, title }))}
+          onSelect={(item) => {
+            selectModel(item.id)
+            setShowModelPicker(false)
+          }}
+          onClose={() => setShowModelPicker(false)}
+        />
+      </Show>
+
+      <Show when={showEffortPicker()}>
+        <PickerDialog
+          title="Select effort"
+          items={Object.entries(EFFORT_LABELS).map(([id, title]) => ({ id, title }))}
+          onSelect={(item) => {
+            selectEffort(item.id)
+            setShowEffortPicker(false)
+          }}
+          onClose={() => setShowEffortPicker(false)}
+        />
+      </Show>
     </div>
   )
 }

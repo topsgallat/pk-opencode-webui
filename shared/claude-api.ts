@@ -121,6 +121,11 @@ async function handleClaudeChat(req: Request): Promise<Response> {
     // deltas) alongside the coarse per-message records, so the frontend can
     // render assistant text token-by-token instead of one paint per turn.
     "--include-partial-messages",
+    // Forwards a Task subagent's own text/thinking as extra assistant/user
+    // records tagged with `parent_tool_use_id`, so the frontend can show
+    // subagent progress nested under the Task tool call instead of just a
+    // silent Running spinner until it completes.
+    "--forward-subagent-text",
     "--model",
     model,
     "--effort",

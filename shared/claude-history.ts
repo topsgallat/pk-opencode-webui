@@ -126,7 +126,7 @@ export type ToolStatus = "running" | "done" | "error"
 export type ChatHistoryItem =
   | { kind: "user"; text: string }
   | { kind: "assistant"; text: string }
-  | { kind: "tool"; id: string; name: string; input: unknown; status: ToolStatus; result?: string }
+  | { kind: "tool"; id: string; name: string; input: unknown; status: ToolStatus; result?: string; subagent?: string }
 
 function pushAssistantText(items: ChatHistoryItem[], text: string) {
   if (!text) return
@@ -148,9 +148,25 @@ export async function loadClaudeSessionMessages(homeDir: string, cwd: string, se
   const toolIndex = new Map<string, number>()
 
   for (const record of records) {
-    if (record.isSidechain === true) continue
     const message = record.message as RawRecord | undefined
     const content = message?.content
+
+    if (record.isSidechain === true) {
+      // A Task subagent's own turn — surface only its text, nested under the
+      // tool call that spawned it (mirrors the live `--forward-subagent-text`
+      // view rather than showing it as a separate top-level message).
+      const parentToolUseId = typeof record.parent_tool_use_id === "string" ? record.parent_tool_use_id : undefined
+      const idx = parentToolUseId !== undefined ? toolIndex.get(parentToolUseId) : undefined
+      if (idx !== undefined && Array.isArray(content)) {
+        for (const block of content as RawRecord[]) {
+          if (block.type === "text" && typeof block.text === "string" && block.text) {
+            const current = items[idx]
+            if (current.kind === "tool") items[idx] = { ...current, subagent: (current.subagent ?? "") + block.text }
+          }
+        }
+      }
+      continue
+    }
 
     if (record.type === "user") {
       if (Array.isArray(content)) {

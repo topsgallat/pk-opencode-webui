@@ -4,7 +4,7 @@ import { MessageTurn } from "./message-turn"
 // Note: Markdown and MessageParts are used in the FlatMessageList component below
 import { Markdown } from "./markdown"
 import { MessageParts } from "./tool-part"
-import { ChevronUp, RefreshCw, Clock, Brain, Loader2, ArrowDown } from "lucide-solid"
+import { ChevronUp, RefreshCw, Clock, Brain, Loader2, ArrowDown, Lock, LockOpen } from "lucide-solid"
 import { errorText } from "../types/message"
 import type { DisplayMessage, QueueTurnState, Turn } from "../types/message"
 import { extractTextContent } from "../utils/message"
@@ -24,7 +24,7 @@ function hasVisibleContent(message: DisplayMessage): boolean {
   return extractTextContent(message.parts).trim().length > 0
 }
 
-function createAutoScroll(options: { bottomThreshold?: number } = {}) {
+function createAutoScroll(options: { bottomThreshold?: number; pinned?: () => boolean } = {}) {
   let scroll: HTMLElement | undefined
   let content: HTMLElement | undefined
   let scrollResizeObserver: ResizeObserver | undefined
@@ -42,9 +42,24 @@ function createAutoScroll(options: { bottomThreshold?: number } = {}) {
   }
   const [showFab, setShowFab] = createSignal(false)
 
+  const scrollToBottomNow = () => {
+    const el = scroll
+    if (!el) return
+    if (!content) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+      return
+    }
+    const target = el.scrollTop + (content.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom)
+    el.scrollTo({ top: target, behavior: "smooth" })
+  }
+
   const update = () => {
     const el = scroll
     if (!el) return
+    // While pinned, re-snap to the true bottom on every content resize (i.e.
+    // every streamed chunk) instead of only tracking distance for the FAB --
+    // this is what reproduces a continuous "follow the stream" feel.
+    if (options.pinned?.()) scrollToBottomNow()
     setShowFab(distanceFromBottom(el) > threshold)
   }
 
@@ -81,16 +96,7 @@ function createAutoScroll(options: { bottomThreshold?: number } = {}) {
       update()
     },
     handleScroll: update,
-    scrollToBottom: () => {
-      const el = scroll
-      if (!el) return
-      if (!content) {
-        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
-        return
-      }
-      const target = el.scrollTop + (content.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom)
-      el.scrollTo({ top: target, behavior: "smooth" })
-    },
+    scrollToBottom: scrollToBottomNow,
     showScrollToBottom: () => showFab(),
   }
 }
@@ -112,7 +118,18 @@ export function MessageTimeline(props: {
   onOpenFile?: (path: string) => void
   scrollToTopTarget?: { turnId: string } | null
 }) {
-  const autoScroll = createAutoScroll()
+  const [pinned, setPinned] = createSignal(false)
+  const autoScroll = createAutoScroll({ pinned })
+
+  // While pinned, block manual scroll input entirely rather than letting it
+  // move and then snapping back -- the user asked for a hard lock: scrolling
+  // up must require pressing unlock first, not just be overridden a moment
+  // later by the next streamed chunk. Scoped to wheel/touch on the container
+  // itself (not a document-level keydown block) so it can't intercept
+  // Space/arrow keys while typing in the composer elsewhere on the page --
+  // this plain scroll div isn't part of the tab order, so it never
+  // legitimately receives keyboard-scroll input anyway.
+  const blockWheelOrTouch = (e: Event) => { if (pinned()) e.preventDefault() }
 
   // The trailing spacer below the turn list reserves just enough room to scroll
   // the newest turn up to the top, and no more. Its height is
@@ -133,7 +150,12 @@ export function MessageTimeline(props: {
     const last = nodes[nodes.length - 1] as HTMLElement | undefined
     setLastTurnHeight(last ? last.getBoundingClientRect().height : 0)
   }
-  onCleanup(() => { containerHeightObserver?.disconnect(); contentObserver?.disconnect() })
+  onCleanup(() => {
+    containerHeightObserver?.disconnect()
+    contentObserver?.disconnect()
+    containerRef?.removeEventListener("wheel", blockWheelOrTouch)
+    containerRef?.removeEventListener("touchmove", blockWheelOrTouch)
+  })
 
   const [now, setNow] = createSignal(Date.now())
   let tick: number | undefined
@@ -282,6 +304,7 @@ export function MessageTimeline(props: {
     })) {
       setRenderCount(INITIAL_TURNS)
       setExpanded({})
+      setPinned(false)
     }
 
     if (currentTurns.length <= INITIAL_TURNS) setRenderCount(INITIAL_TURNS)
@@ -300,6 +323,10 @@ export function MessageTimeline(props: {
 
   createEffect(on(() => props.scrollToTopTarget, (target) => {
     if (!target) return
+    // Pinned mode fully owns scroll positioning (continuous follow-to-bottom
+    // in createAutoScroll's update()); don't fight it with a top-alignment
+    // scroll for the newest turn.
+    if (pinned()) return
 
     // Resolve the turn to align as the LAST rendered turn rather than by id: the
     // just-sent turn starts as an optimistic entry (id = item.id) and is then
@@ -376,6 +403,8 @@ export function MessageTimeline(props: {
             containerHeightObserver = new ResizeObserver(() => setContainerHeight(el.clientHeight))
             containerHeightObserver.observe(el)
           }
+          el?.addEventListener("wheel", blockWheelOrTouch, { passive: false })
+          el?.addEventListener("touchmove", blockWheelOrTouch, { passive: false })
         }}
         onScroll={autoScroll.handleScroll}
         class="h-full overflow-y-auto p-6"
@@ -554,27 +583,38 @@ export function MessageTimeline(props: {
         </Show>
       </div>
 
-      <Show when={showScrollToBottom()}>
+      <Show when={!props.loadingHistory}>
         <div class="pointer-events-none absolute bottom-6 right-6 z-10">
           <button
             type="button"
             class="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all duration-200 hover:-translate-y-0.5 focus-visible:-translate-y-0.5"
             style={{
-              background: "var(--interactive-base)",
-              color: "var(--text-on-interactive)",
+              background: pinned() || showScrollToBottom() ? "var(--interactive-base)" : "var(--surface-inset)",
+              color: pinned() || showScrollToBottom() ? "var(--text-on-interactive)" : "var(--text-weak)",
               border: "1px solid color-mix(in srgb, var(--interactive-hover) 55%, transparent)",
+              opacity: pinned() || showScrollToBottom() ? 1 : 0.6,
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--interactive-hover)"
+              if (pinned() || showScrollToBottom()) e.currentTarget.style.background = "var(--interactive-hover)"
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "var(--interactive-base)"
+              e.currentTarget.style.background = pinned() || showScrollToBottom() ? "var(--interactive-base)" : "var(--surface-inset)"
             }}
-            onClick={() => autoScroll.scrollToBottom()}
-            aria-label="Scroll to bottom"
-            title="Scroll to bottom"
+            onClick={() => {
+              if (pinned()) { setPinned(false); return }
+              if (showScrollToBottom()) { autoScroll.scrollToBottom(); return }
+              setPinned(true)
+            }}
+            aria-label={pinned() ? "Unlock auto-scroll" : showScrollToBottom() ? "Scroll to bottom" : "Lock auto-scroll to bottom"}
+            title={pinned() ? "Unlock auto-scroll" : showScrollToBottom() ? "Scroll to bottom" : "Lock auto-scroll to bottom"}
           >
-            <ArrowDown class="w-5 h-5" />
+            <Show when={pinned()} fallback={
+              <Show when={showScrollToBottom()} fallback={<LockOpen class="w-5 h-5" />}>
+                <ArrowDown class="w-5 h-5" />
+              </Show>
+            }>
+              <Lock class="w-5 h-5" />
+            </Show>
           </button>
         </div>
       </Show>

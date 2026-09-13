@@ -214,11 +214,17 @@ export function ClaudeSession() {
   async function loadHistory(dir: string, id: string) {
     try {
       const res = await fetch(`api/claude/sessions/${encodeURIComponent(id)}/messages?cwd=${encodeURIComponent(dir)}`)
-      if (!res.ok) return
+      if (!res.ok) {
+        // Surface this instead of silently leaving the transcript blank --
+        // a failed reload used to look exactly like the session had vanished.
+        const data = (await res.json().catch(() => null)) as { error?: string } | null
+        setError(data?.error || `Failed to load session history (${res.status})`)
+        return
+      }
       const data = (await res.json()) as { items?: ChatItem[] }
       if (Array.isArray(data.items)) setItems(data.items)
-    } catch {
-      // history is best-effort — leave the transcript empty rather than block the page
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load session history")
     }
   }
 

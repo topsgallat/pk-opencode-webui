@@ -17,7 +17,15 @@
 import * as fs from "node:fs/promises"
 import * as nodePath from "node:path"
 
-const MAX_HISTORY_FILE_BYTES = 10 * 1024 * 1024
+// Real sessions with heavy tool use routinely reach several MB (observed up
+// to ~5MB on this machine, growing); 10MB was getting hit by genuinely
+// active conversations, silently dropping them from both history and the
+// live "resume this session" reload with no error shown at all -- looked
+// exactly like a session vanishing. Only bounds this history-reading feature
+// (listing/reloading past transcripts in the UI), not the ability to keep
+// chatting -- sending a message always spawns `claude --resume` directly,
+// independent of this reader.
+const MAX_HISTORY_FILE_BYTES = 200 * 1024 * 1024
 const MAX_SESSIONS_LISTED = 50
 const SESSION_ID_PATTERN = /^[A-Za-z0-9-]+$/
 
@@ -50,16 +58,21 @@ function readJsonlLines(text: string): RawRecord[] {
   return records
 }
 
-async function readSessionFile(filePath: string): Promise<RawRecord[] | null> {
+type SessionFileResult =
+  | { ok: true; records: RawRecord[]; mtime: Date }
+  | { ok: false; reason: "missing" | "too-large" }
+
+async function readSessionFile(filePath: string): Promise<SessionFileResult> {
   let stat
   try {
     stat = await fs.stat(filePath)
   } catch {
-    return null
+    return { ok: false, reason: "missing" }
   }
-  if (!stat.isFile() || stat.size > MAX_HISTORY_FILE_BYTES) return null
+  if (!stat.isFile()) return { ok: false, reason: "missing" }
+  if (stat.size > MAX_HISTORY_FILE_BYTES) return { ok: false, reason: "too-large" }
   const text = await fs.readFile(filePath, "utf8")
-  return readJsonlLines(text)
+  return { ok: true, records: readJsonlLines(text), mtime: stat.mtime }
 }
 
 function blockText(content: unknown): string {
@@ -98,8 +111,25 @@ export async function listClaudeSessions(homeDir: string, cwd: string): Promise<
     const id = entry.slice(0, -".jsonl".length)
     if (!isValidSessionId(id)) continue
 
-    const records = await readSessionFile(nodePath.join(dir, entry))
-    if (!records || !records.length) continue
+    const file = await readSessionFile(nodePath.join(dir, entry))
+    if (!file.ok) {
+      // Never silently drop a real session from the list just because it's
+      // too large to fully parse right now -- that's exactly what made an
+      // actively-used session look like it had vanished. Surface it with
+      // whatever cheap metadata (mtime) is available instead.
+      if (file.reason === "too-large") {
+        const stat = await fs.stat(nodePath.join(dir, entry)).catch(() => null)
+        summaries.push({
+          id,
+          preview: "(session too large to preview)",
+          updatedAt: (stat?.mtime ?? new Date(0)).toISOString(),
+          messageCount: 0,
+        })
+      }
+      continue
+    }
+    const { records } = file
+    if (!records.length) continue
 
     const recordCwd = records.find((r) => typeof r.cwd === "string")?.cwd
     if (typeof recordCwd === "string" && nodePath.resolve(recordCwd) !== nodePath.resolve(cwd)) continue
@@ -138,11 +168,16 @@ function pushAssistantText(items: ChatHistoryItem[], text: string) {
   }
 }
 
-export async function loadClaudeSessionMessages(homeDir: string, cwd: string, sessionId: string): Promise<ChatHistoryItem[] | null> {
-  if (!isValidSessionId(sessionId)) return null
+export type LoadSessionMessagesResult =
+  | { ok: true; items: ChatHistoryItem[] }
+  | { ok: false; reason: "missing" | "too-large" }
+
+export async function loadClaudeSessionMessages(homeDir: string, cwd: string, sessionId: string): Promise<LoadSessionMessagesResult> {
+  if (!isValidSessionId(sessionId)) return { ok: false, reason: "missing" }
   const dir = projectsDir(homeDir, cwd)
-  const records = await readSessionFile(nodePath.join(dir, `${sessionId}.jsonl`))
-  if (!records) return null
+  const file = await readSessionFile(nodePath.join(dir, `${sessionId}.jsonl`))
+  if (!file.ok) return file
+  const { records } = file
 
   const items: ChatHistoryItem[] = []
   const toolIndex = new Map<string, number>()
@@ -202,5 +237,5 @@ export async function loadClaudeSessionMessages(homeDir: string, cwd: string, se
     }
   }
 
-  return items
+  return { ok: true, items }
 }

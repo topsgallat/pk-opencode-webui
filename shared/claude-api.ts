@@ -78,9 +78,14 @@ async function handleSessionMessages(url: URL, sessionId: string): Promise<Respo
   const resolved = resolveRequestCwd(url)
   if (resolved.error) return resolved.error
   const homeDir = process.env.HOME || os.homedir()
-  const items = await loadClaudeSessionMessages(homeDir, resolved.cwd, sessionId)
-  if (!items) return Response.json({ error: "session not found" }, { status: 404 })
-  return Response.json({ items })
+  const result = await loadClaudeSessionMessages(homeDir, resolved.cwd, sessionId)
+  if (!result.ok) {
+    if (result.reason === "too-large") {
+      return Response.json({ error: "Session history is too large to load" }, { status: 413 })
+    }
+    return Response.json({ error: "session not found" }, { status: 404 })
+  }
+  return Response.json({ items: result.items })
 }
 
 async function handleClaudeChat(req: Request): Promise<Response> {

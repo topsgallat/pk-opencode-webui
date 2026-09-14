@@ -9,6 +9,7 @@ export const QUOTA_PROVIDER_CATALOG: QuotaProviderCatalogItem[] = [
   { id: "anthropic", name: "Anthropic / Claude.ai" },
   { id: "gemini", name: "Google Gemini" },
   { id: "opencode-go", name: "OpenCode Go" },
+  { id: "zai-coding-plan", name: "z.ai Coding Plan" },
 ]
 
 export function quotaProviderName(id: string): string {

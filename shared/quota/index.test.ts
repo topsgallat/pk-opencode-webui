@@ -6,6 +6,7 @@ import { getQuotaData } from './index'
 import { CopilotProvider } from './providers/copilot'
 import { OpenAIProvider } from './providers/openai'
 import { GeminiProvider } from './providers/gemini-cli'
+import { ZaiProvider } from './providers/zai'
 
 const originalFetch = globalThis.fetch
 const originalHome = process.env.HOME
@@ -42,6 +43,20 @@ function installQuotaFetchMock() {
           { modelId: 'gemini-2.0-flash', tokenType: 'standard', remainingFraction: 0.6, remainingAmount: 6000, resetTimeIso: '2026-05-15T10:00:00.000Z' },
           { modelId: 'gemini-2.0-pro', tokenType: 'premium', remainingFraction: 0.2, remainingAmount: 1000, resetTimeIso: '2026-05-15T10:00:00.000Z' },
         ],
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+
+    if (url.includes('api.z.ai/api/monitor/usage/quota/limit')) {
+      return new Response(JSON.stringify({
+        code: 200,
+        success: true,
+        data: {
+          limits: [
+            { type: 'CREDIT_LIMIT', unit: 3, number: 5, usage: 2000, currentValue: 407, remaining: 1592, percentage: 20, nextResetTime: 1789382297080 },
+            { type: 'CREDIT_LIMIT', unit: 6, number: 1, usage: 10000, currentValue: 407, remaining: 9592, percentage: 4, nextResetTime: 1789968751978 },
+          ],
+          level: 'lite',
+        },
       }), { status: 200, headers: { 'content-type': 'application/json' } })
     }
 
@@ -188,5 +203,24 @@ describe('GeminiProvider', () => {
     expect(result.id).toBe('gemini')
     expect(Array.isArray(result.entries)).toBe(true)
     expect(result.entries[0]?.remaining).toBe(6000)
+  })
+})
+
+describe('ZaiProvider', () => {
+  const provider = new ZaiProvider()
+
+  it('has correct id and name', () => {
+    expect(provider.id).toBe('zai-coding-plan')
+    expect(provider.name).toBe('z.ai Coding Plan')
+  })
+
+  it('returns quota view on fetch', async () => {
+    installQuotaFetchMock()
+    const result = await provider.fetch({ resolveProviderAuthHeader: () => 'Bearer test' })
+
+    expect(result.id).toBe('zai-coding-plan')
+    expect(result.status).toBe('ok')
+    expect(result.entries.map(entry => entry.window)).toContain('hourly')
+    expect(result.entries.map(entry => entry.window)).toContain('weekly')
   })
 })

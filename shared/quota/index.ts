@@ -4,6 +4,7 @@ import { CopilotProvider } from './providers/copilot'
 import { OpenAIProvider } from './providers/openai'
 import { GeminiProvider } from './providers/gemini-cli'
 import { OpenCodeGoProvider } from './providers/opencode-go'
+import { ZaiProvider } from './providers/zai'
 
 export async function getQuotaData(options: {
   refresh?: boolean
@@ -22,6 +23,7 @@ export async function getQuotaData(options: {
     new AnthropicProvider(),
     new GeminiProvider(),
     new OpenCodeGoProvider(),
+    new ZaiProvider(),
   ]
 
   const providerViews: QuotaProviderView[] = []

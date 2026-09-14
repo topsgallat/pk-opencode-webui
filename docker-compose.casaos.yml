@@ -32,6 +32,10 @@ services:
         published: "4097"
         protocol: tcp
       - mode: ingress
+        target: 4747
+        published: "4747"
+        protocol: tcp
+      - mode: ingress
         target: 1455
         published: "1455"
         protocol: tcp

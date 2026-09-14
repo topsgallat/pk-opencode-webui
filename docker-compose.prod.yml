@@ -10,9 +10,12 @@ services:
     ports:
       - "8681:8080"
       - "4097:4096"
+      - "4747:4747"
       - "1455:1455"
       - "8085:8085"
       - "19876:19876"
+      - "5174:5174"
+      - "3003:3003"
     environment:
       - OPERATION_MODE=solo
       - BASE_PATH=/
@@ -22,6 +25,8 @@ services:
       - OPENCODE_WORKSPACE_ROOT=/home/sgallat # Do not change this!
       - XDG_CACHE_HOME=/home/sgallat/.cache
       - OPENCODE_SERVER_PASSWORD=
+      - OPENCODE_CONFIG=/home/sgallat/.config/opencode/override-temp.json
+      - TZ=Asia/Bangkok
       - CODEX_AUTH_PER_PROJECT_ACCOUNTS=0
     volumes: # Do not change this!
       - /home/sgallat/syncthing/Ubuntu-24.04:/home/sgallat

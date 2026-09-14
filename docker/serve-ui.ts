@@ -287,6 +287,11 @@ function isLoopbackHost(hostname: string) {
   return hostname === "127.0.0.1" || hostname === "localhost"
 }
 
+// Reserved close codes (1004-1006, 1015, out of range) must never be passed to
+// WebSocket.close(): Bun throws InvalidAccessError, which crashes the server.
+const sanitizeCloseCode = (code: number) =>
+  Number.isInteger(code) && ((code >= 1000 && code <= 1003) || (code >= 1007 && code <= 1011) || (code >= 3000 && code <= 4999)) ? code : 1000
+
 function shouldAttachProxyAuth(target: URL) {
   if (!proxyAuthHeader) return false
   const apiTarget = new URL(API_URL)
@@ -725,7 +730,7 @@ const server = Bun.serve<{ target: string; cookie: string }>({
         console.log("[Proxy] Backend WebSocket closed:", event.code)
         wsConnections.delete(ws)
         if (ws.readyState === 1) {
-          ws.close(event.code, event.reason)
+          ws.close(sanitizeCloseCode(event.code), event.reason)
         }
       })
 
@@ -745,7 +750,7 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       console.log("[Proxy] Client WebSocket closed:", code)
       const backend = wsConnections.get(ws)
       if (backend) {
-        backend.close(code, reason)
+        backend.close(sanitizeCloseCode(code), reason)
         wsConnections.delete(ws)
       }
     },

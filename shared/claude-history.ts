@@ -26,7 +26,12 @@ import * as nodePath from "node:path"
 // chatting -- sending a message always spawns `claude --resume` directly,
 // independent of this reader.
 const MAX_HISTORY_FILE_BYTES = 200 * 1024 * 1024
-const MAX_SESSIONS_LISTED = 50
+// A single active project easily accumulates dozens of sessions over time
+// (one real project on this machine already has 57) -- 50 was quietly
+// cutting off real, findable-by-preview sessions once a project grew past
+// it. PickerDialog already has a filter box, so a much higher cap here just
+// means "don't paginate," not "show an unusable wall of entries."
+const MAX_SESSIONS_LISTED = 500
 const SESSION_ID_PATTERN = /^[A-Za-z0-9-]+$/
 
 export function isValidSessionId(id: string): boolean {
@@ -131,8 +136,15 @@ export async function listClaudeSessions(homeDir: string, cwd: string): Promise<
     const { records } = file
     if (!records.length) continue
 
-    const recordCwd = records.find((r) => typeof r.cwd === "string")?.cwd
-    if (typeof recordCwd === "string" && nodePath.resolve(recordCwd) !== nodePath.resolve(cwd)) continue
+    // Checked against every record's cwd, not just the first one: a session
+    // that ever worked from a git worktree (a `.claude/worktrees/...`
+    // subdirectory -- a common pattern in this user's workflow) records that
+    // worktree's path on some lines and the main repo's path on others.
+    // Comparing only the first cwd-bearing record would wrongly exclude a
+    // real, relevant session from the list whenever that first record
+    // happened to be the worktree leg of the conversation.
+    const recordCwds = records.filter((r) => typeof r.cwd === "string").map((r) => r.cwd as string)
+    if (recordCwds.length && !recordCwds.some((c) => nodePath.resolve(c) === nodePath.resolve(cwd))) continue
 
     const visible = records.filter((r) => r.isSidechain !== true && (r.type === "user" || r.type === "assistant"))
     if (!visible.length) continue

@@ -5,6 +5,7 @@ import { ChevronRight, Eye, File, FileCode, Folder, GitBranch, X } from "lucide-
 import { Spinner } from "./ui/spinner";
 import { Markdown } from "./markdown";
 import { listGitFiles, listGitTree, readGitFile, gitRawFileUrl, type GitTreeEntry } from "../utils/extended-api";
+import { resolveRepoRelativePath, rewriteMarkdownImages } from "../utils/markdown-images";
 
 const SEARCH_MATCH_LIMIT = 300;
 
@@ -19,48 +20,6 @@ interface BranchFileTreeProps {
 function sortEntries(list: GitTreeEntry[]): GitTreeEntry[] {
   return [...list].sort((a, b) =>
     a.type === b.type ? a.name.localeCompare(b.name) : a.type === "dir" ? -1 : 1,
-  );
-}
-
-/** Resolve a markdown image target against the file's directory in the repo. */
-function resolveRepoRelativePath(baseDir: string, target: string): string {
-  const absolute = target.startsWith("/");
-  const segments = (absolute ? target : `${baseDir ? `${baseDir}/` : ""}${target}`).split("/");
-  const stack: string[] = [];
-  for (const segment of segments) {
-    if (!segment || segment === ".") continue;
-    if (segment === "..") stack.pop();
-    else stack.push(segment);
-  }
-  return stack.join("/");
-}
-
-/** Apply a line transform outside fenced code blocks so examples stay intact. */
-function mapOutsideFences(content: string, transform: (line: string) => string): string {
-  let fenced = false;
-  return content
-    .split("\n")
-    .map((line) => {
-      if (/^\s*(```|~~~)/.test(line)) {
-        fenced = !fenced;
-        return line;
-      }
-      return fenced ? line : transform(line);
-    })
-    .join("\n");
-}
-
-function rewriteMarkdownImages(content: string, toUrl: (target: string) => string | null): string {
-  return mapOutsideFences(content, (line) =>
-    line
-      .replace(/!\[([^\]]*)\]\(<?([^)\s]+?)>?(?:\s+"[^"]*")?\)/g, (full, alt: string, target: string) => {
-        const url = toUrl(target);
-        return url ? `![${alt}](${url})` : full;
-      })
-      .replace(/(<img\b[^>]*\bsrc=)("([^"]*)"|'([^']*)')/gi, (full, head: string, _quoted: string, dq: string, sq: string) => {
-        const url = toUrl(dq ?? sq);
-        return url ? `${head}"${url}"` : full;
-      }),
   );
 }
 

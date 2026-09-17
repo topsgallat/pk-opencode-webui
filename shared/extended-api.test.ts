@@ -482,3 +482,46 @@ test("uploads nested binary files through the extended API", async () => {
   const saved = await fs.readFile(nodePath.join(root, "a", "b", "c.bin"))
   expect(Array.from(saved)).toEqual(Array.from(bytes))
 })
+
+test("serves raw file bytes with a guessed content type", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-raw-"))
+  process.env.OPENCODE_WORKSPACE_ROOT = root
+
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 8, 7])
+  await fs.mkdir(nodePath.join(root, "docs"), { recursive: true })
+  await fs.writeFile(nodePath.join(root, "docs", "logo.png"), png)
+  const req = new Request("http://localhost/api/ext/raw?path=docs/logo.png")
+  const res = await handleExtendedEndpoint("/api/ext/raw", "GET", new URL(req.url), req)
+  expect(res).toBeDefined()
+  expect(res!.status).toBe(200)
+  expect(res!.headers.get("Content-Type")).toBe("image/png")
+  const body = Buffer.from(await res!.arrayBuffer())
+  expect(body.equals(png)).toBe(true)
+})
+
+test("guards the raw endpoint against missing, oversized and outside-root paths", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-raw-guard-"))
+  process.env.OPENCODE_WORKSPACE_ROOT = root
+
+  const missing = await handleExtendedEndpoint(
+    "/api/ext/raw", "GET",
+    new URL("http://localhost/api/ext/raw?path=nope.png"),
+    new Request("http://localhost/api/ext/raw?path=nope.png"),
+  )
+  expect(missing!.status).toBe(404)
+
+  const outside = await handleExtendedEndpoint(
+    "/api/ext/raw", "GET",
+    new URL("http://localhost/api/ext/raw?path=/etc/passwd"),
+    new Request("http://localhost/api/ext/raw?path=/etc/passwd"),
+  )
+  expect(outside!.status).toBe(403)
+
+  await fs.writeFile(nodePath.join(root, "big.bin"), Buffer.alloc(11 * 1024 * 1024, 1))
+  const oversize = await handleExtendedEndpoint(
+    "/api/ext/raw", "GET",
+    new URL("http://localhost/api/ext/raw?path=big.bin"),
+    new Request("http://localhost/api/ext/raw?path=big.bin"),
+  )
+  expect(oversize!.status).toBe(413)
+})

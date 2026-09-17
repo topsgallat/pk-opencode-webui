@@ -7,7 +7,8 @@ import { useServer } from "../context/server"
 import { useDevice } from "../context/device"
 import { Spinner } from "./ui/spinner"
 import { FileCode, Pencil, Eye, Maximize2, X, MessageSquarePlus, Download, ShieldAlert } from "lucide-solid"
-import { writeFile } from "../utils/extended-api"
+import { writeFile, rawFileUrl } from "../utils/extended-api"
+import { resolveRepoRelativePath, rewriteMarkdownImages } from "../utils/markdown-images"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { EditorDialog } from "./editor-dialog"
 import { Markdown } from "./markdown"
@@ -145,6 +146,26 @@ export function FileViewer(props: FileViewerProps) {
   const isMarkdown = createMemo(() => lang() === "markdown")
   const isHtml = createMemo(() => lang() === "html")
   const [markdownPreview, setMarkdownPreview] = createSignal(true)
+
+  const markdownBaseDir = createMemo(() => {
+    const p = props.path
+    const idx = p.lastIndexOf("/")
+    return idx === -1 ? "" : p.slice(0, idx)
+  })
+
+  function markdownImageUrl(target: string): string | null {
+    const cleaned = target.replace(/^<|>$/g, "").trim().split("#")[0]
+    if (!cleaned || /^(https?:|data:|blob:|mailto:)/i.test(cleaned)) return null
+    const resolved = resolveRepoRelativePath(markdownBaseDir(), cleaned)
+    if (!resolved) return null
+    const full = sdk.directory && !resolved.startsWith("/") ? `${sdk.directory}/${resolved}` : resolved
+    return rawFileUrl(sdk.url, full, sdk.targetUrl)
+  }
+
+  // Relative images resolve against the project (not the page URL) in preview mode
+  const renderedContent = createMemo(() =>
+    isMarkdown() && markdownPreview() ? rewriteMarkdownImages(fileContent(), markdownImageUrl) : fileContent(),
+  )
   const [htmlPreview, setHtmlPreview] = createSignal(true)
   const [htmlAllowJs, setHtmlAllowJs] = createSignal(false)
   const [htmlReloadToken, setHtmlReloadToken] = createSignal(0)
@@ -600,7 +621,7 @@ export function FileViewer(props: FileViewerProps) {
                     }
                   >
                     <div class="p-4 overflow-y-auto">
-                      <Markdown content={fileContent()} class="text-sm" />
+                      <Markdown content={renderedContent()} class="text-sm" />
                     </div>
                   </Show>
                 </Show>
@@ -721,7 +742,7 @@ export function FileViewer(props: FileViewerProps) {
                   }
                 >
                   <div class="p-8 max-w-4xl mx-auto">
-                    <Markdown content={fileContent()} class="text-sm" />
+                    <Markdown content={renderedContent()} class="text-sm" />
                   </div>
                 </Show>
               </div>

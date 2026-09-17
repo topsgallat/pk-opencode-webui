@@ -10,25 +10,11 @@
  */
 
 import * as nodePath from "node:path"
-import { getAllowedRoot } from "./extended-api"
+import { getAllowedRoot, guessContentType } from "./extended-api"
 
 const GIT_MAX_FILE_BYTES = 2 * 1024 * 1024
 const GIT_RAW_MAX_BYTES = 10 * 1024 * 1024
 const REF_PATTERN = /^[A-Za-z0-9._/-]+$/
-
-const RAW_MIME: Record<string, string> = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  gif: "image/gif",
-  webp: "image/webp",
-  svg: "image/svg+xml",
-  bmp: "image/bmp",
-  ico: "image/x-icon",
-  avif: "image/avif",
-  pdf: "application/pdf",
-  txt: "text/plain; charset=utf-8",
-}
 
 function validateRepoDir(inputPath: string, allowedRoot: string): string | null {
   const resolved = nodePath.resolve(allowedRoot, inputPath)
@@ -206,9 +192,8 @@ async function handleRaw(url: URL): Promise<Response> {
     })
     const [buffer, code] = await Promise.all([new Response(proc.stdout).arrayBuffer(), proc.exited])
     if (code !== 0) return Response.json({ error: "failed to read blob" }, { status: 404 })
-    const ext = filePath.split(".").pop()?.toLowerCase() ?? ""
     return new Response(buffer, {
-      headers: { "Content-Type": RAW_MIME[ext] ?? "application/octet-stream", "Cache-Control": "no-store" },
+      headers: { "Content-Type": guessContentType(filePath), "Cache-Control": "no-store" },
     })
   } catch (e) {
     return gitServerError("raw", e)

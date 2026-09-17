@@ -499,6 +499,27 @@ export function getAllowedRoot(): string {
   return process.env.OPENCODE_WORKSPACE_ROOT || process.env.HOME || os.homedir()
 }
 
+const RAW_FILE_MAX_BYTES = 10 * 1024 * 1024
+
+/** Content type for raw file serving, guessed from the extension. */
+export function guessContentType(filePath: string): string {
+  const ext = filePath.split(".").pop()?.toLowerCase() ?? ""
+  const mime: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+    svg: "image/svg+xml",
+    bmp: "image/bmp",
+    ico: "image/x-icon",
+    avif: "image/avif",
+    pdf: "application/pdf",
+    txt: "text/plain; charset=utf-8",
+  }
+  return mime[ext] ?? "application/octet-stream"
+}
+
 /**
  * API paths that should be proxied to the OpenCode API server.
  * Extended endpoints (/api/ext/*) are NOT in this list - they're handled separately.
@@ -1053,6 +1074,35 @@ export async function handleExtendedEndpoint(
     } catch (e) {
       console.error("[ExtAPI] file read error:", e)
       return Response.json({ error: String(e) }, { status: 500 })
+    }
+  }
+
+  // GET /api/ext/raw - Serve file bytes with a content type (for <img> etc.)
+  if (path === "/api/ext/raw" && method === "GET") {
+    const filePath = url.searchParams.get("path")
+    if (!filePath) {
+      return Response.json({ error: "path parameter is required" }, { status: 400 })
+    }
+
+    const allowedRoot = getAllowedRoot()
+    const validatedPath = validatePath(filePath, allowedRoot)
+    if (!validatedPath) {
+      console.warn("[ExtAPI] raw file: path outside allowed root:", filePath)
+      return Response.json({ error: "path must be within allowed directory" }, { status: 403 })
+    }
+
+    try {
+      const stat = await fs.promises.stat(validatedPath)
+      if (stat.size > RAW_FILE_MAX_BYTES) {
+        return Response.json({ error: "file too large (limit 10MB)" }, { status: 413 })
+      }
+      const buffer = await fs.promises.readFile(validatedPath)
+      return new Response(buffer, {
+        headers: { "Content-Type": guessContentType(validatedPath), "Cache-Control": "no-store" },
+      })
+    } catch (e) {
+      console.error("[ExtAPI] raw file error:", e)
+      return Response.json({ error: String(e) }, { status: 404 })
     }
   }
 

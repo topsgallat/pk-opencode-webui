@@ -551,3 +551,13 @@ export async function readGitFile(serverUrl: string, directory: string, ref: str
     return { error: message }
   }
 }
+
+/**
+ * Absolute URL for a branch blob's raw bytes (used as <img src> in the
+ * markdown preview so relative images resolve against the branch, not the page).
+ */
+export function gitRawFileUrl(serverUrl: string, directory: string, ref: string, path: string, targetUrl?: string): string {
+  const params = new URLSearchParams({ ref, path })
+  if (directory) params.set("directory", directory)
+  return appendTargetParam(`${serverUrl}/api/ext/git/raw?${params}`, targetUrl)
+}

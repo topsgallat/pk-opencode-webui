@@ -13,7 +13,22 @@ import * as nodePath from "node:path"
 import { getAllowedRoot } from "./extended-api"
 
 const GIT_MAX_FILE_BYTES = 2 * 1024 * 1024
+const GIT_RAW_MAX_BYTES = 10 * 1024 * 1024
 const REF_PATTERN = /^[A-Za-z0-9._/-]+$/
+
+const RAW_MIME: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  bmp: "image/bmp",
+  ico: "image/x-icon",
+  avif: "image/avif",
+  pdf: "application/pdf",
+  txt: "text/plain; charset=utf-8",
+}
 
 function validateRepoDir(inputPath: string, allowedRoot: string): string | null {
   const resolved = nodePath.resolve(allowedRoot, inputPath)
@@ -83,6 +98,7 @@ export async function handleGitEndpoint(path: string, method: string, url: URL):
   if (path === "/api/ext/git/tree") return handleTree(url)
   if (path === "/api/ext/git/list") return handleList(url)
   if (path === "/api/ext/git/file") return handleFile(url)
+  if (path === "/api/ext/git/raw") return handleRaw(url)
   return undefined
 }
 
@@ -161,5 +177,40 @@ async function handleFile(url: URL): Promise<Response> {
     return Response.json({ content: res.stdout })
   } catch (e) {
     return gitServerError("file", e)
+  }
+}
+
+/**
+ * Serves a blob as raw bytes so the browser can load branch images directly
+ * in <img src> (markdown preview rewrites relative image paths to this).
+ */
+async function handleRaw(url: URL): Promise<Response> {
+  const resolved = resolveRepoDir(url)
+  if (resolved.error) return resolved.error
+  const ref = validateRef(url.searchParams.get("ref"))
+  if (!ref) return Response.json({ error: "valid ref parameter is required" }, { status: 400 })
+  const filePath = validateRepoPath(url.searchParams.get("path"))
+  if (!filePath) return Response.json({ error: "path parameter is required" }, { status: 400 })
+  const spec = `${ref}:${filePath}`
+  try {
+    const size = await runGit(["cat-file", "-s", spec], resolved.dir)
+    if (size.code !== 0) return gitErrorResponse(size.stderr)
+    if ((Number.parseInt(size.stdout.trim(), 10) || 0) > GIT_RAW_MAX_BYTES) {
+      return Response.json({ error: "file too large (limit 10MB)" }, { status: 413 })
+    }
+    const proc = Bun.spawn(["git", "-c", "safe.directory=*", "cat-file", "blob", spec], {
+      cwd: resolved.dir,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: process.env,
+    })
+    const [buffer, code] = await Promise.all([new Response(proc.stdout).arrayBuffer(), proc.exited])
+    if (code !== 0) return Response.json({ error: "failed to read blob" }, { status: 404 })
+    const ext = filePath.split(".").pop()?.toLowerCase() ?? ""
+    return new Response(buffer, {
+      headers: { "Content-Type": RAW_MIME[ext] ?? "application/octet-stream", "Cache-Control": "no-store" },
+    })
+  } catch (e) {
+    return gitServerError("raw", e)
   }
 }

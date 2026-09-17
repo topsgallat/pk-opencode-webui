@@ -4,7 +4,7 @@ import { createStore } from "solid-js/store";
 import { ChevronRight, Eye, File, FileCode, Folder, GitBranch, X } from "lucide-solid";
 import { Spinner } from "./ui/spinner";
 import { Markdown } from "./markdown";
-import { listGitFiles, listGitTree, readGitFile, type GitTreeEntry } from "../utils/extended-api";
+import { listGitFiles, listGitTree, readGitFile, gitRawFileUrl, type GitTreeEntry } from "../utils/extended-api";
 
 const SEARCH_MATCH_LIMIT = 300;
 
@@ -19,6 +19,48 @@ interface BranchFileTreeProps {
 function sortEntries(list: GitTreeEntry[]): GitTreeEntry[] {
   return [...list].sort((a, b) =>
     a.type === b.type ? a.name.localeCompare(b.name) : a.type === "dir" ? -1 : 1,
+  );
+}
+
+/** Resolve a markdown image target against the file's directory in the repo. */
+function resolveRepoRelativePath(baseDir: string, target: string): string {
+  const absolute = target.startsWith("/");
+  const segments = (absolute ? target : `${baseDir ? `${baseDir}/` : ""}${target}`).split("/");
+  const stack: string[] = [];
+  for (const segment of segments) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") stack.pop();
+    else stack.push(segment);
+  }
+  return stack.join("/");
+}
+
+/** Apply a line transform outside fenced code blocks so examples stay intact. */
+function mapOutsideFences(content: string, transform: (line: string) => string): string {
+  let fenced = false;
+  return content
+    .split("\n")
+    .map((line) => {
+      if (/^\s*(```|~~~)/.test(line)) {
+        fenced = !fenced;
+        return line;
+      }
+      return fenced ? line : transform(line);
+    })
+    .join("\n");
+}
+
+function rewriteMarkdownImages(content: string, toUrl: (target: string) => string | null): string {
+  return mapOutsideFences(content, (line) =>
+    line
+      .replace(/!\[([^\]]*)\]\(<?([^)\s]+?)>?(?:\s+"[^"]*")?\)/g, (full, alt: string, target: string) => {
+        const url = toUrl(target);
+        return url ? `![${alt}](${url})` : full;
+      })
+      .replace(/(<img\b[^>]*\bsrc=)("([^"]*)"|'([^']*)')/gi, (full, head: string, _quoted: string, dq: string, sq: string) => {
+        const url = toUrl(dq ?? sq);
+        return url ? `${head}"${url}"` : full;
+      }),
   );
 }
 
@@ -43,6 +85,26 @@ export function BranchFileTree(props: BranchFileTreeProps) {
   const [markdownPreview, setMarkdownPreview] = createSignal(true);
 
   const isMarkdown = createMemo(() => !!previewPath()?.toLowerCase().endsWith(".md"));
+
+  const markdownBaseDir = createMemo(() => {
+    const p = previewPath() ?? "";
+    const idx = p.lastIndexOf("/");
+    return idx === -1 ? "" : p.slice(0, idx);
+  });
+
+  function markdownImageUrl(target: string): string | null {
+    const cleaned = target.replace(/^<|>$/g, "").trim().split("#")[0];
+    if (!cleaned || /^(https?:|data:|blob:|mailto:)/i.test(cleaned)) return null;
+    const resolved = resolveRepoRelativePath(markdownBaseDir(), cleaned);
+    if (!resolved) return null;
+    return gitRawFileUrl(props.serverUrl, props.directory, props.branch, resolved, props.targetUrl);
+  }
+
+  const renderedContent = createMemo(() =>
+    isMarkdown() && markdownPreview()
+      ? rewriteMarkdownImages(previewContent() ?? "", markdownImageUrl)
+      : previewContent(),
+  );
 
   const inflight = new Map<string, Promise<void>>();
   let searchVersion = 0;
@@ -311,7 +373,7 @@ export function BranchFileTree(props: BranchFileTreeProps) {
                 }
               >
                 <div class="p-3">
-                  <Markdown content={previewContent() ?? ""} class="text-sm" />
+                  <Markdown content={renderedContent() ?? ""} class="text-sm" />
                 </div>
               </Show>
             </Show>

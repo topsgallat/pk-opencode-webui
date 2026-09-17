@@ -151,6 +151,38 @@ test("rejects directories outside the allowed root", async () => {
   expect(res!.status).toBe(403)
 })
 
+test("serves raw bytes with a guessed content type", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-git-raw-"))
+  process.env.OPENCODE_WORKSPACE_ROOT = root
+  process.env.HOME = root
+  await run(["init", "-b", "main"], root)
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3])
+  await fs.writeFile(nodePath.join(root, "logo.png"), png)
+  await run(["add", "."], root)
+  await run(["-c", "user.email=test@test", "-c", "user.name=test", "commit", "-m", "img"], root)
+  const res = await gitGet("/api/ext/git/raw", { directory: root, ref: "main", path: "logo.png" })
+  expect(res!.status).toBe(200)
+  expect(res!.headers.get("Content-Type")).toBe("image/png")
+  const body = Buffer.from(await res!.arrayBuffer())
+  expect(body.equals(png)).toBe(true)
+})
+
+test("returns 404 and 413 for raw blobs", async () => {
+  const root = await makeRepo()
+  const missing = await gitGet("/api/ext/git/raw", { directory: root, ref: "main", path: "nope.png" })
+  expect(missing!.status).toBe(404)
+
+  const big = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-git-bigraw-"))
+  process.env.OPENCODE_WORKSPACE_ROOT = big
+  process.env.HOME = big
+  await run(["init", "-b", "main"], big)
+  await fs.writeFile(nodePath.join(big, "huge.bin"), Buffer.alloc(11 * 1024 * 1024, 1))
+  await run(["add", "."], big)
+  await run(["-c", "user.email=test@test", "-c", "user.name=test", "commit", "-m", "huge"], big)
+  const oversize = await gitGet("/api/ext/git/raw", { directory: big, ref: "main", path: "huge.bin" })
+  expect(oversize!.status).toBe(413)
+})
+
 test("ignores non-git and non-GET requests", async () => {
   const res = await gitGet("/api/ext/other")
   expect(res).toBeUndefined()

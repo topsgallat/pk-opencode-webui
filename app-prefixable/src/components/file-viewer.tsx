@@ -5,10 +5,11 @@ import { useSDK } from "../context/sdk"
 import { useBasePath } from "../context/base-path"
 import { useServer } from "../context/server"
 import { useDevice } from "../context/device"
+import { useLayout } from "../context/layout"
 import { Spinner } from "./ui/spinner"
 import { FileCode, Pencil, Eye, Maximize2, X, MessageSquarePlus, Download, ShieldAlert } from "lucide-solid"
 import { writeFile, rawFileUrl } from "../utils/extended-api"
-import { resolveRepoRelativePath, rewriteMarkdownImages } from "../utils/markdown-images"
+import { resolveMarkdownLinkPath, resolveRepoRelativePath, rewriteMarkdownImages } from "../utils/markdown-images"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { EditorDialog } from "./editor-dialog"
 import { Markdown } from "./markdown"
@@ -126,6 +127,7 @@ export function FileViewer(props: FileViewerProps) {
   const basePath = useBasePath()
   const server = useServer()
   const device = useDevice()
+  const layout = useLayout()
   const capabilities = () => getServerCapabilities(server.selectedServer())
 
   const [isEditing, setIsEditing] = createSignal(false)
@@ -160,6 +162,13 @@ export function FileViewer(props: FileViewerProps) {
     if (!resolved) return null
     const full = sdk.directory && !resolved.startsWith("/") ? `${sdk.directory}/${resolved}` : resolved
     return rawFileUrl(sdk.url, full, sdk.targetUrl)
+  }
+
+  // Open linked files in a viewer tab instead of navigating the page away
+  function openMarkdownLink(href: string) {
+    const resolved = resolveMarkdownLinkPath(markdownBaseDir(), href)
+    if (!resolved) return
+    layout.tabs.open(resolved)
   }
 
   // Relative images resolve against the project (not the page URL) in preview mode
@@ -621,7 +630,7 @@ export function FileViewer(props: FileViewerProps) {
                     }
                   >
                     <div class="p-4 overflow-y-auto">
-                      <Markdown content={renderedContent()} class="text-sm" />
+                      <Markdown content={renderedContent()} class="text-sm" onFileClick={openMarkdownLink} />
                     </div>
                   </Show>
                 </Show>
@@ -742,7 +751,7 @@ export function FileViewer(props: FileViewerProps) {
                   }
                 >
                   <div class="p-8 max-w-4xl mx-auto">
-                    <Markdown content={renderedContent()} class="text-sm" />
+                    <Markdown content={renderedContent()} class="text-sm" onFileClick={openMarkdownLink} />
                   </div>
                 </Show>
               </div>

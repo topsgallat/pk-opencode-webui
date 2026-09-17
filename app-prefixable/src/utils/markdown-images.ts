@@ -16,6 +16,25 @@ export function resolveRepoRelativePath(baseDir: string, target: string): string
   return stack.join("/")
 }
 
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+/**
+ * Repo-relative path a markdown link points at, or null for external URLs,
+ * anchors and empty targets.
+ */
+export function resolveMarkdownLinkPath(baseDir: string, href: string): string | null {
+  const cleaned = safeDecode(href.replace(/^<|>$/g, "").trim()).split("#")[0]
+  if (!cleaned || /^(https?:|data:|blob:|mailto:|tel:)/i.test(cleaned)) return null
+  const resolved = resolveRepoRelativePath(baseDir, cleaned)
+  return resolved || null
+}
+
 /** Apply a line transform outside fenced code blocks so examples stay intact. */
 function mapOutsideFences(content: string, transform: (line: string) => string): string {
   let fenced = false;

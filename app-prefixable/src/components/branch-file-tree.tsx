@@ -5,7 +5,7 @@ import { ChevronRight, Eye, File, FileCode, Folder, GitBranch, X } from "lucide-
 import { Spinner } from "./ui/spinner";
 import { Markdown } from "./markdown";
 import { listGitFiles, listGitTree, readGitFile, gitRawFileUrl, type GitTreeEntry } from "../utils/extended-api";
-import { resolveRepoRelativePath, rewriteMarkdownImages } from "../utils/markdown-images";
+import { resolveMarkdownLinkPath, resolveRepoRelativePath, rewriteMarkdownImages } from "../utils/markdown-images";
 
 const SEARCH_MATCH_LIMIT = 300;
 
@@ -332,7 +332,14 @@ export function BranchFileTree(props: BranchFileTreeProps) {
                 }
               >
                 <div class="p-3">
-                  <Markdown content={renderedContent() ?? ""} class="text-sm" />
+                  <Markdown
+                    content={renderedContent() ?? ""}
+                    class="text-sm"
+                    onFileClick={(href) => {
+                      const resolved = resolveMarkdownLinkPath(markdownBaseDir(), href);
+                      if (resolved) void openFile(resolved);
+                    }}
+                  />
                 </div>
               </Show>
             </Show>

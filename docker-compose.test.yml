@@ -20,3 +20,12 @@ services:
       - OPENCODE_WORKSPACE_ROOT=/home/opencode
       - XDG_CACHE_HOME=/home/opencode/.cache
     restart: unless-stopped
+    volumes:
+      - opencode-data-test:/home/opencode/.local/share/opencode
+      - opencode-config-test:/home/opencode/.config/opencode
+      - opencode-cache-test:/home/opencode/.cache/opencode
+
+volumes:
+  opencode-data-test:
+  opencode-config-test:
+  opencode-cache-test:

@@ -1,8 +1,9 @@
-import { createEffect, createSignal, For, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { reconcile } from "solid-js/store";
 import { createStore } from "solid-js/store";
-import { ChevronRight, File, Folder, GitBranch, X } from "lucide-solid";
+import { ChevronRight, Eye, File, FileCode, Folder, GitBranch, X } from "lucide-solid";
 import { Spinner } from "./ui/spinner";
+import { Markdown } from "./markdown";
 import { listGitFiles, listGitTree, readGitFile, type GitTreeEntry } from "../utils/extended-api";
 
 const SEARCH_MATCH_LIMIT = 300;
@@ -39,6 +40,9 @@ export function BranchFileTree(props: BranchFileTreeProps) {
   const [previewContent, setPreviewContent] = createSignal<string | null>(null);
   const [previewLoading, setPreviewLoading] = createSignal(false);
   const [previewError, setPreviewError] = createSignal<string | null>(null);
+  const [markdownPreview, setMarkdownPreview] = createSignal(true);
+
+  const isMarkdown = createMemo(() => !!previewPath()?.toLowerCase().endsWith(".md"));
 
   const inflight = new Map<string, Promise<void>>();
   let searchVersion = 0;
@@ -111,6 +115,7 @@ export function BranchFileTree(props: BranchFileTreeProps) {
     setPreviewContent(null);
     setPreviewError(null);
     setPreviewLoading(true);
+    setMarkdownPreview(true);
     const res = await readGitFile(props.serverUrl, props.directory, props.branch, path, props.targetUrl);
     if (version !== previewVersion) return;
     setPreviewLoading(false);
@@ -256,15 +261,31 @@ export function BranchFileTree(props: BranchFileTreeProps) {
                 {props.branch}
               </span>
             </div>
-            <button
-              type="button"
-              aria-label="Close preview"
-              onClick={closePreview}
-              class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 shrink-0"
-              style={{ color: "var(--icon-weak)" }}
-            >
-              <X class="w-3.5 h-3.5" />
-            </button>
+            <div class="flex items-center gap-1 shrink-0">
+              <Show when={isMarkdown() && !previewLoading() && !previewError() && previewContent() !== null}>
+                <button
+                  type="button"
+                  class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded flex items-center justify-center"
+                  onClick={() => setMarkdownPreview(!markdownPreview())}
+                  title={markdownPreview() ? "Switch to source" : "Switch to preview"}
+                  aria-label={markdownPreview() ? "Switch to source" : "Switch to preview"}
+                  style={{ color: "var(--text-base)" }}
+                >
+                  <Show when={markdownPreview()} fallback={<Eye class="w-3.5 h-3.5" />}>
+                    <FileCode class="w-3.5 h-3.5" />
+                  </Show>
+                </button>
+              </Show>
+              <button
+                type="button"
+                aria-label="Close preview"
+                onClick={closePreview}
+                class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10"
+                style={{ color: "var(--icon-weak)" }}
+              >
+                <X class="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
           <div class="overflow-auto" style={{ "max-height": "calc(100vh - 240px)" }}>
             <Show when={previewLoading()}>
@@ -281,9 +302,18 @@ export function BranchFileTree(props: BranchFileTreeProps) {
               </div>
             </Show>
             <Show when={!previewLoading() && !previewError() && previewContent() !== null}>
-              <pre class="p-3 font-mono text-xs leading-6 whitespace-pre" style={{ color: "var(--text-base)" }}>
-                {previewContent()}
-              </pre>
+              <Show
+                when={isMarkdown() && markdownPreview()}
+                fallback={
+                  <pre class="p-3 font-mono text-xs leading-6 whitespace-pre" style={{ color: "var(--text-base)" }}>
+                    {previewContent()}
+                  </pre>
+                }
+              >
+                <div class="p-3">
+                  <Markdown content={previewContent() ?? ""} class="text-sm" />
+                </div>
+              </Show>
             </Show>
           </div>
         </div>

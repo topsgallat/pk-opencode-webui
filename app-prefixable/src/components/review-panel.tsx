@@ -22,7 +22,7 @@ import { ContentDiff } from "./diff/content-diff";
 import { Tabs } from "./ui/tabs";
 import { Spinner } from "./ui/spinner";
 import { listGitBranches } from "../utils/extended-api";
-import { ChevronRight, FileCode, GitBranch, RefreshCw, Search, X } from "lucide-solid";
+import { ArrowLeft, ArrowRight, ChevronRight, FileCode, GitBranch, RefreshCw, Search, X } from "lucide-solid";
 
 const FILE_SEARCH_TIMEOUT_MS = 30_000;
 
@@ -65,6 +65,53 @@ export function ReviewPanel(props: ReviewPanelProps) {
   const [branches, setBranches] = createSignal<string[]>([]);
   const [currentBranch, setCurrentBranch] = createSignal<string | null>(null);
   const [viewBranch, setViewBranch] = createSignal("");
+
+  // Back/forward history of opened file tabs
+  const [viewHistory, setViewHistory] = createSignal<string[]>([]);
+  const [viewIndex, setViewIndex] = createSignal(-1);
+  let restoringView = false;
+
+  const openTabPaths = createMemo(() => new Set(fileTabs().map((t) => t.path)));
+
+  const canGoBackView = createMemo(() => {
+    for (let i = viewIndex() - 1; i >= 0; i--) {
+      if (openTabPaths().has(viewHistory()[i])) return true;
+    }
+    return false;
+  });
+
+  const canGoForwardView = createMemo(() => {
+    for (let i = viewIndex() + 1; i < viewHistory().length; i++) {
+      if (openTabPaths().has(viewHistory()[i])) return true;
+    }
+    return false;
+  });
+
+  // Record file tab activations so they can be revisited with back/forward
+  createEffect(() => {
+    const path = activeTab();
+    if (restoringView) {
+      restoringView = false;
+      return;
+    }
+    if (!path) return;
+    const trail = viewHistory().slice(0, viewIndex() + 1);
+    if (trail[trail.length - 1] === path) return;
+    trail.push(path);
+    setViewHistory(trail);
+    setViewIndex(trail.length - 1);
+  });
+
+  function stepViewHistory(delta: number) {
+    const open = openTabPaths();
+    let next = viewIndex() + delta;
+    while (next >= 0 && next < viewHistory().length && !open.has(viewHistory()[next])) next += delta;
+    if (next < 0 || next >= viewHistory().length) return;
+    setViewIndex(next);
+    restoringView = true;
+    layout.tabs.setActive(viewHistory()[next]);
+  }
+
 
   // Track the latest request to prevent race conditions
   let version = 0;
@@ -119,11 +166,15 @@ export function ReviewPanel(props: ReviewPanelProps) {
       // Reset selection when session changes
       setSelected(null);
       setViewBranch("");
+      setViewHistory([]);
+      setViewIndex(-1);
       loadDiffs();
     } else {
       setDiffs([]);
       setSelected(null);
       setViewBranch("");
+      setViewHistory([]);
+      setViewIndex(-1);
     }
   });
 
@@ -328,6 +379,32 @@ export function ReviewPanel(props: ReviewPanelProps) {
           background: "var(--surface-inset)",
         }}
       >
+        {/* Back / Forward through opened files */}
+        <Show when={viewHistory().length > 1}>
+          <button
+            type="button"
+            aria-label="Previous file"
+            title="Previous file"
+            disabled={!canGoBackView()}
+            onClick={() => stepViewHistory(-1)}
+            class="p-1 rounded shrink-0 hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            style={{ color: "var(--text-base)" }}
+          >
+            <ArrowLeft class="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next file"
+            title="Next file"
+            disabled={!canGoForwardView()}
+            onClick={() => stepViewHistory(1)}
+            class="p-1 rounded shrink-0 hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            style={{ color: "var(--text-base)" }}
+          >
+            <ArrowRight class="w-3.5 h-3.5" />
+          </button>
+        </Show>
+
         {/* Review Tab */}
         <button
           type="button"

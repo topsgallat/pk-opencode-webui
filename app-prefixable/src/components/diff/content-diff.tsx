@@ -1,12 +1,17 @@
-import { parsePatch } from "diff"
-import { createMemo, For } from "solid-js"
-import { ContentCode } from "./content-code"
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { useHighlightedLines, type HighlightedLines } from "./content-code"
+import { parseDiffRows } from "./content-diff-rows"
 import "./content-diff.css"
 
-type DiffRow = {
-  left: string
-  right: string
-  type: "added" | "removed" | "unchanged" | "modified"
+type MobileCell = {
+  source: "left" | "right"
+  index: number
+  text: string
+}
+
+type MobileBlock = {
+  type: "removed" | "added" | "unchanged"
+  cells: MobileCell[]
 }
 
 interface Props {
@@ -14,187 +19,125 @@ interface Props {
   lang?: string
 }
 
-export function ContentDiff(props: Props) {
-  const rows = createMemo(() => {
-    const diffRows: DiffRow[] = []
-
-    try {
-      const patches = parsePatch(props.diff)
-
-      for (const patch of patches) {
-        for (const hunk of patch.hunks) {
-          const lines = hunk.lines
-          let i = 0
-
-          while (i < lines.length) {
-            const line = lines[i]
-            const content = line.slice(1)
-            const prefix = line[0]
-
-            if (prefix === "-") {
-              // Look ahead for consecutive additions to pair with removals
-              const removals: string[] = [content]
-              let j = i + 1
-
-              // Collect all consecutive removals
-              while (j < lines.length && lines[j][0] === "-") {
-                removals.push(lines[j].slice(1))
-                j++
-              }
-
-              // Collect all consecutive additions that follow
-              const additions: string[] = []
-              while (j < lines.length && lines[j][0] === "+") {
-                additions.push(lines[j].slice(1))
-                j++
-              }
-
-              // Pair removals with additions
-              const maxLength = Math.max(removals.length, additions.length)
-              for (let k = 0; k < maxLength; k++) {
-                const hasLeft = k < removals.length
-                const hasRight = k < additions.length
-
-                if (hasLeft && hasRight) {
-                  // Replacement - left is removed, right is added
-                  diffRows.push({
-                    left: removals[k],
-                    right: additions[k],
-                    type: "modified",
-                  })
-                } else if (hasLeft) {
-                  // Pure removal
-                  diffRows.push({
-                    left: removals[k],
-                    right: "",
-                    type: "removed",
-                  })
-                } else if (hasRight) {
-                  // Pure addition - only create if we actually have content
-                  diffRows.push({
-                    left: "",
-                    right: additions[k],
-                    type: "added",
-                  })
-                }
-              }
-
-              i = j
-            } else if (prefix === "+") {
-              // Standalone addition (not paired with removal)
-              diffRows.push({
-                left: "",
-                right: content,
-                type: "added",
-              })
-              i++
-            } else if (prefix === " ") {
-              diffRows.push({
-                left: content === "" ? " " : content,
-                right: content === "" ? " " : content,
-                type: "unchanged",
-              })
-              i++
-            } else {
-              i++
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error("[ContentDiff] Failed to parse patch:", error)
-      return []
-    }
-
-    return diffRows
+function DiffSlotCode(props: { source: HighlightedLines | undefined; index: number; text: string }) {
+  const html = createMemo(() => {
+    const source = props.source
+    if (!source || props.index < 0 || props.index >= source.lines.length) return undefined
+    return `<pre class="${source.preClass}" style="${source.preStyle}" tabindex="0"><code>${source.lines[props.index]}</code></pre>`
   })
 
-  const mobileRows = createMemo(() => {
-    const mobileBlocks: {
-      type: "removed" | "added" | "unchanged"
-      lines: string[]
-    }[] = []
-    const currentRows = rows()
+  return (
+    <Show when={html()} fallback={<pre class="content-code" data-flush="true">{props.text}</pre>}>
+      {(h) => <div class="content-code" data-flush="true" innerHTML={h()} />}
+    </Show>
+  )
+}
+
+export function ContentDiff(props: Props) {
+  const parsed = createMemo(() => parseDiffRows(props.diff))
+  const leftSource = useHighlightedLines(() => parsed().leftLines.join("\n"), () => props.lang)
+  const rightSource = useHighlightedLines(() => parsed().rightLines.join("\n"), () => props.lang)
+
+  // Mirror the CSS breakpoint in content-diff.css so only one of the two
+  // layouts is ever in the DOM -- rendering both doubled the highlight and
+  // DOM work for every diff.
+  const [compact, setCompact] = createSignal(false)
+  onMount(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
+    const mql = window.matchMedia("(max-width: 40rem)")
+    const onChange = () => setCompact(mql.matches)
+    onChange()
+    mql.addEventListener("change", onChange)
+    onCleanup(() => mql.removeEventListener("change", onChange))
+  })
+
+  const mobileBlocks = createMemo(() => {
+    const blocks: MobileBlock[] = []
+    const rows = parsed().rows
 
     let i = 0
-    while (i < currentRows.length) {
-      const removedLines: string[] = []
-      const addedLines: string[] = []
+    while (i < rows.length) {
+      const removed: MobileCell[] = []
+      const added: MobileCell[] = []
 
       // Collect consecutive modified/removed/added rows
       while (
-        i < currentRows.length &&
-        (currentRows[i].type === "modified" || currentRows[i].type === "removed" || currentRows[i].type === "added")
+        i < rows.length &&
+        (rows[i].type === "modified" || rows[i].type === "removed" || rows[i].type === "added")
       ) {
-        const row = currentRows[i]
-        if (row.left && (row.type === "removed" || row.type === "modified")) {
-          removedLines.push(row.left)
+        const row = rows[i]
+        if (row.leftText && (row.type === "removed" || row.type === "modified")) {
+          removed.push({ source: "left", index: row.leftIndex, text: row.leftText })
         }
-        if (row.right && (row.type === "added" || row.type === "modified")) {
-          addedLines.push(row.right)
+        if (row.rightText && (row.type === "added" || row.type === "modified")) {
+          added.push({ source: "right", index: row.rightIndex, text: row.rightText })
         }
         i++
       }
 
-      // Add grouped blocks
-      if (removedLines.length > 0) {
-        mobileBlocks.push({ type: "removed", lines: removedLines })
-      }
-      if (addedLines.length > 0) {
-        mobileBlocks.push({ type: "added", lines: addedLines })
-      }
+      if (removed.length > 0) blocks.push({ type: "removed", cells: removed })
+      if (added.length > 0) blocks.push({ type: "added", cells: added })
 
       // Add unchanged rows as-is
-      if (i < currentRows.length && currentRows[i].type === "unchanged") {
-        mobileBlocks.push({
+      if (i < rows.length && rows[i].type === "unchanged") {
+        blocks.push({
           type: "unchanged",
-          lines: [currentRows[i].left],
+          cells: [{ source: "left", index: rows[i].leftIndex, text: rows[i].leftText }],
         })
         i++
       }
     }
 
-    return mobileBlocks
+    return blocks
   })
 
   return (
     <div class="content-diff">
-      <div class="diff-desktop">
-        <For each={rows()}>
-          {(r) => (
-            <div class="diff-row" data-type={r.type}>
-              <div
-                class="diff-slot diff-before"
-                data-diff-type={r.type === "removed" || r.type === "modified" ? "removed" : ""}
-              >
-                <ContentCode code={r.left} flush lang={props.lang} />
+      <Show
+        when={!compact()}
+        fallback={
+          <div class="diff-mobile">
+            <For each={mobileBlocks()}>
+              {(block) => (
+                <div class="diff-block" data-type={block.type}>
+                  <For each={block.cells}>
+                    {(cell) => (
+                      <div data-diff-type={block.type === "removed" ? "removed" : block.type === "added" ? "added" : ""}>
+                        <DiffSlotCode
+                          source={cell.source === "left" ? leftSource() : rightSource()}
+                          index={cell.index}
+                          text={cell.text}
+                        />
+                      </div>
+                    )}
+                  </For>
+                </div>
+              )}
+            </For>
+          </div>
+        }
+      >
+        <div class="diff-desktop">
+          <For each={parsed().rows}>
+            {(r) => (
+              <div class="diff-row" data-type={r.type}>
+                <div
+                  class="diff-slot diff-before"
+                  data-diff-type={r.type === "removed" || r.type === "modified" ? "removed" : ""}
+                >
+                  <DiffSlotCode source={leftSource()} index={r.leftIndex} text={r.leftText} />
+                </div>
+                <div
+                  class="diff-slot diff-after"
+                  data-diff-type={r.type === "added" || r.type === "modified" ? "added" : ""}
+                >
+                  <DiffSlotCode source={rightSource()} index={r.rightIndex} text={r.rightText} />
+                </div>
               </div>
-              <div
-                class="diff-slot diff-after"
-                data-diff-type={r.type === "added" || r.type === "modified" ? "added" : ""}
-              >
-                <ContentCode code={r.right} lang={props.lang} flush />
-              </div>
-            </div>
-          )}
-        </For>
-      </div>
-
-      <div class="diff-mobile">
-        <For each={mobileRows()}>
-          {(block) => (
-            <div class="diff-block" data-type={block.type}>
-              <For each={block.lines}>
-                {(line) => (
-                  <div data-diff-type={block.type === "removed" ? "removed" : block.type === "added" ? "added" : ""}>
-                    <ContentCode code={line} lang={props.lang} flush />
-                  </div>
-                )}
-              </For>
-            </div>
-          )}
-        </For>
-      </div>
+            )}
+          </For>
+        </div>
+      </Show>
     </div>
   )
 }

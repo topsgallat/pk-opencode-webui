@@ -19,16 +19,59 @@ import { TodoListSections } from "./session-sidebar";
 
 const fa = new FancyAnsi();
 
+// Bash output events can arrive many times per second while a command runs.
+// Re-converting and re-inserting the full accumulated text on every event is
+// O(total output) per update and janks the page on long-running commands, so
+// renders are throttled and only the trailing window of output is kept in the
+// DOM. The tail is re-converted whole (not appended) because FancyAnsi keeps
+// no state across toHtml calls and appending would drop colors that stay open
+// across newlines.
+const ANSI_RENDER_INTERVAL_MS = 150;
+const ANSI_RENDER_CHAR_LIMIT = 128 * 1024;
+
+function ansiTailHtml(text: string): string {
+  if (text.length <= ANSI_RENDER_CHAR_LIMIT) return fa.toHtml(text);
+  const tail = text.slice(text.length - ANSI_RENDER_CHAR_LIMIT);
+  // Start at a line boundary so no ANSI escape sequence is cut in half
+  const newline = tail.indexOf("\n");
+  const body = fa.toHtml(newline === -1 ? tail : tail.slice(newline + 1));
+  return `<span style="color: var(--text-weak)">… earlier output trimmed</span>\n${body}`;
+}
+
 function AnsiOutput(props: { text: string }) {
   let el: HTMLPreElement | undefined;
+  let renderTimer: ReturnType<typeof setTimeout> | undefined;
+  let pending: string | undefined;
+  let rendered = false;
 
-  createEffect(() => {
-    if (!el) return;
+  const flush = () => {
+    if (!el || pending === undefined) return;
+    const text = pending;
+    pending = undefined;
+    rendered = true;
     const top = el.scrollTop;
     const left = el.scrollLeft;
-    el.innerHTML = fa.toHtml(props.text);
+    el.innerHTML = ansiTailHtml(text);
     el.scrollTop = top;
     el.scrollLeft = left;
+  };
+
+  onCleanup(() => {
+    if (renderTimer !== undefined) clearTimeout(renderTimer);
+  });
+
+  createEffect(() => {
+    const text = props.text;
+    pending = text;
+    if (!rendered) {
+      flush();
+      return;
+    }
+    if (renderTimer !== undefined) return;
+    renderTimer = setTimeout(() => {
+      renderTimer = undefined;
+      flush();
+    }, ANSI_RENDER_INTERVAL_MS);
   });
 
   return (

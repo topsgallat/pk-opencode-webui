@@ -23,6 +23,7 @@
 
 import { handleExtendedEndpoint, handleSkillEndpoint, isApiPath } from "../shared/extended-api"
 import { handleClaudeEndpoint } from "../shared/claude-api"
+import { handleGitEndpoint } from "../shared/git-api"
 import { loadCopilotModelMultipliers } from "../shared/copilot-model-multipliers"
 import { loadAnthropicPricing } from "../shared/anthropic-pricing"
 import { loadOpenAIPricing } from "../shared/openai-pricing"
@@ -478,6 +479,10 @@ const server = Bun.serve<{ target: string; cookie: string }>({
     // Claude Code backend (not proxied to OpenCode)
     const claudeResponse = await handleClaudeEndpoint(path, req.method, url, req)
     if (claudeResponse) return claudeResponse
+
+    // Git browsing endpoints (not proxied to OpenCode)
+    const gitResponse = await handleGitEndpoint(path, req.method, url)
+    if (gitResponse) return gitResponse
 
     // Check if this is an API request (after stripping prefix)
     if (isApiPath(path)) {

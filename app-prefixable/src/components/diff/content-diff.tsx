@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
-import { useHighlightedLines, type HighlightedLines } from "./content-code"
+import { useHighlightedLines, type HighlightedLines } from "./highlight-cache"
 import { parseDiffRows } from "./content-diff-rows"
 import "./content-diff.css"
 

@@ -868,7 +868,7 @@ export function MessageTurn(props: {
                     {/* Tool calls */}
                     <Show when={summary().hasTools}>
                       <div class="mt-2">
-                        <MessageParts parts={message.parts} />
+                        <MessageParts parts={message.parts} settled={message.time?.completed != null} />
                       </div>
                     </Show>
                   </div>

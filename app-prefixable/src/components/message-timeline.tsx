@@ -8,6 +8,7 @@ import { ChevronUp, RefreshCw, Clock, Brain, Loader2, ArrowDown, Lock, LockOpen 
 import { errorText } from "../types/message"
 import type { DisplayMessage, QueueTurnState, Turn } from "../types/message"
 import { extractTextContent } from "../utils/message"
+import { hasVisibleContent } from "../utils/message-visibility"
 import type { SessionStatus } from "../sdk/client"
 import { reconcileTurns } from "../utils/message-reconcile"
 import { getRealTurnDefaultExpanded } from "./message-turn-state"
@@ -17,13 +18,6 @@ import { createAutoScroll } from "../utils/auto-scroll"
 // Number of turns to render initially and on each "load more"
 const TURNS_PER_BATCH = 10
 const INITIAL_TURNS = 5
-
-function hasVisibleContent(message: DisplayMessage): boolean {
-  if (message.error) return true
-  if (message.role === "user") return true
-  if (message.parts.some((p) => p.type === "tool")) return true
-  return extractTextContent(message.parts).trim().length > 0
-}
 
 export function MessageTimeline(props: {
   messages: DisplayMessage[]
@@ -646,7 +640,7 @@ export function FlatMessageList(props: {
                 }}
               >
                 <Show when={isToolOnly}>
-                  <MessageParts parts={message.parts} />
+                  <MessageParts parts={message.parts} settled={message.time?.completed != null} />
                 </Show>
 
                 <Show when={!isToolOnly}>
@@ -685,7 +679,7 @@ export function FlatMessageList(props: {
                   </div>
                   <Show when={message.role === "assistant" && hasTools}>
                     <div class="mt-2">
-                      <MessageParts parts={message.parts} />
+                      <MessageParts parts={message.parts} settled={message.time?.completed != null} />
                     </div>
                   </Show>
                 </Show>

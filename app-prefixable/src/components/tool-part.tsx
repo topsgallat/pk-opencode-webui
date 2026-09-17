@@ -1101,9 +1101,15 @@ function TaskToolDisplay(props: { part: ToolPart; subtask?: SubtaskPart; agentPa
 }
 
 // Reasoning part display (AI Thinking)
-function ReasoningPartDisplay(props: { parts: ReasoningPart[] }) {
+function ReasoningPartDisplay(props: { parts: ReasoningPart[]; settled?: boolean }) {
   const first = () => props.parts[0];
   const expanded = () => expandedStore.get(first().id);
+  const text = () => props.parts.map((part) => part.text).join("");
+  // While the part streams, every delta would re-run marked + DOMPurify over
+  // the whole accumulated text each frame, so streaming text renders as plain
+  // text and Markdown kicks in once the part (or its message) completes. The
+  // message-level `settled` covers persisted parts that never recorded time.end.
+  const streaming = () => props.settled !== true && props.parts.some((part) => part.time?.end == null);
 
   return (
     <div
@@ -1137,7 +1143,12 @@ function ReasoningPartDisplay(props: { parts: ReasoningPart[] }) {
             color: "var(--text-base)",
           }}
         >
-          <Markdown content={props.parts.map((part) => part.text).join("")} class="thinking-content opacity-80" />
+          <Show
+            when={streaming()}
+            fallback={<Markdown content={text()} class="thinking-content opacity-80" />}
+          >
+            <div class="thinking-content opacity-80 whitespace-pre-wrap break-words">{text()}</div>
+          </Show>
         </div>
       </Show>
     </div>
@@ -1478,7 +1489,7 @@ export function ToolPartDisplay(props: { part: ToolPart; subtask?: SubtaskPart; 
 }
 
 // Render tool parts from a message
-export function MessageParts(props: { parts: Part[] }) {
+export function MessageParts(props: { parts: Part[]; settled?: boolean }) {
   // Separate parts by type but keep order
   const filteredParts = () => props.parts.filter(p => p.type === "tool" || p.type === "reasoning" || p.type === "subtask" || p.type === "agent");
 
@@ -1513,7 +1524,7 @@ export function MessageParts(props: { parts: Part[] }) {
       <div class="space-y-2 mt-3">
         <For each={groupedParts()}>
           {(item) => {
-            if (item.type === "reasoning") return <ReasoningPartDisplay parts={item.parts} />;
+            if (item.type === "reasoning") return <ReasoningPartDisplay parts={item.parts} settled={props.settled} />;
             if (item.type === "subtask") return null;
             if (item.type === "agent") return null;
             if (item.type === "tool") {

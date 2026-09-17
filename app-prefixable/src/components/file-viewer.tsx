@@ -7,7 +7,7 @@ import { useServer } from "../context/server"
 import { useDevice } from "../context/device"
 import { useLayout } from "../context/layout"
 import { Spinner } from "./ui/spinner"
-import { FileCode, Pencil, Eye, Maximize2, X, MessageSquarePlus, Download, ShieldAlert } from "lucide-solid"
+import { FileCode, Pencil, Eye, Maximize2, X, MessageSquarePlus, Download, ShieldAlert, RefreshCw } from "lucide-solid"
 import { writeFile, rawFileUrl } from "../utils/extended-api"
 import { resolveMarkdownLinkPath, resolveRepoRelativePath, rewriteMarkdownImages } from "../utils/markdown-images"
 import { getServerCapabilities } from "../utils/server-capabilities"
@@ -487,6 +487,17 @@ export function FileViewer(props: FileViewerProps) {
               >
                 <div class="truncate flex-1 min-w-0 pr-2">{props.path}</div>
                 <div class="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                  <Show when={!isEditing()}>
+                    <button
+                      class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center"
+                      onClick={() => void file.load(props.path, { force: true })}
+                      title="Reload file"
+                      aria-label="Reload file"
+                      style={{ color: "var(--text-base)" }}
+                    >
+                      <RefreshCw class="w-3.5 h-3.5" classList={{ "animate-spin": fileLoading() }} />
+                    </button>
+                  </Show>
                   <Show when={isMarkdown()}>
                     <button
                       class="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded min-h-[44px] min-w-[44px] flex-shrink-0 flex items-center justify-center gap-1"

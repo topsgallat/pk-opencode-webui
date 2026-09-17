@@ -66,53 +66,6 @@ export function ReviewPanel(props: ReviewPanelProps) {
   const [currentBranch, setCurrentBranch] = createSignal<string | null>(null);
   const [viewBranch, setViewBranch] = createSignal("");
 
-  // Back/forward history of opened file tabs
-  const [viewHistory, setViewHistory] = createSignal<string[]>([]);
-  const [viewIndex, setViewIndex] = createSignal(-1);
-  let restoringView = false;
-
-  const openTabPaths = createMemo(() => new Set(fileTabs().map((t) => t.path)));
-
-  const canGoBackView = createMemo(() => {
-    for (let i = viewIndex() - 1; i >= 0; i--) {
-      if (openTabPaths().has(viewHistory()[i])) return true;
-    }
-    return false;
-  });
-
-  const canGoForwardView = createMemo(() => {
-    for (let i = viewIndex() + 1; i < viewHistory().length; i++) {
-      if (openTabPaths().has(viewHistory()[i])) return true;
-    }
-    return false;
-  });
-
-  // Record file tab activations so they can be revisited with back/forward
-  createEffect(() => {
-    const path = activeTab();
-    if (restoringView) {
-      restoringView = false;
-      return;
-    }
-    if (!path) return;
-    const trail = viewHistory().slice(0, viewIndex() + 1);
-    if (trail[trail.length - 1] === path) return;
-    trail.push(path);
-    setViewHistory(trail);
-    setViewIndex(trail.length - 1);
-  });
-
-  function stepViewHistory(delta: number) {
-    const open = openTabPaths();
-    let next = viewIndex() + delta;
-    while (next >= 0 && next < viewHistory().length && !open.has(viewHistory()[next])) next += delta;
-    if (next < 0 || next >= viewHistory().length) return;
-    setViewIndex(next);
-    restoringView = true;
-    layout.tabs.setActive(viewHistory()[next]);
-  }
-
-
   // Track the latest request to prevent race conditions
   let version = 0;
   let searchVersion = 0;
@@ -365,6 +318,53 @@ export function ReviewPanel(props: ReviewPanelProps) {
 
   const fileTabs = () => layout.tabs.all();
   const activeTab = () => layout.tabs.active();
+
+  // Back/forward history of opened file tabs
+  const [viewHistory, setViewHistory] = createSignal<string[]>([]);
+  const [viewIndex, setViewIndex] = createSignal(-1);
+  let restoringView = false;
+
+  const openTabPaths = createMemo(() => new Set(fileTabs().map((t) => t.path)));
+
+  const canGoBackView = createMemo(() => {
+    for (let i = viewIndex() - 1; i >= 0; i--) {
+      if (openTabPaths().has(viewHistory()[i])) return true;
+    }
+    return false;
+  });
+
+  const canGoForwardView = createMemo(() => {
+    for (let i = viewIndex() + 1; i < viewHistory().length; i++) {
+      if (openTabPaths().has(viewHistory()[i])) return true;
+    }
+    return false;
+  });
+
+  // Record file tab activations so they can be revisited with back/forward
+  createEffect(() => {
+    const path = activeTab();
+    if (restoringView) {
+      restoringView = false;
+      return;
+    }
+    if (!path) return;
+    const trail = viewHistory().slice(0, viewIndex() + 1);
+    if (trail[trail.length - 1] === path) return;
+    trail.push(path);
+    setViewHistory(trail);
+    setViewIndex(trail.length - 1);
+  });
+
+  function stepViewHistory(delta: number) {
+    const open = openTabPaths();
+    let next = viewIndex() + delta;
+    while (next >= 0 && next < viewHistory().length && !open.has(viewHistory()[next])) next += delta;
+    if (next < 0 || next >= viewHistory().length) return;
+    setViewIndex(next);
+    restoringView = true;
+    layout.tabs.setActive(viewHistory()[next]);
+  }
+
 
   return (
     <div

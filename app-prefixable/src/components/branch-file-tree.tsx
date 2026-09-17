@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { reconcile } from "solid-js/store";
 import { createStore } from "solid-js/store";
-import { ChevronRight, Eye, File, FileCode, Folder, GitBranch, X } from "lucide-solid";
+import { ChevronRight, ArrowLeft, ArrowRight, Eye, File, FileCode, Folder, GitBranch, X } from "lucide-solid";
 import { Spinner } from "./ui/spinner";
 import { Markdown } from "./markdown";
 import { listGitFiles, listGitTree, readGitFile, gitRawFileUrl, type GitTreeEntry } from "../utils/extended-api";
@@ -42,6 +42,8 @@ export function BranchFileTree(props: BranchFileTreeProps) {
   const [previewLoading, setPreviewLoading] = createSignal(false);
   const [previewError, setPreviewError] = createSignal<string | null>(null);
   const [markdownPreview, setMarkdownPreview] = createSignal(true);
+  const [history, setHistory] = createSignal<string[]>([]);
+  const [historyIndex, setHistoryIndex] = createSignal(-1);
 
   const isMarkdown = createMemo(() => !!previewPath()?.toLowerCase().endsWith(".md"));
 
@@ -130,18 +132,39 @@ export function BranchFileTree(props: BranchFileTreeProps) {
     if (next) void loadDir(path);
   }
 
-  async function openFile(path: string) {
+  function loadPreview(path: string) {
     const version = ++previewVersion;
     setPreviewPath(path);
     setPreviewContent(null);
     setPreviewError(null);
     setPreviewLoading(true);
     setMarkdownPreview(true);
-    const res = await readGitFile(props.serverUrl, props.directory, props.branch, path, props.targetUrl);
-    if (version !== previewVersion) return;
-    setPreviewLoading(false);
-    if (res.content !== undefined) setPreviewContent(res.content);
-    else setPreviewError(res.error ?? "Failed to load file");
+    void (async () => {
+      const res = await readGitFile(props.serverUrl, props.directory, props.branch, path, props.targetUrl);
+      if (version !== previewVersion) return;
+      setPreviewLoading(false);
+      if (res.content !== undefined) setPreviewContent(res.content);
+      else setPreviewError(res.error ?? "Failed to load file");
+    })();
+  }
+
+  function pushHistory(path: string) {
+    const trail = history().slice(0, historyIndex() + 1);
+    trail.push(path);
+    setHistory(trail);
+    setHistoryIndex(trail.length - 1);
+  }
+
+  function openFile(path: string) {
+    pushHistory(path);
+    loadPreview(path);
+  }
+
+  function stepHistory(delta: number) {
+    const next = historyIndex() + delta;
+    if (next < 0 || next >= history().length) return;
+    setHistoryIndex(next);
+    loadPreview(history()[next]);
   }
 
   function closePreview() {
@@ -150,6 +173,8 @@ export function BranchFileTree(props: BranchFileTreeProps) {
     setPreviewContent(null);
     setPreviewError(null);
     setPreviewLoading(false);
+    setHistory([]);
+    setHistoryIndex(-1);
   }
 
   function renderNodes(dir: string, depth: number) {
@@ -283,6 +308,30 @@ export function BranchFileTree(props: BranchFileTreeProps) {
               </span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
+              <Show when={history().length > 1}>
+                <button
+                  type="button"
+                  aria-label="Previous file"
+                  title="Previous file"
+                  disabled={historyIndex() <= 0}
+                  onClick={() => stepHistory(-1)}
+                  class="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                  style={{ color: "var(--text-base)" }}
+                >
+                  <ArrowLeft class="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next file"
+                  title="Next file"
+                  disabled={historyIndex() >= history().length - 1}
+                  onClick={() => stepHistory(1)}
+                  class="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                  style={{ color: "var(--text-base)" }}
+                >
+                  <ArrowRight class="w-3.5 h-3.5" />
+                </button>
+              </Show>
               <Show when={isMarkdown() && !previewLoading() && !previewError() && previewContent() !== null}>
                 <button
                   type="button"

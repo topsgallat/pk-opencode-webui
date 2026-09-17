@@ -485,3 +485,69 @@ export async function getQuota(serverUrl: string, options?: { refresh?: boolean;
   }
   return await res.json()
 }
+
+/**
+ * Git browsing (read-only) via /api/ext/git/*.
+ * Lets the Review panel browse files of any local branch without touching
+ * the working tree.
+ */
+
+export type GitBranches = { branches: string[]; current: string | null }
+export type GitTreeEntry = { name: string; path: string; type: "file" | "dir" }
+export type GitFileResult = { content?: string; error?: string }
+
+export async function listGitBranches(serverUrl: string, directory: string, targetUrl?: string): Promise<GitBranches | null> {
+  try {
+    const params = new URLSearchParams()
+    if (directory) params.set("directory", directory)
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/git/branches?${params}`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended listGitBranches")
+    if (!res.ok) return null
+    return await res.json()
+  } catch (e) {
+    console.error("[extended-api] listGitBranches failed:", e)
+    return null
+  }
+}
+
+export async function listGitTree(serverUrl: string, directory: string, ref: string, path: string, targetUrl?: string): Promise<GitTreeEntry[] | null> {
+  try {
+    const params = new URLSearchParams({ ref, path })
+    if (directory) params.set("directory", directory)
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/git/tree?${params}`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended listGitTree")
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.entries
+  } catch (e) {
+    console.error("[extended-api] listGitTree failed:", e)
+    return null
+  }
+}
+
+export async function listGitFiles(serverUrl: string, directory: string, ref: string, targetUrl?: string): Promise<string[] | null> {
+  try {
+    const params = new URLSearchParams({ ref })
+    if (directory) params.set("directory", directory)
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/git/list?${params}`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended listGitFiles")
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.files
+  } catch (e) {
+    console.error("[extended-api] listGitFiles failed:", e)
+    return null
+  }
+}
+
+export async function readGitFile(serverUrl: string, directory: string, ref: string, path: string, targetUrl?: string): Promise<GitFileResult> {
+  try {
+    const params = new URLSearchParams({ ref, path })
+    if (directory) params.set("directory", directory)
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/git/file?${params}`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended readGitFile")
+    const data = await res.json().catch(() => null)
+    if (res.ok) return { content: typeof data?.content === "string" ? data.content : "" }
+    return { error: readErrorMessage(data) || res.statusText || `HTTP ${res.status}` }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    console.error("[extended-api] readGitFile failed:", e)
+    return { error: message }
+  }
+}

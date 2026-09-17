@@ -17,9 +17,11 @@ import { base64Encode } from "../utils/path";
 
 import { FileTree } from "./file-tree";
 import { FileViewer } from "./file-viewer";
+import { BranchFileTree } from "./branch-file-tree";
 import { ContentDiff } from "./diff/content-diff";
 import { Tabs } from "./ui/tabs";
 import { Spinner } from "./ui/spinner";
+import { listGitBranches } from "../utils/extended-api";
 import { ChevronRight, FileCode, GitBranch, RefreshCw, Search, X } from "lucide-solid";
 
 const FILE_SEARCH_TIMEOUT_MS = 30_000;
@@ -31,7 +33,7 @@ interface ReviewPanelProps {
 }
 
 export function ReviewPanel(props: ReviewPanelProps) {
-  const { client, directory } = useSDK();
+  const { client, directory, url: serverUrl, targetUrl } = useSDK();
   const navigate = useNavigate();
   const file = useFile();
   const events = useEvents();
@@ -60,6 +62,9 @@ export function ReviewPanel(props: ReviewPanelProps) {
   const [search, setSearch] = createSignal("");
   const [searchResults, setSearchResults] = createSignal<string[]>([]);
   const [searchLoading, setSearchLoading] = createSignal(false);
+  const [branches, setBranches] = createSignal<string[]>([]);
+  const [currentBranch, setCurrentBranch] = createSignal<string | null>(null);
+  const [viewBranch, setViewBranch] = createSignal("");
 
   // Track the latest request to prevent race conditions
   let version = 0;
@@ -113,11 +118,24 @@ export function ReviewPanel(props: ReviewPanelProps) {
     if (id) {
       // Reset selection when session changes
       setSelected(null);
+      setViewBranch("");
       loadDiffs();
     } else {
       setDiffs([]);
       setSelected(null);
+      setViewBranch("");
     }
+  });
+
+  async function loadBranches() {
+    const res = await listGitBranches(serverUrl, directory ?? "", targetUrl);
+    setBranches(res?.branches ?? []);
+    setCurrentBranch(res?.current ?? null);
+  }
+
+  createEffect(() => {
+    if (isGitRepo() !== true || !props.sessionId) return;
+    void loadBranches();
   });
 
   // Subscribe to diff events for real-time updates
@@ -152,6 +170,12 @@ export function ReviewPanel(props: ReviewPanelProps) {
         if (eventProps.sessionID === id && eventProps.status?.type === "idle") {
           loadDiffs();
         }
+      }
+      // Track branch switches so the selector stays current
+      if (event.type === "vcs.branch.updated") {
+        const eventProps = event.properties as { branch?: string };
+        if (eventProps.branch) setCurrentBranch(eventProps.branch);
+        void loadBranches();
       }
     });
 
@@ -219,7 +243,8 @@ export function ReviewPanel(props: ReviewPanelProps) {
 
   createEffect(() => {
     const q = searchQuery();
-    if (tab() !== "all" || !q) {
+    // Branch mode searches inside BranchFileTree, not via the backend
+    if (tab() !== "all" || !q || viewBranch()) {
       setSearchLoading(false);
       setSearchResults([]);
       return;
@@ -586,20 +611,57 @@ export function ReviewPanel(props: ReviewPanelProps) {
 
               {/* All Files Tab */}
               <Tabs.Content value="all" class="flex-1 overflow-auto min-h-0">
-                <div class="p-2">
-                  <FileTree
-                    path=""
-                    allowed={searchQuery() ? searchResults() : undefined}
-                    modified={diffFiles()}
-                    kinds={kinds()}
-                    active={selected() ?? undefined}
-                    viewKey={searchQuery() ? `all:${searchQuery()}` : undefined}
-                    onNavigateParentProject={navigateParentProject}
-                    onFileClick={handleFileClick}
-                    onMentionFile={props.onMentionFile}
-                    onMentionFileLine={props.onMentionFileLine}
-                  />
-                </div>
+                <Show when={isGitRepo() === true && branches().length > 1}>
+                  <div class="flex items-center gap-2 px-2 pt-2">
+                    <GitBranch class="w-3.5 h-3.5 shrink-0" style={{ color: "var(--icon-weak)" }} />
+                    <select
+                      class="flex-1 min-w-0 text-xs rounded-lg px-2 py-1.5 outline-none cursor-pointer"
+                      style={{
+                        background: "var(--surface-inset)",
+                        border: "1px solid var(--border-base)",
+                        color: "var(--text-base)",
+                      }}
+                      value={viewBranch()}
+                      onChange={(e) => setViewBranch(e.currentTarget.value)}
+                    >
+                      <option value="">
+                        {currentBranch() ? `${currentBranch()} (working tree)` : "(working tree)"}
+                      </option>
+                      <For each={branches()}>
+                        {(b) => <option value={b}>{b === currentBranch() ? `${b} (current)` : b}</option>}
+                      </For>
+                    </select>
+                  </div>
+                </Show>
+                <Show
+                  when={viewBranch()}
+                  fallback={
+                    <div class="p-2">
+                      <FileTree
+                        path=""
+                        allowed={searchQuery() ? searchResults() : undefined}
+                        modified={diffFiles()}
+                        kinds={kinds()}
+                        active={selected() ?? undefined}
+                        viewKey={searchQuery() ? `all:${searchQuery()}` : undefined}
+                        onNavigateParentProject={navigateParentProject}
+                        onFileClick={handleFileClick}
+                        onMentionFile={props.onMentionFile}
+                        onMentionFileLine={props.onMentionFileLine}
+                      />
+                    </div>
+                  }
+                >
+                  <div class="p-2">
+                    <BranchFileTree
+                      serverUrl={serverUrl}
+                      directory={directory ?? ""}
+                      branch={viewBranch()}
+                      query={searchQuery()}
+                      targetUrl={targetUrl}
+                    />
+                  </div>
+                </Show>
               </Tabs.Content>
             </Tabs>
         </div>

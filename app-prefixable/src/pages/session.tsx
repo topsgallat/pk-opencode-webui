@@ -884,6 +884,19 @@ export function Session() {
 
   // Track whether the agent was genuinely processing (not initial load)
   const wasProcessing = { value: false };
+  // Full session resyncs re-download the entire message history (tens of MB on
+  // long-lived sessions), so track when the SSE stream last delivered live
+  // updates and when a sync last completed, and skip redundant resyncs.
+  const lastStreamedAt = { value: 0 };
+  const lastSyncAt = { value: 0 };
+  function shouldResyncSession() {
+    return Date.now() - lastStreamedAt.value > 30_000 && Date.now() - lastSyncAt.value > 60_000;
+  }
+  function resyncSession(id: string) {
+    lastSyncAt.value = Date.now();
+    void sync.session.sync(id).catch(() => {});
+    void refreshDirectMessages(id).catch(() => {});
+  }
 
   const syncGen = { value: 0 };
   const restoreGen = { value: 0 };
@@ -951,6 +964,7 @@ export function Session() {
       const gen = ++syncGen.value;
       sync.session.sync(id).then(() => {
         if (syncGen.value !== gen) return;
+        lastSyncAt.value = Date.now();
         setHistoryError(null);
         setLoadingHistory(false);
       }).catch((err) => {
@@ -2010,8 +2024,7 @@ export function Session() {
           wasProcessing.value = false;
           setProcessing(false);
         });
-        void sync.session.sync(sessionID).catch(() => {});
-        void refreshDirectMessages(sessionID).catch(() => {});
+        if (shouldResyncSession()) resyncSession(sessionID);
         return;
       }
 
@@ -2114,6 +2127,19 @@ export function Session() {
         const id = sessionId();
         if (!id) return;
 
+        // Note when this session last delivered live updates, so end-of-turn
+        // resyncs can be skipped when the stream was received in full.
+        const eventProps = event.properties as { sessionID?: string; info?: { sessionID?: string } };
+        if (
+          (event.type === "message.part.delta" ||
+            event.type === "message.part.updated" ||
+            event.type === "message.created" ||
+            event.type === "message.updated") &&
+          (eventProps.sessionID ?? eventProps.info?.sessionID) === id
+        ) {
+          lastStreamedAt.value = Date.now();
+        }
+
         // Handle status changes
         if (event.type === "session.status") {
           const props = event.properties as {
@@ -2123,8 +2149,7 @@ export function Session() {
           if (props.sessionID === id && props.status.type === "idle") {
             setSseActive(false);
             setConnectionRetryCounts({});
-            void sync.session.sync(id).catch(() => {});
-            void refreshDirectMessages(id).catch(() => {});
+            if (shouldResyncSession()) resyncSession(id);
 
             // Reset local processing tracker (notifications now handled globally in Layout)
             wasProcessing.value = false;

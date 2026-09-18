@@ -35,6 +35,9 @@ export function MessageTimeline(props: {
   onRetryHistory?: () => void
   onOpenFile?: (path: string) => void
   scrollToTopTarget?: { turnId: string } | null
+  hasMoreHistory?: boolean
+  loadingHistoryPage?: boolean
+  onLoadEarlierHistory?: () => void
 }) {
   const [pinned, setPinned] = createSignal(false)
   const autoScroll = createAutoScroll({ pinned })
@@ -130,6 +133,20 @@ export function MessageTimeline(props: {
   })
 
   const hasMore = createMemo(() => renderCount() < turns().length)
+
+  // Auto-fetch the next history page when the rendered window approaches the
+  // end of the loaded data, so browsing older turns never dead-ends.
+  createEffect(() => {
+    const remaining = turns().length - renderCount()
+    if (
+      remaining <= TURNS_PER_BATCH &&
+      turns().length > 0 &&
+      props.hasMoreHistory &&
+      !props.loadingHistoryPage
+    ) {
+      props.onLoadEarlierHistory?.()
+    }
+  })
 
   const lastTurn = createMemo(() => {
     const all = turns()
@@ -424,11 +441,12 @@ export function MessageTimeline(props: {
           </Show>
 
           {/* Load earlier button */}
-          <Show when={hasMore()}>
+          <Show when={hasMore() || props.hasMoreHistory}>
             <div class="flex justify-center mb-4">
               <button
                 onClick={loadMore}
-                class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-colors"
+                disabled={props.loadingHistoryPage}
+                class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-colors disabled:opacity-60"
                 style={{
                   background: "var(--surface-inset)",
                   color: "var(--text-weak)",
@@ -443,8 +461,14 @@ export function MessageTimeline(props: {
                   e.currentTarget.style.color = "var(--text-weak)"
                 }}
               >
-                <ChevronUp class="w-4 h-4" />
-                <span>Load {Math.min(TURNS_PER_BATCH, turns().length - renderCount())} earlier turns</span>
+                <Show when={props.loadingHistoryPage} fallback={<ChevronUp class="w-4 h-4" />}>
+                  <Spinner class="w-4 h-4" />
+                </Show>
+                <span>
+                  {props.loadingHistoryPage
+                    ? "Loading earlier messages…"
+                    : `Load ${Math.min(TURNS_PER_BATCH, Math.max(1, turns().length - renderCount()))} earlier turns`}
+                </span>
               </button>
             </div>
           </Show>

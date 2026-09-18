@@ -1,11 +1,17 @@
 import { createContext, useContext, onCleanup, batch, createSignal, type ParentProps } from "solid-js"
 import { createStore, reconcile, produce } from "solid-js/store"
-import type { Session, Message, Part, Provider } from "../sdk/client"
+import type { Session, Message, Part, Provider, SessionMessagesData } from "../sdk/client"
 import { useSDK } from "./sdk"
 import { appendTargetParam } from "../utils/path"
 import { useClientAuth } from "./client-auth"
 import { errorMessage, fetchWithTimeout, withTimeout } from "../utils/request-timeout"
 import { choosePreferredMessageForSyncMerge } from "./sync-merge"
+
+// Page size for message-history fetching. The backend returns the newest
+// messages first and exposes the next page through the X-Next-Cursor header
+// (older pages are requested with that cursor as `before`).
+export const HISTORY_PAGE_SIZE = 300
+type HistoryEnvelope = { hasMore: boolean; nextCursor: string }
 
 export type SyncEvent = {
   type: string
@@ -96,6 +102,8 @@ interface SyncContextValue {
   messages: (sessionID: string) => MessageWithParts[]
   parts: (messageID: string) => Part[]
   providers: () => ProviderData
+  history: (sessionID: string) => HistoryEnvelope
+  loadOlderMessages: (sessionID: string, limit?: number) => Promise<void>
   session: {
     sync: (sessionID: string) => Promise<void>
     get: (sessionID: string) => Session | undefined
@@ -177,6 +185,8 @@ export function SyncProvider(props: ParentProps) {
   const inflight = new Map<string, Promise<void>>()
   const externalListeners = new Set<(event: SyncEvent) => void>()
   const [messageVersion, setMessageVersion] = createSignal(0)
+  const [historyInfo, setHistoryInfo] = createSignal<Record<string, HistoryEnvelope>>({})
+  const olderInflight = new Set<string>()
   // Queue for frame-batching incoming part delta events to avoid many
   // synchronous setStore calls which block the main thread during heavy streams.
   // Keyed by `${messageID}:${partID}` and accumulates per-field string deltas
@@ -696,12 +706,17 @@ export function SyncProvider(props: ParentProps) {
       try {
         const [sessionRes, messagesRes] = await withTimeout(
           () => Promise.all([
-            client.session.get({ sessionID }),
-            client.session.messages({ sessionID }),
+            client.session.get({sessionID}),
+            client.session.messages({ sessionID, limit: HISTORY_PAGE_SIZE }),
           ]),
           SYNC_SESSION_TIMEOUT_MS,
           `Loading session ${sessionID}`,
         )
+
+        // The backend returns the newest page and, when more history exists,
+        // an X-Next-Cursor header pointing at the next older page.
+        const response = (messagesRes as unknown as { response?: Response }).response
+        const nextCursor = response?.headers?.get("x-next-cursor") ?? ""
 
         batch(() => {
           // Update session in appropriate list and remove from other list
@@ -767,6 +782,11 @@ export function SyncProvider(props: ParentProps) {
                 setStore("part", msg.info.id, sortParts(msg.parts))
               }
             }
+
+            setHistoryInfo((prev) => ({
+              ...prev,
+              [sessionID]: { hasMore: !!nextCursor, nextCursor },
+            }))
           }
         })
       } catch (err) {
@@ -782,6 +802,57 @@ export function SyncProvider(props: ParentProps) {
 
   async function refresh() {
     await bootstrap()
+  }
+
+  // Fetch the next older page of history and merge it into the store. The
+  // backend cursor (X-Next-Cursor from the previous page) is opaque.
+  async function loadOlderMessages(sessionID: string, limit = HISTORY_PAGE_SIZE) {
+    const info = historyInfo()[sessionID]
+    if (!info?.hasMore || !info.nextCursor || olderInflight.has(sessionID)) return
+
+    olderInflight.add(sessionID)
+    try {
+      // The cursor param is supported by the backend but not yet part of the
+      // generated parameter type. It MUST ride in the nested `query` object —
+      // the client runtime forwards that verbatim, while top-level unknown
+      // fields are dropped.
+      const res = await withTimeout(
+        () => client.session.messages({
+          sessionID,
+          query: { limit, before: info.nextCursor },
+        } as unknown as { sessionID: string }),
+        SYNC_SESSION_TIMEOUT_MS,
+        `Loading earlier messages ${sessionID}`,
+      )
+
+      const cursor = (res as unknown as { response?: Response }).response?.headers?.get("x-next-cursor") ?? ""
+      const older = (res.data ?? [])
+        .filter((m): m is MessageWithParts => !!m?.info?.id)
+        .sort((a, b) => cmp(a.info.id, b.info.id))
+
+      const existing = store.message[sessionID] ?? []
+      const byId = new Map(existing.map((m) => [m.info.id, m]))
+      for (const m of older) if (!byId.has(m.info.id)) byId.set(m.info.id, m)
+      const merged = [...byId.values()].sort((a, b) => cmp(a.info.id, b.info.id))
+
+      batch(() => {
+        setStore("message", sessionID, merged)
+        for (const msg of older) {
+          if (msg.parts) setStore("part", msg.info.id, sortParts(msg.parts))
+        }
+        setMessageVersion((version) => version + 1)
+        // Nothing new arrived (e.g. the cursor stopped yielding pages) —
+        // declare history complete so the load-earlier loop terminates.
+        setHistoryInfo((prev) => ({
+          ...prev,
+          [sessionID]: { hasMore: !!cursor && merged.length > existing.length, nextCursor: cursor },
+        }))
+      })
+    } catch (err) {
+      console.error("[Sync] Failed to load earlier messages:", sessionID, err)
+    } finally {
+      olderInflight.delete(sessionID)
+    }
   }
 
   // Start connection
@@ -825,6 +896,8 @@ export function SyncProvider(props: ParentProps) {
     },
     parts: (messageID: string) => store.part[messageID] ?? [],
     providers: () => store.provider,
+    history: (sessionID: string) => historyInfo()[sessionID] ?? { hasMore: false, nextCursor: "" },
+    loadOlderMessages: loadOlderMessages,
     session: {
       sync: syncSession,
       get: (sessionID: string) => {

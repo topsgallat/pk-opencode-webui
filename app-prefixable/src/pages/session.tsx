@@ -16,7 +16,7 @@ import { generateUUID } from "../utils/uuid";
 import { Button } from "../components/ui/button";
 import { useSDK } from "../context/sdk";
 import { useEvents } from "../context/events";
-import { useSync, compareMessagesByTime } from "../context/sync";
+import { useSync, compareMessagesByTime, HISTORY_PAGE_SIZE } from "../context/sync";
 import { useProviders } from "../context/providers";
 import { usePermission } from "../context/permission";
 import { useLayout } from "../context/layout";
@@ -468,6 +468,19 @@ export function Session() {
   const [loading, setLoading] = createSignal(false);
   const [processing, setProcessing] = createSignal(false);
   const [loadingHistory, setLoadingHistory] = createSignal(false);
+  const [loadingOlderHistory, setLoadingOlderHistory] = createSignal(false);
+  async function loadOlderHistory() {
+    const id = sessionId();
+    if (!id || loadingOlderHistory()) return;
+    setLoadingOlderHistory(true);
+    try {
+      await sync.loadOlderMessages(id, HISTORY_PAGE_SIZE);
+    } catch (err) {
+      console.error("[Session] Failed to load earlier messages:", err);
+    } finally {
+      setLoadingOlderHistory(false);
+    }
+  }
   const [sessionId, setSessionId] = createSignal(params.id);
 
   // Find the Nth-from-last user message (1-indexed: 1 = last, 2 = second-to-last)
@@ -514,7 +527,7 @@ export function Session() {
   async function refreshDirectMessages(id: string) {
     const seq = (directSyncRefreshSeq.get(id) ?? 0) + 1;
     directSyncRefreshSeq.set(id, seq);
-    const res = await client.session.messages({ sessionID: id });
+    const res = await client.session.messages({ sessionID: id, limit: HISTORY_PAGE_SIZE });
     if (directSyncRefreshSeq.get(id) !== seq) return;
     const source = (res.data ?? [])
       .filter((message) => !!message?.info?.id)
@@ -3362,6 +3375,9 @@ export function Session() {
             onRetry={retryTurn}
             onOpenFile={openFilePreview}
             scrollToTopTarget={scrollToTopTarget()}
+            hasMoreHistory={sync.history(sessionId() ?? "").hasMore}
+            loadingHistoryPage={loadingOlderHistory()}
+            onLoadEarlierHistory={loadOlderHistory}
             onRetryHistory={() => {
               const id = params.id;
               if (!id) return;

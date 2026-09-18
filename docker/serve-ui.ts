@@ -28,6 +28,7 @@ import { loadCopilotModelMultipliers } from "../shared/copilot-model-multipliers
 import { loadAnthropicPricing } from "../shared/anthropic-pricing"
 import { loadOpenAIPricing } from "../shared/openai-pricing"
 import { resolveProxyAuthHeader } from "../shared/proxy-auth-session"
+import { pumpResponseBody } from "../shared/sse-pump"
 import nodePath from "path"
 // Decompression for proxied responses
 let zlib: any
@@ -510,7 +511,9 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       headers.set("X-Forwarded-Proto", url.protocol.replace(":", ""))
       headers.set("X-Forwarded-For", req.headers.get("X-Forwarded-For") || url.hostname)
 
-      // SSE requests need special handling
+      // SSE requests need special handling: the body must be re-pumped
+      // explicitly, otherwise Bun may buffer small chunks (keepalives, tiny
+      // deltas) and idle browser connections get dropped.
       if (path.startsWith("/event")) {
         console.log("[Proxy] SSE request to:", target.toString())
         try {
@@ -521,11 +524,10 @@ const server = Bun.serve<{ target: string; cookie: string }>({
 
           if (!response.ok) {
             console.error("[Proxy] SSE error:", response.status, response.statusText)
-            return new Response(response.body, { status: response.status })
+            return pumpResponseBody(response, { status: response.status })
           }
 
-          return new Response(response.body, {
-            status: response.status,
+          return pumpResponseBody(response, {
             headers: {
               "Content-Type": "text/event-stream",
               "Cache-Control": "no-cache",

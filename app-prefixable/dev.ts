@@ -6,6 +6,7 @@ import { loadCopilotModelMultipliers } from "../shared/copilot-model-multipliers
 import { loadAnthropicPricing } from "../shared/anthropic-pricing"
 import { loadOpenAIPricing } from "../shared/openai-pricing"
 import { resolveProxyAuthHeader } from "../shared/proxy-auth-session"
+import { pumpResponseBody } from "../shared/sse-pump"
 
 const BASE_PATH = process.env.BASE_PATH || "/"
 const PORT = parseInt(process.env.PORT || "3000", 10)
@@ -131,7 +132,8 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       headers.set("X-Forwarded-Proto", url.protocol.replace(":", ""))
       headers.set("X-Forwarded-For", req.headers.get("X-Forwarded-For") || url.hostname)
 
-      // SSE requests - just pass through the response body directly
+      // SSE requests - pass through the response body, explicitly pumped so
+      // small chunks (keepalives, tiny deltas) are not buffered by Bun
       if (strippedPath.startsWith("/event")) {
         console.log("[Proxy] SSE request to:", target.toString())
         try {
@@ -142,12 +144,10 @@ const server = Bun.serve<{ target: string; cookie: string }>({
 
           if (!response.ok) {
             console.error("[Proxy] SSE error:", response.status, response.statusText)
-            return new Response(response.body, { status: response.status })
+            return pumpResponseBody(response, { status: response.status })
           }
 
-          // Pass through the body directly - Bun handles streaming
-          return new Response(response.body, {
-            status: response.status,
+          return pumpResponseBody(response, {
             headers: {
               "Content-Type": "text/event-stream",
               "Cache-Control": "no-cache",

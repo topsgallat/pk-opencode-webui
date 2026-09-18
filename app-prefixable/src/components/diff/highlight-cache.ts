@@ -101,15 +101,20 @@ export function highlightToLines(code: string, lang?: string): Promise<Highlight
   })
 }
 
-export function useHighlightedLines(code: () => string, lang: () => string | undefined) {
+export function useHighlightedLines(
+  code: () => string,
+  lang: () => string | undefined,
+  enabled: () => boolean = () => true,
+) {
   const [result, setResult] = createSignal<HighlightedLines | undefined>(undefined)
 
   createEffect(() => {
+    if (!enabled()) return
     const text = code()
     const language = lang()
     setResult(undefined)
     highlightToLines(text, language).then((parsed) => {
-      if (code() === text && lang() === language) setResult(parsed)
+      if (enabled() && code() === text && lang() === language) setResult(parsed)
     })
   })
 

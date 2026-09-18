@@ -1,5 +1,6 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { useHighlightedLines, type HighlightedLines } from "./highlight-cache"
+import { useInView } from "../../utils/in-view"
 import { parseDiffRows } from "./content-diff-rows"
 import "./content-diff.css"
 
@@ -35,8 +36,11 @@ function DiffSlotCode(props: { source: HighlightedLines | undefined; index: numb
 
 export function ContentDiff(props: Props) {
   const parsed = createMemo(() => parseDiffRows(props.diff))
-  const leftSource = useHighlightedLines(() => parsed().leftLines.join("\n"), () => props.lang)
-  const rightSource = useHighlightedLines(() => parsed().rightLines.join("\n"), () => props.lang)
+  // Defer the (expensive) whole-side highlighting until the diff approaches
+  // the viewport; rows render as plain text until then.
+  const { ref, inView } = useInView({ rootMargin: "400px 0px" })
+  const leftSource = useHighlightedLines(() => parsed().leftLines.join("\n"), () => props.lang, inView)
+  const rightSource = useHighlightedLines(() => parsed().rightLines.join("\n"), () => props.lang, inView)
 
   // Mirror the CSS breakpoint in content-diff.css so only one of the two
   // layouts is ever in the DOM -- rendering both doubled the highlight and
@@ -92,7 +96,7 @@ export function ContentDiff(props: Props) {
   })
 
   return (
-    <div class="content-diff">
+    <div ref={ref} class="content-diff">
       <Show
         when={!compact()}
         fallback={

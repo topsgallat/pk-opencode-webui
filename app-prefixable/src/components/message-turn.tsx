@@ -1,4 +1,4 @@
-import { type Accessor, createSignal, createEffect, Show, For, createMemo, onCleanup, onMount } from "solid-js"
+import { type Accessor, createSignal, createEffect, createRenderEffect, Show, For, createMemo, on, onCleanup, onMount } from "solid-js"
 import { ChevronDown, ChevronRight, Bot, FileText, Copy, Check, Clock, RotateCcw, Loader2, X } from "lucide-solid"
 import { Markdown } from "./markdown"
 import { MessageParts } from "./tool-part"
@@ -242,6 +242,65 @@ export function MessageTurn(props: {
     defaultExpanded: !!props.defaultExpanded,
   }
 
+  // When a turn finishes streaming, its text re-renders from plain text into
+  // Markdown and its chrome (badges, spinners) settles, which can change the
+  // turn's height by thousands of pixels on long replies. The timeline
+  // disables browser scroll anchoring, so without compensation everything the
+  // user is reading lurches upward at that moment. Capture the pre-swap layout
+  // during the render phase (before the DOM changes) and restore the user's
+  // reading position right after.
+  let turnRoot: HTMLDivElement | undefined
+  const preSwap = {
+    pending: false,
+    turnTopViewport: 0,
+    turnHeight: 0,
+    distanceFromBottom: 0,
+    nearBottom: false,
+  }
+
+  function findScroller(from: HTMLElement): HTMLElement | undefined {
+    let el: HTMLElement | null = from.parentElement
+    while (el && el.scrollHeight <= el.clientHeight + 5) el = el.parentElement
+    return el ?? undefined
+  }
+
+  createRenderEffect(on(() => props.streaming, (streaming, prevStreaming) => {
+    if (prevStreaming !== true || streaming !== false) return
+    const el = turnRoot
+    if (!el) return
+    const scroller = findScroller(el)
+    if (!scroller) return
+    const rect = el.getBoundingClientRect()
+    preSwap.turnTopViewport = rect.top
+    preSwap.turnHeight = rect.height
+    preSwap.distanceFromBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+    preSwap.nearBottom = preSwap.distanceFromBottom < 160
+    preSwap.pending = preSwap.turnTopViewport <= 0 || preSwap.nearBottom
+  }, { defer: true }))
+
+  createEffect(() => {
+    if (props.streaming || !preSwap.pending) return
+    preSwap.pending = false
+    queueMicrotask(() => {
+      const el = turnRoot
+      if (!el || !el.isConnected) return
+      const scroller = findScroller(el)
+      if (!scroller) return
+      if (preSwap.nearBottom) {
+        // Keep the same content anchored at the viewport bottom.
+        scroller.scrollTop = scroller.scrollHeight - scroller.clientHeight - preSwap.distanceFromBottom
+        return
+      }
+      // Keep the user's relative position within the turn: the viewport top
+      // should sit at the same fraction of the (new) turn height.
+      const rect = el.getBoundingClientRect()
+      const ratio = preSwap.turnHeight > 0 ? -preSwap.turnTopViewport / preSwap.turnHeight : 0
+      const targetTurnTopViewport = -ratio * rect.height
+      const delta = targetTurnTopViewport - rect.top
+      if (Math.abs(delta) > 2) scroller.scrollTop += delta
+    })
+  })
+
   createEffect(() => {
     const id = props.turn.id
     if (id === turnId) return
@@ -375,6 +434,7 @@ export function MessageTurn(props: {
 
   return (
     <div
+      ref={turnRoot}
       data-turn-id={props.turn.id}
       class="rounded-lg overflow-hidden"
       style={{

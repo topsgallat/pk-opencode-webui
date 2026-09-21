@@ -8,6 +8,12 @@ import { listGitFiles, listGitTree, readGitFile, gitRawFileUrl, type GitTreeEntr
 import { resolveMarkdownLinkPath, resolveRepoRelativePath, rewriteMarkdownImages } from "../utils/markdown-images";
 
 const SEARCH_MATCH_LIMIT = 300;
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "avif", "svg"]);
+
+function isImagePath(path: string): boolean {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  return IMAGE_EXTENSIONS.has(ext);
+}
 
 interface BranchFileTreeProps {
   serverUrl: string;
@@ -39,6 +45,8 @@ export function BranchFileTree(props: BranchFileTreeProps) {
 
   const [previewPath, setPreviewPath] = createSignal<string | null>(null);
   const [previewContent, setPreviewContent] = createSignal<string | null>(null);
+  const [previewImage, setPreviewImage] = createSignal<string | null>(null);
+  const [previewImageError, setPreviewImageError] = createSignal(false);
   const [previewLoading, setPreviewLoading] = createSignal(false);
   const [previewError, setPreviewError] = createSignal<string | null>(null);
   const [markdownPreview, setMarkdownPreview] = createSignal(true);
@@ -137,8 +145,16 @@ export function BranchFileTree(props: BranchFileTreeProps) {
     setPreviewPath(path);
     setPreviewContent(null);
     setPreviewError(null);
-    setPreviewLoading(true);
+    setPreviewImage(null);
+    setPreviewImageError(false);
     setMarkdownPreview(true);
+    // Binary image blobs get mangled by the text endpoint; serve bytes via /api/ext/git/raw instead
+    if (isImagePath(path)) {
+      setPreviewLoading(false);
+      setPreviewImage(gitRawFileUrl(props.serverUrl, props.directory, props.branch, path, props.targetUrl));
+      return;
+    }
+    setPreviewLoading(true);
     void (async () => {
       const res = await readGitFile(props.serverUrl, props.directory, props.branch, path, props.targetUrl);
       if (version !== previewVersion) return;
@@ -171,6 +187,8 @@ export function BranchFileTree(props: BranchFileTreeProps) {
     previewVersion++;
     setPreviewPath(null);
     setPreviewContent(null);
+    setPreviewImage(null);
+    setPreviewImageError(false);
     setPreviewError(null);
     setPreviewLoading(false);
     setHistory([]);
@@ -370,6 +388,25 @@ export function BranchFileTree(props: BranchFileTreeProps) {
               <div class="p-3 text-xs" style={{ color: "var(--text-weak)" }}>
                 {previewError()}
               </div>
+            </Show>
+            <Show when={!previewLoading() && !previewError() && previewImage()}>
+              <Show
+                when={!previewImageError()}
+                fallback={
+                  <div class="p-3 text-xs" style={{ color: "var(--text-weak)" }}>
+                    Failed to load image
+                  </div>
+                }
+              >
+                <div class="p-4 flex justify-center">
+                  <img
+                    src={previewImage()!}
+                    alt={previewPath() ?? ""}
+                    class="max-w-full max-h-[60vh]"
+                    onError={() => setPreviewImageError(true)}
+                  />
+                </div>
+              </Show>
             </Show>
             <Show when={!previewLoading() && !previewError() && previewContent() !== null}>
               <Show

@@ -395,9 +395,9 @@ export function FileViewer(props: FileViewerProps) {
         </Match>
         <Match when={fileLoaded() && isPdf()}>
           <div class="p-2">
-            <div class="rounded overflow-hidden flex flex-col" style={{ border: "1px solid var(--border-base)" }}>
+            <div class="rounded flex flex-col" style={{ border: "1px solid var(--border-base)" }}>
               <div
-                class="px-3 py-1.5 text-xs flex justify-between items-center shrink-0"
+                class="sticky top-0 z-10 rounded-t px-3 py-1.5 text-xs flex justify-between items-center shrink-0"
                 style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}
               >
                 <div class="truncate flex-1 min-w-0 pr-2">{props.path}</div>
@@ -444,7 +444,7 @@ export function FileViewer(props: FileViewerProps) {
                   </Show>
                 </div>
               </div>
-              <div class="overflow-x-auto min-h-0">
+              <div class="overflow-x-auto overflow-hidden rounded-b min-h-0">
                 <iframe
                   src={pdfUrl()}
                   class="w-full border-0"
@@ -480,9 +480,9 @@ export function FileViewer(props: FileViewerProps) {
         </Match>
         <Match when={fileLoaded()}>
           <div class="p-2">
-            <div class="rounded overflow-hidden flex flex-col" style={{ border: "1px solid var(--border-base)" }}>
+            <div class="rounded flex flex-col" style={{ border: "1px solid var(--border-base)" }}>
               <div
-                class="px-3 py-1.5 text-xs flex justify-between items-center shrink-0"
+                class="sticky top-0 z-10 rounded-t px-3 py-1.5 text-xs flex justify-between items-center shrink-0"
                 style={{ background: "var(--surface-inset)", color: "var(--text-base)" }}
               >
                 <div class="truncate flex-1 min-w-0 pr-2">{props.path}</div>
@@ -592,7 +592,7 @@ export function FileViewer(props: FileViewerProps) {
                   </Show>
                 </div>
               </div>
-              <div class="overflow-x-auto min-h-0">
+              <div class="overflow-x-auto overflow-hidden rounded-b min-h-0">
                 <Show when={fileContent()} fallback={<div class="p-4 text-xs" style={{ color: "var(--text-weak)" }}>Empty file</div>}>
                   <Show
                     when={isMarkdown() && markdownPreview()}

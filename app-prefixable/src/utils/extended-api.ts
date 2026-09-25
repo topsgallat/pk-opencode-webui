@@ -318,13 +318,15 @@ export type OpencodeHealthResult = {
   error?: string
   dialect?: "v1" | "v2"
   version?: string
+  authFailed?: boolean
 }
 
 export async function checkOpencodeHealth(serverUrl: string, targetUrl?: string): Promise<OpencodeHealthResult> {
   const v1 = await checkV1Health(serverUrl, targetUrl)
   if (v1.ok) return { ...v1, dialect: "v1" }
   const v2 = await checkV2Health(serverUrl, targetUrl)
-  return v2.ok ? v2 : v1
+  if (v2.ok) return v2
+  return { ...v1, authFailed: v1.authFailed === true || v2.authFailed === true }
 }
 
 export async function syncProxyAuthForServer(
@@ -359,6 +361,7 @@ async function checkV1Health(serverUrl: string, targetUrl?: string): Promise<Ope
       healthy: false,
       status: res.status,
       error: readErrorMessage(data) || res.statusText || `HTTP ${res.status}`,
+      authFailed: res.status === 401 || res.status === 403,
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
@@ -374,7 +377,7 @@ async function checkV2Health(serverUrl: string, targetUrl?: string): Promise<Ope
     if (res.ok && typeof version === "string") {
       return { ok: true, healthy: true, status: res.status, dialect: "v2", version }
     }
-    return { ok: false, healthy: false, status: res.status, error: res.statusText || `HTTP ${res.status}` }
+    return { ok: false, healthy: false, status: res.status, error: res.statusText || `HTTP ${res.status}`, authFailed: res.status === 401 || res.status === 403 }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }

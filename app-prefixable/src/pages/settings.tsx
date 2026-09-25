@@ -24,6 +24,7 @@ import { writeFile } from "../utils/extended-api"
 import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCallback, restartOpencode, checkOpencodeHealth, syncProxyAuthForServer } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
 import { dialectFor } from "../sdk/v2/dialect"
+import { useServerAuthUI } from "../context/server-auth-ui"
 import { browserNotificationStatus, readNotifyMap, writeNotifyMap, NOTIFY_STORAGE_KEY } from "../utils/notify"
 import { extractOAuthCode, extractOAuthInstructionCode, needsOAuthReplay, normalizeOAuthCallbackUrl } from "../utils/oauth"
 import {
@@ -55,7 +56,7 @@ import {
 import { QuotaContent } from "../components/quota/quota-panel"
 import { SkillSourcesTab } from "../components/skill-sources-tab"
 
-type ServerHealthState = "loading" | "online" | "offline"
+type ServerHealthState = "loading" | "online" | "offline" | "auth-failed"
 
 export function Settings() {
   const providers = useProviders()
@@ -185,10 +186,13 @@ export function Settings() {
   const [restartSuccess, setRestartSuccess] = createSignal<string | null>(null)
   const [serverHealth, setServerHealth] = createSignal<Record<string, { state: ServerHealthState; version?: string; dialect?: string }>>({})
   const [serverHealthLoading, setServerHealthLoading] = createSignal(false)
+  const [authRevision, setAuthRevision] = createSignal(0)
   let serverHealthRun = 0
+  const authUI = useServerAuthUI()
 
   createEffect(() => {
     if (activeTab() !== "servers") return
+    void authRevision()
 
     const list = servers()
     const base = url
@@ -203,7 +207,11 @@ export function Settings() {
           const saved = getServerAuth(item.id)
           if (target && saved) await syncProxyAuthForServer(base, target, saved)
           const result = await checkOpencodeHealth(base, target)
-          const state: ServerHealthState = result.ok && result.healthy !== false ? "online" : "offline"
+          const state: ServerHealthState = result.authFailed
+            ? "auth-failed"
+            : result.ok && result.healthy !== false
+              ? "online"
+              : "offline"
           return [item.id, { state, version: result.version, dialect: result.dialect }] as const
         }),
       )
@@ -217,6 +225,14 @@ export function Settings() {
 
   onCleanup(() => {
     serverHealthRun += 1
+  })
+
+  onMount(() => {
+    function handleAuthStorage(e: StorageEvent) {
+      if (e.key === "opencode.serverAuth") setAuthRevision((v) => v + 1)
+    }
+    window.addEventListener("storage", handleAuthStorage)
+    onCleanup(() => window.removeEventListener("storage", handleAuthStorage))
   })
 
   // Keep servers in sync with localStorage
@@ -2857,43 +2873,57 @@ Add your project-specific instructions here.
                                 style={{
                                   background: serverHealthLoading() || !serverHealth()[server.id]
                                     ? "var(--surface-inset)"
-                                    : serverHealth()[server.id]?.state === "online"
-                                      ? "rgba(5, 150, 105, 0.14)"
-                                      : "rgba(220, 38, 38, 0.14)",
+                                    : serverHealth()[server.id]?.state === "auth-failed"
+                                      ? "rgba(180, 83, 9, 0.14)"
+                                      : serverHealth()[server.id]?.state === "online"
+                                        ? "rgba(5, 150, 105, 0.14)"
+                                        : "rgba(220, 38, 38, 0.14)",
                                   color: serverHealthLoading() || !serverHealth()[server.id]
                                     ? "var(--text-weak)"
-                                    : serverHealth()[server.id]?.state === "online"
-                                      ? "var(--text-success-base)"
-                                      : "var(--text-critical-base)",
+                                    : serverHealth()[server.id]?.state === "auth-failed"
+                                      ? "#b45309"
+                                      : serverHealth()[server.id]?.state === "online"
+                                        ? "var(--text-success-base)"
+                                        : "var(--text-critical-base)",
                                   border: serverHealthLoading() || !serverHealth()[server.id]
                                     ? "1px solid var(--border-base)"
-                                    : serverHealth()[server.id]?.state === "online"
-                                      ? "1px solid rgba(5, 150, 105, 0.3)"
-                                      : "1px solid rgba(220, 38, 38, 0.3)",
+                                    : serverHealth()[server.id]?.state === "auth-failed"
+                                      ? "1px solid rgba(180, 83, 9, 0.3)"
+                                      : serverHealth()[server.id]?.state === "online"
+                                        ? "1px solid rgba(5, 150, 105, 0.3)"
+                                        : "1px solid rgba(220, 38, 38, 0.3)",
+                                  cursor: serverHealth()[server.id]?.state === "auth-failed" ? "pointer" : undefined,
                                 }}
                                 title={(() => {
                                   const entry = serverHealth()[server.id]
                                   if (serverHealthLoading() || !entry) return "Checking backend status"
+                                  if (entry.state === "auth-failed") return "Authentication failed — click to update the server password"
                                   if (entry.state !== "online") return "Backend server is offline"
                                   const version = entry.version ? ` (opencode v${entry.version})` : ""
                                   const dialect = entry.dialect ? ` · API ${entry.dialect}` : ""
                                   return `Backend server is online${version}${dialect}`
                                 })()}
                                 role="status"
+                                onClick={() => {
+                                  if (serverHealth()[server.id]?.state === "auth-failed") authUI.requestAuth(server.id)
+                                }}
                               >
                                 <span
                                   class="w-1.5 h-1.5 rounded-full"
                                   style={{
                                     background: serverHealthLoading() || !serverHealth()[server.id]
                                       ? "var(--text-weak)"
-                                      : serverHealth()[server.id]?.state === "online"
-                                        ? "var(--icon-success-base)"
-                                        : "var(--icon-critical-base)",
+                                      : serverHealth()[server.id]?.state === "auth-failed"
+                                        ? "#b45309"
+                                        : serverHealth()[server.id]?.state === "online"
+                                          ? "var(--icon-success-base)"
+                                          : "var(--icon-critical-base)",
                                   }}
                                 />
                                 {(() => {
                                   const entry = serverHealth()[server.id]
                                   if (serverHealthLoading() || !entry) return "Checking"
+                                  if (entry.state === "auth-failed") return "Auth failed"
                                   if (entry.state !== "online") return "Offline"
                                   return entry.version ? `Online · v${entry.version}` : "Online"
                                 })()}

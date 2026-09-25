@@ -4,7 +4,7 @@ import { getServerAuthForTarget } from "../utils/servers"
 
 const HEALTH_CHECK_INTERVAL_MS = 15_000
 
-type ServerHealthState = "checking" | "online" | "offline"
+type ServerHealthState = "checking" | "online" | "offline" | "auth-failed"
 
 interface ServerHealthBadgeProps {
   serverUrl: string
@@ -27,7 +27,7 @@ export function ServerHealthBadge(props: ServerHealthBadgeProps) {
       }
       const result = await checkOpencodeHealth(serverUrl, targetUrl)
       if (!active) return
-      setHealth(result.ok && result.healthy !== false ? "online" : "offline")
+      setHealth(result.authFailed ? "auth-failed" : result.ok && result.healthy !== false ? "online" : "offline")
       timeout = window.setTimeout(check, HEALTH_CHECK_INTERVAL_MS)
     }
 
@@ -46,16 +46,20 @@ export function ServerHealthBadge(props: ServerHealthBadgeProps) {
       style={{
         background: health() === "checking"
           ? "var(--text-weak)"
-          : health() === "online"
-            ? "var(--icon-success-base)"
-            : "var(--icon-critical-base)",
+          : health() === "auth-failed"
+            ? "#b45309"
+            : health() === "online"
+              ? "var(--icon-success-base)"
+              : "var(--icon-critical-base)",
         opacity: health() === "checking" ? 0.7 : 1,
       }}
       title={health() === "checking"
         ? "Checking backend status"
-        : health() === "online"
-          ? "Backend server is online"
-          : "Backend server is offline"}
+        : health() === "auth-failed"
+          ? "Authentication failed — update the server password in Settings"
+          : health() === "online"
+            ? "Backend server is online"
+            : "Backend server is offline"}
       role="status"
     />
   )

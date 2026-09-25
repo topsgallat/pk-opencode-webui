@@ -85,7 +85,35 @@ test("reads opencode health responses", async () => {
     expect(result.ok).toBe(true)
     expect(result.healthy).toBe(true)
     expect(result.status).toBe(200)
+    expect(result.version).toBe("1.2.3")
     expect(requestUrl).toContain("/global/health")
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("flags auth failures when both health probes return 401", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () =>
+    new Response("unauthorized", { status: 401 })) as unknown as typeof fetch
+
+  try {
+    const result = await checkOpencodeHealth("http://127.0.0.1:4096")
+    expect(result.ok).toBe(false)
+    expect(result.authFailed).toBe(true)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("does not flag auth failures for unreachable servers", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => new Response("nope", { status: 503 })) as unknown as typeof fetch
+
+  try {
+    const result = await checkOpencodeHealth("http://127.0.0.1:4096")
+    expect(result.ok).toBe(false)
+    expect(result.authFailed).toBe(false)
   } finally {
     globalThis.fetch = originalFetch
   }

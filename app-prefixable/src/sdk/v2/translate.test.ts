@@ -200,6 +200,16 @@ describe("planV2Request", () => {
     expect(plan.kind).toBe("local")
   })
 
+  test("clamps list limits to the V2 cap of 200", async () => {
+    const messages = await planV2Request(new Request("http://ui/session/ses_1/message?limit=300&directory=/x"))
+    if (messages.kind !== "rewrite") throw new Error("expected rewrite")
+    expect(messages.url).toBe("/api/session/ses_1/message?limit=200")
+
+    const list = await planV2Request(new Request("http://ui/session?roots=true&limit=500"))
+    if (list.kind !== "rewrite") throw new Error("expected rewrite")
+    expect(list.url).toBe("/api/session?limit=200")
+  })
+
   test("unknown paths pass through untouched", async () => {
     const plan = await planV2Request(new Request("http://ui/tui/submit-prompt", { method: "POST" }))
     expect(plan.kind).toBe("passthrough")

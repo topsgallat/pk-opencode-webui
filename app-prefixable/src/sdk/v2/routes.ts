@@ -15,6 +15,17 @@ function dropDirectoryQuery(search: string): string {
   return qs ? `?${qs}` : ""
 }
 
+// V2 validates query params strictly and caps list limits at 200.
+function pagedQuery(search: string, max = 200): string {
+  const params = new URLSearchParams(search)
+  const out = new URLSearchParams()
+  const raw = Number(params.get("limit"))
+  if (Number.isFinite(raw) && raw > 0) out.set("limit", String(Math.min(Math.floor(raw), max)))
+  const cursor = params.get("cursor")
+  if (cursor) out.set("cursor", cursor)
+  return out.toString() ? `?${out.toString()}` : ""
+}
+
 function jsonInit(method: string, url: string, body: unknown): RequestInit {
   return {
     method,
@@ -284,7 +295,7 @@ const ROUTES: RouteDef[] = [
   {
     method: "GET",
     pattern: /^\/session$/,
-    to: ({ url }) => ({ url: api("/session", url.search), init: { method: "GET" } }),
+    to: ({ url }) => ({ url: `/api/session${pagedQuery(url.search)}`, init: { method: "GET" } }),
     from: (payload) => {
       const data = unwrapData(payload)
       return Array.isArray(data) ? data.map(sessionFromV2) : []
@@ -305,7 +316,7 @@ const ROUTES: RouteDef[] = [
   {
     method: "GET",
     pattern: /^\/session\/([^/]+)\/message$/,
-    to: ({ url, params }) => ({ url: api(`/session/${params[0]}/message`, url.search), init: { method: "GET" } }),
+    to: ({ url, params }) => ({ url: `/api/session/${params[0]}/message${pagedQuery(url.search)}`, init: { method: "GET" } }),
     from: (payload, { url }) => messagesFromV2Response(payload, url),
   },
   {

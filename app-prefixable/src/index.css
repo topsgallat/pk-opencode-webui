@@ -514,6 +514,29 @@
     color: inherit;
   }
 
+  .markdown-content .mermaid-block {
+    @apply mb-4 overflow-x-auto rounded-lg border;
+    background: var(--background-strongest);
+    border-color: var(--border-base);
+  }
+
+  .markdown-content .mermaid-block[data-mermaid="pending"] {
+    @apply whitespace-pre-wrap p-4 font-mono text-sm;
+    color: var(--text-strong);
+  }
+
+  .markdown-content .mermaid-block[data-mermaid="error"] {
+    @apply p-4;
+  }
+
+  .markdown-content .mermaid-block[data-mermaid="error"] pre {
+    @apply m-0 bg-transparent p-0;
+  }
+
+  .markdown-content .mermaid-block[data-mermaid="done"] svg {
+    @apply mx-auto h-auto max-w-full;
+  }
+
   .markdown-content blockquote {
     @apply border-l-4 pl-4 italic mb-4;
     border-color: var(--interactive-base);

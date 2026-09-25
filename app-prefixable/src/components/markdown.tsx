@@ -8,6 +8,97 @@ marked.setOptions({
   breaks: true,
 })
 
+const MERMAID_LANGS = new Set(["mermaid", "mmd"])
+
+function escapeHtml(text: string) {
+  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+}
+
+marked.use({
+  renderer: {
+    code(token) {
+      const lang = token.lang?.trim().split(/\s+/)[0]?.toLowerCase() ?? ""
+      if (!MERMAID_LANGS.has(lang)) return false
+      return `<div class="mermaid-block" data-mermaid="pending">${escapeHtml(token.text)}</div>`
+    },
+  },
+})
+
+type Mermaid = typeof import("mermaid")["default"]
+
+let mermaidPromise: Promise<Mermaid> | null = null
+let mermaidTheme = ""
+
+function loadMermaid() {
+  const theme = document.documentElement.classList.contains("dark") ? "dark" : "default"
+  if (mermaidPromise && mermaidTheme === theme) return mermaidPromise
+
+  mermaidTheme = theme
+  mermaidPromise = import("mermaid").then((mod) => {
+    mod.default.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme,
+    })
+    return mod.default
+  })
+  return mermaidPromise
+}
+
+const svgCache = new Map<string, string | null>()
+const SVG_CACHE_LIMIT = 100
+let renderSeq = 0
+// mermaid.render mutates global DOM state - concurrent calls race, so serialize them
+let renderQueue: Promise<unknown> = Promise.resolve()
+
+function cacheSvg(source: string, svg: string | null) {
+  if (svgCache.size >= SVG_CACHE_LIMIT) {
+    const oldest = svgCache.keys().next().value
+    if (oldest !== undefined) svgCache.delete(oldest)
+  }
+  svgCache.set(source, svg)
+}
+
+function renderMermaid(source: string): Promise<string | null> {
+  const cached = svgCache.get(source)
+  if (cached !== undefined) return Promise.resolve(cached)
+
+  const task = renderQueue.then(async () => {
+    const mermaid = await loadMermaid()
+    await mermaid.parse(source)
+    const { svg } = await mermaid.render(`pkui-mermaid-${++renderSeq}`, source)
+    return svg
+  })
+  renderQueue = task.catch(() => undefined)
+
+  return task.catch(() => null).then((svg) => {
+    cacheSvg(source, svg)
+    return svg
+  })
+}
+
+function enhanceMermaid(root: HTMLElement) {
+  for (const block of root.querySelectorAll<HTMLElement>("[data-mermaid='pending']")) {
+    const source = block.textContent ?? ""
+    block.dataset.mermaid = "loading"
+    void renderMermaid(source).then((svg) => {
+      if (!block.isConnected) return
+      if (svg) {
+        block.dataset.mermaid = "done"
+        block.innerHTML = svg
+        return
+      }
+      const pre = document.createElement("pre")
+      const code = document.createElement("code")
+      code.className = "language-mermaid"
+      code.textContent = source
+      pre.append(code)
+      block.replaceChildren(pre)
+      block.dataset.mermaid = "error"
+    })
+  }
+}
+
 const config = {
   USE_PROFILES: { html: true },
   SANITIZE_NAMED_PROPS: true,
@@ -176,6 +267,7 @@ function enhanceCodeBlocks(root: HTMLElement) {
 
 export function Markdown(props: MarkdownProps) {
   const [root, setRoot] = createSignal<HTMLDivElement | undefined>(undefined)
+  let mermaidTimer = 0
   const html = createMemo(() => {
     if (!props.content) return ""
     const raw = marked.parse(props.content, { async: false }) as string
@@ -190,6 +282,12 @@ export function Markdown(props: MarkdownProps) {
       if (root() !== el) return
       if (props.copyCodeBlocks) enhanceCodeBlocks(el)
       if (props.onFileClick && props.linkifyFiles) enhanceFileLinks(el, props.onFileClick)
+      if (!el.querySelector("[data-mermaid='pending']")) return
+      window.clearTimeout(mermaidTimer)
+      mermaidTimer = window.setTimeout(() => {
+        if (root() !== el) return
+        enhanceMermaid(el)
+      }, 250)
     })
   })
 

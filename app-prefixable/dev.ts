@@ -126,6 +126,11 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       const syncedAuth = resolveProxyAuthHeader(req, target.toString())
       if (syncedAuth) headers.set("Authorization", syncedAuth)
       headers.delete("x-opencode-target")
+      // Bun's fetch decompresses upstream responses but keeps the
+      // content-encoding header, which breaks browser decoding. Bun also
+      // auto-adds an accept-encoding header when missing, so force identity
+      // explicitly.
+      headers.set("accept-encoding", "identity")
 
       headers.set("Host", url.host)
       headers.set("X-Forwarded-Host", url.host)

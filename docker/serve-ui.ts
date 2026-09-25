@@ -501,7 +501,7 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       }
 
       headers.delete("x-opencode-target")
-      headers.delete("Accept-Encoding")
+      headers.set("Accept-Encoding", "identity")
 
       // Forward the original Host header and proxy metadata so the backend
       // can construct correct public URLs (for OAuth callbacks/redirects)

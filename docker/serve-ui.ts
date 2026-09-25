@@ -613,6 +613,9 @@ const server = Bun.serve<{ target: string; cookie: string }>({
         responseHeaders.delete("content-encoding")
         responseHeaders.delete("transfer-encoding")
         responseHeaders.delete("content-length")
+        // The web UI manages upstream credentials itself; never let the
+        // browser pop its native Basic Auth dialog.
+        responseHeaders.delete("www-authenticate")
         if (responseEncoding) {
           responseHeaders.set("content-encoding", responseEncoding)
         }

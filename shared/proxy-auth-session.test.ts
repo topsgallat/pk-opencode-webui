@@ -81,6 +81,27 @@ describe("proxy auth session", () => {
     expect(auth).toBe(`Basic ${Buffer.from("alice:pw-2").toString("base64")}`)
   })
 
+  test("resolves credentials stored for the origin root on any path", async () => {
+    const syncReq = new Request("http://localhost/api/ext/auth-session", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        target: "https://root-cred.test",
+        username: "opencode",
+        password: "pw-root",
+      }),
+    })
+    const syncRes = await handleExtendedEndpoint("/api/ext/auth-session", "PUT", new URL(syncReq.url), syncReq)
+    const sid = (syncRes?.headers.get("set-cookie") || "").split(";")[0]
+    expect(sid.length).toBeGreaterThan(0)
+
+    const lookupReq = new Request("http://localhost/api/info", {
+      headers: { cookie: sid },
+    })
+    const auth = resolveProxyAuthHeader(lookupReq, "https://root-cred.test/api/info")
+    expect(auth).toBe(`Basic ${Buffer.from("opencode:pw-root").toString("base64")}`)
+  })
+
   test("same origin different base paths do not collide", async () => {
     const syncA = new Request("http://localhost/api/ext/auth-session", {
       method: "POST",

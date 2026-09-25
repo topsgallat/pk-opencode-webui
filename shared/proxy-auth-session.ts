@@ -92,6 +92,11 @@ function resolveSessionKey(values: Map<string, string>, target: string): string 
     if (parsedStored.search && parsedStored.search !== parsedTarget.search) continue
     const base = parsedStored.pathname
     const path = parsedTarget.pathname
+    // A credential stored for the origin root covers every path on that origin
+    if (base === "/") {
+      candidates.push(stored)
+      continue
+    }
     if (path === base || path.startsWith(`${base}/`)) {
       candidates.push(stored)
     }

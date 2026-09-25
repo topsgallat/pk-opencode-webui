@@ -167,10 +167,19 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       }
 
       console.log("[Proxy] API:", req.method, strippedPath)
-      return fetch(target.toString(), {
+      const response = await fetch(target.toString(), {
         method: req.method,
         headers,
         body: req.body,
+      })
+      // The web UI manages upstream credentials itself; never let the
+      // browser pop its native Basic Auth dialog.
+      const sanitized = new Headers(response.headers)
+      sanitized.delete("www-authenticate")
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: sanitized,
       })
     }
 

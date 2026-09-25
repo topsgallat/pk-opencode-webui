@@ -88,7 +88,7 @@ const server = Bun.serve<{ target: string; cookie: string }>({
     }
 
     // WebSocket upgrade for /pty routes - proxy to backend
-    if (strippedPath.startsWith("/pty/") && req.headers.get("upgrade") === "websocket") {
+    if ((strippedPath.startsWith("/pty/") || strippedPath.startsWith("/api/pty/")) && req.headers.get("upgrade") === "websocket") {
       const target = buildUpstreamUrl(strippedPath, url, req, "ws").toString()
       console.log("[Proxy] WebSocket upgrade:", target)
 
@@ -134,7 +134,7 @@ const server = Bun.serve<{ target: string; cookie: string }>({
 
       // SSE requests - pass through the response body, explicitly pumped so
       // small chunks (keepalives, tiny deltas) are not buffered by Bun
-      if (strippedPath.startsWith("/event")) {
+      if (strippedPath.startsWith("/event") || strippedPath === "/api/event") {
         console.log("[Proxy] SSE request to:", target.toString())
         try {
           const response = await fetch(target.toString(), {

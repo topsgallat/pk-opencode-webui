@@ -23,6 +23,7 @@ import { generateUUID } from "../utils/uuid"
 import { writeFile } from "../utils/extended-api"
 import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCallback, restartOpencode, checkOpencodeHealth } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
+import { dialectFor } from "../sdk/v2/dialect"
 import { browserNotificationStatus, readNotifyMap, writeNotifyMap, NOTIFY_STORAGE_KEY } from "../utils/notify"
 import { extractOAuthCode, extractOAuthInstructionCode, needsOAuthReplay, normalizeOAuthCallbackUrl } from "../utils/oauth"
 import {
@@ -522,7 +523,9 @@ export function Settings() {
       }
 
       const ptyId = ptyRes.data.id
-      const wsUrl = appendTargetParam(`${url.replace(/^http/, "ws")}/pty/${ptyId}/connect`, targetUrl)
+      const dialect = await dialectFor(url, targetUrl)
+      const ptyBase = dialect === "v2" ? "/api/pty" : "/pty"
+      const wsUrl = appendTargetParam(`${url.replace(/^http/, "ws")}${ptyBase}/${ptyId}/connect`, targetUrl)
       if (import.meta.env.DEV) console.debug("[runPtyCommand] Connecting to:", wsUrl)
 
       const output = await new Promise<string>((resolve) => {

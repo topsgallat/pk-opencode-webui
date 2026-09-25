@@ -2,6 +2,9 @@ import { createContext, useContext, onCleanup, onMount, createSignal, type Paren
 import { createStore, produce } from "solid-js/store"
 import type { Event, SessionStatus, QuestionRequest } from "../sdk/client"
 import { appendTargetParam } from "../utils/path"
+import { dialectAwareFetch } from "../sdk/v2/fetch"
+import { dialectFor } from "../sdk/v2/dialect"
+import { eventFromV2, isV2EventEnvelope } from "../sdk/v2/translate"
 import { useSDK } from "./sdk"
 import { SyncContext, type SyncEvent } from "./sync"
 import { useClientAuth } from "./client-auth"
@@ -101,14 +104,21 @@ export function EventProvider(props: ParentProps) {
   let eventSource: EventSource | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
-  function connect() {
+  const statusFetch = (pathWithQuery: string, timeout: number) =>
+    dialectAwareFetch(appendTargetParam(`${url}${pathWithQuery}`, targetUrl), url, targetUrl, {
+      signal: AbortSignal.timeout(timeout),
+    })
+
+  async function connect() {
     if (eventSource) {
       eventSource.close()
       eventSource = null
     }
 
     const dirParam = directory ? `?directory=${encodeURIComponent(directory)}` : ""
-    const eventUrl = appendTargetParam(`${url}/event${dirParam}`, targetUrl)
+    const dialect = await dialectFor(url, targetUrl)
+    const eventPath = dialect === "v2" ? "/api/event" : "/event"
+    const eventUrl = appendTargetParam(`${url}${eventPath}${dirParam}`, targetUrl)
     eventSource = new EventSource(eventUrl)
     console.log("[Events] Connecting to SSE:", eventUrl)
 
@@ -121,7 +131,8 @@ export function EventProvider(props: ParentProps) {
     eventSource.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data)
-        const event = (data?.payload ?? data) as Event
+        const v2 = isV2EventEnvelope(data) ? eventFromV2(data) : undefined
+        const event = v2 ?? ((data?.payload ?? data) as Event)
         if (!event || !event.type) {
           console.warn("[Events] Received event without type:", data)
           return
@@ -139,12 +150,7 @@ export function EventProvider(props: ParentProps) {
       eventSource?.close()
       eventSource = null
 
-      const authProbe = fetchWithTimeout(
-        appendTargetParam(`${url}/session/status${dirParam}`, targetUrl),
-        {},
-        EVENT_PROBE_TIMEOUT_MS,
-        "Event reconnect probe",
-      )
+      const authProbe = statusFetch(`/session/status${dirParam}`, EVENT_PROBE_TIMEOUT_MS)
         .then((r) => {
           if (r.status === 401 || r.status === 403) {
             auth.markFailure({ scope: "events", status: r.status, message: `HTTP ${r.status}` })
@@ -180,12 +186,7 @@ export function EventProvider(props: ParentProps) {
     if (!directory) return Promise.resolve()
     if (refreshStatusesInFlight) return refreshStatusesInFlight
 
-    refreshStatusesInFlight = fetchWithTimeout(
-      appendTargetParam(`${url}/session/status?directory=${encodeURIComponent(directory)}`, targetUrl),
-      {},
-      EVENT_SEED_TIMEOUT_MS,
-      "Refreshing session statuses",
-    )
+    refreshStatusesInFlight = statusFetch(`/session/status?directory=${encodeURIComponent(directory)}`, EVENT_SEED_TIMEOUT_MS)
       .then((r) => r.json())
       .then((res) => {
         const statuses = (res.data ?? {}) as Record<string, SessionStatus>
@@ -231,12 +232,7 @@ export function EventProvider(props: ParentProps) {
         }
       })
       .catch((err) => console.error("[Events] Failed to load questions:", err))
-    fetchWithTimeout(
-      appendTargetParam(`${url}/session/status?directory=${encodeURIComponent(directory)}`, targetUrl),
-      {},
-      EVENT_SEED_TIMEOUT_MS,
-      "Loading session statuses",
-    )
+    statusFetch(`/session/status?directory=${encodeURIComponent(directory)}`, EVENT_SEED_TIMEOUT_MS)
       .then((r) => r.json())
       .then((res) => {
         const statuses = (res.data ?? {}) as Record<string, SessionStatus>

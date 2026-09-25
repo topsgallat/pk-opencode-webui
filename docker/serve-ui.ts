@@ -395,7 +395,7 @@ async function maybeGzip(req: Request, body: Uint8Array | string, contentType: s
 
 // Check if this is a PTY WebSocket connection request
 function isPtyWebSocket(path: string): boolean {
-  return /^\/pty\/[^/]+\/connect/.test(path)
+  return /^\/(api\/)?pty\/[^/]+\/connect/.test(path)
 }
 
 // Track last non-polling activity for Kubeflow idle culling
@@ -514,7 +514,7 @@ const server = Bun.serve<{ target: string; cookie: string }>({
       // SSE requests need special handling: the body must be re-pumped
       // explicitly, otherwise Bun may buffer small chunks (keepalives, tiny
       // deltas) and idle browser connections get dropped.
-      if (path.startsWith("/event")) {
+      if (path.startsWith("/event") || path === "/api/event") {
         console.log("[Proxy] SSE request to:", target.toString())
         try {
           const response = await fetchWithTimeout(target.toString(), {

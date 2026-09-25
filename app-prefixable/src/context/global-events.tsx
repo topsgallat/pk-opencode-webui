@@ -13,6 +13,9 @@ import { useServer } from "./server"
 import { globalSyncReady } from "./sync"
 import { appendTargetParam } from "../utils/path"
 import { getTargetServerUrl } from "../utils/servers"
+import { dialectAwareFetch } from "../sdk/v2/fetch"
+import { dialectFor } from "../sdk/v2/dialect"
+import { eventFromV2, isV2EventEnvelope } from "../sdk/v2/translate"
 import { useClientAuth } from "./client-auth"
 import { playSound, playErrorSound, primeAudioContext, readSoundSettings, SOUND_STORAGE_KEY } from "../utils/sound"
 
@@ -141,7 +144,7 @@ export function GlobalEventsProvider(props: ParentProps & {
     })
   }
 
-  function connectToDirectory(dir: string) {
+  async function connectToDirectory(dir: string) {
     if (connections.has(dir)) return
 
     // Cancel any pending reconnect timer for this directory
@@ -152,7 +155,9 @@ export function GlobalEventsProvider(props: ParentProps & {
     }
 
     const dirParam = `?directory=${encodeURIComponent(dir)}`
-    const url = appendTargetParam(prefix(`/event${dirParam}`), targetUrl())
+    const dialect = await dialectFor(prefix("/").replace(/\/$/, ""), targetUrl())
+    const eventPath = dialect === "v2" ? "/api/event" : "/event"
+    const url = appendTargetParam(prefix(`${eventPath}${dirParam}`), targetUrl())
     const source = new EventSource(url)
 
     connections.set(dir, { source })
@@ -175,7 +180,7 @@ export function GlobalEventsProvider(props: ParentProps & {
     function processMessage(e: MessageEvent) {
       const data = (() => { try { return JSON.parse(e.data) } catch { return null } })()
       if (!data) return
-      const event = data?.payload ?? data
+      const event = isV2EventEnvelope(data) ? eventFromV2(data) : (data?.payload ?? data)
       if (!event?.type) return
 
       const tracking = getTracking(dir)
@@ -310,7 +315,11 @@ export function GlobalEventsProvider(props: ParentProps & {
       if (disposed) return
       // Clear all state (source, perDir, alerts) so stale badges don't linger
       disconnectDirectory(dir)
-      const authProbe = fetch(appendTargetParam(prefix(`/session/status?directory=${encodeURIComponent(dir)}`), targetUrl()))
+      const authProbe = dialectAwareFetch(
+        appendTargetParam(prefix(`/session/status?directory=${encodeURIComponent(dir)}`), targetUrl()),
+        prefix("/").replace(/\/$/, ""),
+        targetUrl(),
+      )
         .then((r) => {
           if (r.status === 401 || r.status === 403) {
             auth.markFailure({ scope: "global-events", status: r.status, message: `HTTP ${r.status}` })
@@ -368,7 +377,11 @@ export function GlobalEventsProvider(props: ParentProps & {
   // Returns null on failure so callers can gracefully degrade (seed all sessions)
   // instead of clearing all state with a false-negative empty set.
   function fetchRootSessionIds(dir: string): Promise<Set<string> | null> {
-    return fetch(appendTargetParam(prefix(`/session?directory=${encodeURIComponent(dir)}&roots=true`), targetUrl()))
+    return dialectAwareFetch(
+      appendTargetParam(prefix(`/session?directory=${encodeURIComponent(dir)}&roots=true`), targetUrl()),
+      prefix("/").replace(/\/$/, ""),
+      targetUrl(),
+    )
       .then((r) => {
         if (!r.ok) {
           console.warn("[GlobalEvents] Failed to fetch root sessions for", dir, `HTTP ${r.status}`)
@@ -409,7 +422,11 @@ export function GlobalEventsProvider(props: ParentProps & {
     // Seed subAgents from all sessions: any session with a parentID is a
     // sub-agent. This covers sessions that existed before the SSE connection.
     if (roots) {
-      await fetch(appendTargetParam(prefix(`/session?directory=${encodeURIComponent(dir)}`), targetUrl()))
+      await dialectAwareFetch(
+        appendTargetParam(prefix(`/session?directory=${encodeURIComponent(dir)}`), targetUrl()),
+        prefix("/").replace(/\/$/, ""),
+        targetUrl(),
+      )
         .then((r) => {
           if (!r.ok) return
           return r.json()
@@ -484,7 +501,11 @@ export function GlobalEventsProvider(props: ParentProps & {
   function seedStatuses(dir: string, roots: Set<string> | null) {
     const tracking = perDir.get(dir)
     if (!tracking) return  // disconnected: do not recreate tracking while seeding
-    return fetch(appendTargetParam(prefix(`/session/status?directory=${encodeURIComponent(dir)}`), targetUrl()))
+    return dialectAwareFetch(
+      appendTargetParam(prefix(`/session/status?directory=${encodeURIComponent(dir)}`), targetUrl()),
+      prefix("/").replace(/\/$/, ""),
+      targetUrl(),
+    )
       .then((r) => r.json())
       .then((data) => {
         if (!perDir.has(dir)) return  // disconnected while fetching

@@ -316,9 +316,18 @@ export type OpencodeHealthResult = {
   healthy?: boolean
   status?: number
   error?: string
+  dialect?: "v1" | "v2"
+  version?: string
 }
 
 export async function checkOpencodeHealth(serverUrl: string, targetUrl?: string): Promise<OpencodeHealthResult> {
+  const v1 = await checkV1Health(serverUrl, targetUrl)
+  if (v1.ok) return { ...v1, dialect: "v1" }
+  const v2 = await checkV2Health(serverUrl, targetUrl)
+  return v2.ok ? v2 : v1
+}
+
+async function checkV1Health(serverUrl: string, targetUrl?: string): Promise<OpencodeHealthResult> {
   try {
     const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/global/health`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended checkOpencodeHealth")
     const data = await res.json().catch(() => null)
@@ -335,6 +344,20 @@ export async function checkOpencodeHealth(serverUrl: string, targetUrl?: string)
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return { ok: false, error: message }
+  }
+}
+
+async function checkV2Health(serverUrl: string, targetUrl?: string): Promise<OpencodeHealthResult> {
+  try {
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/info`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended checkOpencodeHealthV2")
+    const data = await res.json().catch(() => null)
+    const version = data && typeof data === "object" ? (data as { version?: unknown }).version : undefined
+    if (res.ok && typeof version === "string") {
+      return { ok: true, healthy: true, status: res.status, dialect: "v2", version }
+    }
+    return { ok: false, healthy: false, status: res.status, error: res.statusText || `HTTP ${res.status}` }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
 

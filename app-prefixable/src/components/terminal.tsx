@@ -6,6 +6,7 @@ import { useSDK } from "../context/sdk"
 import { useTheme } from "../context/theme"
 import { useClientAuth } from "../context/client-auth"
 import { appendTargetParam } from "../utils/path"
+import { dialectFor } from "../sdk/v2/dialect"
 import { Sun, Moon, Monitor, Clipboard, Copy, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from "lucide-solid"
 import type { ITheme } from "@xterm/xterm"
 
@@ -132,7 +133,7 @@ export function Terminal(props: TerminalProps) {
     term.write(`${colors[type]}${message}\x1b[0m\r\n`)
   }
 
-  function connect() {
+  async function connect() {
     if (disposed || !term) return
     if (!auth.canReconnect()) {
       setStatus("error")
@@ -144,8 +145,10 @@ export function Terminal(props: TerminalProps) {
 
     // Build WebSocket URL
     const wsBase = url.replace(/^http/, "ws")
+    const dialect = await dialectFor(url, targetUrl)
+    const ptyBase = dialect === "v2" ? "/api/pty" : "/pty"
     const wsUrl = appendTargetParam(
-      `${wsBase}/pty/${props.ptyId}/connect?directory=${encodeURIComponent(directory || "")}`,
+      `${wsBase}${ptyBase}/${props.ptyId}/connect?directory=${encodeURIComponent(directory || "")}`,
       targetUrl,
     )
     console.log("[Terminal] Connecting to:", wsUrl)

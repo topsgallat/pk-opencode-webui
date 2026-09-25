@@ -183,7 +183,7 @@ export function Settings() {
   const [restartInfo, setRestartInfo] = createSignal<string | null>(null)
   const [restartError, setRestartError] = createSignal<string | null>(null)
   const [restartSuccess, setRestartSuccess] = createSignal<string | null>(null)
-  const [serverHealth, setServerHealth] = createSignal<Record<string, ServerHealthState>>({})
+  const [serverHealth, setServerHealth] = createSignal<Record<string, { state: ServerHealthState; version?: string; dialect?: string }>>({})
   const [serverHealthLoading, setServerHealthLoading] = createSignal(false)
   let serverHealthRun = 0
 
@@ -204,7 +204,7 @@ export function Settings() {
           if (target && saved) await syncProxyAuthForServer(base, target, saved)
           const result = await checkOpencodeHealth(base, target)
           const state: ServerHealthState = result.ok && result.healthy !== false ? "online" : "offline"
-          return [item.id, state] as const
+          return [item.id, { state, version: result.version, dialect: result.dialect }] as const
         }),
       )
 
@@ -2857,25 +2857,28 @@ Add your project-specific instructions here.
                                 style={{
                                   background: serverHealthLoading() || !serverHealth()[server.id]
                                     ? "var(--surface-inset)"
-                                    : serverHealth()[server.id] === "online"
+                                    : serverHealth()[server.id]?.state === "online"
                                       ? "rgba(5, 150, 105, 0.14)"
                                       : "rgba(220, 38, 38, 0.14)",
                                   color: serverHealthLoading() || !serverHealth()[server.id]
                                     ? "var(--text-weak)"
-                                    : serverHealth()[server.id] === "online"
+                                    : serverHealth()[server.id]?.state === "online"
                                       ? "var(--text-success-base)"
                                       : "var(--text-critical-base)",
                                   border: serverHealthLoading() || !serverHealth()[server.id]
                                     ? "1px solid var(--border-base)"
-                                    : serverHealth()[server.id] === "online"
+                                    : serverHealth()[server.id]?.state === "online"
                                       ? "1px solid rgba(5, 150, 105, 0.3)"
                                       : "1px solid rgba(220, 38, 38, 0.3)",
                                 }}
-                                title={serverHealthLoading() || !serverHealth()[server.id]
-                                  ? "Checking backend status"
-                                  : serverHealth()[server.id] === "online"
-                                    ? "Backend server is online"
-                                    : "Backend server is offline"}
+                                title={(() => {
+                                  const entry = serverHealth()[server.id]
+                                  if (serverHealthLoading() || !entry) return "Checking backend status"
+                                  if (entry.state !== "online") return "Backend server is offline"
+                                  const version = entry.version ? ` (opencode v${entry.version})` : ""
+                                  const dialect = entry.dialect ? ` · API ${entry.dialect}` : ""
+                                  return `Backend server is online${version}${dialect}`
+                                })()}
                                 role="status"
                               >
                                 <span
@@ -2883,16 +2886,17 @@ Add your project-specific instructions here.
                                   style={{
                                     background: serverHealthLoading() || !serverHealth()[server.id]
                                       ? "var(--text-weak)"
-                                      : serverHealth()[server.id] === "online"
+                                      : serverHealth()[server.id]?.state === "online"
                                         ? "var(--icon-success-base)"
                                         : "var(--icon-critical-base)",
                                   }}
                                 />
-                                {serverHealthLoading() || !serverHealth()[server.id]
-                                  ? "Checking"
-                                  : serverHealth()[server.id] === "online"
-                                    ? "Online"
-                                    : "Offline"}
+                                {(() => {
+                                  const entry = serverHealth()[server.id]
+                                  if (serverHealthLoading() || !entry) return "Checking"
+                                  if (entry.state !== "online") return "Offline"
+                                  return entry.version ? `Online · v${entry.version}` : "Online"
+                                })()}
                               </span>
                               <Show when={server.isDefault}>
                                 <span

@@ -349,8 +349,9 @@ async function checkV1Health(serverUrl: string, targetUrl?: string): Promise<Ope
   try {
     const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/global/health`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended checkOpencodeHealth")
     const data = await res.json().catch(() => null)
+    const version = data && typeof data === "object" ? (data as { version?: unknown }).version : undefined
     if (res.ok && data && typeof data === "object" && (data as { healthy?: boolean }).healthy === true) {
-      return { ok: true, healthy: true, status: res.status }
+      return { ok: true, healthy: true, status: res.status, version: typeof version === "string" ? version : undefined }
     }
 
     return {

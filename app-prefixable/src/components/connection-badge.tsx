@@ -1,5 +1,6 @@
 import { createEffect, createSignal, onCleanup } from "solid-js"
-import { checkOpencodeHealth } from "../utils/extended-api"
+import { checkOpencodeHealth, syncProxyAuthForServer } from "../utils/extended-api"
+import { getServerAuthForTarget } from "../utils/servers"
 
 const HEALTH_CHECK_INTERVAL_MS = 15_000
 
@@ -20,6 +21,10 @@ export function ServerHealthBadge(props: ServerHealthBadgeProps) {
     let active = true
 
     const check = async () => {
+      if (targetUrl) {
+        const saved = getServerAuthForTarget(targetUrl)
+        if (saved) await syncProxyAuthForServer(serverUrl, targetUrl, saved)
+      }
       const result = await checkOpencodeHealth(serverUrl, targetUrl)
       if (!active) return
       setHealth(result.ok && result.healthy !== false ? "online" : "offline")

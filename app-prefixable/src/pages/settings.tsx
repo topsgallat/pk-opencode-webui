@@ -21,7 +21,7 @@ import { useServer } from "../context/server"
 import { ConstrainDragXAxis } from "../utils/solid-dnd"
 import { generateUUID } from "../utils/uuid"
 import { writeFile } from "../utils/extended-api"
-import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCallback, restartOpencode, checkOpencodeHealth } from "../utils/extended-api"
+import { deleteGlobalProvider, validateProviderConnection, replayProviderOAuthCallback, restartOpencode, checkOpencodeHealth, syncProxyAuthForServer } from "../utils/extended-api"
 import { appendTargetParam } from "../utils/path"
 import { dialectFor } from "../sdk/v2/dialect"
 import { browserNotificationStatus, readNotifyMap, writeNotifyMap, NOTIFY_STORAGE_KEY } from "../utils/notify"
@@ -199,7 +199,10 @@ export function Settings() {
     void (async () => {
       const entries = await Promise.all(
         list.map(async (item) => {
-          const result = await checkOpencodeHealth(base, getTargetServerUrl(item))
+          const target = getTargetServerUrl(item)
+          const saved = getServerAuth(item.id)
+          if (target && saved) await syncProxyAuthForServer(base, target, saved)
+          const result = await checkOpencodeHealth(base, target)
           const state: ServerHealthState = result.ok && result.healthy !== false ? "online" : "offline"
           return [item.id, state] as const
         }),

@@ -327,6 +327,24 @@ export async function checkOpencodeHealth(serverUrl: string, targetUrl?: string)
   return v2.ok ? v2 : v1
 }
 
+export async function syncProxyAuthForServer(
+  serverUrl: string,
+  target: string,
+  auth?: { username?: string; password: string },
+): Promise<boolean> {
+  if (!auth?.password) return false
+  try {
+    const res = await fetchWithTimeout(`${serverUrl}/api/ext/auth-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target, username: auth.username, password: auth.password }),
+    }, EXT_API_TIMEOUT_MS, "extended syncProxyAuthForServer")
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 async function checkV1Health(serverUrl: string, targetUrl?: string): Promise<OpencodeHealthResult> {
   try {
     const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/global/health`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended checkOpencodeHealth")

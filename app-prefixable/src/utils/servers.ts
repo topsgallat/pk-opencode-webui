@@ -5,7 +5,7 @@
  */
 
 import { dispatchStorageEvent } from "./storage"
-import { cleanupServerAuth, markServerAuthForRevalidation, migrateLegacyServerAuth } from "./server-auth"
+import { cleanupServerAuth, getServerAuth, markServerAuthForRevalidation, migrateLegacyServerAuth } from "./server-auth"
 import { getServerUrl } from "./path"
 import { loadSettings, saveSetting } from "./settings-api"
 
@@ -159,6 +159,16 @@ export function resolveSelectedServer(id: string | null, servers = getServers())
  */
 export function getServer(id: string): ServerConfig | undefined {
   return getServers().find(s => s.id === id)
+}
+
+export function getServerAuthForTarget(target: string) {
+  try {
+    const key = normalizeServerUrl(target)
+    const server = getServers().find((s) => getServerKey(s) === key)
+    return server ? getServerAuth(server.id) : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**

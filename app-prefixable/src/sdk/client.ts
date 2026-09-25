@@ -30,24 +30,26 @@ export function createOpencodeClient(config?: Config & {
       let response: Response
       try {
         const plan = dialect === "v2" ? await planV2Request(next) : ({ kind: "passthrough" as const })
+        const buildUpstream = (url: string, reqInit: RequestInit = {}) => {
+          const mergedHeaders: Record<string, string> = {}
+          next.headers.forEach((value, key) => {
+            mergedHeaders[key.toLowerCase()] = value
+          })
+          for (const [key, value] of Object.entries((reqInit.headers ?? {}) as Record<string, string>)) {
+            mergedHeaders[key.toLowerCase()] = value
+          }
+          const upstream = new Request(new URL(url, next.url), { ...reqInit, headers: mergedHeaders }) as Request & { timeout?: boolean }
+          upstream.timeout = false
+          return upstream
+        }
         if (plan.kind === "local") {
           response = new Response(JSON.stringify(plan.payload), {
             status: plan.status,
             headers: { "Content-Type": "application/json" },
           })
+        } else if (plan.kind === "custom") {
+          response = await plan.run(async (url, reqInit) => fetch(buildUpstream(url, reqInit)))
         } else if (plan.kind === "rewrite") {
-          const buildUpstream = (url: string, reqInit: RequestInit) => {
-            const mergedHeaders: Record<string, string> = {}
-            next.headers.forEach((value, key) => {
-              mergedHeaders[key.toLowerCase()] = value
-            })
-            for (const [key, value] of Object.entries((reqInit.headers ?? {}) as Record<string, string>)) {
-              mergedHeaders[key.toLowerCase()] = value
-            }
-            const upstream = new Request(new URL(url, next.url), { ...reqInit, headers: mergedHeaders }) as Request & { timeout?: boolean }
-            upstream.timeout = false
-            return upstream
-          }
           if (plan.pre) {
             try {
               await fetch(buildUpstream(plan.pre.url, plan.pre.init))

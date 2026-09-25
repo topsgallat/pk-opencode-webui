@@ -1,5 +1,5 @@
 import { dialectFor } from "./dialect"
-import { applyV2Response, planV2Request } from "./routes"
+import { applyV2Response, planV2Request, type Send } from "./routes"
 
 export async function dialectAwareFetch(
   url: string,
@@ -18,6 +18,17 @@ export async function dialectAwareFetch(
       headers: { "Content-Type": "application/json" },
     })
   }
+  const send: Send = (u, reqInit = {}) => {
+    const mergedHeaders: Record<string, string> = {}
+    request.headers.forEach((value, key) => {
+      mergedHeaders[key.toLowerCase()] = value
+    })
+    for (const [key, value] of Object.entries((reqInit.headers ?? {}) as Record<string, string>)) {
+      mergedHeaders[key.toLowerCase()] = value
+    }
+    return fetch(new Request(new URL(u, request.url), { ...reqInit, headers: mergedHeaders }))
+  }
+  if (plan.kind === "custom") return plan.run(send)
   const upstream = new Request(new URL(plan.url, request.url), plan.init)
   return applyV2Response(plan, await fetch(upstream))
 }

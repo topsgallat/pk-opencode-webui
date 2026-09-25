@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { eventFromV2, isV2EventEnvelope, messageFromV2, messageListFromV2, sessionFromV2 } from "./translate"
-import { planV2Request } from "./routes"
+import { applyV2Response, planV2Request } from "./routes"
 
 const V2_SESSION = {
   id: "ses_f2b7fe64bffe0ltIeXOxYQLLhY",
@@ -201,7 +201,34 @@ describe("planV2Request", () => {
   })
 
   test("unknown paths pass through untouched", async () => {
-    const plan = await planV2Request(new Request("http://ui/auth/anthropic", { method: "PUT" }))
+    const plan = await planV2Request(new Request("http://ui/tui/submit-prompt", { method: "POST" }))
     expect(plan.kind).toBe("passthrough")
+  })
+
+  test("permission list maps V2 requests to V1 PermissionRequest", async () => {
+    const plan = await planV2Request(new Request("http://ui/permission?directory=/home/x"))
+    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
+    expect(plan.url).toBe("/api/permission/request")
+    const res = await applyV2Response(plan, new Response(JSON.stringify({
+      data: [{ id: "per_1", sessionID: "ses_1", action: "edit", resources: ["/tmp/a"], save: ["always"], metadata: {} }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }))
+    const list = (await res.json()) as Array<{ id: string; permission: string; patterns: string[]; always: string[] }>
+    expect(list[0].id).toBe("per_1")
+    expect(list[0].permission).toBe("edit")
+    expect(list[0].patterns).toEqual(["/tmp/a"])
+    expect(list[0].always).toEqual(["always"])
+  })
+
+  test("question list maps V2 forms to V1 QuestionRequest", async () => {
+    const plan = await planV2Request(new Request("http://ui/question"))
+    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
+    expect(plan.url).toBe("/api/form")
+    const res = await applyV2Response(plan, new Response(JSON.stringify({
+      data: [{ id: "frm_1", sessionID: "ses_1", title: "Pick one", fields: [{ type: "multiselect", key: "choice", options: [{ value: "a", label: "A" }] }] }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }))
+    const list = (await res.json()) as Array<{ id: string; questions: Array<{ question: string; options: unknown[] }> }>
+    expect(list[0].id).toBe("frm_1")
+    expect(list[0].questions[0].question).toBe("Pick one")
+    expect(list[0].questions[0].options.length).toBe(1)
   })
 })

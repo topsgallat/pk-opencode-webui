@@ -165,20 +165,6 @@ if (OPERATION_MODE === "solo") {
   await Bun.write(mcpConfigPath, `${JSON.stringify(config, null, 2)}\n`)
   console.log(`[solo] Merged Playwright MCP CloakBrowser config: ${mcpConfigPath}`)
 
-  console.log(`[solo] Refreshing OpenCode models cache...`)
-  const modelsRefresh = Bun.spawn(["opencode", "models", "--refresh"], {
-    stdout: "inherit",
-    stderr: "inherit",
-    env: opencodeServerEnv,
-    cwd: workspaceDir,
-  })
-
-  const modelsRefreshed = await modelsRefresh.exited
-  if (modelsRefreshed !== 0) {
-    console.error(`[solo] ERROR: Failed to refresh OpenCode models cache (exit ${modelsRefreshed})`)
-    process.exit(1)
-  }
-
   console.log(`[solo] Starting OpenCode API server on port ${API_PORT}...`)
 
   const apiProc = Bun.spawn(["opencode", "serve", "--port", `${API_PORT}`, "--hostname", process.env.API_HOSTNAME || "127.0.0.1"], {

@@ -24,7 +24,7 @@ services:
       - HOME=/home/sgallat # Do not change this!
       - OPENCODE_WORKSPACE_ROOT=/home/sgallat # Do not change this!
       - XDG_CACHE_HOME=/home/sgallat/.cache
-      - OPENCODE_SERVER_PASSWORD=
+      - OPENCODE_SERVER_PASSWORD=4a24bf1d5c4b9e21350c364a4d2244c2
       - OPENCODE_CONFIG=/home/sgallat/.config/opencode/override-temp.json
       - TZ=Asia/Bangkok
       - CODEX_AUTH_PER_PROJECT_ACCOUNTS=0

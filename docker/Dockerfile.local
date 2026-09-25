@@ -208,7 +208,7 @@ RUN for i in 1 2 3 4 5; do \
 # Expected: agents beyond the 7 built-ins (build, compaction, explore, etc.)
 # -----------------------------------------------------------------------------
 ENV SHELL=/bin/bash
-RUN curl -fsSL https://opencode.ai/install | bash -s -- && \
+RUN curl -fsSL https://opencode.ai/v2/install | bash -s -- && \
     mv ${HOME}/.opencode/bin/opencode /usr/local/bin/opencode && \
     rm -rf ${HOME}/.opencode
 

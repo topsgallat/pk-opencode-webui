@@ -210,6 +210,13 @@ describe("planV2Request", () => {
     expect(list.url).toBe("/api/session?limit=200")
   })
 
+  test("session share returns an explicit V2 gap error", async () => {
+    const plan = await planV2Request(new Request("http://ui/session/ses_1/share", { method: "POST" }))
+    expect(plan.kind).toBe("local")
+    if (plan.kind !== "local") throw new Error("expected local")
+    expect(plan.status).toBe(400)
+  })
+
   test("unknown paths pass through untouched", async () => {
     const plan = await planV2Request(new Request("http://ui/tui/submit-prompt", { method: "POST" }))
     expect(plan.kind).toBe("passthrough")

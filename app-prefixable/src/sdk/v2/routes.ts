@@ -500,6 +500,18 @@ const ROUTES: RouteDef[] = [
   },
   {
     method: "POST",
+    pattern: /^\/session\/([^/]+)\/share$/,
+    respond: () => ({ status: 400, payload: { message: "Session sharing is not available on opencode v2" } }),
+    to: () => ({ url: "", init: {} }),
+  },
+  {
+    method: "POST",
+    pattern: /^\/session\/([^/]+)\/unshare$/,
+    respond: () => ({ status: 400, payload: { message: "Session sharing is not available on opencode v2" } }),
+    to: () => ({ url: "", init: {} }),
+  },
+  {
+    method: "POST",
     pattern: /^\/instance\/dispose$/,
     respond: () => ({ status: 200, payload: { ok: true } }),
     to: () => ({ url: "", init: {} }),

@@ -6,6 +6,9 @@ import { appendTargetParam } from "../utils/path"
 import { useClientAuth } from "./client-auth"
 import { errorMessage, fetchWithTimeout, withTimeout } from "../utils/request-timeout"
 import { choosePreferredMessageForSyncMerge } from "./sync-merge"
+import { dialectAwareFetch } from "../sdk/v2/fetch"
+import { dialectFor } from "../sdk/v2/dialect"
+import { eventFromV2, isV2EventEnvelope } from "../sdk/v2/translate"
 
 // Page size for message-history fetching. The backend returns the newest
 // messages first and exposes the next page through the X-Next-Cursor header
@@ -323,14 +326,16 @@ export function SyncProvider(props: ParentProps) {
   let eventSource: EventSource | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
-  function connect() {
+  async function connect() {
     if (eventSource) {
       eventSource.close()
       eventSource = null
     }
 
     const dirParam = directory ? `?directory=${encodeURIComponent(directory)}` : ""
-    const eventUrl = appendTargetParam(`${url}/event${dirParam}`, targetUrl)
+    const dialect = await dialectFor(url, targetUrl)
+    const eventPath = dialect === "v2" ? "/api/event" : "/event"
+    const eventUrl = appendTargetParam(`${url}${eventPath}${dirParam}`, targetUrl)
     eventSource = new EventSource(eventUrl)
     console.log("[Sync] Connecting to SSE:", eventUrl)
 
@@ -341,7 +346,8 @@ export function SyncProvider(props: ParentProps) {
     eventSource.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data)
-        const event = (data?.payload ?? data) as SyncEvent
+        const v2 = isV2EventEnvelope(data) ? eventFromV2(data) : undefined
+        const event = (v2 ?? (data?.payload ?? data)) as SyncEvent
         if (!event || !event.type) return
         handleEvent(event)
       } catch (err) {
@@ -355,11 +361,11 @@ export function SyncProvider(props: ParentProps) {
       eventSource = null
 
       const dirParam = directory ? `?directory=${encodeURIComponent(directory)}` : ""
-      const authProbe = fetchWithTimeout(
+      const authProbe = dialectAwareFetch(
         appendTargetParam(`${url}/session/status${dirParam}`, targetUrl),
-        {},
-        SYNC_PROBE_TIMEOUT_MS,
-        "Sync reconnect probe",
+        url,
+        targetUrl,
+        { signal: AbortSignal.timeout(SYNC_PROBE_TIMEOUT_MS) },
       )
         .then((r) => {
           if (r.status === 401 || r.status === 403) {

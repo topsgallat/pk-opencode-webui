@@ -43,3 +43,21 @@
   font-weight: var(--shiki-dark-font-weight) !important;
   text-decoration: var(--shiki-dark-text-decoration) !important;
 }
+
+/* File-viewer rows: no wrap (horizontal scroll) and the surrounding
+   plain-text line metrics (leading-6, font-mono) instead of the diff's. */
+.content-code[data-nowrap="true"] {
+  line-height: inherit;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.content-code[data-nowrap="true"] pre {
+  white-space: pre;
+  word-break: normal;
+  line-height: inherit;
+}
+
+.content-code[data-nowrap="true"] pre span {
+  white-space: pre;
+}

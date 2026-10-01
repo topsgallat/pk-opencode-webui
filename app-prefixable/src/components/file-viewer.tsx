@@ -13,6 +13,7 @@ import { resolveMarkdownLinkPath, resolveRepoRelativePath, rewriteMarkdownImages
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { EditorDialog } from "./editor-dialog"
 import { Markdown } from "./markdown"
+import { useHighlightedLines } from "./diff/highlight-cache"
 
 interface FileViewerProps {
   path: string
@@ -121,6 +122,25 @@ function blobFromContent(content: string, type: string, encoding?: string) {
   return new Blob([content], { type })
 }
 
+// Very large files skip shiki: highlighted HTML is ~5-10x the source and
+// would bloat the per-line DOM and freeze the viewer.
+const HIGHLIGHT_MAX_CHARS = 200_000
+
+function HighlightedCode(props: { html: string | undefined; text: string }) {
+  return (
+    <Show when={props.html} fallback={<div class="min-h-[1.5rem] flex-1 pr-3">{props.text || " "}</div>}>
+      {(html) => (
+        <div
+          class="content-code min-h-[1.5rem] flex-1 pr-3"
+          data-flush="true"
+          data-nowrap="true"
+          innerHTML={html()}
+        />
+      )}
+    </Show>
+  )
+}
+
 export function FileViewer(props: FileViewerProps) {
   const file = useFile()
   const sdk = useSDK()
@@ -197,6 +217,24 @@ export function FileViewer(props: FileViewerProps) {
     device.isTouchDevice()
       ? "opacity-100 transition-opacity p-1 rounded min-h-[28px] min-w-[28px] flex items-center justify-center"
       : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 rounded min-h-[28px] min-w-[28px] flex items-center justify-center"
+
+  // Only the raw code view gets syntax highlighting; markdown/HTML preview
+  // modes render the content themselves and would waste a shiki pass.
+  const codeViewShown = createMemo(
+    () => fileLoaded() && !(isMarkdown() && markdownPreview()) && !(isHtml() && htmlPreview()),
+  )
+  const highlighted = useHighlightedLines(
+    () => fileContent(),
+    lang,
+    () => codeViewShown() && fileContent().length <= HIGHLIGHT_MAX_CHARS,
+  )
+
+  function highlightedLineHtml(index: number) {
+    const source = highlighted()
+    if (!source || index >= source.lines.length) return undefined
+    return `<pre class="${source.preClass}" style="${source.preStyle}"><code>${source.lines[index]}</code></pre>`
+  }
+
   const SAFE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"])
 
   createEffect(() => {
@@ -607,9 +645,7 @@ export function FileViewer(props: FileViewerProps) {
                                   const num = () => index() + 1
                                   return (
                                     <div class="group flex min-w-max rounded-sm px-1 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-                                      <div class="min-h-[1.5rem] flex-1 pr-3">
-                                        {line || " "}
-                                      </div>
+                                      <HighlightedCode html={highlightedLineHtml(index())} text={line} />
                                         <Show when={props.onMentionFileLine}>
                                           <button
                                             type="button"
@@ -721,9 +757,7 @@ export function FileViewer(props: FileViewerProps) {
                                 const num = () => index() + 1
                                 return (
                                   <div class="group flex min-w-max rounded-sm px-1 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-                                    <div class="min-h-[1.5rem] flex-1 pr-3">
-                                      {line || " "}
-                                    </div>
+                                    <HighlightedCode html={highlightedLineHtml(index())} text={line} />
                                     <Show when={props.onMentionFileLine}>
                                       <button
                                         type="button"

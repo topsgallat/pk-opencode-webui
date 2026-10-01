@@ -222,7 +222,11 @@ export function ClaudeSession() {
         return
       }
       const data = (await res.json()) as { items?: ChatItem[] }
-      if (Array.isArray(data.items)) setItems(data.items)
+      if (Array.isArray(data.items)) {
+        setItems(data.items)
+        // Land on the latest message instead of the top of the transcript
+        requestAnimationFrame(() => autoScroll.settleToBottom())
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load session history")
     }

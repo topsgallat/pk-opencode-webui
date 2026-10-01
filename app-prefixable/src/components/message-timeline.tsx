@@ -352,6 +352,27 @@ export function MessageTimeline(props: {
   const showScrollToBottom = createMemo(() => !props.loadingHistory && autoScroll.showScrollToBottom())
   const fabVivid = createMemo(() => (pinned() ? justLocked() : showScrollToBottom()))
 
+  // Open-at-latest: the render window already starts at the newest turns, but
+  // the scroll position starts at the top of that window. When a session's
+  // history first renders (initial open or session switch), land on the latest
+  // turn instead. Runs once per session; skips a fresh session's very first
+  // send, which the scrollToTopTarget alignment above positions.
+  const settledSession = { value: undefined as string | undefined }
+  createEffect(() => {
+    const key = props.sessionKey
+    if (!key || props.loadingHistory) return
+    if (turns().length === 0) return
+    if (props.processing && turns().length <= 1) return
+    if (pinned()) {
+      // Hard-lock already follows the bottom; don't yank later on unpin.
+      settledSession.value = key
+      return
+    }
+    if (settledSession.value === key) return
+    settledSession.value = key
+    autoScroll.settleToBottom()
+  })
+
   return (
     <div class="relative flex-1 min-h-0">
       <div

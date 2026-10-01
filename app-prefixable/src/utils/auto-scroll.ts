@@ -50,6 +50,47 @@ export function createAutoScroll(options: { bottomThreshold?: number; pinned?: (
     setShowFab(distanceFromBottom(el) > threshold)
   }
 
+  /**
+   * One-shot "land at the latest content" used when a chat first opens: jump
+   * instantly to the bottom and keep re-snapping for a short settle window
+   * while late-measuring content (images, tool output, markdown) grows the
+   * list. Bails the moment the user scrolls (wheel/touch on the container).
+   */
+  const settleToBottom = () => {
+    const el = scroll
+    if (!el) return
+    let aborted = false
+    const onUserScroll = () => { aborted = true }
+    el.addEventListener("wheel", onUserScroll, { passive: true })
+    el.addEventListener("touchmove", onUserScroll, { passive: true })
+    let frames = 0
+    let onTarget = 0
+    const tick = () => {
+      if (!scroll) return
+      const current = scroll
+      if (aborted) {
+        current.removeEventListener("wheel", onUserScroll)
+        current.removeEventListener("touchmove", onUserScroll)
+        return
+      }
+      const distance = current.scrollHeight - current.scrollTop - current.clientHeight
+      if (distance <= 1) {
+        onTarget++
+      } else {
+        onTarget = 0
+        scrollToBottomNow("auto")
+      }
+      frames++
+      if (onTarget < 8 && frames < 240) {
+        requestAnimationFrame(tick)
+        return
+      }
+      current.removeEventListener("wheel", onUserScroll)
+      current.removeEventListener("touchmove", onUserScroll)
+    }
+    requestAnimationFrame(tick)
+  }
+
   const observe = () => {
     if (!content || typeof ResizeObserver === "undefined") return
     if (resizeObserver) resizeObserver.disconnect()
@@ -84,6 +125,7 @@ export function createAutoScroll(options: { bottomThreshold?: number; pinned?: (
     },
     handleScroll: update,
     scrollToBottom: () => scrollToBottomNow("smooth"),
+    settleToBottom,
     showScrollToBottom: () => showFab(),
   }
 }

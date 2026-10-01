@@ -57,10 +57,17 @@ import {
 import { browserNotificationStatus, isSessionNotifyEnabled, setSessionNotifyOverride, NOTIFY_STORAGE_KEY } from "../utils/notify";
 import { sessionQuestionRequest, rootAncestorId } from "../utils/session-tree-request";
 import { errorMessage, withTimeout } from "../utils/request-timeout";
-import { applyQueuedPromptSubmission } from "../utils/chat-queue";
 import { findOptimisticMessageEcho, projectDisplayMessages, type OptimisticQueueMessage, type SyncMessageLike } from "../utils/message-reconcile";
 import { projectedPartsWeight } from "../utils/part-compare";
-import { getQuota, uploadFile, deleteFile } from "../utils/extended-api";
+import {
+  deleteQueuedPromptFromQueue,
+  enqueuePromptToQueue,
+  getQuota,
+  listPromptQueue,
+  uploadFile,
+  deleteFile,
+  type QueuedPromptView,
+} from "../utils/extended-api";
 import { isConnectionModelFailure, isRetryableModelFailure, pickFallbackCandidate, shouldFallbackAfterRetryAttempts } from "../utils/model-fallback";
 import { loadFallbackSettings, resolveFallbackPolicyForAgent, resolveFallbackPolicies } from "../utils/fallback-settings";
 
@@ -200,7 +207,8 @@ interface PendingPromptItem {
   agent: string;
   model?: { providerID: string; modelID: string };
   variant?: string | null;
-  status?: "queued" | "running";
+  status?: "queued" | "running" | "failed";
+  lastError?: string;
 }
 
 interface PendingPromptStorage {
@@ -956,7 +964,10 @@ export function Session() {
     setSessionSelection(null);
     setSessionId(id);
     setActivePrompt(null);
+    // Queued prompts live in the UI server so they keep flowing even when
+    // this page is closed; mirror the server's queue for this session.
     setPendingQueue([]);
+    void refreshQueue();
 
     // Restore draft for the new session (or clear if none saved)
     const saved = drafts.get(key);
@@ -1092,23 +1103,27 @@ export function Session() {
       setError(`Provider "${providers.selectedModel.providerID}" is not connected. Please configure it in Settings.`);
       return;
     }
-    // All validation passed — mark as sent, clear storage, and enqueue
+    // All validation passed — mark as sent, clear storage, and enqueue.
+    // enqueuePrompt now posts to the UI server's queue, so enqueue in order.
     setPromptSent(true);
     sessionStorage.removeItem(key);
     setError(null);
-    for (const item of valid) {
-      enqueuePrompt({
-        id: item.id,
-        createdAt: item.ts,
-        text: item.text,
-        files: item.fileContext ?? [],
-        images: item.imageAttachments ?? [],
-        agent: item.agent ? item.agent : (providers.selectedAgent || "build"),
-        model: item.model ?? providers.selectedModel,
-        variant: item.variant ?? providers.selectedVariant ?? undefined,
-        status: "queued",
-      });
-    }
+    const fallbackModel = providers.selectedModel;
+    void (async () => {
+      for (const item of valid) {
+        await enqueuePrompt({
+          id: item.id,
+          createdAt: item.ts,
+          text: item.text,
+          files: item.fileContext ?? [],
+          images: item.imageAttachments ?? [],
+          agent: item.agent ? item.agent : (providers.selectedAgent || "build"),
+          model: item.model ?? fallbackModel ?? undefined,
+          variant: item.variant ?? providers.selectedVariant ?? undefined,
+          status: "queued",
+        });
+      }
+    })();
   });
 
   // Get messages from sync context - reactive, automatically updated via SSE
@@ -1272,7 +1287,18 @@ export function Session() {
         userMessage: {
           id: item.id,
           role: "user" as const,
-          parts: previewPromptParts(item),
+          parts: [
+            ...previewPromptParts(item),
+            ...(item.status === "failed"
+              ? [{
+                  id: `${item.id}-error`,
+                  sessionID: sessionId() || "",
+                  messageID: "",
+                  type: "text" as const,
+                  text: `⚠ Queue delivery failed: ${item.lastError ?? "unknown error"}`,
+                }]
+              : []),
+          ],
           time: { created: item.createdAt },
         },
         assistantMessages: [],
@@ -1899,30 +1925,22 @@ export function Session() {
     }
   });
 
+  // The UI server owns the prompt queue and delivers queued prompts when the
+  // session turns idle — even with this page closed. Poll the queue so the
+  // timeline stays in sync while the page is open.
+  onMount(() => {
+    const timer = setInterval(() => {
+      void refreshQueue();
+    }, 4_000);
+    onCleanup(() => clearInterval(timer));
+  });
+
+  // A new user message means the server delivered a queued prompt (it sends
+  // with the queued item's id) — refresh promptly so the preview disappears.
   createEffect(on(
-    () => ({
-      processing: processing(),
-      blocked: inputBlocked(),
-      active: !!activePrompt(),
-      queueLength: pendingQueue().length,
-      loading: loading(),
-      session: sessionId(),
-    }),
-    (state, prev) => {
-      if (state.processing || state.blocked || state.loading || state.active || state.queueLength === 0) return;
-      if (!prev) {
-        void flushQueuedPrompt();
-        return;
-      }
-      const sameSession = prev.session === state.session;
-      if (
-        sameSession &&
-        !prev.processing &&
-        !prev.active &&
-        prev.queueLength === state.queueLength &&
-        prev.loading === state.loading
-      ) return;
-      void flushQueuedPrompt();
+    () => countUserMessages(syncMessages()),
+    () => {
+      void refreshQueue();
     },
   ));
 
@@ -2422,19 +2440,68 @@ export function Session() {
     drafts.delete(draftKey(server.serverKey(), params.dir, sessionId()));
   }
 
-  function enqueuePrompt(item: PendingPromptItem) {
+  const queueGen = { value: 0 };
+  function queuedItemFromServer(item: QueuedPromptView): PendingPromptItem {
+    return {
+      id: item.id,
+      createdAt: item.createdAt,
+      text: item.text,
+      files: (item.fileContext ?? []) as FileContext[],
+      images: (item.imageAttachments ?? []) as ImageAttachment[],
+      agent: item.agent ?? "build",
+      model: item.model,
+      variant: item.variant,
+      status: item.status === "failed" ? "failed" : "queued",
+      lastError: item.lastError,
+    };
+  }
+
+  async function refreshQueue() {
+    const id = sessionId();
+    if (!id) return;
+    const gen = ++queueGen.value;
+    const items = await listPromptQueue(serverUrl, id, targetUrl).catch(() => null);
+    if (!items || queueGen.value !== gen) return;
+    setPendingQueue(items.map(queuedItemFromServer));
+  }
+
+  async function enqueuePrompt(item: PendingPromptItem) {
     setError(null);
     setShowTodoTray(false);
+    // Optimistic append so the queued turn shows up instantly; the server
+    // response below is the source of truth.
     setPendingQueue((prev) => [...prev, { ...item, status: "queued" }]);
     resetComposer();
+    const id = sessionId();
+    if (!id) return;
+    const items = await enqueuePromptToQueue(serverUrl, id, {
+      id: item.id,
+      createdAt: item.createdAt,
+      text: item.text,
+      fileContext: item.files,
+      imageAttachments: item.images,
+      agent: item.agent,
+      model: item.model,
+      variant: item.variant ?? null,
+      parts: buildPromptParts(item),
+    }, targetUrl).catch((err) => {
+      setError(`Failed to queue message: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    });
+    if (items) setPendingQueue(items.map(queuedItemFromServer));
+    else void refreshQueue();
   }
 
   function queueActive() {
     return !!activePrompt() || processing();
   }
 
-  function deleteQueuedPrompt(id: string) {
+  async function deleteQueuedPrompt(id: string) {
     setPendingQueue((prev) => prev.filter((item) => item.id !== id));
+    const sid = sessionId();
+    if (!sid) return;
+    const items = await deleteQueuedPromptFromQueue(serverUrl, sid, id, targetUrl).catch(() => null);
+    if (items) setPendingQueue(items.map(queuedItemFromServer));
   }
 
   function buildPromptParts(item: PendingPromptItem) {
@@ -2556,13 +2623,6 @@ export function Session() {
     } finally {
       setLoading(false);
     }
-  }
-
-  async function flushQueuedPrompt() {
-    const next = pendingQueue()[0];
-    if (!next || queueActive() || inputBlocked() || loading()) return;
-    const submitted = await submitPrompt(next);
-    setPendingQueue((prev) => applyQueuedPromptSubmission(prev, next.id, submitted));
   }
 
   function handleFileInputChange(e: Event) {

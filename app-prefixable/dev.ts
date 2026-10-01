@@ -1,5 +1,6 @@
 import { watch } from "fs"
 import { handleExtendedEndpoint, handleSkillEndpoint, isApiPath } from "../shared/extended-api"
+import { handlePromptQueueEndpoint, warmPromptQueue } from "../shared/prompt-queue"
 import { handleClaudeEndpoint } from "../shared/claude-api"
 import { handleGitEndpoint } from "../shared/git-api"
 import { loadCopilotModelMultipliers } from "../shared/copilot-model-multipliers"
@@ -118,6 +119,13 @@ const server = Bun.serve<{ target: string; cookie: string }>({
     // Git browsing endpoints (not proxied to OpenCode)
     const gitResponse = await handleGitEndpoint(strippedPath, req.method, url)
     if (gitResponse) return gitResponse
+
+    // Server-side prompt queue (delivers queued prompts even with the page closed)
+    const queueResponse = await handlePromptQueueEndpoint(strippedPath, req.method, url, req, {
+      resolveUpstreamAuthHeader: (target) => resolveProxyAuthHeader(req, target),
+      defaultTarget: API_URL,
+    })
+    if (queueResponse) return queueResponse
 
     // API requests go directly to the backend
     if (isApiPath(strippedPath)) {
@@ -298,6 +306,9 @@ const server = Bun.serve<{ target: string; cookie: string }>({
 })
 
 console.log(`\nDev server running at http://localhost:${PORT}${basePathWithTrailing}`)
+
+// Resume delivering prompts queued before a server restart
+void warmPromptQueue()
 
 // Watch for changes and rebuild
 let debounce: Timer | null = null

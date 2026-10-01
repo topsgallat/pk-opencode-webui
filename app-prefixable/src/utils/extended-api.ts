@@ -615,3 +615,83 @@ export function rawFileUrl(serverUrl: string, path: string, targetUrl?: string):
   const params = new URLSearchParams({ path })
   return appendTargetParam(`${serverUrl}/api/ext/raw?${params}`, targetUrl)
 }
+
+// --- Server-side prompt queue ---------------------------------------------
+
+export interface QueuedPromptPayload {
+  id: string
+  createdAt: number
+  text: string
+  fileContext?: unknown[]
+  imageAttachments?: unknown[]
+  agent?: string
+  model?: { providerID: string; modelID: string }
+  variant?: string | null
+  parts: Array<Record<string, unknown>>
+}
+
+export interface QueuedPromptView {
+  id: string
+  createdAt: number
+  text: string
+  fileContext?: unknown[]
+  imageAttachments?: unknown[]
+  agent?: string
+  model?: { providerID: string; modelID: string }
+  variant?: string | null
+  status: "queued" | "failed"
+  attempts: number
+  lastError?: string
+}
+
+async function promptQueueRequest(
+  serverUrl: string,
+  sessionID: string,
+  init: RequestInit,
+  label: string,
+  targetUrl?: string,
+): Promise<QueuedPromptView[]> {
+  const url = appendTargetParam(`${serverUrl}/api/ext/prompt-queue/${encodeURIComponent(sessionID)}`, targetUrl)
+  const res = await fetchWithTimeout(url, init, EXT_API_TIMEOUT_MS, label)
+  if (!res.ok) {
+    const body = await res.json().catch(() => undefined)
+    throw new Error(readErrorMessage(body) || `HTTP ${res.status}`)
+  }
+  const body = await res.json() as { items?: QueuedPromptView[] }
+  return Array.isArray(body.items) ? body.items : []
+}
+
+export async function listPromptQueue(serverUrl: string, sessionID: string, targetUrl?: string): Promise<QueuedPromptView[]> {
+  return promptQueueRequest(serverUrl, sessionID, {}, "extended listPromptQueue", targetUrl)
+}
+
+export async function enqueuePromptToQueue(
+  serverUrl: string,
+  sessionID: string,
+  payload: QueuedPromptPayload,
+  targetUrl?: string,
+): Promise<QueuedPromptView[]> {
+  return promptQueueRequest(serverUrl, sessionID, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }, "extended enqueuePromptToQueue", targetUrl)
+}
+
+export async function deleteQueuedPromptFromQueue(
+  serverUrl: string,
+  sessionID: string,
+  itemID: string,
+  targetUrl?: string,
+): Promise<QueuedPromptView[]> {
+  const url = `${serverUrl}/api/ext/prompt-queue/${encodeURIComponent(sessionID)}/${encodeURIComponent(itemID)}`
+  const res = await fetchWithTimeout(appendTargetParam(url, targetUrl), {
+    method: "DELETE",
+  }, EXT_API_TIMEOUT_MS, "extended deleteQueuedPromptFromQueue")
+  if (!res.ok) {
+    const body = await res.json().catch(() => undefined)
+    throw new Error(readErrorMessage(body) || `HTTP ${res.status}`)
+  }
+  const body = await res.json() as { items?: QueuedPromptView[] }
+  return Array.isArray(body.items) ? body.items : []
+}

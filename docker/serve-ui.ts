@@ -22,6 +22,7 @@
 
 
 import { handleExtendedEndpoint, handleSkillEndpoint, isApiPath } from "../shared/extended-api"
+import { handlePromptQueueEndpoint, warmPromptQueue } from "../shared/prompt-queue"
 import { handleClaudeEndpoint } from "../shared/claude-api"
 import { handleGitEndpoint } from "../shared/git-api"
 import { loadCopilotModelMultipliers } from "../shared/copilot-model-multipliers"
@@ -471,6 +472,18 @@ const server = Bun.serve<{ target: string; cookie: string }>({
     const gitResponse = await handleGitEndpoint(path, req.method, url)
     if (gitResponse) return gitResponse
 
+    // Server-side prompt queue (delivers queued prompts even with the page closed)
+    const queueResponse = await handlePromptQueueEndpoint(path, req.method, url, req, {
+      resolveUpstreamAuthHeader: (target) => {
+        const syncedAuth = resolveProxyAuthHeader(req, target)
+        if (syncedAuth) return syncedAuth
+        if (!shouldAttachProxyAuth(new URL(target))) return undefined
+        return proxyAuthHeader
+      },
+      defaultTarget: API_URL,
+    })
+    if (queueResponse) return queueResponse
+
     // Check if this is an API request (after stripping prefix)
     if (isApiPath(path)) {
       const targetOverride = getTargetOverride(req, url)
@@ -752,3 +765,6 @@ const server = Bun.serve<{ target: string; cookie: string }>({
     },
   },
 })
+
+// Resume delivering prompts queued before a server restart
+void warmPromptQueue()

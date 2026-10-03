@@ -106,13 +106,17 @@ test("rejects enqueue without id or parts", async () => {
 test("worker sends the head prompt when the session is idle (v1)", async () => {
   await setupTempStore()
   const calls: string[] = []
-  mockFetch((url) => {
+  const bodies: Array<Record<string, unknown>> = []
+  mockFetch((url, init) => {
     calls.push(url)
     if (url.endsWith("/global/health")) return Promise.resolve(jsonResponse({ healthy: true }))
     if (url.endsWith("/session/status")) {
       return Promise.resolve(jsonResponse({ ses_1: { type: "idle" } }))
     }
-    if (url.endsWith("/session/ses_1/prompt_async")) return Promise.resolve(jsonResponse({}))
+    if (url.endsWith("/session/ses_1/prompt_async")) {
+      bodies.push((init?.body ? JSON.parse(init.body as string) : {}) as Record<string, unknown>)
+      return Promise.resolve(jsonResponse({}))
+    }
     return Promise.resolve(jsonResponse({}))
   })
 
@@ -122,6 +126,9 @@ test("worker sends the head prompt when the session is idle (v1)", async () => {
   await __runWorkerPassForTests()
 
   expect(calls.some((url) => url.endsWith("/session/ses_1/prompt_async"))).toBe(true)
+  // opencode rejects client-supplied message ids that aren't msg_* shaped
+  expect(bodies[0].messageID).toBeUndefined()
+  expect(bodies[0].parts).toEqual([{ type: "text", text: "hello a" }])
   const after = await (await handlePromptQueueEndpoint("/api/ext/prompt-queue/ses_1", "GET", new URL("http://ui/?target=http://upstream"), endpointReq("/x", "GET")))!.json() as { items: unknown[] }
   expect(after.items).toEqual([])
 })

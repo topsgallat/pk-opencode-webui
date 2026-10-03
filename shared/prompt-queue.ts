@@ -218,11 +218,12 @@ async function sendPrompt(target: string, dialect: "v1" | "v2", sessionID: strin
   if (item.authHeader) headers.Authorization = item.authHeader
 
   if (dialect === "v1") {
+    // No messageID: opencode rejects client-supplied IDs that don't match its
+    // msg_* format (400), so let the server generate the message id.
     return fetch(`${target}/session/${sessionID}/prompt_async`, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        messageID: item.id,
         agent: item.agent,
         model: item.model,
         variant: item.variant ?? undefined,

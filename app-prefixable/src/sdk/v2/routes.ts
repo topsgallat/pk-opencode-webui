@@ -1,9 +1,11 @@
 import {
   eventFromV2,
   isV2EventEnvelope,
+  messageFromV2,
   messageListFromV2,
   sessionFromV2,
 } from "./translate"
+import { cachedV2Version } from "./dialect"
 
 type Dict = Record<string, unknown>
 
@@ -47,7 +49,16 @@ function unwrapData(payload: unknown): unknown {
     : payload
 }
 
-function promptBodyFromV1(body: unknown, sessionID: string): RouteToResult {
+// The prompt payload drifted across V2 generations: 2.0.x releases take the
+// text top-level ({text, files}), newer dev builds wrap it ({prompt: {...}}).
+// Distinguish by the /api/info version the dialect probe cached — default to
+// the release shape since that is what ships.
+function isWrappedPromptV2(url: URL): boolean {
+  const version = cachedV2Version(url.searchParams.get("target") ?? undefined)
+  return !!version && !/^2\.\d/.test(version)
+}
+
+function promptBodyFromV1(body: unknown, sessionID: string, url: URL): RouteToResult {
   const raw = (body ?? {}) as Dict
   const parts = Array.isArray(raw.parts) ? raw.parts : []
   const legacy = (raw.part ?? {}) as Dict
@@ -61,9 +72,9 @@ function promptBodyFromV1(body: unknown, sessionID: string): RouteToResult {
       files.push({ uri: p.url, name: typeof p.filename === "string" ? p.filename : undefined })
     }
   }
-  // V2 wraps the prompt payload: {prompt: {text, files}} — a bare {text} body
-  // fails schema validation with 400 "Missing key [\"prompt\"]".
-  const prompt: Dict = { text: texts.join("\n\n"), files }
+  const text = texts.join("\n\n")
+  const payload: Dict = { text, files }
+  const wrapped = isWrappedPromptV2(url)
   let pre: RouteToResult["pre"]
   const model = (raw.model ?? {}) as Dict
   if (typeof model.providerID === "string" && typeof model.modelID === "string" && model.modelID) {
@@ -73,7 +84,7 @@ function promptBodyFromV1(body: unknown, sessionID: string): RouteToResult {
   }
   return {
     url: api(`/session/${sessionID}/prompt`, ""),
-    init: jsonInit("POST", "", { prompt }),
+    init: jsonInit("POST", "", wrapped ? { prompt: payload } : payload),
     pre,
   }
 }
@@ -111,13 +122,17 @@ function messagesFromV2Response(payload: unknown, url: URL): unknown {
   return messageListFromV2(unwrapData(payload), sessionID)
 }
 
-// V2 prompt returns an admitted-input record ({data: {id, sessionID, prompt,
-// delivery, timeCreated}}), not a message — reshape it into the V1 user
-// message {info, parts} the SDK consumers expect.
+// Prompt responses also drifted: releases answer with the admitted user
+// message ({data: User}), newer dev builds with an admitted-input record
+// ({data: {id, prompt, timeCreated}}). Map both to the V1 {info, parts}.
 function promptResponseFromV1(payload: unknown, url: URL): unknown {
   const segments = url.pathname.split("/").filter(Boolean)
   const sessionID = segments.length >= 2 ? segments[segments.length - 2] : (segments[0] ?? "")
   const raw = (unwrapData(payload) ?? {}) as Dict
+  if (!isWrappedPromptV2(url)) {
+    const item = messageFromV2(raw, sessionID)
+    if (item) return item
+  }
   const messageID = str2(raw.id) || `${sessionID}-prompt`
   const created = typeof raw.timeCreated === "number" ? raw.timeCreated : Date.now()
   const text = str2(dict2(raw.prompt).text)
@@ -377,13 +392,13 @@ const ROUTES: RouteDef[] = [
   {
     method: "POST",
     pattern: /^\/session\/([^/]+)\/prompt_async$/,
-    to: ({ params, body }) => promptBodyFromV1(body, params[0]),
+    to: ({ params, body, url }) => promptBodyFromV1(body, params[0], url),
     from: (payload, { url }) => promptResponseFromV1(payload, url),
   },
   {
     method: "POST",
     pattern: /^\/session\/([^/]+)\/prompt$/,
-    to: ({ params, body }) => promptBodyFromV1(body, params[0]),
+    to: ({ params, body, url }) => promptBodyFromV1(body, params[0], url),
     from: (payload, { url }) => promptResponseFromV1(payload, url),
   },
   {

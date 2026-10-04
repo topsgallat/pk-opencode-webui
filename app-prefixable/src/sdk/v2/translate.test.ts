@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { eventFromV2, isV2EventEnvelope, messageFromV2, messageListFromV2, sessionFromV2 } from "./translate"
 import { applyV2Response, planV2Request } from "./routes"
+import { cacheV2Version, resetDialectCacheForTests } from "./dialect"
 
 const V2_SESSION = {
   id: "ses_f2b7fe64bffe0ltIeXOxYQLLhY",
@@ -249,7 +250,7 @@ describe("planV2Request", () => {
     expect(plan.url).toBe("/api/session/ses_1/interrupt")
   })
 
-  test("maps v1 prompt part body to the v2 wrapped prompt body", async () => {
+  test("maps v1 prompt part body to the bare release-v2 body by default", async () => {
     const plan = await planV2Request(new Request("http://ui/session/ses_1/prompt_async", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -258,11 +259,42 @@ describe("planV2Request", () => {
     if (plan.kind !== "rewrite") throw new Error("expected rewrite")
     expect(plan.url).toBe("/api/session/ses_1/prompt")
     const body = JSON.parse(String(plan.init.body))
-    expect(body.prompt.text).toBe("hello")
+    expect(body.text).toBe("hello")
+    expect(body.prompt).toBeUndefined()
   })
 
-  test("prompt response (admitted input) maps to a v1 user message", async () => {
+  test("wraps the prompt body for dev-line v2 builds", async () => {
+    cacheV2Version("http://up:4096", "0.0.0-dev-202610030456")
+    const plan = await planV2Request(new Request("http://ui/session/ses_1/prompt_async?target=http%3A%2F%2Fup%3A4096", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ part: { type: "text", text: "hello" } }),
+    }))
+    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
+    const body = JSON.parse(String(plan.init.body))
+    expect(body.prompt.text).toBe("hello")
+    resetDialectCacheForTests()
+  })
+
+  test("release prompt response (admitted user message) maps to a v1 user message", async () => {
     const plan = await planV2Request(new Request("http://ui/session/ses_1/prompt_async", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ part: { type: "text", text: "hello" } }),
+    }))
+    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
+    const res = await applyV2Response(plan, new Response(JSON.stringify({
+      data: { id: "msg_9", sessionID: "ses_1", time: { created: 1234 }, type: "user", payload: { text: "hello" } },
+    }), { status: 200, headers: { "Content-Type": "application/json" } }))
+    const body = await res.json()
+    expect(body.info.role).toBe("user")
+    expect(body.info.id).toBe("msg_9")
+    expect(body.parts[0].text).toBe("hello")
+  })
+
+  test("dev prompt response (admitted input) maps to a v1 user message", async () => {
+    cacheV2Version("http://up:4096", "0.0.0-dev-202610030456")
+    const plan = await planV2Request(new Request("http://ui/session/ses_1/prompt_async?target=http%3A%2F%2Fup%3A4096", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ part: { type: "text", text: "hello" } }),
@@ -275,6 +307,7 @@ describe("planV2Request", () => {
     expect(body.info.role).toBe("user")
     expect(body.info.id).toBe("msg_9")
     expect(body.parts[0].text).toBe("hello")
+    resetDialectCacheForTests()
   })
 
   test("session status maps the v2 active record to a v1 status map", async () => {

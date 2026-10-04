@@ -81,7 +81,10 @@ function promptBodyFromV1(body: unknown, sessionID: string): RouteToResult {
 function locationFromV2(payload: unknown): unknown {
   const raw = (payload ?? {}) as Dict
   const directory = typeof raw.directory === "string" ? raw.directory : ""
-  return { cwd: directory, root: directory }
+  // V1 /path returns {home, cwd, root}; V2 /api/location only knows the
+  // instance directory — expose it as home so consumers like the project
+  // dialog (which searches from home) keep working.
+  return { home: directory, cwd: directory, root: directory }
 }
 
 function messagesFromV2Response(payload: unknown, url: URL): unknown {

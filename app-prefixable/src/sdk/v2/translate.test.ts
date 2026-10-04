@@ -287,6 +287,19 @@ describe("planV2Request", () => {
     expect(map.ses_1.type).toBe("busy")
   })
 
+  test("path maps the v2 location to a v1 path info with home", async () => {
+    const plan = await planV2Request(new Request("http://ui/path"))
+    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
+    const res = await applyV2Response(plan, new Response(JSON.stringify({
+      directory: "/home/opencode",
+      project: { id: "p1", directory: "/home/opencode", canonical: "/home/opencode" },
+    }), { status: 200, headers: { "Content-Type": "application/json" } }))
+    const info = await res.json()
+    expect(info.home).toBe("/home/opencode")
+    expect(info.cwd).toBe("/home/opencode")
+    expect(info.root).toBe("/home/opencode")
+  })
+
   test("instance dispose is served locally", async () => {
     const plan = await planV2Request(new Request("http://ui/instance/dispose", { method: "POST" }))
     expect(plan.kind).toBe("local")

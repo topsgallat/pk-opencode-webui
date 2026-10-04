@@ -210,9 +210,12 @@ function modelEntryFromV2(m: Dict, pid: string, mid: string): Dict {
     headers: {},
     release_date: "",
     ...m,
-    id: `${pid}/${mid}`,
+    // Bare model id: the UI sends it back as modelID on /session/:id/model,
+    // which the V2 API expects unprefixed (a "pid/mid" id 400s as
+    // "Model unavailable: pid/pid/mid").
+    id: mid,
     providerID: pid,
-    api: { id: `${pid}/${mid}`, url: str2(dict2(m.settings).baseURL), npm: str2(m.package) },
+    api: { id: mid, url: str2(dict2(m.settings).baseURL), npm: str2(m.package) },
   }
   const cost = dict2(merged.cost)
   merged.cost = {
@@ -245,7 +248,7 @@ export async function providerListCustom({ send }: { send: Send }): Promise<Resp
     for (const m of models) {
       if (str2(m.providerID) !== pid) continue
       const mid = str2(m.modelID) || str2(m.id)
-      modelMap[`${pid}/${mid}`] = modelEntryFromV2(m, pid, mid)
+      modelMap[mid] = modelEntryFromV2(m, pid, mid)
     }
     return { id: pid, name: str2(p.name) || pid, source: "custom", env: [], options: {}, models: modelMap }
   })

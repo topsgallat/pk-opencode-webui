@@ -418,8 +418,8 @@ describe("providerListCustom", () => {
     const body = await res.json()
     expect(body.connected).toEqual(["zai"])
     expect(body.default).toEqual({ zai: "glm" })
-    const model = body.all[0].models["zai/glm"]
-    expect(model.id).toBe("zai/glm")
+    const model = body.all[0].models["glm"]
+    expect(model.id).toBe("glm")
     expect(model.providerID).toBe("zai")
     expect(model.name).toBe("GLM")
     expect(model.cost).toEqual({ input: 0, output: 0, cache: { read: 0, write: 0 } })

@@ -85,12 +85,13 @@ function promptBodyFromV1(body: unknown, sessionID: string): RouteToResult {
 function fileListFromV2(payload: unknown, { url }: { url: URL }): unknown {
   const data = unwrapData(payload)
   if (!Array.isArray(data)) return data
-  const dir = (url.searchParams.get("directory") ?? "").replace(/\/$/, "")
+  // "/" normalizes to "" so the join below still produces "/home", not "home".
+  const base = (url.searchParams.get("directory") ?? "").replace(/\/+$/, "")
   return data.map((item) => {
     const entry = dict2(item)
     const rel = str2(entry.path)
     const isAbsolute = rel.startsWith("/") || rel.startsWith("~")
-    const absolute = isAbsolute || !dir ? rel : `${dir}/${rel}`.replace(/\/+/g, "/")
+    const absolute = isAbsolute ? rel : `${base}/${rel}`.replace(/\/+/g, "/")
     return { ...entry, path: isAbsolute ? rel : absolute, absolute }
   })
 }

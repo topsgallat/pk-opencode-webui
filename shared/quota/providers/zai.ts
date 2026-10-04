@@ -1,6 +1,5 @@
-import { homedir } from "node:os"
-import { join } from "node:path"
 import { QuotaEntryView, QuotaFetchOptions, QuotaProvider, QuotaProviderView } from "../types"
+import { readOpenCodeAuthKey } from "../opencode-auth-file"
 
 const AUTH_IDS = ["zai-coding-plan", "zhipu-coding-plan"] as const
 
@@ -44,30 +43,9 @@ function asResetIso(value: unknown): string | undefined {
   return new Date(ms > 1e12 ? ms : ms * 1000).toISOString()
 }
 
-function authFilePaths(): string[] {
-  const home = process.env.HOME || process.env.USERPROFILE || homedir()
-  const dataHome = process.env.XDG_DATA_HOME
-  return [
-    ...(dataHome ? [join(dataHome, "opencode", "auth.json")] : []),
-    join(home, ".local", "share", "opencode", "auth.json"),
-    join(home, ".config", "opencode", "auth.json"),
-    join(home, "Library", "Application Support", "opencode", "auth.json"),
-  ]
-}
-
 async function readAuthFileHeader(id: string): Promise<string | undefined> {
-  for (const path of authFilePaths()) {
-    try {
-      const file = Bun.file(path)
-      if (!(await file.exists())) continue
-      const data = (await file.json()) as Record<string, Record<string, unknown>>
-      const key = asString(data?.[id]?.key)
-      if (key) return `Bearer ${key}`
-    } catch {
-      // unreadable or malformed auth file — try the next path
-    }
-  }
-  return undefined
+  const key = await readOpenCodeAuthKey(id)
+  return key ? `Bearer ${key}` : undefined
 }
 
 async function resolveAuth(options?: QuotaFetchOptions): Promise<{ id: string; header: string } | undefined> {

@@ -35,6 +35,9 @@ export function QuotaContent() {
   )
 
   const goConfigured = createMemo(() => Boolean(goApiKey().trim()))
+  const goAutoDetected = createMemo(() => !goConfigured() && Boolean(providers().find((provider) => provider.id === 'opencode-go')?.available))
+  const goBadgeActive = createMemo(() => goConfigured() || goAutoDetected())
+  const goBadgeLabel = createMemo(() => goConfigured() ? 'Configured' : goAutoDetected() ? 'Auto-detected' : 'Not configured')
 
   const handleSaveGoConfig = async () => {
     setGoSaving(true)
@@ -255,12 +258,12 @@ export function QuotaContent() {
             <span
               class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
               style={{
-                background: goConfigured() ? 'var(--surface-raised)' : 'var(--background-base)',
-                color: goConfigured() ? 'var(--icon-success-base)' : 'var(--text-weak)',
+                background: goBadgeActive() ? 'var(--surface-raised)' : 'var(--background-base)',
+                color: goBadgeActive() ? 'var(--icon-success-base)' : 'var(--text-weak)',
                 border: '1px solid var(--border-base)',
               }}
             >
-              {goConfigured() ? 'Configured' : 'Not configured'}
+              {goBadgeLabel()}
             </span>
             <Show when={goSavedAt()}>
               <span class="text-xs" style={{ color: 'var(--text-weak)' }}>
@@ -269,28 +272,35 @@ export function QuotaContent() {
             </Show>
           </div>
           <p class="text-xs" style={{ color: 'var(--text-weak)' }}>
-            Enter your OpenCode API key to display Go plan usage. The same key that the OpenCode CLI uses for the Go / Zen provider.
+            Reuses the OpenCode API key already stored by the CLI when you connected the OpenCode Zen / Go provider (<code style={{ 'font-family': 'var(--font-mono, monospace)' }}>/connect</code> or <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>opencode auth login</code>). Enter a key below only to override it.
           </p>
           <details class="text-xs" style={{ color: 'var(--text-weak)' }}>
             <summary class="cursor-pointer select-none" style={{ color: 'var(--text-weak)' }}>
-              How to find this value
+              How the key is resolved
             </summary>
             <div class="mt-2 space-y-2 pl-1">
               <div>
-                <strong style={{ color: 'var(--text-base)' }}>API key</strong>
+                <strong style={{ color: 'var(--text-base)' }}>Automatic (default)</strong>
                 <ol class="mt-1 list-decimal list-inside space-y-0.5">
-                  <li>Sign in to the <a href="https://opencode.ai/auth" target="_blank" rel="noreferrer" style={{ color: 'var(--text-base)', 'text-decoration': 'underline' }}>OpenCode console</a> and copy your API key (the same key used with <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>Authorization: Bearer</code> for opencode.ai).</li>
-                  <li>Paste the key into the field above — an <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>Authorization: Bearer …</code> header or an <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>OPENCODE_API_KEY=…</code> line also works.</li>
+                  <li>Run <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>/connect</code> in the OpenCode CLI (or <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>opencode auth login</code>) and pick <strong>OpenCode Zen</strong>.</li>
+                  <li>The key stored in the CLI auth file is picked up automatically — no need to paste anything here.</li>
+                </ol>
+              </div>
+              <div>
+                <strong style={{ color: 'var(--text-base)' }}>Manual override</strong>
+                <ol class="mt-1 list-decimal list-inside space-y-0.5">
+                  <li>Sign in to the <a href="https://opencode.ai/auth" target="_blank" rel="noreferrer" style={{ color: 'var(--text-base)', 'text-decoration': 'underline' }}>OpenCode console</a> and copy your API key.</li>
+                  <li>Paste it into the field above — an <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>Authorization: Bearer …</code> header or an <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>OPENCODE_API_KEY=…</code> line also works.</li>
                 </ol>
               </div>
               <p class="text-[11px]" style={{ color: 'var(--text-weak)' }}>
-                The key is stored locally on this server only and is sent directly to opencode.ai. Revoke it in the OpenCode console to invalidate it.
+                Keys are stored locally on this server only and are sent directly to opencode.ai. Revoke them in the OpenCode console to invalidate.
               </p>
             </div>
           </details>
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
             <label class="flex-1 space-y-1">
-              <span class="text-xs font-medium" style={{ color: 'var(--text-weak)' }}>API key</span>
+              <span class="text-xs font-medium" style={{ color: 'var(--text-weak)' }}>API key (optional override)</span>
               <input
                 type="password"
                 value={goApiKey()}
@@ -303,7 +313,7 @@ export function QuotaContent() {
                     setGoApiKey(key)
                   }
                 }}
-                placeholder="OpenCode API key"
+                placeholder="Detected from OpenCode CLI auth"
                 class="w-full rounded-md px-3 py-2 text-sm font-mono"
                 style={{
                   background: 'var(--background-base)',
@@ -312,7 +322,7 @@ export function QuotaContent() {
                 }}
               />
               <span class="text-[10px]" style={{ color: 'var(--text-weak)' }}>
-                Paste the key, an Authorization header, or an OPENCODE_API_KEY=… line.
+                Leave empty to use the CLI auth key, or paste a key / Authorization header / OPENCODE_API_KEY=… line.
               </span>
             </label>
             <button

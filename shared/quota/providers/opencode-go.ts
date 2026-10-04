@@ -1,9 +1,13 @@
 import { QuotaFetchOptions, QuotaProvider, QuotaProviderView, QuotaEntryView } from "../types"
+import { readOpenCodeAuthKey } from "../opencode-auth-file"
 import { getSettingsStore } from "../../settings-store"
 
 const ZEN_USAGE_URL = "https://opencode.ai/zen/go/v1/usage"
 const REQUEST_TIMEOUT_MS = 10_000
 const CACHE_TTL_MS = 30_000
+
+// the OpenCode CLI stores the Zen/Go API key in its auth store under these provider ids
+const ZEN_AUTH_IDS = ["opencode", "opencode-zen"] as const
 
 export type OpenCodeGoConfig = {
   apiKey?: string
@@ -30,7 +34,7 @@ type ParsedWindows = {
 
 const WINDOW_KEYS = ["rolling", "weekly", "monthly"] as const
 
-function loadOpenCodeGoConfig(): OpenCodeGoConfig {
+export function loadOpenCodeGoConfig(): OpenCodeGoConfig {
   try {
     const settings = getSettingsStore().load("opencode-go")
     return {
@@ -98,16 +102,31 @@ export function parseOpenCodeGoUsage(body: unknown): OpenCodeGoResult {
   return { success: true, rolling: windows.rolling, weekly: windows.weekly, monthly: windows.monthly }
 }
 
-async function loadOpenCodeGoUsage(config: OpenCodeGoConfig, refresh?: boolean): Promise<OpenCodeGoResult> {
+export async function resolveOpenCodeGoApiKey(
+  config: OpenCodeGoConfig,
+  options?: QuotaFetchOptions,
+): Promise<string | undefined> {
+  if (config.apiKey) return config.apiKey
+
+  const session = options?.resolveProviderAuthHeader?.(ZEN_AUTH_IDS[0])
+  const fromSession = session?.replace(/^bearer\s+/i, "").trim()
+  if (fromSession) return fromSession
+
+  for (const id of ZEN_AUTH_IDS) {
+    const key = await readOpenCodeAuthKey(id)
+    if (key) return key
+  }
+  return undefined
+}
+
+async function loadOpenCodeGoUsage(apiKey: string, refresh?: boolean): Promise<OpenCodeGoResult> {
   const cached = getCached(refresh)
   if (cached !== undefined) return cached
-
-  if (!config.apiKey) return { success: false, error: "OpenCode Go API key not configured" }
 
   try {
     const res = await fetch(ZEN_USAGE_URL, {
       headers: {
-        "Authorization": `Bearer ${config.apiKey}`,
+        "Authorization": `Bearer ${apiKey}`,
         "Accept": "application/json",
       },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -153,15 +172,16 @@ export class OpenCodeGoProvider implements QuotaProvider {
   id = "opencode-go"
   name = "OpenCode Go"
 
-  async isAvailable(): Promise<boolean> {
+  async isAvailable(options?: QuotaFetchOptions): Promise<boolean> {
     const config = loadOpenCodeGoConfig()
-    return Boolean(config.apiKey)
+    return Boolean(await resolveOpenCodeGoApiKey(config, options))
   }
 
   async fetch(options: QuotaFetchOptions): Promise<QuotaProviderView> {
     const config = loadOpenCodeGoConfig()
+    const apiKey = await resolveOpenCodeGoApiKey(config, options)
 
-    if (!config.apiKey) {
+    if (!apiKey) {
       return {
         id: this.id,
         name: this.name,
@@ -170,13 +190,13 @@ export class OpenCodeGoProvider implements QuotaProvider {
         fetchedAt: new Date().toISOString(),
         entries: [],
         warning: config.legacyCredentials
-          ? "opencode.ai no longer serves Go plan usage through the web session. Create an API key in the OpenCode console and enter it below."
-          : "OpenCode Go API key not configured. Enter your API key below.",
+          ? "opencode.ai no longer serves Go plan usage through the web session. Connect the OpenCode Zen provider in the CLI (/connect) or enter an API key below."
+          : "OpenCode Go API key not configured — connect the OpenCode Zen provider in the CLI (/connect) or enter an API key below.",
       }
     }
 
     try {
-      const result = await loadOpenCodeGoUsage(config, options?.refresh)
+      const result = await loadOpenCodeGoUsage(apiKey, options?.refresh)
 
       if (!result || !result.success) {
         return {

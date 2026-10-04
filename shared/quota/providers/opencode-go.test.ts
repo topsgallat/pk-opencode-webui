@@ -1,8 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { parseOpenCodeGoUsage, OpenCodeGoProvider } from "./opencode-go"
-import { __resetSettingsStoreForTests } from "../../settings-store"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
+import { parseOpenCodeGoUsage, OpenCodeGoProvider, resolveOpenCodeGoApiKey, loadOpenCodeGoConfig } from "./opencode-go"
+import { __resetSettingsStoreForTests, getSettingsStore } from "../../settings-store"
 
-const TMP_DB = `/tmp/opencode-go-test-${Date.now()}.db`
+const env = { HOME: process.env.HOME, XDG_DATA_HOME: process.env.XDG_DATA_HOME }
+let home = ""
+
+function writeCliAuth(id: string, key: string) {
+  const dir = join(home, ".local", "share", "opencode")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "auth.json"), JSON.stringify({ [id]: { type: "api", key } }))
+}
 
 function usageBody(offsetsMs: { rolling?: number; weekly?: number; monthly?: number }) {
   const window = (offsetMs?: number) => {
@@ -19,11 +29,21 @@ function usageBody(offsetsMs: { rolling?: number; weekly?: number; monthly?: num
 }
 
 beforeEach(() => {
-  __resetSettingsStoreForTests(TMP_DB)
+  home = mkdtempSync(join(tmpdir(), "pkui-ocgo-"))
+  process.env.HOME = home
+  delete process.env.XDG_DATA_HOME
+  __resetSettingsStoreForTests(join(home, "settings.db"))
 })
 
 afterEach(() => {
-  __resetSettingsStoreForTests(TMP_DB)
+  process.env.HOME = env.HOME
+  if (env.XDG_DATA_HOME === undefined) delete process.env.XDG_DATA_HOME
+  else process.env.XDG_DATA_HOME = env.XDG_DATA_HOME
+  __resetSettingsStoreForTests(join(tmpdir(), `pkui-ocgo-closed-${Date.now()}.db`))
+  if (home) {
+    rmSync(home, { recursive: true, force: true })
+    home = ""
+  }
 })
 
 describe("parseOpenCodeGoUsage — zen usage API", () => {
@@ -108,6 +128,46 @@ describe("parseOpenCodeGoUsage — edge cases", () => {
   })
 })
 
+describe("OpenCodeGoProvider — key resolution", () => {
+  it("resolves the key from the CLI auth store under the opencode provider id", async () => {
+    writeCliAuth("opencode", "cli_key")
+
+    const provider = new OpenCodeGoProvider()
+
+    expect(await provider.isAvailable()).toBe(true)
+    expect(await resolveOpenCodeGoApiKey({})).toBe("cli_key")
+  })
+
+  it("resolves the key under the opencode-zen provider id", async () => {
+    writeCliAuth("opencode-zen", "zen_key")
+
+    expect(await resolveOpenCodeGoApiKey({})).toBe("zen_key")
+  })
+
+  it("prefers the settings key over the CLI auth store", async () => {
+    writeCliAuth("opencode", "cli_key")
+    getSettingsStore().save("opencode-go", "apiKey", "manual_key")
+
+    expect(await resolveOpenCodeGoApiKey(loadOpenCodeGoConfig(), {})).toBe("manual_key")
+  })
+
+  it("strips the Bearer prefix from a session auth header", async () => {
+    writeCliAuth("opencode", "cli_key")
+
+    const key = await resolveOpenCodeGoApiKey({}, { resolveProviderAuthHeader: () => "Bearer session_key" })
+
+    expect(key).toBe("session_key")
+  })
+
+  it("falls through to the CLI auth store when no session auth matches", async () => {
+    writeCliAuth("opencode", "cli_key")
+
+    const key = await resolveOpenCodeGoApiKey({}, { resolveProviderAuthHeader: () => undefined })
+
+    expect(key).toBe("cli_key")
+  })
+})
+
 describe("OpenCodeGoProvider", () => {
   it("reports unavailable when no config in settings store", async () => {
     const provider = new OpenCodeGoProvider()
@@ -122,19 +182,19 @@ describe("OpenCodeGoProvider", () => {
   })
 
   it("asks for an API key when only legacy credentials are present", async () => {
-    __resetSettingsStoreForTests(TMP_DB).save("opencode-go", "workspaceId", "wk_test")
-    __resetSettingsStoreForTests(TMP_DB).save("opencode-go", "authCookie", "cookie123")
+    getSettingsStore().save("opencode-go", "workspaceId", "wk_test")
+    getSettingsStore().save("opencode-go", "authCookie", "cookie123")
 
     const provider = new OpenCodeGoProvider()
     const view = await provider.fetch({})
 
     expect(await provider.isAvailable()).toBe(false)
     expect(view.status).toBe("unavailable")
-    expect(view.warning).toContain("API key")
+    expect(view.warning).toContain("/connect")
   })
 
   it("reports available when an API key is saved in settings store", async () => {
-    __resetSettingsStoreForTests(TMP_DB).save("opencode-go", "apiKey", "oc_test_key")
+    getSettingsStore().save("opencode-go", "apiKey", "oc_test_key")
 
     const provider = new OpenCodeGoProvider()
 

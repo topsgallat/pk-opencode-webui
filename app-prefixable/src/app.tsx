@@ -1,5 +1,5 @@
 import { Router, Route, useNavigate, useParams } from "@solidjs/router"
-import { createMemo, createSignal, For, Show, onMount, onCleanup } from "solid-js"
+import { createMemo, createSignal, Show, onMount, onCleanup } from "solid-js"
 import { BasePathProvider, useBasePath } from "./context/base-path"
 import { BrandingProvider } from "./context/branding"
 import { DeviceProvider } from "./context/device"
@@ -19,53 +19,21 @@ import { ClaudeSession } from "./pages/claude-session"
 import { Settings } from "./pages/settings"
 import { Logs } from "./pages/logs"
 import { ProjectPicker } from "./pages/project-picker"
-import { base64Decode, deriveDirectoryFromPathname } from "./utils/path"
+import { deriveDirectoryFromPathname } from "./utils/path"
+import { getLastSessionHref, projectsStorageKey, shouldFallbackToRecent } from "./utils/session-href"
 import { hydrateSoundSettingsFromDb } from "./utils/sound"
 import type { Project } from "./components/shared"
-
-const PROJECTS_STORAGE_KEY = "opencode.projects"
-
-function projectsStorageKey(serverKey: string) {
-  return `${PROJECTS_STORAGE_KEY}.${serverKey}`
-}
-
-function getLastSessionHref(encodedDir: string, serverId: string, fallbackToRecent = false): string {
-  try {
-    const dir = base64Decode(encodedDir)
-    const last = typeof window !== "undefined"
-      ? window.localStorage.getItem(`opencode.lastSession.${serverId}.${dir}`)
-      : null
-    if (!last || last.includes("..") || /[\/\\]/.test(last)) return fallbackToRecent ? "/" : "session"
-    return `session/${last}`
-  } catch {
-    return fallbackToRecent ? "/" : "session"
-  }
-}
-
-function shouldFallbackToRecent() {
-  return typeof window !== "undefined" && new URL(window.location.href).searchParams.get("server-switch") === "1"
-}
 
 function DirectoryIndex() {
   const params = useParams<{ dir: string }>()
   const navigate = useNavigate()
   const server = useServer()
-  onMount(() => navigate(getLastSessionHref(params.dir, server.serverKey(), shouldFallbackToRecent()), { replace: true }))
-  return null
-}
-
-function SessionIndex() {
-  const params = useParams<{ dir: string }>()
-  const navigate = useNavigate()
-  const server = useServer()
-  const href = getLastSessionHref(params.dir, server.serverKey(), shouldFallbackToRecent())
-  if (href === "/") {
-    onMount(() => navigate("/", { replace: true }))
-    return null
-  }
-  if (href === "session") return <Session />
-  const id = href.replace(/^session\//, "")
-  onMount(() => navigate(id, { replace: true }))
+  // Deferred like the Session redirect: a synchronous navigate during the
+  // route's first render re-enters the router mid-context-creation.
+  onMount(() => {
+    const href = getLastSessionHref(params.dir, server.serverKey(), shouldFallbackToRecent())
+    setTimeout(() => navigate(href, { replace: true }), 0)
+  })
   return null
 }
 
@@ -84,8 +52,11 @@ function AppRoutes() {
       {/* Directory-scoped routes */}
       <Route path="/:dir" component={DirectoryLayout}>
         <Route path="/" component={DirectoryIndex} />
-        <Route path="/session" component={SessionIndex} />
-        <Route path="/session/:id" component={Session} />
+        {/* Single optional-param route: /session and /session/:id share the
+            Session component so navigating between them never remounts the
+            route (a SessionIndex redirect transition used to tear the route
+            context down mid-render and crash the router primitives). */}
+        <Route path="/session/:id?" component={Session} />
         <Route path="/settings" component={Settings} />
         <Route path="/logs" component={Logs} />
       </Route>

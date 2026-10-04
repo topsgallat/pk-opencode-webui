@@ -41,6 +41,7 @@ import { Terminal } from "../components/terminal";
 import { SessionHeader } from "../components/session-header";
 import { ResizeHandle } from "../components/resize-handle";
 import { base64Encode, base64Decode, getServerUrl } from "../utils/path";
+import { getLastSessionHref, shouldFallbackToRecent } from "../utils/session-href";
 import { loadSettings, saveSetting } from "../utils/settings-api";
 import type { AssistantMessage, Command as BackendCommand, Part, TextPart } from "../sdk/client";
 import type { DisplayMessage, QueueTurnState } from "../types/message";
@@ -450,6 +451,21 @@ export function Session() {
         setInstructionsActive((cfg?.instructions ?? []).length > 0);
       })
       .catch(() => { });
+  });
+
+  // Land on the user's last chat when /session is opened without an id.
+  // This used to live in a separate SessionIndex redirect route, but a
+  // navigate() fired synchronously during the route's first render re-enters
+  // the router mid-context-creation and crashes its primitives ("router
+  // primitives can be only used inside a Route") — deferring one tick turns
+  // it into a normal transition, which is safe.
+  onMount(() => {
+    if (params.id) return;
+    const href = getLastSessionHref(params.dir, server.serverKey(), shouldFallbackToRecent());
+    if (href === "session") return;
+    // navigate() resolves relative to the matched route (/dir/session), so
+    // strip the "session/" prefix and pass the bare id.
+    setTimeout(() => navigate(href === "/" ? "/" : href.replace(/^session\//, ""), { replace: true }), 0);
   });
 
   // Helper to get the current directory slug
@@ -951,7 +967,6 @@ export function Session() {
   // preventing drafts from leaking across projects when id stays undefined.
   createEffect(on(() => draftKey(server.serverKey(), params.dir, params.id), (key, prevKey) => {
     const id = params.id;
-    // DEBUG: URL param changed - removed console.log for production
 
     // Save draft from the previous session before switching.
     // Read signals via untrack() so they aren't tracked dependencies.

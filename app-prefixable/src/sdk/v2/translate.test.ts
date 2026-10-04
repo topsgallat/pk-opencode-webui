@@ -61,7 +61,9 @@ describe("sessionFromV2", () => {
 
 describe("messageFromV2", () => {
   test("assistant message becomes info + ordered parts", () => {
-    const { info, parts } = messageFromV2(V2_ASSISTANT, "ses_1")
+    const item = messageFromV2(V2_ASSISTANT, "ses_1")
+    if (!item) throw new Error("expected message")
+    const { info, parts } = item
     if (info.role !== "assistant") throw new Error("expected assistant")
     expect(info.modelID).toBe("space-bunny-free")
     expect(info.providerID).toBe("opencode")
@@ -74,7 +76,9 @@ describe("messageFromV2", () => {
   })
 
   test("user message gets a synthetic text part", () => {
-    const { info, parts } = messageFromV2(V2_USER, "ses_1")
+    const item = messageFromV2(V2_USER, "ses_1")
+    if (!item) throw new Error("expected message")
+    const { info, parts } = item
     if (info.role !== "user") throw new Error("expected user")
     expect(parts[0].type).toBe("text")
     if (parts[0].type !== "text") throw new Error("expected text")
@@ -89,10 +93,16 @@ describe("messageFromV2", () => {
       type: "user",
       payload: { text: "hi", delivery: "steer" },
     }
-    const { info, parts } = messageFromV2(inbox, "ses_1")
-    expect(info.role).toBe("user")
-    if (parts[0].type !== "text") throw new Error("expected text")
-    expect(parts[0].text).toBe("hi")
+    const item = messageFromV2(inbox, "ses_1")
+    if (!item) throw new Error("expected message")
+    expect(item.info.role).toBe("user")
+    if (item.parts[0].type !== "text") throw new Error("expected text")
+    expect(item.parts[0].text).toBe("hi")
+  })
+
+  test("timeline entries without a v1 counterpart are skipped", () => {
+    expect(messageFromV2({ id: "msg_1", type: "model-switched", time: { created: 1 }, model: { id: "m", providerID: "p" } }, "ses_1")).toBeUndefined()
+    expect(messageFromV2({ id: "msg_2", type: "agent-switched", time: { created: 1 }, agent: "plan" }, "ses_1")).toBeUndefined()
   })
 
   test("messageListFromV2 reverses newest-first to chronological", () => {
@@ -168,6 +178,62 @@ describe("eventFromV2", () => {
   test("unknown v2 events are dropped", () => {
     expect(eventFromV2({ type: "session.instructions.updated", data: {} })).toBeUndefined()
   })
+
+  test("session.next.* prefix (dev-line builds) is normalized", () => {
+    const delta = eventFromV2({
+      type: "session.next.text.delta",
+      data: { timestamp: 1791114479859, sessionID: "ses_9", assistantMessageID: "msg_1", ordinal: 0, delta: "hi" },
+    })
+    expect(delta?.type).toBe("message.part.delta")
+    const props = (delta as { properties: { delta: string } }).properties
+    expect(props.delta).toBe("hi")
+  })
+
+  test("step.failed maps to session.error", () => {
+    const event = eventFromV2({
+      type: "session.next.step.failed",
+      data: { timestamp: 1, sessionID: "ses_9", assistantMessageID: "msg_1", error: { type: "unknown", message: "boom" } },
+    })
+    expect(event?.type).toBe("session.error")
+  })
+
+  test("prompt admitted maps to a user message echo", () => {
+    const event = eventFromV2({
+      type: "session.next.prompt.admitted",
+      data: { timestamp: 1791114473019, sessionID: "ses_9", messageID: "msg_7", prompt: { text: "count to 3" }, delivery: "steer" },
+    })
+    expect(event?.type).toBe("message.updated")
+    const props = (event as unknown as { properties: { info: { id: string; role: string }; parts: Array<{ type: string; text: string }> } }).properties
+    expect(props.info.id).toBe("msg_7")
+    expect(props.info.role).toBe("user")
+    expect(props.parts[0].text).toBe("count to 3")
+  })
+
+  test("tool events map to v1 tool parts", () => {
+    const started = eventFromV2({
+      type: "session.next.tool.input.started",
+      data: { timestamp: 1, sessionID: "ses_9", assistantMessageID: "msg_1", callID: "call_1", name: "bash" },
+    })
+    expect(started?.type).toBe("message.part.updated")
+    const startedPart = (started as { properties: { part: { state: { status: string } } } }).properties.part
+    expect(startedPart.state.status).toBe("pending")
+
+    eventFromV2({
+      type: "session.next.tool.called",
+      data: { timestamp: 2, sessionID: "ses_9", assistantMessageID: "msg_1", callID: "call_1", tool: "bash", input: { command: "ls" } },
+    })
+    const done = eventFromV2({
+      type: "session.next.tool.success",
+      data: { timestamp: 3, sessionID: "ses_9", assistantMessageID: "msg_1", callID: "call_1", structured: { exit: 0 }, content: [{ type: "text", text: "out" }] },
+    })
+    expect(done?.type).toBe("message.part.updated")
+    const part = (done as { properties: { part: { callID: string; state: { status: string; output: string; input: Record<string, string> } } } }).properties.part
+    expect(part.callID).toBe("call_1")
+    expect(part.state.status).toBe("completed")
+    expect(part.state.output).toBe("out")
+    // Input from the earlier `called` event is carried into the terminal state.
+    expect(part.state.input.command).toBe("ls")
+  })
 })
 
 describe("planV2Request", () => {
@@ -183,7 +249,7 @@ describe("planV2Request", () => {
     expect(plan.url).toBe("/api/session/ses_1/interrupt")
   })
 
-  test("maps v1 prompt part body to v2 text body", async () => {
+  test("maps v1 prompt part body to the v2 wrapped prompt body", async () => {
     const plan = await planV2Request(new Request("http://ui/session/ses_1/prompt_async", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -192,7 +258,33 @@ describe("planV2Request", () => {
     if (plan.kind !== "rewrite") throw new Error("expected rewrite")
     expect(plan.url).toBe("/api/session/ses_1/prompt")
     const body = JSON.parse(String(plan.init.body))
-    expect(body.text).toBe("hello")
+    expect(body.prompt.text).toBe("hello")
+  })
+
+  test("prompt response (admitted input) maps to a v1 user message", async () => {
+    const plan = await planV2Request(new Request("http://ui/session/ses_1/prompt_async", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ part: { type: "text", text: "hello" } }),
+    }))
+    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
+    const res = await applyV2Response(plan, new Response(JSON.stringify({
+      data: { admittedSeq: 3, id: "msg_9", sessionID: "ses_1", prompt: { text: "hello" }, delivery: "steer", timeCreated: 1234 },
+    }), { status: 200, headers: { "Content-Type": "application/json" } }))
+    const body = await res.json()
+    expect(body.info.role).toBe("user")
+    expect(body.info.id).toBe("msg_9")
+    expect(body.parts[0].text).toBe("hello")
+  })
+
+  test("session status maps the v2 active record to a v1 status map", async () => {
+    const plan = await planV2Request(new Request("http://ui/session/status"))
+    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
+    const res = await applyV2Response(plan, new Response(JSON.stringify({
+      data: { ses_1: { type: "running" } },
+    }), { status: 200, headers: { "Content-Type": "application/json" } }))
+    const map = await res.json()
+    expect(map.ses_1.type).toBe("busy")
   })
 
   test("instance dispose is served locally", async () => {

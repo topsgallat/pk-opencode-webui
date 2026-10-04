@@ -190,7 +190,18 @@ function sessionBusy(statusPayload: unknown, sessionID: string): boolean {
     if (typeof type === "string") return type === "busy" || type === "retry"
     return true
   }
-  // v2 /api/session/active: { data: [...] } lists busy sessions
+  // V2 /api/session/active: {data: {<sessionID>: {type: "running"}}} — a
+  // record, not a list. Sessions absent from the record are idle.
+  const data = raw.data
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const owned = (data as Dict)[sessionID]
+    if (owned && typeof owned === "object") {
+      const type = (owned as Dict).type
+      return typeof type === "string" ? type === "running" : true
+    }
+    return false
+  }
+  // Some V2 builds list busy sessions as {data: [...]}.
   if (Array.isArray(raw.data)) {
     return raw.data.some((item) => {
       if (!item || typeof item !== "object") return false
@@ -247,7 +258,9 @@ async function sendPrompt(target: string, dialect: "v1" | "v2", sessionID: strin
   return fetch(`${target}/api/session/${sessionID}/prompt`, {
     method: "POST",
     headers,
-    body: JSON.stringify(partsToBody(item.parts)),
+    // V2 wraps the payload: {prompt: {text, files}} — a bare body fails
+    // schema validation with 400 "Missing key [\"prompt\"]".
+    body: JSON.stringify({ prompt: partsToBody(item.parts) }),
     signal: AbortSignal.timeout(20_000),
   })
 }

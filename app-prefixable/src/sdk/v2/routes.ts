@@ -1,7 +1,6 @@
 import {
   eventFromV2,
   isV2EventEnvelope,
-  messageFromV2,
   messageListFromV2,
   sessionFromV2,
 } from "./translate"
@@ -62,6 +61,8 @@ function promptBodyFromV1(body: unknown, sessionID: string): RouteToResult {
       files.push({ uri: p.url, name: typeof p.filename === "string" ? p.filename : undefined })
     }
   }
+  // V2 wraps the prompt payload: {prompt: {text, files}} — a bare {text} body
+  // fails schema validation with 400 "Missing key [\"prompt\"]".
   const prompt: Dict = { text: texts.join("\n\n"), files }
   let pre: RouteToResult["pre"]
   const model = (raw.model ?? {}) as Dict
@@ -72,7 +73,7 @@ function promptBodyFromV1(body: unknown, sessionID: string): RouteToResult {
   }
   return {
     url: api(`/session/${sessionID}/prompt`, ""),
-    init: jsonInit("POST", "", prompt),
+    init: jsonInit("POST", "", { prompt }),
     pre,
   }
 }
@@ -89,11 +90,33 @@ function messagesFromV2Response(payload: unknown, url: URL): unknown {
   return messageListFromV2(unwrapData(payload), sessionID)
 }
 
+// V2 prompt returns an admitted-input record ({data: {id, sessionID, prompt,
+// delivery, timeCreated}}), not a message — reshape it into the V1 user
+// message {info, parts} the SDK consumers expect.
 function promptResponseFromV1(payload: unknown, url: URL): unknown {
   const segments = url.pathname.split("/").filter(Boolean)
   const sessionID = segments.length >= 2 ? segments[segments.length - 2] : (segments[0] ?? "")
-  const item = messageFromV2(unwrapData(payload), sessionID)
-  return { info: item.info, parts: item.parts }
+  const raw = (unwrapData(payload) ?? {}) as Dict
+  const messageID = str2(raw.id) || `${sessionID}-prompt`
+  const created = typeof raw.timeCreated === "number" ? raw.timeCreated : Date.now()
+  const text = str2(dict2(raw.prompt).text)
+  const info: Dict = {
+    id: messageID,
+    sessionID,
+    role: "user",
+    time: { created },
+    agent: "build",
+    model: { providerID: "", modelID: "" },
+  }
+  const parts: Dict[] = [{
+    id: `${messageID}-text`,
+    sessionID,
+    messageID,
+    type: "text",
+    text,
+    time: { start: created },
+  }]
+  return { info, parts }
 }
 
 type RouteToResult = {
@@ -291,6 +314,17 @@ const ROUTES: RouteDef[] = [
     method: "GET",
     pattern: /^\/session\/status$/,
     to: ({ url }) => ({ url: api("/session/active", url.search), init: { method: "GET" } }),
+    // V2 active is {data: {<sessionID>: {type: "running"}}} — reshape into the
+    // V1 status map and translate the only V2 state to V1's "busy".
+    from: (payload) => {
+      const data = unwrapData(payload)
+      if (!data || typeof data !== "object" || Array.isArray(data)) return {}
+      const out: Dict = {}
+      for (const [sessionID, entry] of Object.entries(data as Dict)) {
+        out[sessionID] = str2(dict2(entry).type) === "running" ? { type: "busy" } : entry
+      }
+      return out
+    },
   },
   {
     method: "GET",

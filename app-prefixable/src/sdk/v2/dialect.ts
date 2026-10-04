@@ -20,6 +20,13 @@ async function probeJson(url: string, headers: HeadersInit): Promise<unknown> {
 
 async function probe(baseUrl: string, targetUrl?: string): Promise<Dialect> {
   const headers: HeadersInit = targetUrl ? { "x-opencode-target": targetUrl } : {}
+  // /global/health returns {healthy: true, version} on BOTH the V1 (1.x) and
+  // the V2 (2.x) lines, and V2 keeps the whole legacy V1 surface mounted
+  // (including directory-scoped /event). So a healthy answer means "use the
+  // V1-compatible surface" — routing stock V2 servers to the /api/* paths
+  // would break chat (native runner rejects non-catalog models). The /api/*
+  // dialect below only fires for builds that expose JSON /api/info and no
+  // healthy /global/health.
   const health = await probeJson(`${baseUrl}/global/health`, headers)
   if (health && typeof health === "object" && (health as Record<string, unknown>).healthy === true) return "v1"
   const info = await probeJson(`${baseUrl}/api/info`, headers)

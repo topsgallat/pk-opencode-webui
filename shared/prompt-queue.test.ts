@@ -179,7 +179,7 @@ test("worker sends v2-shaped requests against a v2 upstream", async () => {
   mockFetch((url, init) => {
     if (url.endsWith("/global/health")) return Promise.resolve(jsonResponse({}, 404))
     if (url.endsWith("/api/info")) return Promise.resolve(jsonResponse({ version: "2.0.0" }))
-    if (url.endsWith("/api/session/active")) return Promise.resolve(jsonResponse({ data: [] }))
+    if (url.endsWith("/api/session/active")) return Promise.resolve(jsonResponse({ data: { ses_other: { type: "running" } } }))
     bodies.push({ url, body: init?.body ? JSON.parse(init.body as string) : undefined })
     return Promise.resolve(jsonResponse({}))
   })
@@ -190,7 +190,8 @@ test("worker sends v2-shaped requests against a v2 upstream", async () => {
 
   const prompt = bodies.find((entry) => entry.url.endsWith("/api/session/ses_1/prompt"))
   expect(prompt).toBeDefined()
-  expect(prompt!.body).toEqual({ text: "hello a", files: [] })
+  // V2 wraps the payload in a `prompt` key.
+  expect(prompt!.body).toEqual({ prompt: { text: "hello a", files: [] } })
 })
 
 test("delete removes a single queued item", async () => {

@@ -42,7 +42,7 @@ import { SessionHeader } from "../components/session-header";
 import { ResizeHandle } from "../components/resize-handle";
 import { base64Encode, base64Decode, getServerUrl } from "../utils/path";
 import { loadSettings, saveSetting } from "../utils/settings-api";
-import type { Command as BackendCommand, Part, TextPart } from "../sdk/client";
+import type { AssistantMessage, Command as BackendCommand, Part, TextPart } from "../sdk/client";
 import type { DisplayMessage, QueueTurnState } from "../types/message";
 import { Plus, Settings, Paperclip, Upload, Bookmark, BookOpen, X as XIcon, SquareTerminal, RefreshCw, Clock } from "lucide-solid";
 import { Portal } from "solid-js/web";
@@ -918,6 +918,30 @@ export function Session() {
     void sync.session.sync(id).catch(() => {});
     void refreshDirectMessages(id).catch(() => {});
   }
+
+  // opencode v2 scopes event streams per directory. When the opened session
+  // lives outside the project directory (CLI-created, shared server, etc.) the
+  // project stream never carries its events and turns would hang at
+  // "Responding" forever — watch the session's own directory as well.
+  createEffect(() => {
+    const id = sessionId();
+    const sessionDir = id ? sync.session.get(id)?.directory : undefined;
+    if (!sessionDir || sessionDir === directory) return;
+
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    void sync.watchSessionEvents(sessionDir).then((fn) => {
+      if (cancelled) {
+        fn();
+        return;
+      }
+      unsub = fn;
+    });
+    onCleanup(() => {
+      cancelled = true;
+      unsub?.();
+    });
+  });
 
   const syncGen = { value: 0 };
   const restoreGen = { value: 0 };
@@ -2050,7 +2074,15 @@ export function Session() {
       }
 
       if (wasBusy) {
-        if (!sseActive()) return;
+        if (!sseActive()) {
+          // opencode v2 keeps its status endpoints empty even while a turn is
+          // running, so a missing entry here means "unknown", not "idle". A
+          // live SSE stream stays authoritative; otherwise decide from the
+          // session history so a turn whose events were never delivered (e.g.
+          // a foreign-directory session) cannot hang at "Responding" forever.
+          if (status === undefined) await resolveProcessingFromHistory(sessionID);
+          return;
+        }
         batch(() => {
           wasProcessing.value = false;
           setProcessing(false);
@@ -2062,6 +2094,49 @@ export function Session() {
       setProcessing(false);
     } catch {
       if (!wasBusy) return;
+    }
+  }
+
+  // History-based turn-completion check for streams without a usable status
+  // endpoint. The turn is over when its newest assistant message reached a
+  // terminal state (finish/completed/error); mid-turn the message is still
+  // open and processing continues.
+  let resolvingProcessing = false;
+  let lastHistoryCheckAt = 0;
+  async function resolveProcessingFromHistory(sessionID: string) {
+    if (resolvingProcessing) return;
+    const now = Date.now();
+    if (now - lastHistoryCheckAt < 6_000) return;
+    lastHistoryCheckAt = now;
+    resolvingProcessing = true;
+    try {
+      await sync.session.sync(sessionID);
+      if (!processing() || sessionId() !== sessionID) return;
+      const msgs = sync.data.message[sessionID] ?? [];
+      let last: AssistantMessage | undefined;
+      for (const m of msgs) {
+        const info = m.info;
+        if (info.role !== "assistant") continue;
+        if (!last || (info.time?.created ?? 0) >= (last.time?.created ?? 0)) last = info;
+      }
+      if (!last) return;
+      const errored = last.error;
+      const done = !!errored || !!last.finish || !!last.time?.completed;
+      if (!done) return;
+      batch(() => {
+        if (errored) {
+          setError(errorMessage(errored, "The selected model hit a limit. Please choose another model or try again later."));
+          const prompt = activePrompt() ?? failedPromptItem();
+          if (prompt && isRetryableModelFailure(errored)) setFailedPromptItem(prompt);
+        }
+        setActivePrompt(null);
+        wasProcessing.value = false;
+        setProcessing(false);
+      });
+    } catch {
+      // Keep polling — the next tick retries.
+    } finally {
+      resolvingProcessing = false;
     }
   }
 

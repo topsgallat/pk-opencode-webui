@@ -114,6 +114,8 @@ interface SyncContextValue {
   refresh: () => Promise<void>
   retryBootstrap: () => Promise<void>
   registerExternalListener: (fn: (event: SyncEvent) => void) => () => void
+  /** Subscribe to another directory's event stream (foreign-directory sessions). */
+  watchSessionEvents: (sessionDirectory: string) => Promise<() => void>
 }
 
 export const SyncContext = createContext<SyncContextValue>()
@@ -326,6 +328,18 @@ export function SyncProvider(props: ParentProps) {
   let eventSource: EventSource | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
+  function handleSSEMessage(e: MessageEvent) {
+    try {
+      const data = JSON.parse(e.data)
+      const v2 = isV2EventEnvelope(data) ? eventFromV2(data) : undefined
+      const event = (v2 ?? (data?.payload ?? data)) as SyncEvent
+      if (!event || !event.type) return
+      handleEvent(event)
+    } catch (err) {
+      console.error("[Sync] Parse error:", err)
+    }
+  }
+
   async function connect() {
     if (eventSource) {
       eventSource.close()
@@ -343,17 +357,7 @@ export function SyncProvider(props: ParentProps) {
       if (!store.ready) bootstrap()
     }
 
-    eventSource.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data)
-        const v2 = isV2EventEnvelope(data) ? eventFromV2(data) : undefined
-        const event = (v2 ?? (data?.payload ?? data)) as SyncEvent
-        if (!event || !event.type) return
-        handleEvent(event)
-      } catch (err) {
-        console.error("[Sync] Parse error:", err)
-      }
-    }
+    eventSource.onmessage = handleSSEMessage
 
     eventSource.onerror = () => {
       console.error("[Sync] Connection error, reconnecting...")
@@ -386,6 +390,60 @@ export function SyncProvider(props: ParentProps) {
           })
         }, 3000)
       }
+    }
+  }
+
+  // Directory-scoped event streams: opencode v2 publishes session events per
+  // directory, so a session whose directory differs from the project never
+  // appears on the project's stream and its turns would hang forever. Watch
+  // such directories with dedicated connections, one per directory, kept
+  // alive while at least one subscriber is registered.
+  const sessionSources = new Map<string, { refs: number; stopped: boolean; retryTimer: ReturnType<typeof setTimeout> | null; source: EventSource | null }>()
+
+  async function watchSessionEvents(sessionDirectory: string): Promise<() => void> {
+    let entry = sessionSources.get(sessionDirectory)
+    if (!entry || entry.stopped) {
+      entry = { refs: 0, stopped: false, retryTimer: null, source: null }
+      sessionSources.set(sessionDirectory, entry)
+    }
+    const state = entry
+    state.refs += 1
+
+    const open = async () => {
+      state.source?.close()
+      state.source = null
+      const dirParam = `?directory=${encodeURIComponent(sessionDirectory)}`
+      const dialect = await dialectFor(url, targetUrl)
+      // The watch may have been cancelled while the dialect probe ran.
+      if (state.stopped) return
+      const eventPath = dialect === "v2" ? "/api/event" : "/event"
+      state.source = new EventSource(appendTargetParam(`${url}${eventPath}${dirParam}`, targetUrl))
+      console.log("[Sync] Watching session directory SSE:", sessionDirectory)
+      state.source.onmessage = handleSSEMessage
+      state.source.onerror = () => {
+        state.source?.close()
+        state.source = null
+        if (state.stopped) return
+        state.retryTimer = setTimeout(() => {
+          void open()
+        }, 3000)
+      }
+    }
+    if (state.refs === 1) void open()
+
+    let cancelled = false
+    return () => {
+      if (cancelled) return
+      cancelled = true
+      state.refs -= 1
+      if (state.refs > 0) return
+      state.stopped = true
+      if (state.retryTimer) clearTimeout(state.retryTimer)
+      state.source?.close()
+      state.source = null
+      setTimeout(() => {
+        if (sessionSources.get(sessionDirectory) === state) sessionSources.delete(sessionDirectory)
+      }, 0)
     }
   }
 
@@ -872,6 +930,13 @@ export function SyncProvider(props: ParentProps) {
     setGlobalSyncReady(false)
     eventSource?.close()
     if (reconnectTimer) clearTimeout(reconnectTimer)
+    for (const state of sessionSources.values()) {
+      state.stopped = true
+      if (state.retryTimer) clearTimeout(state.retryTimer)
+      state.source?.close()
+      state.source = null
+    }
+    sessionSources.clear()
     if (typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", rescheduleFlushForHiddenTab)
     }
@@ -916,11 +981,12 @@ export function SyncProvider(props: ParentProps) {
     },
     refresh,
     retryBootstrap: bootstrap,
-    registerExternalListener(fn) {
-      externalListeners.add(fn)
-      return () => externalListeners.delete(fn)
-    },
-  }
+  registerExternalListener(fn) {
+    externalListeners.add(fn)
+    return () => externalListeners.delete(fn)
+  },
+  watchSessionEvents,
+}
 
   return <SyncContext.Provider value={value}>{props.children}</SyncContext.Provider>
 }

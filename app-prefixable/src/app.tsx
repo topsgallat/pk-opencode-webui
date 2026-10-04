@@ -28,11 +28,13 @@ function DirectoryIndex() {
   const params = useParams<{ dir: string }>()
   const navigate = useNavigate()
   const server = useServer()
-  // Deferred like the Session redirect: a synchronous navigate during the
-  // route's first render re-enters the router mid-context-creation.
+  // Deferred like the Session redirect (a synchronous navigate during the
+  // route's first render re-enters the router mid-context-creation) and with
+  // an absolute target so a late/racing invocation cannot double-append.
   onMount(() => {
     const href = getLastSessionHref(params.dir, server.serverKey(), shouldFallbackToRecent())
-    setTimeout(() => navigate(href, { replace: true }), 0)
+    const target = href === "session" ? `/${params.dir}/session` : href === "/" ? "/" : `/${params.dir}/${href}`
+    setTimeout(() => navigate(target, { replace: true }), 0)
   })
   return null
 }

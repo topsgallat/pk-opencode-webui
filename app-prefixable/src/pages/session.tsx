@@ -456,16 +456,21 @@ export function Session() {
   // Land on the user's last chat when /session is opened without an id.
   // This used to live in a separate SessionIndex redirect route, but a
   // navigate() fired synchronously during the route's first render re-enters
-  // the router mid-context-creation and crashes its primitives ("router
-  // primitives can be only used inside a Route") — deferring one tick turns
-  // it into a normal transition, which is safe.
+  // the router mid-context-creation and crashes its primitives — deferring
+  // one tick turns it into a normal transition.
   onMount(() => {
     if (params.id) return;
     const href = getLastSessionHref(params.dir, server.serverKey(), shouldFallbackToRecent());
     if (href === "session") return;
-    // navigate() resolves relative to the matched route (/dir/session), so
-    // strip the "session/" prefix and pass the bare id.
-    setTimeout(() => navigate(href === "/" ? "/" : href.replace(/^session\//, ""), { replace: true }), 0);
+    // Navigate to an ABSOLUTE path and re-check params inside the timeout:
+    // a relative id ("ses_x") resolves against the current URL, so a redirect
+    // racing the route transition could append twice (/session/ses_x/ses_x —
+    // a path no route matches = blank page). Absolute targets are idempotent.
+    const target = href === "/" ? "/" : `/${params.dir}/${href}`;
+    setTimeout(() => {
+      if (params.id) return;
+      navigate(target, { replace: true });
+    }, 0);
   });
 
   // Helper to get the current directory slug

@@ -78,6 +78,23 @@ function promptBodyFromV1(body: unknown, sessionID: string): RouteToResult {
   }
 }
 
+// V2 fs.list entries are {path, type} with paths relative to the queried
+// directory; V1 file nodes carry absolute paths (and consumers like the
+// project dialog read node.absolute). Rebuild the absolute path from the
+// directory query parameter of the original request.
+function fileListFromV2(payload: unknown, { url }: { url: URL }): unknown {
+  const data = unwrapData(payload)
+  if (!Array.isArray(data)) return data
+  const dir = (url.searchParams.get("directory") ?? "").replace(/\/$/, "")
+  return data.map((item) => {
+    const entry = dict2(item)
+    const rel = str2(entry.path)
+    const isAbsolute = rel.startsWith("/") || rel.startsWith("~")
+    const absolute = isAbsolute || !dir ? rel : `${dir}/${rel}`.replace(/\/+/g, "/")
+    return { ...entry, path: isAbsolute ? rel : absolute, absolute }
+  })
+}
+
 function locationFromV2(payload: unknown): unknown {
   const raw = (payload ?? {}) as Dict
   const directory = typeof raw.directory === "string" ? raw.directory : ""
@@ -468,7 +485,7 @@ const ROUTES: RouteDef[] = [
     method: "GET",
     pattern: /^\/file$/,
     to: ({ url }) => ({ url: api("/fs/list", url.search), init: { method: "GET" } }),
-    from: unwrapData,
+    from: fileListFromV2,
   },
   {
     method: "GET",

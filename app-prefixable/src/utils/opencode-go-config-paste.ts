@@ -1,60 +1,33 @@
-const WORKSPACE_RE = /workspace\/([a-zA-Z0-9_-]+)/i
-const AUTH_COOKIE_RE = /(?:^|;|\s)auth=([^;\s]+)/i
+const BEARER_RE = /bearer\s+([A-Za-z0-9._-]+)/i
+const KEY_VALUE_RE = /(?:OPENCODE(?:_GO)?_)?API[_-]?KEY["':=\s]+([A-Za-z0-9._-]{8,})/i
 
 function firstLine(text: string): string {
   return text.split(/\r?\n/)[0] ?? text
 }
 
-function looksLikeWorkspaceId(value: string): boolean {
-  return /^[a-z0-9_-]+$/i.test(value.trim()) && value.trim().length >= 3
-}
-
-function looksLikeAuthCookie(value: string): boolean {
+function looksLikeApiKey(value: string): boolean {
   const trimmed = value.trim()
-  return trimmed.length >= 8 && !trimmed.includes(" ") && !trimmed.includes("\t")
+  return trimmed.length >= 16 && /^[A-Za-z0-9._-]+$/.test(trimmed)
 }
 
-export function extractOpenCodeGoWorkspaceId(input: string): string | undefined {
+export function extractOpenCodeGoApiKey(input: string): string | undefined {
   const trimmed = input.trim()
   if (!trimmed) return undefined
 
-  if (looksLikeWorkspaceId(trimmed)) return trimmed
+  const bearerMatch = trimmed.match(BEARER_RE)
+  if (bearerMatch?.[1]) return bearerMatch[1]
 
-  const match = trimmed.match(WORKSPACE_RE)
-  if (match) {
-    const id = match[1]
-    if (id) return id
-  }
-
-  return undefined
-}
-
-function cleanCookieValue(value: string): string {
-  return value.trim().replace(/['"`]+$/, "")
-}
-
-export function extractOpenCodeGoAuthCookie(input: string): string | undefined {
-  const trimmed = input.trim()
-  if (!trimmed) return undefined
-
-  const headerMatch = trimmed.match(/cookie:\s*([^\n]+)/i)
-  if (headerMatch) {
-    const cookieMatch = headerMatch[1].match(AUTH_COOKIE_RE)
-    if (cookieMatch?.[1]) return cleanCookieValue(cookieMatch[1])
-  }
-
-  const authMatch = trimmed.match(AUTH_COOKIE_RE)
-  if (authMatch?.[1]) return cleanCookieValue(authMatch[1])
+  const envMatch = trimmed.match(KEY_VALUE_RE)
+  if (envMatch?.[1]) return envMatch[1]
 
   const first = firstLine(trimmed)
   const parts = first.split(/\t/)
   if (parts.length >= 2) {
-    const name = parts[0].trim()
+    const name = parts[0].trim().toLowerCase()
     const value = parts[1].trim()
-    if (name.toLowerCase() === "auth" && value) return value
+    if (name.includes("authorization") && value) return value.replace(/^bearer\s+/i, "")
   }
 
-  if (looksLikeAuthCookie(trimmed)) return trimmed
-
+  if (looksLikeApiKey(trimmed)) return trimmed
   return undefined
 }

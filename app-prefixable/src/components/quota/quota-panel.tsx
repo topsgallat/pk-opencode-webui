@@ -3,7 +3,7 @@ import { useBasePath } from '../../context/base-path'
 import { useSDK } from '../../context/sdk'
 import { getQuota } from '../../utils/extended-api'
 import { loadSettings, saveSetting } from '../../utils/settings-api'
-import { extractOpenCodeGoAuthCookie, extractOpenCodeGoWorkspaceId } from '../../utils/opencode-go-config-paste'
+import { extractOpenCodeGoApiKey } from '../../utils/opencode-go-config-paste'
 import { QuotaProviderView } from '../../types/quota'
 import { QUOTA_PROVIDER_CATALOG } from '../../../../shared/quota/provider-catalog'
 import { QuotaProviderCard } from './quota-provider-card'
@@ -16,8 +16,7 @@ export function QuotaContent() {
   const [clock, setClock] = createSignal(Date.now())
   const [disabledProviders, setDisabledProviders] = createSignal<string[]>([])
 
-  const [goWorkspaceId, setGoWorkspaceId] = createSignal('')
-  const [goAuthCookie, setGoAuthCookie] = createSignal('')
+  const [goApiKey, setGoApiKey] = createSignal('')
   const [goSaving, setGoSaving] = createSignal(false)
   const [goSavedAt, setGoSavedAt] = createSignal<string | null>(null)
 
@@ -30,19 +29,17 @@ export function QuotaContent() {
       ])
       const ids = Array.isArray(quotaData?.disabledProviders) ? quotaData.disabledProviders.filter((id: unknown): id is string => typeof id === "string") : []
       setDisabledProviders(ids)
-      if (typeof goData?.workspaceId === "string") setGoWorkspaceId(goData.workspaceId)
-      if (typeof goData?.authCookie === "string") setGoAuthCookie(goData.authCookie)
+      if (typeof goData?.apiKey === "string") setGoApiKey(goData.apiKey)
       return { quota: quotaData, go: goData }
     },
   )
 
-  const goConfigured = createMemo(() => Boolean(goWorkspaceId().trim() && goAuthCookie().trim()))
+  const goConfigured = createMemo(() => Boolean(goApiKey().trim()))
 
   const handleSaveGoConfig = async () => {
     setGoSaving(true)
     try {
-      await saveSetting(serverUrl, "opencode-go", "workspaceId", goWorkspaceId().trim())
-      await saveSetting(serverUrl, "opencode-go", "authCookie", goAuthCookie().trim())
+      await saveSetting(serverUrl, "opencode-go", "apiKey", goApiKey().trim())
       setGoSavedAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
       refetch()
     } catch (error) {
@@ -272,77 +269,41 @@ export function QuotaContent() {
             </Show>
           </div>
           <p class="text-xs" style={{ color: 'var(--text-weak)' }}>
-            Enter your OpenCode workspace ID and auth cookie to display Go plan usage. Both values come from the opencode.ai website while you are logged in.
+            Enter your OpenCode API key to display Go plan usage. The same key that the OpenCode CLI uses for the Go / Zen provider.
           </p>
           <details class="text-xs" style={{ color: 'var(--text-weak)' }}>
             <summary class="cursor-pointer select-none" style={{ color: 'var(--text-weak)' }}>
-              How to find these values
+              How to find this value
             </summary>
             <div class="mt-2 space-y-2 pl-1">
               <div>
-                <strong style={{ color: 'var(--text-base)' }}>Workspace ID</strong>
+                <strong style={{ color: 'var(--text-base)' }}>API key</strong>
                 <ol class="mt-1 list-decimal list-inside space-y-0.5">
-                  <li>Open <a href="https://opencode.ai/" target="_blank" rel="noreferrer" style={{ color: 'var(--text-base)', 'text-decoration': 'underline' }}>opencode.ai</a> and sign in.</li>
-                  <li>Go to your dashboard — the URL will look like <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>https://opencode.ai/workspace/<strong>wk_xxx…</strong>/usage</code>.</li>
-                  <li>The <strong>workspace ID</strong> is the <code>wk_…</code> segment in that URL. Copy it into the field above.</li>
-                </ol>
-              </div>
-              <div>
-                <strong style={{ color: 'var(--text-base)' }}>Auth cookie</strong>
-                <ol class="mt-1 list-decimal list-inside space-y-0.5">
-                  <li>While on the opencode.ai site, open your browser DevTools (F12, or right-click → Inspect).</li>
-                  <li>Go to the <strong>Application</strong> tab → <strong>Storage</strong> → <strong>Cookies</strong> → <code>https://opencode.ai</code>.</li>
-                  <li>Find the cookie named <code>auth</code> (it is httpOnly, so you may need to copy the value via the row's edit field).</li>
-                  <li>Copy the cookie <em>value</em> (not the name) into the field above. It is a long opaque string.</li>
+                  <li>Sign in to the <a href="https://opencode.ai/auth" target="_blank" rel="noreferrer" style={{ color: 'var(--text-base)', 'text-decoration': 'underline' }}>OpenCode console</a> and copy your API key (the same key used with <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>Authorization: Bearer</code> for opencode.ai).</li>
+                  <li>Paste the key into the field above — an <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>Authorization: Bearer …</code> header or an <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>OPENCODE_API_KEY=…</code> line also works.</li>
                 </ol>
               </div>
               <p class="text-[11px]" style={{ color: 'var(--text-weak)' }}>
-                The cookie is stored locally on this server only and is sent directly to opencode.ai. Sign out of opencode.ai to invalidate it.
+                The key is stored locally on this server only and is sent directly to opencode.ai. Revoke it in the OpenCode console to invalidate it.
               </p>
             </div>
           </details>
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
             <label class="flex-1 space-y-1">
-              <span class="text-xs font-medium" style={{ color: 'var(--text-weak)' }}>Workspace ID</span>
-              <input
-                type="text"
-                value={goWorkspaceId()}
-                onInput={(e) => setGoWorkspaceId(e.currentTarget.value)}
-                onPaste={(e) => {
-                  const text = e.clipboardData?.getData('text') ?? ''
-                  const id = extractOpenCodeGoWorkspaceId(text)
-                  if (id) {
-                    e.preventDefault()
-                    setGoWorkspaceId(id)
-                  }
-                }}
-                placeholder="wk_abc123 or paste workspace URL"
-                class="w-full rounded-md px-3 py-2 text-sm"
-                style={{
-                  background: 'var(--background-base)',
-                  color: 'var(--text-strong)',
-                  border: '1px solid var(--border-base)',
-                }}
-              />
-              <span class="text-[10px]" style={{ color: 'var(--text-weak)' }}>
-                Paste the workspace URL or just the ID.
-              </span>
-            </label>
-            <label class="flex-1 space-y-1">
-              <span class="text-xs font-medium" style={{ color: 'var(--text-weak)' }}>Auth cookie</span>
+              <span class="text-xs font-medium" style={{ color: 'var(--text-weak)' }}>API key</span>
               <input
                 type="password"
-                value={goAuthCookie()}
-                onInput={(e) => setGoAuthCookie(e.currentTarget.value)}
+                value={goApiKey()}
+                onInput={(e) => setGoApiKey(e.currentTarget.value)}
                 onPaste={(e) => {
                   const text = e.clipboardData?.getData('text') ?? ''
-                  const cookie = extractOpenCodeGoAuthCookie(text)
-                  if (cookie) {
+                  const key = extractOpenCodeGoApiKey(text)
+                  if (key) {
                     e.preventDefault()
-                    setGoAuthCookie(cookie)
+                    setGoApiKey(key)
                   }
                 }}
-                placeholder="auth cookie value"
+                placeholder="OpenCode API key"
                 class="w-full rounded-md px-3 py-2 text-sm font-mono"
                 style={{
                   background: 'var(--background-base)',
@@ -351,7 +312,7 @@ export function QuotaContent() {
                 }}
               />
               <span class="text-[10px]" style={{ color: 'var(--text-weak)' }}>
-                Paste the cookie value, auth=… string, DevTools row, or cURL header.
+                Paste the key, an Authorization header, or an OPENCODE_API_KEY=… line.
               </span>
             </label>
             <button

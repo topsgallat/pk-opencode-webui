@@ -184,11 +184,52 @@ function dict2(value: unknown): Dict {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Dict) : {}
 }
 
+function num2(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0
+}
+
+// V1 consumers read the full Model shape (capabilities/cost/limit/status) —
+// and some fields feed numeric formatting that crashes on undefined. V2
+// model entries carry a different subset, so guarantee the V1-required
+// structure with safe defaults while keeping whatever V2 provided.
+function modelEntryFromV2(m: Dict, pid: string, mid: string): Dict {
+  const merged: Dict = {
+    name: mid,
+    capabilities: {
+      temperature: true,
+      reasoning: false,
+      attachment: false,
+      toolcall: true,
+      input: { text: true, audio: false, image: false, video: false, pdf: false },
+      output: { text: true, audio: false, image: false, video: false, pdf: false },
+    },
+    cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+    limit: { context: 0, output: 0 },
+    status: "active",
+    options: {},
+    headers: {},
+    release_date: "",
+    ...m,
+    id: `${pid}/${mid}`,
+    providerID: pid,
+    api: { id: `${pid}/${mid}`, url: str2(dict2(m.settings).baseURL), npm: str2(m.package) },
+  }
+  const cost = dict2(merged.cost)
+  merged.cost = {
+    input: num2(cost.input),
+    output: num2(cost.output),
+    cache: { read: num2(dict2(cost.cache).read), write: num2(dict2(cost.cache).write) },
+  }
+  const limit = dict2(merged.limit)
+  merged.limit = { context: num2(limit.context), input: num2(limit.input), output: num2(limit.output) }
+  return merged
+}
+
 async function jsonOf(res: Response): Promise<unknown> {
   return res.json().catch(() => null)
 }
 
-async function providerListCustom({ send }: { send: Send }): Promise<Response> {
+export async function providerListCustom({ send }: { send: Send }): Promise<Response> {
   const [provRes, modelRes, defRes] = await Promise.all([
     send("/api/provider"),
     send("/api/model"),
@@ -204,12 +245,7 @@ async function providerListCustom({ send }: { send: Send }): Promise<Response> {
     for (const m of models) {
       if (str2(m.providerID) !== pid) continue
       const mid = str2(m.modelID) || str2(m.id)
-      modelMap[`${pid}/${mid}`] = {
-        ...m,
-        id: `${pid}/${mid}`,
-        providerID: pid,
-        api: { id: `${pid}/${mid}`, url: str2(dict2(m.settings).baseURL), npm: str2(m.package) },
-      }
+      modelMap[`${pid}/${mid}`] = modelEntryFromV2(m, pid, mid)
     }
     return { id: pid, name: str2(p.name) || pid, source: "custom", env: [], options: {}, models: modelMap }
   })

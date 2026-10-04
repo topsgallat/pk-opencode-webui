@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { eventFromV2, isV2EventEnvelope, messageFromV2, messageListFromV2, sessionFromV2 } from "./translate"
-import { applyV2Response, planV2Request } from "./routes"
+import { applyV2Response, planV2Request, providerListCustom } from "./routes"
 import { cacheV2Version, resetDialectCacheForTests } from "./dialect"
 
 const V2_SESSION = {
@@ -401,5 +401,30 @@ describe("planV2Request", () => {
     expect(list[0].id).toBe("frm_1")
     expect(list[0].questions[0].question).toBe("Pick one")
     expect(list[0].questions[0].options.length).toBe(1)
+  })
+})
+
+describe("providerListCustom", () => {
+  test("merges v2 provider/model into complete v1 shapes with connected", async () => {
+    const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } })
+    const res = await providerListCustom({
+      send: async (path: string) => {
+        if (path === "/api/provider") return jsonResponse({ data: [{ id: "zai", name: "ZAI" }] })
+        if (path === "/api/model") return jsonResponse({ data: [{ providerID: "zai", modelID: "glm", name: "GLM" }] })
+        if (path === "/api/model/default") return jsonResponse({ data: { providerID: "zai", modelID: "glm" } })
+        return jsonResponse({}, 404)
+      },
+    })
+    const body = await res.json()
+    expect(body.connected).toEqual(["zai"])
+    expect(body.default).toEqual({ zai: "glm" })
+    const model = body.all[0].models["zai/glm"]
+    expect(model.id).toBe("zai/glm")
+    expect(model.providerID).toBe("zai")
+    expect(model.name).toBe("GLM")
+    expect(model.cost).toEqual({ input: 0, output: 0, cache: { read: 0, write: 0 } })
+    expect(model.limit).toEqual({ context: 0, input: 0, output: 0 })
+    expect(model.capabilities.toolcall).toBe(true)
+    expect(model.status).toBe("active")
   })
 })

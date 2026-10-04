@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { parseOpenCodeGoUsage, OpenCodeGoProvider, resolveOpenCodeGoApiKey, loadOpenCodeGoConfig } from "./opencode-go"
@@ -11,7 +11,9 @@ let home = ""
 function writeCliAuth(id: string, key: string) {
   const dir = join(home, ".local", "share", "opencode")
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, "auth.json"), JSON.stringify({ [id]: { type: "api", key } }))
+  const path = join(dir, "auth.json")
+  const existing = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {}
+  writeFileSync(path, JSON.stringify({ ...existing, [id]: { type: "api", key } }))
 }
 
 function usageBody(offsetsMs: { rolling?: number; weekly?: number; monthly?: number }) {
@@ -129,13 +131,20 @@ describe("parseOpenCodeGoUsage — edge cases", () => {
 })
 
 describe("OpenCodeGoProvider — key resolution", () => {
-  it("resolves the key from the CLI auth store under the opencode provider id", async () => {
-    writeCliAuth("opencode", "cli_key")
+  it("resolves the key from the CLI auth store under the opencode-go provider id", async () => {
+    writeCliAuth("opencode-go", "go_key")
 
     const provider = new OpenCodeGoProvider()
 
     expect(await provider.isAvailable()).toBe(true)
-    expect(await resolveOpenCodeGoApiKey({})).toBe("cli_key")
+    expect(await resolveOpenCodeGoApiKey(loadOpenCodeGoConfig(), {})).toBe("go_key")
+  })
+
+  it("prefers the opencode-go id over the zen ids", async () => {
+    writeCliAuth("opencode-go", "go_key")
+    writeCliAuth("opencode", "zen_key")
+
+    expect(await resolveOpenCodeGoApiKey(loadOpenCodeGoConfig(), {})).toBe("go_key")
   })
 
   it("resolves the key under the opencode-zen provider id", async () => {

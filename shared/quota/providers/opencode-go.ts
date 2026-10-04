@@ -6,8 +6,8 @@ const ZEN_USAGE_URL = "https://opencode.ai/zen/go/v1/usage"
 const REQUEST_TIMEOUT_MS = 10_000
 const CACHE_TTL_MS = 30_000
 
-// the OpenCode CLI stores the Zen/Go API key in its auth store under these provider ids
-const ZEN_AUTH_IDS = ["opencode", "opencode-zen"] as const
+// the OpenCode CLI stores the Go/Zen API key in its auth store under these provider ids
+const ZEN_AUTH_IDS = ["opencode-go", "opencode", "opencode-zen"] as const
 
 export type OpenCodeGoConfig = {
   apiKey?: string
@@ -108,9 +108,11 @@ export async function resolveOpenCodeGoApiKey(
 ): Promise<string | undefined> {
   if (config.apiKey) return config.apiKey
 
-  const session = options?.resolveProviderAuthHeader?.(ZEN_AUTH_IDS[0])
-  const fromSession = session?.replace(/^bearer\s+/i, "").trim()
-  if (fromSession) return fromSession
+  for (const id of ZEN_AUTH_IDS) {
+    const session = options?.resolveProviderAuthHeader?.(id)
+    const fromSession = session?.replace(/^bearer\s+/i, "").trim()
+    if (fromSession) return fromSession
+  }
 
   for (const id of ZEN_AUTH_IDS) {
     const key = await readOpenCodeAuthKey(id)
@@ -190,8 +192,8 @@ export class OpenCodeGoProvider implements QuotaProvider {
         fetchedAt: new Date().toISOString(),
         entries: [],
         warning: config.legacyCredentials
-          ? "opencode.ai no longer serves Go plan usage through the web session. Connect the OpenCode Zen provider in the CLI (/connect) or enter an API key below."
-          : "OpenCode Go API key not configured — connect the OpenCode Zen provider in the CLI (/connect) or enter an API key below.",
+          ? "opencode.ai no longer serves Go plan usage through the web session. Connect the OpenCode Go provider in the CLI (/connect) or enter an API key below."
+          : "OpenCode Go API key not configured — connect the OpenCode Go provider in the CLI (/connect) or enter an API key below.",
       }
     }
 

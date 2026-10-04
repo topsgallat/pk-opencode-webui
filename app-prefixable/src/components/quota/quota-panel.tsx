@@ -275,7 +275,7 @@ export function QuotaContent() {
             </Show>
           </div>
           <p class="text-xs" style={{ color: 'var(--text-weak)' }}>
-            Reuses the OpenCode API key already stored by the CLI when you connected the OpenCode Zen / Go provider (<code style={{ 'font-family': 'var(--font-mono, monospace)' }}>/connect</code> or <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>opencode auth login</code>). Enter a key below only to override it.
+            Reuses the OpenCode API key already stored by the CLI when you connected the OpenCode Go / Zen provider (<code style={{ 'font-family': 'var(--font-mono, monospace)' }}>/connect</code> or <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>opencode auth login</code>). Enter a key below only to override it.
           </p>
           <details class="text-xs" style={{ color: 'var(--text-weak)' }}>
             <summary class="cursor-pointer select-none" style={{ color: 'var(--text-weak)' }}>
@@ -285,7 +285,7 @@ export function QuotaContent() {
               <div>
                 <strong style={{ color: 'var(--text-base)' }}>Automatic (default)</strong>
                 <ol class="mt-1 list-decimal list-inside space-y-0.5">
-                  <li>Run <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>/connect</code> in the OpenCode CLI (or <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>opencode auth login</code>) and pick <strong>OpenCode Zen</strong>.</li>
+                  <li>Run <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>/connect</code> in the OpenCode CLI (or <code style={{ 'font-family': 'var(--font-mono, monospace)' }}>opencode auth login</code>) and pick <strong>OpenCode Go</strong>.</li>
                   <li>The key stored in the CLI auth file is picked up automatically — no need to paste anything here.</li>
                 </ol>
               </div>

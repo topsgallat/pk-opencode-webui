@@ -213,7 +213,11 @@ async function providerListCustom({ send }: { send: Send }): Promise<Response> {
     }
     return { id: pid, name: str2(p.name) || pid, source: "custom", env: [], options: {}, models: modelMap }
   })
-  const body: Dict = { all, connected: [] }
+  // V1 /provider marks providers with credentials as "connected"; the V2
+  // model list only contains usable providers, so treat those as connected —
+  // an empty connected list makes the UI hide every model.
+  const connected = [...new Set(models.map((m) => str2(m.providerID)).filter(Boolean))]
+  const body: Dict = { all, connected }
   const defPid = str2(def.providerID)
   if (defPid) body.default = { [defPid]: str2(def.modelID) || str2(def.id) }
   return jsonResponse(body)

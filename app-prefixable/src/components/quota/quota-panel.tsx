@@ -35,9 +35,6 @@ export function QuotaContent() {
   )
 
   const goConfigured = createMemo(() => Boolean(goApiKey().trim()))
-  const goAutoDetected = createMemo(() => !goConfigured() && Boolean(providers().find((provider) => provider.id === 'opencode-go')?.available))
-  const goBadgeActive = createMemo(() => goConfigured() || goAutoDetected())
-  const goBadgeLabel = createMemo(() => goConfigured() ? 'Configured' : goAutoDetected() ? 'Auto-detected' : 'Not configured')
 
   const handleSaveGoConfig = async () => {
     setGoSaving(true)
@@ -87,6 +84,12 @@ export function QuotaContent() {
   }
 
   const providers = createMemo(() => quotaResource()?.providers ?? [])
+  // Declared after `providers`: these read it, and createMemo factories run
+  // eagerly — referencing providers above its declaration throws a TDZ
+  // ReferenceError on every mount of this panel.
+  const goAutoDetected = createMemo(() => !goConfigured() && Boolean(providers().find((provider) => provider.id === 'opencode-go')?.available))
+  const goBadgeActive = createMemo(() => goConfigured() || goAutoDetected())
+  const goBadgeLabel = createMemo(() => goConfigured() ? 'Configured' : goAutoDetected() ? 'Auto-detected' : 'Not configured')
   const anthropicProvider = createMemo(() => providers().find((provider) => provider.id === 'anthropic') ?? null)
   const anthropicCooldownUntil = createMemo(() => anthropicProvider()?.cooldownUntil ?? null)
   const anthropicCoolingDown = createMemo(() => {

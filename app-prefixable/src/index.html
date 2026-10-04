@@ -51,6 +51,34 @@
       <div class="loading-initial">Loading...</div>
     </div>
     <script>
+      // Fatal-error overlay: must run before the module bundle so failures
+      // during module evaluation (old browser APIs, failed chunk loads) are
+      // still visible on the device instead of a blank page.
+      (function() {
+        var shown = 0;
+        function show(label, text) {
+          if (shown >= 4) return;
+          shown++;
+          var el = document.createElement("pre");
+          el.setAttribute("data-fatal-overlay", label);
+          el.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#fff0f0;color:#a00;padding:10px;margin:0;font:12px/1.4 monospace;white-space:pre-wrap;max-height:45vh;overflow:auto;border-top:2px solid #a00";
+          el.textContent = "[" + label + "] " + text;
+          (document.body || document.documentElement).appendChild(el);
+        }
+        window.addEventListener("error", function(e) {
+          if (e.target && (e.target.tagName === "SCRIPT" || e.target.tagName === "LINK")) {
+            show("resource", "failed to load " + e.target.tagName + " " + (e.target.src || e.target.href || ""));
+          } else {
+            show("error", (e.message || String(e.error || "unknown")) + "\n" + (e.filename || "") + ":" + (e.lineno || "?"));
+          }
+        }, true);
+        window.addEventListener("unhandledrejection", function(e) {
+          var r = e.reason;
+          show("promise", (r && (r.stack || r.message)) || String(r));
+        });
+      })();
+    </script>
+    <script>
       // Runtime configuration injection point
       window.__OPENCODE__ = window.__OPENCODE__ || {}
       // Branding config will be injected by the server as a JSON object.

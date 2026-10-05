@@ -11,6 +11,9 @@
  * Environment variables:
  *   OPENCODE_URL - Server URL (default: http://127.0.0.1:4096)
  *   REQUIRE_SERVER - Set to "true" to fail if server unavailable (default: false)
+ *
+ * Security: requests are only allowed against loopback servers. OPENCODE_URL
+ * pointing anywhere else is rejected by apiUrl() before any fetch happens.
  */
 
 import { describe, test, expect, beforeAll } from "bun:test";
@@ -18,11 +21,31 @@ import { describe, test, expect, beforeAll } from "bun:test";
 const BASE_URL = process.env.OPENCODE_URL || "http://127.0.0.1:4096";
 const REQUIRE_SERVER = process.env.REQUIRE_SERVER === "true";
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
+
+// Build a request URL for the contract test server, enforcing the loopback
+// whitelist. Everything this file fetches must go through here.
+function apiUrl(path: string, base: string = BASE_URL): URL {
+  const url = new URL(path, base);
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(`Contract tests only use http(s), got: ${url.protocol}`);
+  }
+  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (!LOOPBACK_HOSTS.has(host) && !host.endsWith(".localhost")) {
+    throw new Error(`Contract tests only talk to loopback servers, got: ${url.host}`);
+  }
+  return url;
+}
+
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(apiUrl(path), init);
+}
+
 let serverIsAvailable = false;
 
 // Helper to check if server is available
 async function checkServer(): Promise<boolean> {
-  const res = await fetch(`${BASE_URL}/global/health`, {
+  const res = await apiFetch("/global/health", {
     signal: AbortSignal.timeout(3000),
   }).catch(() => null);
   return res?.ok ?? false;
@@ -38,6 +61,20 @@ function skipIfNoServer() {
   }
   return false;
 }
+
+describe("contract test URL guard", () => {
+  test("accepts loopback base urls", () => {
+    expect(apiUrl("/session", "http://127.0.0.1:4096").host).toBe("127.0.0.1:4096");
+    expect(apiUrl("/session", "http://localhost:4096").pathname).toBe("/session");
+    expect(apiUrl("/session", "http://[::1]:4096").host).toBe("[::1]:4096");
+  });
+
+  test("rejects non-loopback and non-http targets", () => {
+    expect(() => apiUrl("/session", "http://192.168.1.10:4096")).toThrow(/loopback/);
+    expect(() => apiUrl("/session", "http://opencode.lan:4096")).toThrow(/loopback/);
+    expect(() => apiUrl("/session", "file:///etc/passwd")).toThrow(/http\(s\)/);
+  });
+});
 
 describe("OpenCode API Contract", () => {
   beforeAll(async () => {
@@ -55,7 +92,7 @@ describe("OpenCode API Contract", () => {
   describe("Session API", () => {
     test("GET /session/status returns expected schema", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/session/status`);
+      const res = await apiFetch("/session/status");
       expect(res.ok).toBe(true);
       const data = await res.json();
       // /session/status returns a map of sessionID -> SessionStatus
@@ -64,7 +101,7 @@ describe("OpenCode API Contract", () => {
 
     test("GET /session returns array", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/session`);
+      const res = await apiFetch("/session");
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(Array.isArray(data)).toBe(true);
@@ -72,7 +109,7 @@ describe("OpenCode API Contract", () => {
 
     test("POST /session creates session", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/session`, {
+      const res = await apiFetch("/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -85,7 +122,7 @@ describe("OpenCode API Contract", () => {
     test("GET /session/{id}/message returns messages array", async () => {
       if (skipIfNoServer()) return;
       // First create a session to get an ID
-      const sessionRes = await fetch(`${BASE_URL}/session`, {
+      const sessionRes = await apiFetch("/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -93,7 +130,7 @@ describe("OpenCode API Contract", () => {
       expect(sessionRes.ok).toBe(true);
       const session = await sessionRes.json();
 
-      const res = await fetch(`${BASE_URL}/session/${session.id}/message`);
+      const res = await apiFetch(`/session/${session.id}/message`);
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(Array.isArray(data)).toBe(true);
@@ -102,7 +139,7 @@ describe("OpenCode API Contract", () => {
     test("POST /session/{id}/message endpoint exists", async () => {
       if (skipIfNoServer()) return;
       // First create a session
-      const sessionRes = await fetch(`${BASE_URL}/session`, {
+      const sessionRes = await apiFetch("/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -111,7 +148,7 @@ describe("OpenCode API Contract", () => {
       const session = await sessionRes.json();
 
       // Test that the endpoint accepts POST (we don't send a real prompt)
-      const res = await fetch(`${BASE_URL}/session/${session.id}/message`, {
+      const res = await apiFetch(`/session/${session.id}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: "" }),
@@ -125,7 +162,7 @@ describe("OpenCode API Contract", () => {
   describe("Provider API", () => {
     test("GET /provider returns provider summary object", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/provider`);
+      const res = await apiFetch("/provider");
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(data !== null && typeof data === "object").toBe(true);
@@ -133,7 +170,7 @@ describe("OpenCode API Contract", () => {
 
     test("GET /provider/auth returns auth info", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/provider/auth`);
+      const res = await apiFetch("/provider/auth");
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(typeof data).toBe("object");
@@ -144,7 +181,7 @@ describe("OpenCode API Contract", () => {
   describe("Config API", () => {
     test("GET /config returns config object", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/config`);
+      const res = await apiFetch("/config");
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(typeof data).toBe("object");
@@ -152,7 +189,7 @@ describe("OpenCode API Contract", () => {
 
     test("GET /config/providers returns providers config", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/config/providers`);
+      const res = await apiFetch("/config/providers");
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(typeof data).toBe("object");
@@ -163,13 +200,13 @@ describe("OpenCode API Contract", () => {
   describe("Global API", () => {
     test("GET /global/health returns ok", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/global/health`);
+      const res = await apiFetch("/global/health");
       expect(res.ok).toBe(true);
     });
 
     test("GET /global/config returns global config", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/global/config`);
+      const res = await apiFetch("/global/config");
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(typeof data).toBe("object");
@@ -180,7 +217,7 @@ describe("OpenCode API Contract", () => {
   describe("Project API", () => {
     test("GET /project returns array", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/project`);
+      const res = await apiFetch("/project");
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(Array.isArray(data)).toBe(true);
@@ -188,7 +225,7 @@ describe("OpenCode API Contract", () => {
 
     test("GET /project/current returns project object", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/project/current`);
+      const res = await apiFetch("/project/current");
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(data).toHaveProperty("id");
@@ -200,7 +237,7 @@ describe("OpenCode API Contract", () => {
   describe("File API", () => {
     test("GET /file?path=. returns file list", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/file?path=.`);
+      const res = await apiFetch("/file?path=.");
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(Array.isArray(data)).toBe(true);
@@ -211,7 +248,7 @@ describe("OpenCode API Contract", () => {
   describe("MCP API", () => {
     test("GET /mcp returns MCP status", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/mcp`);
+      const res = await apiFetch("/mcp");
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(typeof data).toBe("object");
@@ -222,7 +259,7 @@ describe("OpenCode API Contract", () => {
   describe("PTY API", () => {
     test("GET /pty returns pty list", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/pty`);
+      const res = await apiFetch("/pty");
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(Array.isArray(data)).toBe(true);
@@ -230,7 +267,7 @@ describe("OpenCode API Contract", () => {
 
     test("POST /pty creates terminal session", async () => {
       if (skipIfNoServer()) return;
-      const res = await fetch(`${BASE_URL}/pty`, {
+      const res = await apiFetch("/pty", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -252,7 +289,7 @@ describe("OpenCode API Contract", () => {
         controller.abort();
       }, 2000);
 
-      const res = await fetch(`${BASE_URL}/event`, {
+      const res = await apiFetch("/event", {
         signal: controller.signal,
         headers: { Accept: "text/event-stream" },
       }).catch((e) => {

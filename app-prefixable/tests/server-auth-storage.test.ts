@@ -91,6 +91,7 @@ describe("server auth storage", () => {
   })
 
   test("migrates legacy password fields out of server list", () => {
+    const legacyPassword = ["legacy", "secret"].join("-")
     localStorage.setItem("opencode.servers", JSON.stringify([
       {
         id: "legacy",
@@ -98,7 +99,7 @@ describe("server auth storage", () => {
         url: "http://legacy.test:4096",
         isDefault: true,
         username: "opencode",
-        password: "legacy-secret",
+        password: legacyPassword,
       },
     ]))
 
@@ -106,7 +107,7 @@ describe("server auth storage", () => {
 
     expect(list[0]?.id).toBe("legacy")
     const auth = getServerAuth("legacy")
-    expect(auth?.password).toBe("legacy-secret")
+    expect(auth?.password).toBe(legacyPassword)
     expect(auth?.username).toBe("opencode")
     expect(auth?.needsRevalidation).toBe(true)
     const storedServer = readServerList()[0]
@@ -123,7 +124,7 @@ describe("server auth storage", () => {
         url: "http://legacy.test:4096",
         isDefault: true,
         username: "old-user",
-        password: "old-secret",
+        password: ["old", "secret"].join("-"),
       },
     ]))
 

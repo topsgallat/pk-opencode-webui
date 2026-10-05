@@ -166,7 +166,7 @@ export type Send = (url: string, init?: RequestInit) => Promise<Response>
 type RouteDef = {
   method: string
   pattern: RegExp
-  to: (args: { params: string[]; url: URL; body: unknown }) => RouteToResult
+  to?: (args: { params: string[]; url: URL; body: unknown }) => RouteToResult
   from?: (payload: unknown, input: { url: URL }) => unknown
   respond?: (input: { url: URL; body: unknown }) => { status: number; payload: unknown }
   custom?: (args: { params: string[]; url: URL; body: unknown; send: Send }) => Promise<Response>
@@ -408,10 +408,28 @@ const ROUTES: RouteDef[] = [
   {
     method: "GET",
     pattern: /^\/session$/,
-    to: ({ url }) => ({ url: `/api/session${pagedQuery(url.search)}`, init: { method: "GET" } }),
-    from: (payload) => {
-      const data = unwrapData(payload)
-      return Array.isArray(data) ? data.map(sessionFromV2) : []
+    custom: async ({ url, send }) => {
+      // V2 pages its global session list (default 50) and ignores directory
+      // filters, so follow cursor.next until the list is exhausted - the
+      // caller filters by directory client-side like it did against V1.
+      const requested = Number(new URL(url).searchParams.get("limit"))
+      const limit = Number.isFinite(requested) && requested > 0 ? Math.min(Math.floor(requested), 200) : 200
+      const sessions: Dict[] = []
+      let cursor: string | undefined
+      for (let page = 0; page < 100; page++) {
+        const params = new URLSearchParams({ limit: String(limit) })
+        if (cursor) params.set("cursor", cursor)
+        const res = await send(`/api/session?${params.toString()}`)
+        if (!res.ok) return res
+        const payload = (await res.json().catch(() => undefined)) as { cursor?: { next?: unknown } } | undefined
+        const data = unwrapData(payload)
+        if (!Array.isArray(data)) return Response.json([], { status: 502 })
+        sessions.push(...(data as Dict[]))
+        const next = payload?.cursor?.next
+        cursor = typeof next === "string" ? next : undefined
+        if (!cursor) break
+      }
+      return Response.json(sessions.map(sessionFromV2))
     },
   },
   {
@@ -742,6 +760,7 @@ export async function planV2Request(request: Request): Promise<V2RequestResult> 
     const params = match.params
     return { kind: "custom", run: (send) => def.custom!({ params, url, body, send }) }
   }
+  if (!match.def.to) return { kind: "passthrough" }
   const target = match.def.to({ params: match.params, url, body })
   return {
     kind: "rewrite",

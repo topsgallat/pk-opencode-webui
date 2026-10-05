@@ -238,10 +238,9 @@ describe("eventFromV2", () => {
 })
 
 describe("planV2Request", () => {
-  test("rewrites session list", async () => {
+  test("rewrites session list into a cursor-following custom plan", async () => {
     const plan = await planV2Request(new Request("http://ui/session?directory=/home/x"))
-    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
-    expect(plan.url).toBe("/api/session")
+    expect(plan.kind).toBe("custom")
   })
 
   test("rewrites abort to interrupt", async () => {
@@ -358,10 +357,31 @@ describe("planV2Request", () => {
     const messages = await planV2Request(new Request("http://ui/session/ses_1/message?limit=300&directory=/x"))
     if (messages.kind !== "rewrite") throw new Error("expected rewrite")
     expect(messages.url).toBe("/api/session/ses_1/message?limit=200")
+  })
 
-    const list = await planV2Request(new Request("http://ui/session?roots=true&limit=500"))
-    if (list.kind !== "rewrite") throw new Error("expected rewrite")
-    expect(list.url).toBe("/api/session?limit=200")
+  test("session list follows cursor.next until the list is exhausted", async () => {
+    const plan = await planV2Request(new Request("http://ui/session?limit=500&directory=/home/x"))
+    if (plan.kind !== "custom") throw new Error("expected custom")
+    const pages = [
+      { data: [V2_SESSION, { ...V2_SESSION, id: "ses_2" }], cursor: { next: "CUR2" } },
+      { data: [{ ...V2_SESSION, id: "ses_3" }], cursor: {} },
+    ]
+    const calls: string[] = []
+    const send = async (u: string) => {
+      calls.push(u)
+      return new Response(JSON.stringify(pages[calls.length - 1]), { headers: { "Content-Type": "application/json" } })
+    }
+    const res = await plan.run(send)
+    const body = (await res.json()) as Array<{ id: string }>
+    expect(calls).toEqual(["/api/session?limit=200", "/api/session?limit=200&cursor=CUR2"])
+    expect(body.map((s) => s.id)).toEqual([V2_SESSION.id, "ses_2", "ses_3"])
+  })
+
+  test("session list surfaces upstream failures instead of empty pages", async () => {
+    const plan = await planV2Request(new Request("http://ui/session"))
+    if (plan.kind !== "custom") throw new Error("expected custom")
+    const res = await plan.run(async () => new Response(JSON.stringify({ message: "unauthorized" }), { status: 401 }))
+    expect(res.status).toBe(401)
   })
 
   test("session share returns an explicit V2 gap error", async () => {

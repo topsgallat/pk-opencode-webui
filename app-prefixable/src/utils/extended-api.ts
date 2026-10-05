@@ -610,9 +610,12 @@ export function gitRawFileUrl(serverUrl: string, directory: string, ref: string,
 /**
  * Absolute URL for a working-tree file's raw bytes (used as <img src> in the
  * markdown preview so relative images resolve against the project, not the page).
+ * `directory` is the project root, letting the server fall back to the target
+ * backend for files that are not on the UI server's own filesystem.
  */
-export function rawFileUrl(serverUrl: string, path: string, targetUrl?: string): string {
+export function rawFileUrl(serverUrl: string, path: string, directory?: string, targetUrl?: string): string {
   const params = new URLSearchParams({ path })
+  if (directory) params.set("directory", directory)
   return appendTargetParam(`${serverUrl}/api/ext/raw?${params}`, targetUrl)
 }
 

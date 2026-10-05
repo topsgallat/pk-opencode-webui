@@ -501,6 +501,61 @@ export function getAllowedRoot(): string {
 
 const RAW_FILE_MAX_BYTES = 10 * 1024 * 1024
 
+function parseTargetUrl(value: string | null | undefined): string | undefined {
+  if (!value) return undefined
+  try {
+    const parsed = new URL(value.trim())
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return undefined
+    return parsed.toString()
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Fetch a file's bytes from a backend target via /file/content. Used by the
+ * raw endpoint when the path is unreadable locally (remote target whose
+ * project lives outside this server's filesystem). Only paths strictly inside
+ * the declared project directory are fetched, mirroring the backend's own
+ * contains() scope; anything else returns undefined.
+ */
+async function readTargetRawFile(target: string, filePath: string, directory: string | undefined, auth: string | undefined): Promise<Response | undefined> {
+  if (!directory || directory === "/" || !directory.startsWith("/") || !filePath.startsWith("/")) return undefined
+  if (filePath !== directory && !filePath.startsWith(`${directory}/`)) return undefined
+
+  const upstream = new URL("file/content", target.endsWith("/") ? target : `${target}/`)
+  upstream.searchParams.set("path", filePath)
+  if (directory) upstream.searchParams.set("directory", directory)
+
+  const headers = new Headers()
+  if (auth) headers.set("Authorization", auth)
+
+  try {
+    const res = await fetch(upstream, { headers, signal: AbortSignal.timeout(10_000) })
+    const data = await res.json().catch(() => null) as { type?: unknown; content?: unknown; encoding?: unknown; mimeType?: unknown } | null
+    if (!res.ok || !data || typeof data.content !== "string") return undefined
+
+    if (data.type === "binary" && data.encoding === "base64") {
+      const bytes = Buffer.from(data.content, "base64")
+      if (bytes.byteLength > RAW_FILE_MAX_BYTES) {
+        return Response.json({ error: "file too large (limit 10MB)" }, { status: 413 })
+      }
+      const mime = typeof data.mimeType === "string" && data.mimeType ? data.mimeType : guessContentType(filePath)
+      return new Response(bytes, { headers: { "Content-Type": mime, "Cache-Control": "no-store" } })
+    }
+
+    if (data.type !== "text" || !data.content) return undefined
+    const body = Buffer.from(data.content, "utf-8")
+    if (body.byteLength > RAW_FILE_MAX_BYTES) {
+      return Response.json({ error: "file too large (limit 10MB)" }, { status: 413 })
+    }
+    return new Response(body, { headers: { "Content-Type": guessContentType(filePath), "Cache-Control": "no-store" } })
+  } catch (e) {
+    console.warn("[ExtAPI] raw backend fetch failed:", filePath, e instanceof Error ? e.message : e)
+    return undefined
+  }
+}
+
 /** Content type for raw file serving, guessed from the extension. */
 export function guessContentType(filePath: string): string {
   const ext = filePath.split(".").pop()?.toLowerCase() ?? ""
@@ -1086,24 +1141,39 @@ export async function handleExtendedEndpoint(
 
     const allowedRoot = getAllowedRoot()
     const validatedPath = validatePath(filePath, allowedRoot)
-    if (!validatedPath) {
-      console.warn("[ExtAPI] raw file: path outside allowed root:", filePath)
-      return Response.json({ error: "path must be within allowed directory" }, { status: 403 })
+    if (validatedPath) {
+      try {
+        const stat = await fs.promises.stat(validatedPath)
+        if (stat.size > RAW_FILE_MAX_BYTES) {
+          return Response.json({ error: "file too large (limit 10MB)" }, { status: 413 })
+        }
+        const buffer = await fs.promises.readFile(validatedPath)
+        return new Response(buffer, {
+          headers: { "Content-Type": guessContentType(validatedPath), "Cache-Control": "no-store" },
+        })
+      } catch (e) {
+        console.warn("[ExtAPI] raw local read failed, trying backend:", filePath, String(e))
+      }
+    } else {
+      console.warn("[ExtAPI] raw file: path outside allowed root, trying backend:", filePath)
     }
 
-    try {
-      const stat = await fs.promises.stat(validatedPath)
-      if (stat.size > RAW_FILE_MAX_BYTES) {
-        return Response.json({ error: "file too large (limit 10MB)" }, { status: 413 })
-      }
-      const buffer = await fs.promises.readFile(validatedPath)
-      return new Response(buffer, {
-        headers: { "Content-Type": guessContentType(validatedPath), "Cache-Control": "no-store" },
-      })
-    } catch (e) {
-      console.error("[ExtAPI] raw file error:", e)
-      return Response.json({ error: String(e) }, { status: 404 })
+    const target = parseTargetUrl(url.searchParams.get("target"))
+      ?? parseTargetUrl(options?.getUpstreamBaseUrl?.() ?? process.env.API_URL)
+    if (target) {
+      const upstream = await readTargetRawFile(
+        target,
+        filePath,
+        url.searchParams.get("directory") || undefined,
+        options?.resolveUpstreamAuthHeader?.(target),
+      )
+      if (upstream) return upstream
     }
+
+    if (!validatedPath) {
+      return Response.json({ error: "path must be within allowed directory" }, { status: 403 })
+    }
+    return Response.json({ error: "file not found" }, { status: 404 })
   }
 
   // GET /api/ext/log-files - List available OpenCode log files

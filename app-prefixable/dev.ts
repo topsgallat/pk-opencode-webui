@@ -103,6 +103,7 @@ const server = Bun.serve<{ target: string; cookie: string }>({
 
     // Extended API endpoints (handled locally, not proxied)
     const extResponse = await handleExtendedEndpoint(strippedPath, req.method, url, req, {
+      getUpstreamBaseUrl: () => API_URL,
       resolveUpstreamAuthHeader: (target) => resolveProxyAuthHeader(req, target),
     })
     if (extResponse) return extResponse

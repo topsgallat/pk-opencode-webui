@@ -181,7 +181,7 @@ export function FileViewer(props: FileViewerProps) {
     const resolved = resolveRepoRelativePath(markdownBaseDir(), cleaned)
     if (!resolved) return null
     const full = sdk.directory && !resolved.startsWith("/") ? `${sdk.directory}/${resolved}` : resolved
-    return rawFileUrl(sdk.url, full, sdk.targetUrl)
+    return rawFileUrl(sdk.url, full, sdk.directory || undefined, sdk.targetUrl)
   }
 
   // Open linked files in a viewer tab instead of navigating the page away

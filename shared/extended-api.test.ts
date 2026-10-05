@@ -9,12 +9,14 @@ const env = {
   HOME: process.env.HOME,
   XDG_DATA_HOME: process.env.XDG_DATA_HOME,
   OPENCODE_WORKSPACE_ROOT: process.env.OPENCODE_WORKSPACE_ROOT,
+  API_URL: process.env.API_URL,
 }
 
 afterEach(() => {
   process.env.HOME = env.HOME
   process.env.XDG_DATA_HOME = env.XDG_DATA_HOME
   process.env.OPENCODE_WORKSPACE_ROOT = env.OPENCODE_WORKSPACE_ROOT
+  process.env.API_URL = env.API_URL
   __resetProviderAuthSessionsForTests()
 })
 
@@ -502,6 +504,7 @@ test("serves raw file bytes with a guessed content type", async () => {
 test("guards the raw endpoint against missing, oversized and outside-root paths", async () => {
   const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-raw-guard-"))
   process.env.OPENCODE_WORKSPACE_ROOT = root
+  process.env.API_URL = ""
 
   const missing = await handleExtendedEndpoint(
     "/api/ext/raw", "GET",
@@ -524,4 +527,120 @@ test("guards the raw endpoint against missing, oversized and outside-root paths"
     new Request("http://localhost/api/ext/raw?path=big.bin"),
   )
   expect(oversize!.status).toBe(413)
+})
+
+test("raw endpoint falls back to the target backend for paths outside the local root", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-raw-fallback-"))
+  process.env.OPENCODE_WORKSPACE_ROOT = root
+  process.env.API_URL = ""
+
+  const jpg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 0xff, 0xd9])
+  const originalFetch = globalThis.fetch
+  let upstreamUrl = ""
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    upstreamUrl = String(input)
+    expect(init?.headers instanceof Headers ? init.headers.get("Authorization") : new Headers(init?.headers).get("Authorization")).toBe("Basic dXNlcjpwYXNz")
+    return new Response(JSON.stringify({
+      type: "binary",
+      content: jpg.toString("base64"),
+      encoding: "base64",
+      mimeType: "image/jpeg",
+    }), { status: 200, headers: { "Content-Type": "application/json" } })
+  }) as unknown as typeof fetch
+
+  try {
+    const req = new Request("http://localhost/api/ext/raw?path=%2FDATA%2Fproject%2Fimg%2Fphoto.jpg&directory=%2FDATA%2Fproject&target=http%3A%2F%2F172.17.0.1%3A4096")
+    const res = await handleExtendedEndpoint("/api/ext/raw", "GET", new URL(req.url), req, {
+      resolveUpstreamAuthHeader: (target) => (target === "http://172.17.0.1:4096/" ? "Basic dXNlcjpwYXNz" : undefined),
+    })
+    expect(res).toBeDefined()
+    expect(res!.status).toBe(200)
+    expect(res!.headers.get("Content-Type")).toBe("image/jpeg")
+    const body = Buffer.from(await res!.arrayBuffer())
+    expect(body.equals(jpg)).toBe(true)
+    expect(upstreamUrl).toBe("http://172.17.0.1:4096/file/content?path=%2FDATA%2Fproject%2Fimg%2Fphoto.jpg&directory=%2FDATA%2Fproject")
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("raw endpoint keeps serving local files without contacting the backend", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-raw-local-"))
+  process.env.OPENCODE_WORKSPACE_ROOT = root
+  process.env.API_URL = ""
+
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3])
+  await fs.writeFile(nodePath.join(root, "local.png"), png)
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => {
+    throw new Error("backend must not be contacted for local files")
+  }) as unknown as typeof fetch
+
+  try {
+    const req = new Request(`http://localhost/api/ext/raw?path=${encodeURIComponent("local.png")}&target=http://172.17.0.1:4096`)
+    const res = await handleExtendedEndpoint("/api/ext/raw", "GET", new URL(req.url), req)
+    expect(res).toBeDefined()
+    expect(res!.status).toBe(200)
+    const body = Buffer.from(await res!.arrayBuffer())
+    expect(body.equals(png)).toBe(true)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("raw endpoint reports 403 when outside the root and the backend serves nothing", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-raw-nofallback-"))
+  process.env.OPENCODE_WORKSPACE_ROOT = root
+  process.env.API_URL = ""
+
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => new Response(JSON.stringify({ type: "text", content: "" }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  })) as unknown as typeof fetch
+
+  try {
+    const req = new Request("http://localhost/api/ext/raw?path=/etc/passwd&target=http://172.17.0.1:4096")
+    const res = await handleExtendedEndpoint("/api/ext/raw", "GET", new URL(req.url), req)
+    expect(res).toBeDefined()
+    expect(res!.status).toBe(403)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("raw endpoint never contacts the backend for paths outside the declared directory", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-raw-scope-"))
+  process.env.OPENCODE_WORKSPACE_ROOT = root
+  process.env.API_URL = ""
+
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => {
+    throw new Error("backend must not be contacted for paths outside the declared directory")
+  }) as unknown as typeof fetch
+
+  try {
+    const outside = await handleExtendedEndpoint(
+      "/api/ext/raw", "GET",
+      new URL("http://localhost/api/ext/raw?path=%2Fetc%2Fpasswd&directory=%2FDATA%2Fproject&target=http%3A%2F%2F172.17.0.1%3A4096"),
+      new Request("http://localhost/api/ext/raw"),
+    )
+    expect(outside!.status).toBe(403)
+
+    const noDir = await handleExtendedEndpoint(
+      "/api/ext/raw", "GET",
+      new URL("http://localhost/api/ext/raw?path=%2FDATA%2Fproject%2Fimg%2Fphoto.jpg&target=http%3A%2F%2F172.17.0.1%3A4096"),
+      new Request("http://localhost/api/ext/raw"),
+    )
+    expect(noDir!.status).toBe(403)
+
+    const relative = await handleExtendedEndpoint(
+      "/api/ext/raw", "GET",
+      new URL("http://localhost/api/ext/raw?path=etc%2Fpasswd&directory=%2FDATA%2Fproject&target=http%3A%2F%2F172.17.0.1%3A4096"),
+      new Request("http://localhost/api/ext/raw"),
+    )
+    expect(relative!.status).toBe(404)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
 })

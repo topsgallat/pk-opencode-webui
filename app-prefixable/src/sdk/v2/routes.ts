@@ -606,7 +606,18 @@ const ROUTES: RouteDef[] = [
     method: "GET",
     pattern: /^\/agent$/,
     to: ({ url }) => ({ url: api("/agent", url.search), init: { method: "GET" } }),
-    from: unwrapData,
+    // V1 agents are identified by their name field; V2 entries split id
+    // ("build") from display name ("Build"). Copy the id into name so the
+    // UI's selected agent value is the id the V2 API expects — sending the
+    // display name fails with "Agent not found".
+    from: (payload) => {
+      const data = unwrapData(payload)
+      if (!Array.isArray(data)) return data
+      return data.map((entry) => {
+        const a = dict2(entry)
+        return { ...a, name: str2(a.id) || str2(a.name) }
+      })
+    },
   },
   {
     method: "GET",

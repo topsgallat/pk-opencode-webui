@@ -609,6 +609,42 @@ test("raw endpoint reports 403 when outside the root and the backend serves noth
   }
 })
 
+test("fs/list serves v1-shaped nodes under the workspace root", async () => {
+  const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-fslist-"))
+  process.env.OPENCODE_WORKSPACE_ROOT = root
+  process.env.API_URL = ""
+
+  await fs.mkdir(nodePath.join(root, "proj", "src"), { recursive: true })
+  await fs.writeFile(nodePath.join(root, "proj", "src", "app.ts"), "export 1")
+  await fs.writeFile(nodePath.join(root, "proj", "README.md"), "# hi")
+
+  const req = new Request("http://localhost/api/ext/fs/list?directory=" + encodeURIComponent(nodePath.join(root, "proj")) + "&path=src")
+  const res = await handleExtendedEndpoint("/api/ext/fs/list", "GET", new URL(req.url), req)
+  expect(res).toBeDefined()
+  expect(res!.status).toBe(200)
+  const nodes = await res!.json() as Array<{ name: string; path: string; absolute: string; type: string }>
+  expect(nodes.length).toBe(1)
+  expect(nodes[0].name).toBe("app.ts")
+  expect(nodes[0].path).toBe("src/app.ts")
+  expect(nodes[0].absolute).toBe(nodePath.join(root, "proj", "src", "app.ts"))
+  expect(nodes[0].type).toBe("file")
+
+  const rootList = await handleExtendedEndpoint(
+    "/api/ext/fs/list", "GET",
+    new URL("http://localhost/api/ext/fs/list?directory=" + encodeURIComponent(nodePath.join(root, "proj"))),
+    new Request("http://localhost/api/ext/fs/list"),
+  )
+  const rootNodes = await rootList!.json() as Array<{ name: string; type: string }>
+  expect(rootNodes.map((n) => n.name)).toEqual(["src", "README.md"])
+
+  const outside = await handleExtendedEndpoint(
+    "/api/ext/fs/list", "GET",
+    new URL("http://localhost/api/ext/fs/list?directory=" + encodeURIComponent(nodePath.join(root, "proj")) + "&path=%2Fetc"),
+    new Request("http://localhost/api/ext/fs/list"),
+  )
+  expect(outside!.status).toBe(403)
+})
+
 test("raw endpoint never contacts the backend for paths outside the declared directory", async () => {
   const root = await fs.mkdtemp(nodePath.join(os.tmpdir(), "pkui-raw-scope-"))
   process.env.OPENCODE_WORKSPACE_ROOT = root

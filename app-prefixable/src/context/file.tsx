@@ -4,7 +4,7 @@ import type { FileNode } from "../sdk/client"
 import { useSDK } from "./sdk"
 import { useServer } from "./server"
 import { useEvents } from "./events"
-import { readFile, mkdir, createFile as apiCreateFile, deleteFile as apiDeleteFile, deleteDir as apiDeleteDir, uploadFile as apiUploadFile, moveItem as apiMoveItem } from "../utils/extended-api"
+import { readFile, mkdir, createFile as apiCreateFile, deleteFile as apiDeleteFile, deleteDir as apiDeleteDir, uploadFile as apiUploadFile, moveItem as apiMoveItem, listDirEntries } from "../utils/extended-api"
 import { getServerCapabilities } from "../utils/server-capabilities"
 import { withTimeout, errorMessage } from "../utils/request-timeout"
 
@@ -126,8 +126,29 @@ export function FileProvider(props: ParentProps) {
           )
         })
       })
-      .catch((e) => {
+      .catch(async (e) => {
         console.error("[File] Failed to list dir:", dir, e)
+
+        // Fallback: the UI server's own directory listing (v2.0.22 fs.list
+        // 500s on subdirectory paths, so the SDK list cannot be trusted there).
+        const nodes = capabilities().canUseLocalExtFileOps
+          ? await listDirEntries(serverUrl, directory || "", dir, targetUrl)
+          : null
+        if (nodes) {
+          batch(() => {
+            setStore("children", dir, nodes)
+            setStore(
+              "dirs",
+              dir,
+              produce((d) => {
+                d.loaded = true
+                d.loading = false
+              }),
+            )
+          })
+          return
+        }
+
         setStore(
           "dirs",
           dir,

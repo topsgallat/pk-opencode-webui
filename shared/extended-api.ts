@@ -1176,6 +1176,45 @@ export async function handleExtendedEndpoint(
     return Response.json({ error: "file not found" }, { status: 404 })
   }
 
+  // GET /api/ext/fs/list - List a directory's entries as v1-shaped file nodes
+  // (fallback for v2 backends whose fs.list cannot enumerate subdirectories).
+  if (path === "/api/ext/fs/list" && method === "GET") {
+    const directory = url.searchParams.get("directory") || ""
+    const sub = url.searchParams.get("path") || "."
+    if (!directory) {
+      return Response.json({ error: "directory parameter is required" }, { status: 400 })
+    }
+
+    const allowedRoot = getAllowedRoot()
+    const validatedDir = validatePath(directory, allowedRoot)
+    if (!validatedDir) {
+      console.warn("[ExtAPI] fs/list: directory outside allowed root:", directory)
+      return Response.json({ error: "path must be within allowed directory" }, { status: 403 })
+    }
+    const validatedSub = validatePath(sub, validatedDir)
+    if (!validatedSub) {
+      console.warn("[ExtAPI] fs/list: path outside directory:", sub)
+      return Response.json({ error: "path must be within allowed directory" }, { status: 403 })
+    }
+
+    try {
+      const dirents = await fs.promises.readdir(validatedSub, { withFileTypes: true })
+      const relBase = nodePath.relative(validatedDir, validatedSub).split(nodePath.sep).join("/").replace(/^\.$/, "")
+      const nodes = dirents.map((d) => ({
+        name: d.name,
+        path: relBase ? `${relBase}/${d.name}` : d.name,
+        absolute: nodePath.join(validatedSub, d.name),
+        type: d.isDirectory() ? "directory" : "file",
+        ignored: false,
+      }))
+      nodes.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === "directory" ? -1 : 1))
+      return Response.json(nodes)
+    } catch (e) {
+      console.error("[ExtAPI] fs/list error:", validatedSub, e)
+      return Response.json({ error: String(e) }, { status: 404 })
+    }
+  }
+
   // GET /api/ext/log-files - List available OpenCode log files
   if (path === "/api/ext/log-files" && method === "GET") {
     try {

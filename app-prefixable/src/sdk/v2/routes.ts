@@ -90,21 +90,31 @@ function promptBodyFromV1(body: unknown, sessionID: string, url: URL): RouteToRe
 }
 
 // V2 fs.list entries are {path, type} with paths relative to the queried
-// directory; V1 file nodes carry absolute paths (and consumers like the
-// project dialog read node.absolute). Rebuild the absolute path from the
-// directory query parameter of the original request.
-function fileListFromV2(payload: unknown, { url }: { url: URL }): unknown {
-  const data = unwrapData(payload)
-  if (!Array.isArray(data)) return data
-  // "/" normalizes to "" so the join below still produces "/home", not "home".
-  const base = (url.searchParams.get("directory") ?? "").replace(/\/+$/, "")
-  return data.map((item) => {
+// workspace; V1 file nodes carry name + absolute paths (and consumers like
+// the file tree render node.name). v2.0.22 also only routes the workspace
+// via the x-opencode-directory header (the directory query is ignored) and
+// 500s on subdirectory paths — handled by the file context's ext fallback.
+async function fileListCustom({ url, send, directory }: { url: URL; send: Send; directory: string }): Promise<Response> {
+  const base = directory.replace(/\/+$/, "")
+  let requested = url.searchParams.get("path") ?? "."
+  if (requested.startsWith("/") && base) {
+    requested = requested === base ? "." : requested.startsWith(`${base}/`) ? requested.slice(base.length + 1) : requested
+  }
+  if (!requested) requested = "."
+  const res = await send(`/api/fs/list?path=${encodeURIComponent(requested)}`, { method: "GET" })
+  if (!res.ok) return res
+  const payload = (await res.json().catch(() => null)) as { location?: { directory?: unknown }; data?: unknown } | null
+  if (!payload) return res
+  const workspace = (base || (typeof payload.location?.directory === "string" ? payload.location.directory : "")).replace(/\/+$/, "")
+  const data = Array.isArray(payload.data) ? payload.data : []
+  const nodes = data.map((item) => {
     const entry = dict2(item)
-    const rel = str2(entry.path)
-    const isAbsolute = rel.startsWith("/") || rel.startsWith("~")
-    const absolute = isAbsolute ? rel : `${base}/${rel}`.replace(/\/+/g, "/")
-    return { ...entry, path: isAbsolute ? rel : absolute, absolute }
+    const rel = str2(entry.path).replace(/\/+$/, "")
+    const name = rel.split("/").pop() ?? rel
+    const absolute = rel.startsWith("/") || !workspace ? rel : `${workspace}/${rel}`
+    return { name, path: rel, absolute, type: str2(entry.type) || "file", ignored: false }
   })
+  return jsonResponse(nodes)
 }
 
 function locationFromV2(payload: unknown): unknown {
@@ -169,11 +179,19 @@ type RouteDef = {
   to?: (args: { params: string[]; url: URL; body: unknown }) => RouteToResult
   from?: (payload: unknown, input: { url: URL }) => unknown
   respond?: (input: { url: URL; body: unknown }) => { status: number; payload: unknown }
-  custom?: (args: { params: string[]; url: URL; body: unknown; send: Send }) => Promise<Response>
+  custom?: (args: { params: string[]; url: URL; body: unknown; send: Send; directory: string }) => Promise<Response>
 }
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), { status, headers: { "Content-Type": "application/json" } })
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
 }
 
 function str2(value: unknown): string {
@@ -561,8 +579,7 @@ const ROUTES: RouteDef[] = [
   {
     method: "GET",
     pattern: /^\/file$/,
-    to: ({ url }) => ({ url: api("/fs/list", url.search), init: { method: "GET" } }),
-    from: fileListFromV2,
+    custom: ({ url, send, directory }) => fileListCustom({ url, send, directory }),
   },
   {
     method: "GET",
@@ -758,7 +775,9 @@ export async function planV2Request(request: Request): Promise<V2RequestResult> 
   if (match.def.custom) {
     const def = match.def
     const params = match.params
-    return { kind: "custom", run: (send) => def.custom!({ params, url, body, send }) }
+    const headerDir = request.headers.get("x-opencode-directory")
+    const directory = headerDir ? safeDecode(headerDir) : url.searchParams.get("directory") || ""
+    return { kind: "custom", run: (send) => def.custom!({ params, url, body, send, directory }) }
   }
   if (!match.def.to) return { kind: "passthrough" }
   const target = match.def.to({ params: match.params, url, body })

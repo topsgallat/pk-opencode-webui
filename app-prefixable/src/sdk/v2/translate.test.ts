@@ -332,20 +332,48 @@ describe("planV2Request", () => {
     expect(info.root).toBe("/home/opencode")
   })
 
-  test("file list maps relative v2 entries to absolute v1 nodes", async () => {
-    const plan = await planV2Request(new Request("http://ui/file?path=.&directory=%2Fhome%2Fopencode"))
-    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
-    const res = await applyV2Response(plan, new Response(JSON.stringify({
-      location: { directory: "/home/opencode" },
-      data: [
-        { path: "e2e-proj/", type: "directory" },
-        { path: "notes.txt", type: "file" },
-      ],
-    }), { status: 200, headers: { "Content-Type": "application/json" } }))
-    const list = await res.json() as Array<{ path: string; type: string; absolute: string }>
-    expect(list[0].absolute).toBe("/home/opencode/e2e-proj/")
+  test("file list forwards the workspace header and synthesizes v1 node names", async () => {
+    const plan = await planV2Request(new Request("http://ui/file?path=.", {
+      headers: { "x-opencode-directory": encodeURIComponent("/home/opencode") },
+    }))
+    if (plan.kind !== "custom") throw new Error("expected custom")
+    const calls: string[] = []
+    const send = async (u: string) => {
+      calls.push(u)
+      return new Response(JSON.stringify({
+        location: { directory: "/home/opencode" },
+        data: [
+          { path: "e2e-proj/", type: "directory" },
+          { path: "notes.txt", type: "file" },
+        ],
+      }), { status: 200, headers: { "Content-Type": "application/json" } })
+    }
+    const res = await plan.run(send)
+    const list = await res.json() as Array<{ name: string; path: string; type: string; absolute: string }>
+    expect(calls).toEqual(["/api/fs/list?path=."])
+    expect(list[0].name).toBe("e2e-proj")
+    expect(list[0].path).toBe("e2e-proj")
+    expect(list[0].absolute).toBe("/home/opencode/e2e-proj")
     expect(list[0].type).toBe("directory")
+    expect(list[1].name).toBe("notes.txt")
     expect(list[1].absolute).toBe("/home/opencode/notes.txt")
+  })
+
+  test("file list relativizes absolute v1 paths against the workspace", async () => {
+    const plan = await planV2Request(new Request("http://ui/file?path=%2Fhome%2Fopencode%2Fsrc", {
+      headers: { "x-opencode-directory": encodeURIComponent("/home/opencode") },
+    }))
+    if (plan.kind !== "custom") throw new Error("expected custom")
+    const calls: string[] = []
+    const send = async (u: string) => {
+      calls.push(u)
+      return new Response(JSON.stringify({ location: { directory: "/home/opencode" }, data: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+    await plan.run(send)
+    expect(calls).toEqual([`/api/fs/list?path=${encodeURIComponent("src")}`])
   })
 
   test("instance dispose is served locally", async () => {

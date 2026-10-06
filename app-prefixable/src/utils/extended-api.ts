@@ -1,5 +1,6 @@
 import { appendTargetParam } from "./path"
 import { fetchWithTimeout } from "./request-timeout"
+import type { FileNode } from "../sdk/client"
 import type { QuotaApiResponse } from "../../../shared/quota/types"
 
 const EXT_API_TIMEOUT_MS = 15_000
@@ -617,6 +618,23 @@ export function rawFileUrl(serverUrl: string, path: string, directory?: string, 
   const params = new URLSearchParams({ path })
   if (directory) params.set("directory", directory)
   return appendTargetParam(`${serverUrl}/api/ext/raw?${params}`, targetUrl)
+}
+
+/**
+ * List a directory via the UI server's local filesystem (v1 FileNode shape).
+ * Fallback for v2 backends whose fs.list cannot enumerate subdirectories.
+ */
+export async function listDirEntries(serverUrl: string, directory: string, subPath: string, targetUrl?: string): Promise<FileNode[] | null> {
+  try {
+    const params = new URLSearchParams({ directory, path: subPath || "." })
+    const res = await fetchWithTimeout(appendTargetParam(`${serverUrl}/api/ext/fs/list?${params}`, targetUrl), {}, EXT_API_TIMEOUT_MS, "extended listDirEntries")
+    if (!res.ok) return null
+    const nodes = await res.json()
+    return Array.isArray(nodes) ? (nodes as FileNode[]) : null
+  } catch (e) {
+    console.error("[extended-api] listDirEntries failed:", e)
+    return null
+  }
 }
 
 // --- Server-side prompt queue ---------------------------------------------

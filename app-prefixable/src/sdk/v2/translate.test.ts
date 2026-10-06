@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { eventFromV2, isV2EventEnvelope, messageFromV2, messageListFromV2, sessionFromV2 } from "./translate"
-import { applyV2Response, planV2Request, providerListCustom } from "./routes"
+import { applyV2Response, planV2Request, promptCustom, providerListCustom } from "./routes"
 import { cacheV2Version, resetDialectCacheForTests } from "./dialect"
+
+const jsonReply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } })
 
 const V2_SESSION = {
   id: "ses_f2b7fe64bffe0ltIeXOxYQLLhY",
@@ -249,42 +251,46 @@ describe("planV2Request", () => {
     expect(plan.url).toBe("/api/session/ses_1/interrupt")
   })
 
-  test("maps v1 prompt part body to the bare release-v2 body by default", async () => {
-    const plan = await planV2Request(new Request("http://ui/session/ses_1/prompt_async", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ part: { type: "text", text: "hello" } }),
-    }))
-    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
-    expect(plan.url).toBe("/api/session/ses_1/prompt")
-    const body = JSON.parse(String(plan.init.body))
-    expect(body.text).toBe("hello")
-    expect(body.prompt).toBeUndefined()
+  test("sends the bare release-v2 prompt body by default", async () => {
+    const bodies: unknown[] = []
+    await promptCustom({
+      params: ["ses_1"],
+      body: { part: { type: "text", text: "hello" } },
+      url: new URL("http://ui/session/ses_1/prompt_async"),
+      send: async (u, init) => {
+        if (u.endsWith("/prompt")) { const b = JSON.parse(String(init?.body)); bodies.push(b); return jsonReply({ data: { id: "msg_1", sessionID: "ses_1", time: { created: 1 }, type: "user", payload: { text: "hello" } } }) }
+        return jsonReply({})
+      },
+    })
+    expect(bodies[0]).toEqual({ text: "hello", files: [] })
   })
 
   test("wraps the prompt body for dev-line v2 builds", async () => {
     cacheV2Version("http://up:4096", "0.0.0-dev-202610030456")
-    const plan = await planV2Request(new Request("http://ui/session/ses_1/prompt_async?target=http%3A%2F%2Fup%3A4096", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ part: { type: "text", text: "hello" } }),
-    }))
-    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
-    const body = JSON.parse(String(plan.init.body))
-    expect(body.prompt.text).toBe("hello")
+    const bodies: unknown[] = []
+    await promptCustom({
+      params: ["ses_1"],
+      body: { part: { type: "text", text: "hello" } },
+      url: new URL("http://ui/session/ses_1/prompt_async?target=http%3A%2F%2Fup%3A4096"),
+      send: async (u, init) => {
+        if (u.endsWith("/prompt")) { const b = JSON.parse(String(init?.body)); bodies.push(b); return jsonReply({ data: { admittedSeq: 1, id: "msg_1", sessionID: "ses_1", prompt: { text: "hello" }, timeCreated: 1 } }) }
+        return jsonReply({})
+      },
+    })
+    expect(bodies[0]).toEqual({ prompt: { text: "hello", files: [] } })
     resetDialectCacheForTests()
   })
 
   test("release prompt response (admitted user message) maps to a v1 user message", async () => {
-    const plan = await planV2Request(new Request("http://ui/session/ses_1/prompt_async", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ part: { type: "text", text: "hello" } }),
-    }))
-    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
-    const res = await applyV2Response(plan, new Response(JSON.stringify({
-      data: { id: "msg_9", sessionID: "ses_1", time: { created: 1234 }, type: "user", payload: { text: "hello" } },
-    }), { status: 200, headers: { "Content-Type": "application/json" } }))
+    const res = await promptCustom({
+      params: ["ses_1"],
+      body: { part: { type: "text", text: "hello" } },
+      url: new URL("http://ui/session/ses_1/prompt_async"),
+      send: async (u) => {
+        if (u.endsWith("/prompt")) return jsonReply({ data: { id: "msg_9", sessionID: "ses_1", time: { created: 1234 }, type: "user", payload: { text: "hello" } } })
+        return jsonReply({})
+      },
+    })
     const body = await res.json()
     expect(body.info.role).toBe("user")
     expect(body.info.id).toBe("msg_9")
@@ -293,15 +299,15 @@ describe("planV2Request", () => {
 
   test("dev prompt response (admitted input) maps to a v1 user message", async () => {
     cacheV2Version("http://up:4096", "0.0.0-dev-202610030456")
-    const plan = await planV2Request(new Request("http://ui/session/ses_1/prompt_async?target=http%3A%2F%2Fup%3A4096", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ part: { type: "text", text: "hello" } }),
-    }))
-    if (plan.kind !== "rewrite") throw new Error("expected rewrite")
-    const res = await applyV2Response(plan, new Response(JSON.stringify({
-      data: { admittedSeq: 3, id: "msg_9", sessionID: "ses_1", prompt: { text: "hello" }, delivery: "steer", timeCreated: 1234 },
-    }), { status: 200, headers: { "Content-Type": "application/json" } }))
+    const res = await promptCustom({
+      params: ["ses_1"],
+      body: { part: { type: "text", text: "hello" } },
+      url: new URL("http://ui/session/ses_1/prompt_async?target=http%3A%2F%2Fup%3A4096"),
+      send: async (u) => {
+        if (u.endsWith("/prompt")) return jsonReply({ data: { admittedSeq: 3, id: "msg_9", sessionID: "ses_1", prompt: { text: "hello" }, delivery: "steer", timeCreated: 1234 } })
+        return jsonReply({})
+      },
+    })
     const body = await res.json()
     expect(body.info.role).toBe("user")
     expect(body.info.id).toBe("msg_9")
@@ -499,5 +505,51 @@ describe("providerListCustom", () => {
     expect(Array.isArray(variants)).toBe(false)
     expect(Object.keys(variants)).toEqual(["none", "low", "high"])
     expect(variants.high.settings.enableThinking).toBe(true)
+  })
+})
+
+describe("promptCustom", () => {
+  test("switches agent with build fallback for unknown agents, then prompts", async () => {
+    const calls: Array<{ u: string; b: { agent?: string } }> = []
+    const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } })
+    const res = await promptCustom({
+      params: ["ses_1"],
+      body: { agent: "Sisyphus - Ultraworker", part: { type: "text", text: "hi" } },
+      url: new URL("http://ui/session/ses_1/prompt_async"),
+      send: async (u, init) => {
+        const b = (init?.body ? JSON.parse(init.body as string) : {}) as { agent?: string }
+        calls.push({ u, b })
+        if (u.endsWith("/agent") && b?.agent !== "build") return jsonResponse({}, 400)
+        if (u.endsWith("/prompt")) return jsonResponse({ data: { id: "msg_1", sessionID: "ses_1", time: { created: 1 }, type: "user", payload: { text: "hi" } } })
+        return jsonResponse({})
+      },
+    })
+    expect(res.status).toBe(200)
+    const agentCalls = calls.filter((c) => c.u.endsWith("/agent"))
+    expect(agentCalls.length).toBe(2)
+    expect(agentCalls[0].b.agent).toBe("Sisyphus - Ultraworker")
+    expect(agentCalls[1].b.agent).toBe("build")
+    expect(calls.some((c) => c.u.endsWith("/prompt"))).toBe(true)
+    const body = await res.json()
+    expect(body.info.role).toBe("user")
+  })
+
+  test("known agents switch without fallback", async () => {
+    const calls: Array<{ u: string; b: { agent?: string } }> = []
+    const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } })
+    await promptCustom({
+      params: ["ses_1"],
+      body: { agent: "build", part: { type: "text", text: "hi" } },
+      url: new URL("http://ui/session/ses_1/prompt"),
+      send: async (u, init) => {
+        const b = (init?.body ? JSON.parse(init.body as string) : {}) as { agent?: string }
+        calls.push({ u, b })
+        if (u.endsWith("/prompt")) return jsonResponse({ data: { id: "msg_1", sessionID: "ses_1", time: { created: 1 }, type: "user", payload: { text: "hi" } } })
+        return jsonResponse({})
+      },
+    })
+    const agentCalls = calls.filter((c) => c.u.endsWith("/agent"))
+    expect(agentCalls.length).toBe(1)
+    expect(agentCalls[0].b.agent).toBe("build")
   })
 })

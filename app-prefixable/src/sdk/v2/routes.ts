@@ -259,6 +259,42 @@ function modelEntryFromV2(m: Dict, pid: string, mid: string): Dict {
   return merged
 }
 
+// V2 runs the session's STORED agent; sessions migrated from V1 can reference
+// plugin agents that V2 builds didn't load ("Agent not found: ..."), and the
+// V1 prompt body's agent choice is otherwise dropped. Before prompting,
+// switch the session to the requested agent — falling back to "build" when
+// the server doesn't know it — so migrated sessions keep working.
+async function ensureAgentV2(send: Send, sessionID: string, agent?: string): Promise<void> {
+  if (!agent) return
+  const init = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agent }) }
+  const res = await send(`/api/session/${sessionID}/agent`, init).catch(() => undefined)
+  if (res?.ok) return
+  await send(`/api/session/${sessionID}/agent`, { ...init, body: JSON.stringify({ agent: "build" }) }).catch(() => undefined)
+}
+
+export async function promptCustom({
+  params,
+  body,
+  url,
+  send,
+}: {
+  params: string[]
+  body: unknown
+  url: URL
+  send: Send
+}): Promise<Response> {
+  const sessionID = params[0]
+  const raw = (body ?? {}) as Dict
+  const agent = str2(raw.agent) || undefined
+  const { url: promptUrl, init: promptInit, pre } = promptBodyFromV1(body, sessionID, url)
+  if (pre) await send(pre.url, pre.init).catch(() => undefined)
+  await ensureAgentV2(send, sessionID, agent)
+  const res = await send(promptUrl, promptInit)
+  if (!res.ok) return res
+  const payload = await jsonOf(res)
+  return jsonResponse(promptResponseFromV1(payload, url) ?? payload)
+}
+
 async function jsonOf(res: Response): Promise<unknown> {
   return res.json().catch(() => null)
 }
@@ -484,14 +520,12 @@ const ROUTES: RouteDef[] = [
   {
     method: "POST",
     pattern: /^\/session\/([^/]+)\/prompt_async$/,
-    to: ({ params, body, url }) => promptBodyFromV1(body, params[0], url),
-    from: (payload, { url }) => promptResponseFromV1(payload, url),
+    custom: ({ params, body, url, send }) => promptCustom({ params, body, url, send }),
   },
   {
     method: "POST",
     pattern: /^\/session\/([^/]+)\/prompt$/,
-    to: ({ params, body, url }) => promptBodyFromV1(body, params[0], url),
-    from: (payload, { url }) => promptResponseFromV1(payload, url),
+    custom: ({ params, body, url, send }) => promptCustom({ params, body, url, send }),
   },
   {
     method: "POST",

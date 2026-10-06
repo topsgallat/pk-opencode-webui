@@ -476,3 +476,28 @@ describe("providerListCustom", () => {
     expect(model.status).toBe("active")
   })
 })
+
+describe("providerListCustom", () => {
+  test("normalizes v2 array variants to the v1 keyed map", async () => {
+    const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } })
+    const res = await providerListCustom({
+      send: async (path: string) => {
+        if (path === "/api/provider") return jsonResponse({ data: [{ id: "opencode-go", name: "Go" }] })
+        if (path === "/api/model") return jsonResponse({ data: [{
+          providerID: "opencode-go", modelID: "deepseek-v4.1-flash", name: "DeepSeek",
+          variants: [
+            { id: "none", settings: { enableThinking: false } },
+            { id: "low", settings: { enableThinking: true } },
+            { id: "high", settings: { enableThinking: true } },
+          ],
+        }] })
+        return jsonResponse({}, 404)
+      },
+    })
+    const body = await res.json()
+    const variants = body.all[0].models["deepseek-v4.1-flash"].variants
+    expect(Array.isArray(variants)).toBe(false)
+    expect(Object.keys(variants)).toEqual(["none", "low", "high"])
+    expect(variants.high.settings.enableThinking).toBe(true)
+  })
+})

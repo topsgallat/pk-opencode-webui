@@ -243,6 +243,19 @@ function modelEntryFromV2(m: Dict, pid: string, mid: string): Dict {
   }
   const limit = dict2(merged.limit)
   merged.limit = { context: num2(limit.context), input: num2(limit.input), output: num2(limit.output) }
+  // V2 2.0.x lists variants as an array of {id, settings}; the V1 shape (and
+  // the UI's Object.entries over it) expects a map keyed by variant id — an
+  // array leaks numeric indexes as variant names ("Variant unavailable: 2").
+  const rawVariants = merged.variants
+  if (Array.isArray(rawVariants)) {
+    const variants: Dict = {}
+    for (const item of rawVariants) {
+      const entry = dict2(item)
+      const id = str2(entry.id)
+      if (id) variants[id] = entry
+    }
+    merged.variants = variants
+  }
   return merged
 }
 

@@ -214,6 +214,7 @@ export function TerminalProvider(props: ParentProps) {
     setCreating(false)
     setRestoredProjectID(null)
     setHasStoredRecord(false)
+    console.log("[TerminalCtx] restore() RESET — projectID", projectID, "params.id", params.id, new Error().stack?.split("\n").slice(2, 5).join(" <= "))
     setSessions([])
     setActive(null)
     setOpened(false)
@@ -248,6 +249,7 @@ export function TerminalProvider(props: ParentProps) {
       const nextActive = ui?.active && nextTabs.some((tab) => tab.id === ui.active)
         ? ui.active
         : nextTabs[0]?.id ?? null
+      console.log("[TerminalCtx] restore: storedTabs", storedTabs.length, "live", live.length, "nextTabs", nextTabs.length, "opened", ui?.opened ?? false, "active", nextActive)
 
       setActive(nextActive)
       setOpened(ui?.opened ?? false)
@@ -343,7 +345,8 @@ export function TerminalProvider(props: ParentProps) {
           id: res.data.id,
           title: res.data.title || title,
         }
-        setSessions((prev) => [...prev, session])
+        setSessions((prev) => { console.log("[TerminalCtx] create: appending", session.id, "prev", prev.length); return [...prev, session] })
+        console.log("[TerminalCtx] create: setActive+opened", session.id)
         setActive(session.id)
         setOpened(true)
         setRestoredProjectID(projectID)

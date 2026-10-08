@@ -786,8 +786,34 @@ const ROUTES: RouteDef[] = [
   {
     method: "DELETE",
     pattern: /^\/auth\/(.+)$/,
-    to: ({ params }) => ({ url: `/api/credential/${params[0]}`, init: { method: "DELETE" } }),
-    from: () => true,
+    // V2 credentials have generated ids (cred_...) keyed by integrationID —
+    // deleting /api/credential/<providerName> hits nothing, so disconnects
+    // silently no-op. Find every credential belonging to this provider
+    // (exact or account-scoped integrationID) and remove each.
+    custom: async ({ params, send }) => {
+      const providerID = params[0]
+      const base = providerID.split(":")[0]
+      const listRes = await send("/api/credential").catch(() => undefined)
+      const payload = listRes?.ok ? await jsonOf(listRes) : null
+      const creds = (unwrapData(payload) as Dict[]) ?? []
+      const matches = creds.filter((c) => {
+        const integrationID = str2(dict2(c).integrationID)
+        const id = str2(dict2(c).id)
+        return (
+          id === providerID ||
+          integrationID === providerID ||
+          integrationID === base ||
+          integrationID.startsWith(`${providerID}:`) ||
+          integrationID.startsWith(`${base}:`)
+        )
+      })
+      for (const cred of matches) {
+        const id = str2(dict2(cred).id)
+        if (!id) continue
+        await send(`/api/credential/${id}`, { method: "DELETE" }).catch(() => undefined)
+      }
+      return jsonResponse(true)
+    },
   },
   {
     method: "GET",

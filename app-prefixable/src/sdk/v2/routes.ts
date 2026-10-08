@@ -169,6 +169,10 @@ type RouteToResult = {
   url: string
   init: RequestInit
   pre?: { url: string; init: RequestInit }
+  // v2.0.22 PTY routes 500 when x-opencode-directory is present; routes
+  // flagged with this move the directory into the query and drop the header
+  // from the outgoing request.
+  stripDirectoryHeader?: boolean
 }
 
 export type Send = (url: string, init?: RequestInit) => Promise<Response>
@@ -176,7 +180,7 @@ export type Send = (url: string, init?: RequestInit) => Promise<Response>
 type RouteDef = {
   method: string
   pattern: RegExp
-  to?: (args: { params: string[]; url: URL; body: unknown }) => RouteToResult
+  to?: (args: { params: string[]; url: URL; body: unknown; headers?: Headers }) => RouteToResult
   from?: (payload: unknown, input: { url: URL }) => unknown
   respond?: (input: { url: URL; body: unknown }) => { status: number; payload: unknown }
   custom?: (args: { params: string[]; url: URL; body: unknown; send: Send; directory: string }) => Promise<Response>
@@ -665,21 +669,60 @@ const ROUTES: RouteDef[] = [
     from: unwrapData,
   },
   {
+    // v2.0.22 PTY routes 500 whenever x-opencode-directory is sent — move the
+    // directory into the query (which they accept) and strip the header.
     method: "GET",
     pattern: /^\/pty$/,
-    to: ({ url }) => ({ url: api("/pty", url.search), init: { method: "GET" } }),
+    to: ({ url, headers }) => {
+      const search = new URLSearchParams(url.search)
+      const directory = headers?.get("x-opencode-directory") ?? search.get("directory")
+      if (directory) search.set("directory", directory)
+      return { url: `/api/pty?${search.toString()}`, init: { method: "GET" }, stripDirectoryHeader: true }
+    },
     from: unwrapData,
   },
   {
     method: "POST",
     pattern: /^\/pty$/,
-    to: ({ url, body }) => ({ url: api("/pty", url.search), init: jsonInit("POST", "", body ?? {}) }),
+    to: ({ url, body, headers }) => {
+      const search = new URLSearchParams(url.search)
+      const directory = headers?.get("x-opencode-directory") ?? search.get("directory")
+      if (directory) search.set("directory", directory)
+      return {
+        url: `/api/pty?${search.toString()}`,
+        init: jsonInit("POST", "", body ?? {}),
+        stripDirectoryHeader: true,
+      }
+    },
     from: unwrapData,
+  },
+  {
+    method: "PUT",
+    pattern: /^\/pty\/([^/]+)$/,
+    to: ({ url, params, body, headers }) => {
+      const search = new URLSearchParams(url.search)
+      const directory = headers?.get("x-opencode-directory") ?? search.get("directory")
+      if (directory) search.set("directory", directory)
+      return {
+        url: `/api/pty/${params[0]}?${search.toString()}`,
+        init: jsonInit("PUT", "", body ?? {}),
+        stripDirectoryHeader: true,
+      }
+    },
   },
   {
     method: "DELETE",
     pattern: /^\/pty\/([^/]+)$/,
-    to: ({ params }) => ({ url: api(`/pty/${params[0]}`, ""), init: { method: "DELETE" } }),
+    to: ({ url, params, headers }) => {
+      const search = new URLSearchParams(url.search)
+      const directory = headers?.get("x-opencode-directory") ?? search.get("directory")
+      if (directory) search.set("directory", directory)
+      return {
+        url: `/api/pty/${params[0]}?${search.toString()}`,
+        init: { method: "DELETE" },
+        stripDirectoryHeader: true,
+      }
+    },
   },
   {
     method: "GET",
@@ -818,6 +861,7 @@ export type V2RequestResult =
       pre?: { url: string; init: RequestInit }
       from?: RouteDef["from"]
       input: { url: URL }
+      stripDirectoryHeader?: boolean
     }
 
 export async function planV2Request(request: Request): Promise<V2RequestResult> {
@@ -838,7 +882,7 @@ export async function planV2Request(request: Request): Promise<V2RequestResult> 
     return { kind: "custom", run: (send) => def.custom!({ params, url, body, send, directory }) }
   }
   if (!match.def.to) return { kind: "passthrough" }
-  const target = match.def.to({ params: match.params, url, body })
+  const target = match.def.to({ params: match.params, url, body, headers: request.headers })
   return {
     kind: "rewrite",
     url: target.url,
@@ -846,6 +890,7 @@ export async function planV2Request(request: Request): Promise<V2RequestResult> 
     pre: target.pre,
     from: match.def.from,
     input: { url },
+    stripDirectoryHeader: target.stripDirectoryHeader,
   }
 }
 

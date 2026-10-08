@@ -30,7 +30,7 @@ export function createOpencodeClient(config?: Config & {
       let response: Response
       try {
         const plan = dialect === "v2" ? await planV2Request(next) : ({ kind: "passthrough" as const })
-        const buildUpstream = (url: string, reqInit: RequestInit = {}) => {
+        const buildUpstream = (url: string, reqInit: RequestInit = {}, stripDirectoryHeader = false) => {
           const mergedHeaders: Record<string, string> = {}
           next.headers.forEach((value, key) => {
             mergedHeaders[key.toLowerCase()] = value
@@ -38,6 +38,7 @@ export function createOpencodeClient(config?: Config & {
           for (const [key, value] of Object.entries((reqInit.headers ?? {}) as Record<string, string>)) {
             mergedHeaders[key.toLowerCase()] = value
           }
+          if (stripDirectoryHeader) delete mergedHeaders["x-opencode-directory"]
           const upstream = new Request(new URL(url, next.url), { ...reqInit, headers: mergedHeaders }) as Request & { timeout?: boolean }
           upstream.timeout = false
           return upstream
@@ -57,7 +58,7 @@ export function createOpencodeClient(config?: Config & {
               console.error("[sdk] v2 pre-request failed:", plan.pre.url, e)
             }
           }
-          response = await applyV2Response(plan, await fetch(buildUpstream(plan.url, plan.init)))
+          response = await applyV2Response(plan, await fetch(buildUpstream(plan.url, plan.init, plan.stripDirectoryHeader)))
         } else {
           response = await fetch(next)
         }

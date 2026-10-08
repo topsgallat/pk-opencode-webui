@@ -26,9 +26,16 @@ export async function dialectAwareFetch(
     for (const [key, value] of Object.entries((reqInit.headers ?? {}) as Record<string, string>)) {
       mergedHeaders[key.toLowerCase()] = value
     }
+    if (plan.kind === "rewrite" && plan.stripDirectoryHeader) delete mergedHeaders["x-opencode-directory"]
     return fetch(new Request(new URL(u, request.url), { ...reqInit, headers: mergedHeaders }))
   }
   if (plan.kind === "custom") return plan.run(send)
-  const upstream = new Request(new URL(plan.url, request.url), plan.init)
+  const upstreamInit: RequestInit = { ...plan.init }
+  if (plan.stripDirectoryHeader) {
+    const headers = new Headers(upstreamInit.headers)
+    headers.delete("x-opencode-directory")
+    upstreamInit.headers = headers
+  }
+  const upstream = new Request(new URL(plan.url, request.url), upstreamInit)
   return applyV2Response(plan, await fetch(upstream))
 }

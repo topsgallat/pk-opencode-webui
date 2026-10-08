@@ -4,7 +4,7 @@ import { useSDK } from "./sdk"
 import { useConfig } from "./config"
 import { useServer } from "./server"
 import { getAnthropicModelPricing, getCopilotModelMultipliers, getOpenAIModelPricing, normalizeCopilotModelKey } from "../utils/path"
-import { clearProviderAuth, getProviderAccounts, readErrorMessage, removeProviderAccount, saveProviderAccounts, syncProviderAuth, syncProviderAuthFromBackend, type ProviderAccount } from "../utils/extended-api"
+import { clearProviderAuth, deleteGlobalProvider, getProviderAccounts, readErrorMessage, removeProviderAccount, saveProviderAccounts, syncProviderAuth, syncProviderAuthFromBackend, type ProviderAccount } from "../utils/extended-api"
 import { loadSettings, saveSetting } from "../utils/settings-api"
 import { withTimeout } from "../utils/request-timeout"
 import { modelPolicyEnabled, providerBaseID } from "../utils/model-policy"
@@ -536,6 +536,16 @@ export function ProviderProvider(props: ParentProps) {
     // Remove from OpenCode backend (provider-level or account-level)
     await client.auth.remove({ providerID })
     await clearProviderAuth(serverUrl, providerID, targetUrl)
+
+    // Providers defined in the global config (opencode.json provider block
+    // with inline credentials) stay available after credential removal —
+    // remove their config block too, otherwise "disconnect" never visually
+    // takes effect for them.
+    try {
+      await deleteGlobalProvider(serverUrl, providerID, targetUrl)
+    } catch {
+      // Providers without a config block 404 — nothing to remove
+    }
 
     // Ensure the SDK instance reloads provider state before we refetch the
     // provider list. Connecting calls client.instance.dispose() to force a

@@ -276,7 +276,7 @@ export function MobileLayout(props: ParentProps & {
     async function loadRootSessions() {
         try {
             setLoading(true)
-            const res = await client.session.list({ roots: true })
+            const res = await client.session.list({ roots: true, limit: 1000 })
             if (res.data) {
                 const all = Object.values(res.data) as Session[]
                 setSessions(all)

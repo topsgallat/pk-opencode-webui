@@ -542,7 +542,7 @@ export function ProviderProvider(props: ParentProps) {
     // remove their config block too, otherwise "disconnect" never visually
     // takes effect for them.
     try {
-      await deleteGlobalProvider(serverUrl, providerID, targetUrl)
+      await deleteGlobalProvider(serverUrl, providerID)
     } catch {
       // Providers without a config block 404 — nothing to remove
     }

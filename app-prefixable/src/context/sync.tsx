@@ -717,7 +717,7 @@ export function SyncProvider(props: ParentProps) {
 
     try {
       const [sessionsResult, providersResult] = await Promise.allSettled([
-        withTimeout(() => client.session.list(), SYNC_BOOTSTRAP_TIMEOUT_MS, "Loading sessions"),
+        withTimeout(() => client.session.list({ limit: 1000 }), SYNC_BOOTSTRAP_TIMEOUT_MS, "Loading sessions"),
         withTimeout(() => client.provider.list(), SYNC_BOOTSTRAP_TIMEOUT_MS, "Loading providers"),
       ])
 

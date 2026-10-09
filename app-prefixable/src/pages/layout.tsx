@@ -1157,7 +1157,9 @@ export function Layout(props: ParentProps) {
       const showSpinner = sessions().length === 0;
       if (showSpinner) setLoading(true);
       const res = await withTimeout(
-        () => client.session.list({ roots: true }),
+        // v1 backends default the session list to the newest 100 — request enough
+        // to cover the full history (there is no offset pagination).
+        () => client.session.list({ roots: true, limit: 1000 }),
         SESSION_LIST_TIMEOUT_MS,
         "Loading sessions",
       );
@@ -1197,7 +1199,7 @@ export function Layout(props: ParentProps) {
     setSearching(true);
     searchTimer.id = setTimeout(() => {
       searchTimer.id = undefined;
-      client.session.list({ search: trimmed, directory, roots: true })
+      client.session.list({ search: trimmed, directory, roots: true, limit: 1000 })
         .then((res) => {
           // Only update if query hasn't changed while waiting
           if (searchQuery().trim() !== trimmed) return;

@@ -304,29 +304,65 @@ async function jsonOf(res: Response): Promise<unknown> {
 }
 
 export async function providerListCustom({ send }: { send: Send }): Promise<Response> {
-  const [provRes, modelRes, defRes] = await Promise.all([
+  const [provRes, modelRes, defRes, intRes] = await Promise.all([
     send("/api/provider"),
     send("/api/model"),
     send("/api/model/default").catch(() => undefined),
+    send("/api/integration").catch(() => undefined),
   ])
   if (!provRes.ok) return new Response(provRes.body, { status: provRes.status, headers: provRes.headers })
   const providers = (unwrapData(await jsonOf(provRes)) ?? []) as Dict[]
   const models = modelRes.ok ? ((unwrapData(await jsonOf(modelRes)) ?? []) as Dict[]) : []
   const def = defRes?.ok ? ((unwrapData(await jsonOf(defRes)) ?? {}) as Dict) : {}
+  // The full connectable catalog: v2's /api/provider only lists ACTIVE
+  // providers (config-defined or with credentials), while /api/integration
+  // lists every integration — merge both so the Add Provider list is complete.
+  const integrations: Dict[] = intRes?.ok ? ((unwrapData(await jsonOf(intRes)) ?? []) as Dict[]) : []
+  const integrationMap = new Map<string, Dict>()
+  for (const item of integrations) {
+    const id = str2(dict2(item).id)
+    if (id) integrationMap.set(id, dict2(item))
+  }
+  const modelsByProvider = new Map<string, Dict[]>()
+  for (const m of models) {
+    const pid = str2(m.providerID)
+    if (!pid) continue
+    const list = modelsByProvider.get(pid) ?? []
+    list.push(m)
+    modelsByProvider.set(pid, list)
+  }
   const all = providers.map((p) => {
     const pid = str2(p.id)
     const modelMap: Dict = {}
-    for (const m of models) {
-      if (str2(m.providerID) !== pid) continue
+    for (const m of modelsByProvider.get(pid) ?? []) {
       const mid = str2(m.modelID) || str2(m.id)
       modelMap[mid] = modelEntryFromV2(m, pid, mid)
     }
     return { id: pid, name: str2(p.name) || pid, source: "custom", env: [], options: {}, models: modelMap }
   })
-  // V1 /provider marks providers with credentials as "connected"; the V2
-  // model list only contains usable providers, so treat those as connected —
-  // an empty connected list makes the UI hide every model.
-  const connected = [...new Set(models.map((m) => str2(m.providerID)).filter(Boolean))]
+  for (const [iid, integ] of integrationMap) {
+    if (providers.some((p) => str2(p.id) === iid)) continue
+    const modelMap: Dict = {}
+    for (const [pid, list] of modelsByProvider) {
+      if (pid !== iid && !pid.startsWith(`${iid}:`)) continue
+      for (const m of list) {
+        const mid = str2(m.modelID) || str2(m.id)
+        modelMap[mid] = modelEntryFromV2(m, pid, mid)
+      }
+    }
+    all.push({ id: iid, name: str2(integ.name) || iid, source: "custom", env: [], options: {}, models: modelMap })
+  }
+  // "Connected" drives the UI's Connect/Disconnect split: an integration with
+  // registered connections is connected, and so is any provider the backend
+  // currently serves models for (e.g. opencode's built-in free models need
+  // no credential).
+  const connectedSet = new Set<string>()
+  for (const integ of integrations) {
+    const connections = dict2(integ).connections
+    if (Array.isArray(connections) && connections.length > 0) connectedSet.add(str2(dict2(integ).id))
+  }
+  for (const pid of modelsByProvider.keys()) connectedSet.add(pid)
+  const connected = [...connectedSet]
   const body: Dict = { all, connected }
   const defPid = str2(def.providerID)
   if (defPid) body.default = { [defPid]: str2(def.modelID) || str2(def.id) }

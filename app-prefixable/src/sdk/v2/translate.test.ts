@@ -466,12 +466,20 @@ describe("providerListCustom", () => {
         if (path === "/api/provider") return jsonResponse({ data: [{ id: "zai", name: "ZAI" }] })
         if (path === "/api/model") return jsonResponse({ data: [{ providerID: "zai", modelID: "glm", name: "GLM" }] })
         if (path === "/api/model/default") return jsonResponse({ data: { providerID: "zai", modelID: "glm" } })
+        if (path === "/api/integration") return jsonResponse({ data: [
+          { id: "zai", name: "ZAI", connections: [{ type: "credential", id: "cred_1" }] },
+          { id: "groq", name: "Groq", connections: [] },
+        ] })
         return jsonResponse({}, 404)
       },
     })
     const body = await res.json()
+    // connected: zai has a registered connection AND models; groq is a bare
+    // catalog entry (no connection, no models) and must NOT be connected.
     expect(body.connected).toEqual(["zai"])
     expect(body.default).toEqual({ zai: "glm" })
+    const groqEntry = body.all.find((p: { id: string }) => p.id === "groq")
+    expect(groqEntry.models).toEqual({})
     const model = body.all[0].models["glm"]
     expect(model.id).toBe("glm")
     expect(model.providerID).toBe("zai")

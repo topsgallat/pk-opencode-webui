@@ -43,5 +43,8 @@ docker-compose.test.yml
 docker/Dockerfile.test
 .test-home/
 
+# Local deployment compose (environment-specific paths and secrets)
+docker-compose.prod.yml
+
 # Generated agent notes
 .sisyphus/notepads/
